@@ -1,0 +1,133 @@
+# FLICK Playtest Checklist
+
+Use this after each meaningful physics tuning pass.
+
+- Does startup show the main menu without accepting accidental board input?
+- Does the translucent menu panel cover roughly the left third, keep the arena visible, and slope from its narrower top edge to its wider bottom edge at common aspect ratios?
+- Does the main-menu background rotate through 4v4, 3v3, and BOB while `Next Match` remains the player's selected mode?
+- Does each automatic arena change ease through its transition without a visible one-frame rebuild or input interruption?
+- Are 3v3 Knockout, 4v4 Knockout, and BOB the only selectable modes?
+- Do both Knockout cards and result screens consistently say Best of 5 / first to three rounds?
+- Does a Knockout match continue at two round wins and end exactly on the third?
+- Does Knockout rematch reset the series to 0-0 and restart behavior preserve the selected format?
+- Can Player 1 configure every active lineup slot before starting without an unnecessary mirrored editor?
+- Does 4v4 show four selectable pucks in formation and 3v3 show exactly three in a readable triangle?
+- Does clicking a formation puck move the selection ring and update the equipped detail panel?
+- Does hovering each puck class preview its strengths, weaknesses, six ratings, and signed deltas without changing the saved lineup?
+- Does clicking the hovered class equip it only in the selected slot and update the formation puck's size, mark, and accent?
+- Can Player 1 apply Class 1, Class 2, Class 3, or Class 4 in one action, then make an individual change that clearly becomes Custom?
+- Is the active slot visually obvious, and does choosing any of the nine class tiles update that slot directly?
+- Do lineups persist after returning to the menu and relaunching the project?
+- When Lineups is opened from Mode Select, does Back return to Mode Select rather than Home?
+- Does the Item Shop open from Home, show three non-purchasable cosmetic placeholders, and return cleanly with Back or Escape?
+- Do Main Menu, Mode Select, Lineup, Settings, Item Shop, match HUDs, and Pause share the same angular panel language and cyan/orange team accents?
+- Do all nine puck-type cards, the formation, radar, comparison panel, Class 1-4 controls, Back, and Save fit without clipping at 1280x720 and 1920x1080?
+- Does hovering a puck type update both the selected-slot deltas and aggregate radar without moving the surrounding layout?
+- Are Settings toggles, sliders, selectors, Back, and Apply Changes fully readable without text clipping?
+- Is each puck role identifiable by shape, accent, and top mark during play?
+- Does Heavy noticeably win equal-speed momentum exchanges without feeling unusably slow?
+- Does Striker travel faster and farther while remaining easier to displace?
+- Does Grippy stop more precisely without feeling stuck to the board?
+- Does Slider coast farther than Striker while remaining vulnerable near the edge?
+- Does Blocker cover more space without gaining Heavy's collision authority?
+- Is Compact noticeably smaller and useful for threading precise gaps?
+- Does Bouncer produce stronger but still predictable rebounds?
+- Can Toppler pitch and roll more readily because of its taller body and raised center of mass?
+- Does Standard remain a worthwhile dependable choice?
+- Does BOB hide lineup editing and spawn every colored puck as Standard?
+- Does BOB begin with exactly twelve active pucks per player in a non-overlapping mixed rack?
+- Are two dark, team-trimmed Standard strikers present, with only the active player's striker selectable?
+- After a normal shot, does that striker remain where it settled when the turn changes?
+- Is a striker returned to its own baseline only after entering a pocket?
+- Do all four BOB rails contain hard shots while still producing useful bank angles?
+- Does each visible corner pocket score at the same apparent radius?
+- Can a puck travel and settle in the lane behind every pocket?
+- Do BOB pucks coast noticeably farther than Knockout pucks without making turn resolution feel stalled?
+- Does pocketing your own BOB puck reduce your remaining count by one?
+- Does pocketing an opponent BOB puck reduce the opponent's remaining count by one?
+- Does pocketing the striker lose the turn and restore one previously pocketed own puck when available?
+- Does clearing your twelfth own puck immediately win BOB after physics settles?
+- If both colors clear in one shot, is the active shooter awarded the board?
+- Do mixed-size puck formations begin without overlap or immediate movement?
+- Does the first-contact marker select the puck that would actually be touched first?
+- Does the guide remain honest by avoiding rebound or ring-out promises?
+- Does displayed effective speed change appropriately by archetype?
+- Does Player 1 plan first in odd rounds and Player 2 plan first in even rounds?
+- Does the first kickoff release lock its puck, direction, and power without moving any puck?
+- Does the locked puck and launch line remain clear while the opponent aims?
+- Does the second kickoff release launch both committed pucks in the same physics frame?
+- Does each kickoff player gain exactly one shot in the round statistics?
+- After a settled kickoff, does normal play begin with that round's opener?
+- Can simultaneous kickoff ring-outs produce a draw without awarding a series point?
+- Do pause/resume preserve a locked kickoff while restart and Main Menu clear it?
+- Does a round win award exactly one series point?
+- Does a draw award no point and still allow the next round?
+- Does the match end immediately when either player reaches three wins?
+- Do Next Round, Rematch, and Edit Lineups preserve the expected series or loadout state?
+- Do launch sounds distinguish all nine archetypes without becoming distracting?
+- Do collision sounds scale naturally with impact strength and combined mass?
+- Is scrape audio audible while moving but quiet at rest?
+- Does each ring-out, turn change, round result, and match result produce one cue?
+- Do all three audio sliders persist and reach true silence at zero?
+- Do the cyan perimeter, graphite rings, and four inward chevrons remain readable without overpowering puck colors?
+- Do impact shards remain readable without obscuring puck positions?
+- Does Escape reliably pause and resume during a match?
+- Can D-pad left/right and either shoulder cycle only through the active player's selectable pucks?
+- Does holding controller A begin aiming from the focused puck?
+- Does pulling the right stick backward aim in the opposite launch direction, with analog power from weak to full?
+- Does releasing A submit the shot, while B cancels an active aim without firing?
+- Do Start, B, and Y reliably pause/resume, back out, and restart in the appropriate screens?
+- Can every menu be traversed with the D-pad or left stick, confirmed with A, and backed out of with B?
+- Is the focused menu command always visually obvious at 1280x720 and 1920x1080?
+- Do launch, impact, knockout, and pocket rumble scale naturally with event strength without becoming distracting?
+- Do Settings return to the screen they were opened from?
+- Do gameplay preferences persist after relaunching the project?
+- Do display settings apply without breaking menu layout or cursor input?
+- Can I reliably select my own puck?
+- Can I accidentally select opponent pucks?
+- Does aim direction feel intuitive?
+- Can I make very weak shots?
+- Can I make medium shots?
+- Can I make strong shots?
+- Does a medium shot cross a meaningful part of the arena?
+- Are direct hits predictable?
+- Can I deliberately perform bank shots?
+- Do collisions feel satisfying?
+- Do pieces slide too long?
+- Do pieces stop too quickly?
+- Are pieces too bouncy?
+- Can a piece get stuck forever?
+- Does resolution ever soft-lock?
+- Do pucks stay upright enough to read as tabletop pucks?
+- Does a puck resting just over halfway across the edge tip under its own weight?
+- Can a glancing hit leave a puck teetering before it falls?
+- Do full-power rim impacts avoid tunneling through the arena?
+- Do pucks settle flat without excessive pitch-and-roll wobble on the tabletop?
+- Can I knock my own pieces out?
+- Are eliminations detected exactly once?
+- Does the turn always change correctly?
+- Can both players be eliminated for a draw?
+- Does restarting work repeatedly?
+- Is the entire arena readable from the camera?
+- Does hovering make the selectable team obvious without visual clutter?
+- Does the pull tether remain attached to the cursor at different window sizes?
+- Do low, medium, and maximum power read clearly before release?
+- Do impact flashes and bursts match the collision strength?
+- Does camera response make hard hits clearer without making aim or motion hard to read?
+- Does each ring-out produce one callout and one count change?
+- Are the turn banner and top score bar readable for both players?
+- Does the interface still fit at 1280x720 and 1920x1080?
+- Does each Player 1 turn begin from the Player 1 home side and each Player 2 turn from the opposite home side?
+- Before aiming, can Q/E and middle mouse reach all four board sides in 3v3, 4v4, and BOB?
+- On controller, can D-pad up/down reach all four sides without changing the focused puck?
+- Does the four-segment camera indicator highlight the active side with the current player's color?
+- Is puck selection temporarily unavailable during a camera blend and restored as soon as the view settles?
+- Does camera rotation stay disabled during an active mouse or controller drag?
+- From every side, does mouse selection hit the puck under the cursor and does drag-backwards still launch in the expected world direction?
+- From every side, does right-stick aiming remain screen-relative and release in the expected world direction?
+- Do pause/resume preserve the chosen side while turn changes and round restarts restore the active player's home view?
+- Is the game already slightly fun with identical pieces?
+
+Most important question:
+
+> If this game had no upgrades, no progression and no special pieces, would I voluntarily play another round?
