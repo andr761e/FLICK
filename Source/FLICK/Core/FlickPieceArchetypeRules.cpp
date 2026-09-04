@@ -193,6 +193,25 @@ const FFlickPieceArchetypeRules& FlickPieceArchetypeRules::Get(const EFlickPiece
 	}
 }
 
+FLinearColor FlickPieceArchetypeRules::GetVisualAccent(
+	const EFlickPieceArchetype Archetype,
+	const FLinearColor& TeamColor)
+{
+	switch (Archetype)
+	{
+	case EFlickPieceArchetype::Toppler: return FLinearColor(0.72f, 0.32f, 1.0f, 1.0f);
+	case EFlickPieceArchetype::Bouncer: return FLinearColor(1.0f, 0.66f, 0.08f, 1.0f);
+	case EFlickPieceArchetype::Compact: return FLinearColor(0.16f, 0.92f, 1.0f, 1.0f);
+	case EFlickPieceArchetype::Blocker: return FLinearColor(0.74f, 0.91f, 1.0f, 1.0f);
+	case EFlickPieceArchetype::Slider: return FLinearColor(0.04f, 0.9f, 0.94f, 1.0f);
+	case EFlickPieceArchetype::Grippy: return FLinearColor(0.16f, 1.0f, 0.7f, 1.0f);
+	case EFlickPieceArchetype::Striker: return FLinearColor(0.74f, 0.28f, 1.0f, 1.0f);
+	case EFlickPieceArchetype::Heavy: return FLinearColor(1.0f, 0.82f, 0.56f, 1.0f);
+	case EFlickPieceArchetype::Standard:
+	default: return FMath::Lerp(TeamColor, FLinearColor::White, 0.16f);
+	}
+}
+
 FFlickPieceDisplayStats FlickPieceArchetypeRules::GetDisplayStats(const EFlickPieceArchetype Archetype)
 {
 	const FFlickPieceArchetypeRules& Rules = Get(Archetype);

@@ -38,6 +38,15 @@ namespace FlickModeRules
 	FLICK_API const FFlickModeRules& Get(EFlickMatchVariant Variant);
 	FLICK_API int32 GetStartingPiecesPerTeam(EFlickMatchVariant Variant, int32 PlayersPerTeam);
 	FLICK_API float GetArenaRadius(EFlickMatchVariant Variant, int32 PlayersPerTeam);
+	FLICK_API bool IsPieceOutsideCircularTabletop(
+		const FVector& PieceLocation,
+		const FVector& PieceUpVector,
+		float PieceRadius,
+		float PieceThickness,
+		const FVector& ArenaLocation,
+		float ArenaRadius,
+		float ArenaSurfaceZ,
+		float ClearanceTolerance);
 	FLICK_API TArray<FVector2D> BuildMultiplayerFormationPositions(
 		EFlickMatchVariant Variant,
 		int32 PlayersPerTeam,

@@ -28,7 +28,15 @@ enum class EFlickTrainingActivity : uint8
 {
 	None,
 	FreePlay,
-	BotMatch
+	BotMatch,
+	BobBotMatch
+};
+
+enum class EFlickProfileTab : uint8
+{
+	Stats,
+	Leaderboards,
+	MatchHistory
 };
 
 class SFlickGameLayer final : public SCompoundWidget
@@ -46,11 +54,14 @@ public:
 
 private:
 	TSharedRef<SWidget> BuildMainMenu();
+	TSharedRef<SWidget> BuildProfile();
+	TSharedRef<SWidget> BuildProfileStatsPanel();
 	TSharedRef<SWidget> BuildStartupOverlay();
 	TSharedRef<SWidget> BuildSocialPanel();
 	TSharedRef<SWidget> BuildSocialFriendRow(int32 FriendIndex);
 	TSharedRef<SWidget> BuildRecentPlayerRow(int32 RecentIndex);
 	TSharedRef<SWidget> BuildPartyMemberRow(int32 PartySlot);
+	TSharedRef<SWidget> BuildMainMenuPartyMember(int32 PartySlot);
 	TSharedRef<SWidget> BuildItemShop();
 	TSharedRef<SWidget> BuildShopItemCard(const FString& Name, const FString& Type, const FString& Mark, const FLinearColor& Accent);
 	TSharedRef<SWidget> BuildModeSelect();
@@ -146,6 +157,8 @@ private:
 	EVisibility GetEventVisibility(int32 IndexFromNewest) const;
 	FText GetEventText(int32 IndexFromNewest) const;
 	FSlateColor GetEventColor(int32 IndexFromNewest) const;
+	EVisibility GetEventPointsVisibility(int32 IndexFromNewest) const;
+	FText GetEventPointsText(int32 IndexFromNewest) const;
 	FText GetMatchStatusText() const;
 	FSlateColor GetMatchStatusColor() const;
 	FText GetScoreboardPlayerName(EFlickTeam Team, int32 PlayerSlot) const;
@@ -193,6 +206,7 @@ private:
 	FProgressBarStyle ShotClockBarStyle;
 	TSharedPtr<SButton> MainMenuDefaultButton;
 	TSharedPtr<SButton> ItemShopDefaultButton;
+	TSharedPtr<SButton> ProfileDefaultButton;
 	TSharedPtr<SButton> ModeSelectDefaultButton;
 	TSharedPtr<SButton> TrainingActivityDefaultButton;
 	TSharedPtr<SButton> ModeFormatDefaultButton;
@@ -210,12 +224,19 @@ private:
 	bool bHasAppliedInitialFocus = false;
 	bool bSocialPanelOpen = false;
 	bool bShowingRecentPlayers = false;
+	bool bSocialPartyExpanded = true;
+	bool bSocialFriendsExpanded = true;
+	bool bSocialInGameExpanded = true;
+	bool bSocialOnlineExpanded = true;
+	bool bSocialOfflineExpanded = false;
+	bool bSocialRecentExpanded = true;
 	bool bStartupOverlayVisible = false;
 	float StartupOverlayElapsed = 0.0f;
 	float StartupOverlayHoldDuration = 0.0f;
 	float StartupOverlayFadeDuration = 0.35f;
 	EFlickPlayPlaylist SelectedPlayPlaylist = EFlickPlayPlaylist::None;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;
+	EFlickProfileTab SelectedProfileTab = EFlickProfileTab::Stats;
 	int32 Player1SelectedLoadoutSlot = 0;
 	int32 Player2SelectedLoadoutSlot = 0;
 	TOptional<EFlickPieceArchetype> Player1HoveredLoadoutArchetype;

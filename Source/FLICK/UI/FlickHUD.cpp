@@ -20,6 +20,42 @@ namespace
 	constexpr float TopBarHeight = 205.0f;
 	const FLinearColor PanelColor(0.008f, 0.012f, 0.02f, 0.93f);
 	const FLinearColor MutedTextColor(0.62f, 0.68f, 0.72f, 1.0f);
+
+	FString GetDramaticFeedLabel(const AFlickGameState& GameState)
+	{
+		switch (GameState.DramaticEvent)
+		{
+		case EFlickDramaticEvent::Trade:
+			return TEXT("DOUBLE KNOCKOUT  //  TRADE");
+		case EFlickDramaticEvent::DoubleKnockout:
+			return TEXT("DOUBLE KNOCKOUT");
+		case EFlickDramaticEvent::MultiKnockout:
+			return FString::Printf(TEXT("MULTI KNOCKOUT  //  %d PUCKS"), GameState.DramaticEventValue);
+		case EFlickDramaticEvent::SelfKnockout:
+			return TEXT("SELF KNOCKOUT");
+		case EFlickDramaticEvent::LastPuckStanding:
+			return TEXT("LAST PUCK STANDING");
+		case EFlickDramaticEvent::ChainReaction:
+			return FString::Printf(TEXT("CHAIN REACTION  //  %d IMPACTS"), GameState.DramaticEventImpactCount);
+		case EFlickDramaticEvent::None:
+		default:
+			return FString();
+		}
+	}
+
+	FLinearColor GetDramaticFeedColor(const AFlickGameState& GameState)
+	{
+		if (GameState.DramaticEvent == EFlickDramaticEvent::SelfKnockout)
+		{
+			return FLinearColor(1.0f, 0.3f, 0.08f, 1.0f);
+		}
+		if (GameState.DramaticEvent == EFlickDramaticEvent::Trade
+			|| GameState.DramaticEventTeam == EFlickTeam::None)
+		{
+			return FLinearColor(1.0f, 0.76f, 0.16f, 1.0f);
+		}
+		return GetTeamColor(GameState.DramaticEventTeam);
+	}
 }
 
 void AFlickHUD::BeginPlay()
@@ -178,35 +214,105 @@ void AFlickHUD::DrawLockedKickoffPresentation(const AFlickGameMode& GameMode)
 		return;
 	}
 
-	const FLinearColor TeamColor = GetTeamColor(Piece->GetTeam());
-	const FVector2D ScreenDirection = (EndScreen - StartScreen).GetSafeNormal();
-	const FVector2D Side(-ScreenDirection.Y, ScreenDirection.X);
-	constexpr int32 SegmentCount = 12;
-	for (int32 Index = 0; Index < SegmentCount; ++Index)
-	{
-		const float StartAlpha = static_cast<float>(Index) / SegmentCount;
-		const float EndAlpha = FMath::Min(StartAlpha + 0.045f, 1.0f);
-		const FVector2D SegmentStart = FMath::Lerp(StartScreen, EndScreen, StartAlpha);
-		const FVector2D SegmentEnd = FMath::Lerp(StartScreen, EndScreen, EndAlpha);
-		DrawLine(
-			SegmentStart.X,
-			SegmentStart.Y,
-			SegmentEnd.X,
-			SegmentEnd.Y,
-			FLinearColor(TeamColor.R, TeamColor.G, TeamColor.B, 0.72f),
-			3.0f);
-	}
-	const FVector2D ArrowBase = EndScreen - ScreenDirection * 18.0f;
-	DrawLine(EndScreen.X, EndScreen.Y, ArrowBase.X + Side.X * 10.0f, ArrowBase.Y + Side.Y * 10.0f, TeamColor, 3.0f);
-	DrawLine(EndScreen.X, EndScreen.Y, ArrowBase.X - Side.X * 10.0f, ArrowBase.Y - Side.Y * 10.0f, TeamColor, 3.0f);
-	DrawCircle(StartScreen, 18.0f, FMath::Lerp(TeamColor, FLinearColor::White, 0.55f), 28, 3.0f);
+	DrawTechnicalAimArrow(
+		StartScreen,
+		EndScreen,
+		FMath::Lerp(GetTeamColor(Piece->GetTeam()), FLinearColor::White, 0.12f));
 }
 
-void AFlickHUD::PushEventMessage(const FString& Message, const FLinearColor& Color, const float Duration)
+void AFlickHUD::DrawTechnicalAimArrow(
+	const FVector2D& Start,
+	const FVector2D& End,
+	const FLinearColor& Accent)
+{
+	const FVector2D ArrowVector = End - Start;
+	const float ArrowLength = ArrowVector.Size();
+	if (ArrowLength < 18.0f)
+	{
+		return;
+	}
+
+	const FVector2D Direction = ArrowVector / ArrowLength;
+	const FVector2D Side(-Direction.Y, Direction.X);
+	const float TailInset = FMath::Min(25.0f, ArrowLength * 0.16f);
+	const float HeadLength = FMath::Clamp(ArrowLength * 0.14f, 22.0f, 36.0f);
+	const FVector2D RailStart = Start + Direction * TailInset;
+	const FVector2D HeadBase = End - Direction * FMath::Min(HeadLength, ArrowLength * 0.4f);
+	const float RailLength = FVector2D::Distance(RailStart, HeadBase);
+	const FLinearColor BrightAccent = FMath::Lerp(Accent, FLinearColor::White, 0.22f);
+
+	// Thin parallel rails and separated power blocks mirror the angular HUD
+	// borders without covering the arena or the puck underneath the guide.
+	for (const float RailSide : {-1.0f, 1.0f})
+	{
+		const FVector2D RailOffset = Side * 6.0f * RailSide;
+		DrawLine(
+			RailStart.X + RailOffset.X,
+			RailStart.Y + RailOffset.Y,
+			HeadBase.X + RailOffset.X,
+			HeadBase.Y + RailOffset.Y,
+			FLinearColor(Accent.R, Accent.G, Accent.B, 0.24f),
+			1.0f);
+	}
+
+	constexpr int32 SegmentCount = 6;
+	for (int32 SegmentIndex = 0; SegmentIndex < SegmentCount; ++SegmentIndex)
+	{
+		const float SegmentStartAlpha = static_cast<float>(SegmentIndex) / SegmentCount;
+		const float SegmentEndAlpha = FMath::Min(
+			SegmentStartAlpha + 0.72f / SegmentCount,
+			1.0f);
+		const FVector2D SegmentStart = RailStart + Direction * RailLength * SegmentStartAlpha;
+		const FVector2D SegmentEnd = RailStart + Direction * RailLength * SegmentEndAlpha;
+		const float SegmentOpacity = FMath::Lerp(0.52f, 0.96f, SegmentEndAlpha);
+		DrawLine(SegmentStart.X, SegmentStart.Y, SegmentEnd.X, SegmentEnd.Y,
+			FLinearColor(0.0f, 0.006f, 0.012f, 0.9f), 8.0f);
+		DrawLine(SegmentStart.X, SegmentStart.Y, SegmentEnd.X, SegmentEnd.Y,
+			FLinearColor(Accent.R, Accent.G, Accent.B, SegmentOpacity), 3.5f);
+		DrawLine(SegmentStart.X, SegmentStart.Y, SegmentEnd.X, SegmentEnd.Y,
+			FLinearColor(BrightAccent.R, BrightAccent.G, BrightAccent.B, SegmentOpacity * 0.72f), 1.0f);
+	}
+
+	const FVector2D OuterLeft = HeadBase + Side * 17.0f;
+	const FVector2D OuterRight = HeadBase - Side * 17.0f;
+	const FVector2D InnerBase = HeadBase + Direction * 5.0f;
+	const FVector2D InnerLeft = InnerBase + Side * 10.5f;
+	const FVector2D InnerRight = InnerBase - Side * 10.5f;
+	DrawFilledTriangle(End + Direction * 3.0f, OuterLeft, OuterRight, FLinearColor(0.0f, 0.006f, 0.012f, 0.92f));
+	DrawLine(End.X, End.Y, OuterLeft.X, OuterLeft.Y, Accent, 3.0f);
+	DrawLine(End.X, End.Y, OuterRight.X, OuterRight.Y, Accent, 3.0f);
+	DrawLine(OuterLeft.X, OuterLeft.Y, InnerLeft.X, InnerLeft.Y, Accent.CopyWithNewOpacity(0.58f), 1.5f);
+	DrawLine(OuterRight.X, OuterRight.Y, InnerRight.X, InnerRight.Y, Accent.CopyWithNewOpacity(0.58f), 1.5f);
+	DrawLine(End.X, End.Y, InnerLeft.X, InnerLeft.Y, BrightAccent, 1.25f);
+	DrawLine(End.X, End.Y, InnerRight.X, InnerRight.Y, BrightAccent, 1.25f);
+
+	TArray<FVector2D, TInlineAllocator<9>> OriginPoints;
+	for (int32 PointIndex = 0; PointIndex <= 8; ++PointIndex)
+	{
+		const float Angle = PI * 0.125f + 2.0f * PI * static_cast<float>(PointIndex % 8) / 8.0f;
+		OriginPoints.Add(Start + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * 18.0f);
+	}
+	for (int32 PointIndex = 0; PointIndex < 8; ++PointIndex)
+	{
+		const FVector2D& A = OriginPoints[PointIndex];
+		const FVector2D& B = OriginPoints[PointIndex + 1];
+		DrawLine(A.X, A.Y, B.X, B.Y, FLinearColor(0.0f, 0.006f, 0.012f, 0.88f), 5.5f);
+		DrawLine(A.X, A.Y, B.X, B.Y, Accent.CopyWithNewOpacity(0.9f), 2.0f);
+	}
+	DrawLine(Start.X - Side.X * 7.0f, Start.Y - Side.Y * 7.0f,
+		Start.X + Side.X * 7.0f, Start.Y + Side.Y * 7.0f, BrightAccent, 1.5f);
+}
+
+void AFlickHUD::PushEventMessage(
+	const FString& Message,
+	const FLinearColor& Color,
+	const float Duration,
+	const FString& PointsText)
 {
 	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 	FFlickHudEventMessage& Event = EventMessages.AddDefaulted_GetRef();
 	Event.Message = Message;
+	Event.PointsText = PointsText;
 	Event.Color = Color;
 	Event.CreatedAt = Now;
 	Event.ExpiresAt = Now + FMath::Max(Duration, 0.1f);
@@ -222,12 +328,33 @@ void AFlickHUD::ResetPresentation()
 	EventMessages.Reset();
 	bHasObservedState = false;
 	LastObservedTeam = EFlickTeam::None;
+	LastObservedDramaticEventSerial = 0;
 	LastObservedPhase = EFlickMatchPhase::WaitingToStart;
 	StateChangedAt = -100.0f;
 }
 
 void AFlickHUD::ObserveMatchState(const AFlickGameState& GameState, const float Now)
 {
+	if (LastObservedDramaticEventSerial != GameState.DramaticEventSerial)
+	{
+		LastObservedDramaticEventSerial = GameState.DramaticEventSerial;
+		if (GameState.DramaticEvent != EFlickDramaticEvent::None)
+		{
+			FString PointsText;
+			if (GameState.DramaticEventBonusPoints > 0)
+			{
+				PointsText = GameState.DramaticEvent == EFlickDramaticEvent::Trade
+					? FString::Printf(TEXT("+%d EACH"), GameState.DramaticEventBonusPoints)
+					: FString::Printf(TEXT("+%d"), GameState.DramaticEventBonusPoints);
+			}
+			PushEventMessage(
+				GetDramaticFeedLabel(GameState),
+				GetDramaticFeedColor(GameState),
+				GameState.DramaticEventDuration,
+				PointsText);
+		}
+	}
+
 	if (!bHasObservedState
 		|| LastObservedPhase != GameState.MatchPhase
 		|| LastObservedTeam != GameState.CurrentTeam)
@@ -351,59 +478,7 @@ void AFlickHUD::DrawAimPresentation(const AFlickPlayerController& Controller)
 	FVector2D EndScreen;
 	if (Controller.ProjectWorldLocationToScreen(PieceWorld + Aim.Direction * GuideLength, EndScreen))
 	{
-		const FVector2D ScreenVector = EndScreen - PieceScreen;
-		const float ScreenLength = ScreenVector.Size();
-		const FVector2D ScreenDirection = ScreenVector.GetSafeNormal();
-		const FVector2D Side(-ScreenDirection.Y, ScreenDirection.X);
-		if (ScreenLength > 12.0f)
-		{
-			const float TailInset = FMath::Min(26.0f, ScreenLength * 0.16f);
-			const float HeadLength = FMath::Clamp(ScreenLength * 0.16f, 22.0f, 38.0f);
-			const FVector2D ShaftStart = PieceScreen + ScreenDirection * TailInset;
-			const FVector2D ArrowBase = EndScreen - ScreenDirection * FMath::Min(HeadLength, ScreenLength * 0.42f);
-			const auto DrawRibbon = [this, &Side](
-				const FVector2D& Start,
-				const FVector2D& End,
-				const float StartHalfWidth,
-				const float EndHalfWidth,
-				const FLinearColor& Color)
-			{
-				const FVector2D A = Start + Side * StartHalfWidth;
-				const FVector2D B = Start - Side * StartHalfWidth;
-				const FVector2D C = End - Side * EndHalfWidth;
-				const FVector2D D = End + Side * EndHalfWidth;
-				DrawFilledTriangle(A, B, C, Color);
-				DrawFilledTriangle(A, C, D, Color);
-			};
-
-			// Soft glow, dark silhouette, and a bright inset form one clean tapered
-			// arrow that remains readable at every arena angle and resolution.
-			DrawRibbon(ShaftStart, ArrowBase, 12.0f, 8.0f, FLinearColor(GuideColor.R, GuideColor.G, GuideColor.B, 0.16f));
-			DrawRibbon(ShaftStart, ArrowBase, 8.0f, 5.5f, FLinearColor(0.0f, 0.0f, 0.0f, 0.82f));
-			DrawRibbon(ShaftStart, ArrowBase, 5.5f, 3.5f, FLinearColor(GuideColor.R, GuideColor.G, GuideColor.B, 0.9f));
-			DrawLine(ShaftStart.X, ShaftStart.Y, ArrowBase.X, ArrowBase.Y, FMath::Lerp(GuideColor, FLinearColor::White, 0.68f), 1.5f);
-
-			const FVector2D OuterBaseLeft = ArrowBase + Side * 17.0f;
-			const FVector2D OuterBaseRight = ArrowBase - Side * 17.0f;
-			DrawFilledTriangle(EndScreen + ScreenDirection * 3.0f, OuterBaseLeft, OuterBaseRight, FLinearColor(0.0f, 0.0f, 0.0f, 0.86f));
-			const FVector2D InnerBase = ArrowBase + ScreenDirection * 4.0f;
-			DrawFilledTriangle(
-				EndScreen,
-				InnerBase + Side * 12.5f,
-				InnerBase - Side * 12.5f,
-				FLinearColor(GuideColor.R, GuideColor.G, GuideColor.B, 0.98f));
-			DrawLine(
-				EndScreen.X - ScreenDirection.X * 5.0f,
-				EndScreen.Y - ScreenDirection.Y * 5.0f,
-				InnerBase.X,
-				InnerBase.Y,
-				FMath::Lerp(GuideColor, FLinearColor::White, 0.76f),
-				2.0f);
-
-			DrawCircle(PieceScreen, 20.0f, FLinearColor(0.0f, 0.0f, 0.0f, 0.82f), 48, 6.0f);
-			DrawCircle(PieceScreen, 17.0f, GuideColor, 48, 2.8f);
-			DrawCircle(PieceScreen, 9.0f, FMath::Lerp(GuideColor, FLinearColor::White, 0.62f), 40, 1.8f);
-		}
+		DrawTechnicalAimArrow(PieceScreen, EndScreen, GuideColor);
 	}
 
 	if (Controller.HasPredictedContact())
@@ -473,7 +548,7 @@ void AFlickHUD::DrawEventFeed(const float Width, const float Now)
 		const float Duration = FMath::Max(Event.ExpiresAt - Event.CreatedAt, 0.1f);
 		const float Remaining = FMath::Clamp((Event.ExpiresAt - Now) / Duration, 0.0f, 1.0f);
 		const float Fade = FMath::Clamp(Remaining * 3.0f, 0.0f, 1.0f);
-		const float EventWidth = 220.0f;
+		const float EventWidth = 280.0f;
 		const float X = Width - EventWidth - 20.0f;
 		DrawShowcasePanel(
 			X,
@@ -484,6 +559,10 @@ void AFlickHUD::DrawEventFeed(const float Width, const float Now)
 			FLinearColor(Event.Color.R, Event.Color.G, Event.Color.B, Fade),
 			6.0f);
 		DrawText(Event.Message, FLinearColor(Event.Color.R, Event.Color.G, Event.Color.B, Fade), X + 14.0f, Y + 8.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f);
+		if (!Event.PointsText.IsEmpty())
+		{
+			DrawText(Event.PointsText, FLinearColor(0.3f, 1.0f, 0.58f, Fade), X + EventWidth - 66.0f, Y + 8.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f);
+		}
 		Y += 41.0f;
 	}
 }

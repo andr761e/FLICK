@@ -65,6 +65,48 @@ float FlickModeRules::GetArenaRadius(
 		+ (bUseMultiplayerArena ? Rules.MultiplayerArenaRadiusGrowth : 0.0f);
 }
 
+bool FlickModeRules::IsPieceOutsideCircularTabletop(
+	const FVector& PieceLocation,
+	const FVector& PieceUpVector,
+	const float PieceRadius,
+	const float PieceThickness,
+	const FVector& ArenaLocation,
+	const float ArenaRadius,
+	const float ArenaSurfaceZ,
+	const float ClearanceTolerance)
+{
+	const FVector NormalizedPieceUp = PieceUpVector.GetSafeNormal(SMALL_NUMBER, FVector::UpVector);
+	const float SafePieceRadius = FMath::Max(0.0f, PieceRadius);
+	const float HalfThickness = FMath::Max(0.0f, PieceThickness) * 0.5f;
+	const float SafeArenaRadius = FMath::Max(0.0f, ArenaRadius);
+	const float SafeTolerance = FMath::Max(0.0f, ClearanceTolerance);
+	const FVector ArenaToPiece = PieceLocation - ArenaLocation;
+	const FVector2D PlanarOffset(ArenaToPiece.X, ArenaToPiece.Y);
+	const float PlanarDistance = PlanarOffset.Size();
+
+	// A puck is a cylinder, so the amount of it extending back over the table
+	// depends on its tilt. An upright puck uses its radius; a puck lying with its
+	// axis toward the rim uses only half its thickness. This prevents the arena's
+	// vertical collision edge from keeping a tipped puck alive outside the board.
+	bool bOutsideRim = false;
+	if (PlanarDistance > UE_SMALL_NUMBER)
+	{
+		const FVector OutwardDirection(PlanarOffset.X / PlanarDistance, PlanarOffset.Y / PlanarDistance, 0.0f);
+		const float AxisAlignment = FMath::Abs(FVector::DotProduct(NormalizedPieceUp, OutwardDirection));
+		const float RadialExtent = SafePieceRadius
+			* FMath::Sqrt(FMath::Max(0.0f, 1.0f - FMath::Square(AxisAlignment)))
+			+ HalfThickness * AxisAlignment;
+		bOutsideRim = PlanarDistance - RadialExtent > SafeArenaRadius + SafeTolerance;
+	}
+
+	const float VerticalAxisAlignment = FMath::Abs(NormalizedPieceUp.Z);
+	const float VerticalExtent = SafePieceRadius
+		* FMath::Sqrt(FMath::Max(0.0f, 1.0f - FMath::Square(VerticalAxisAlignment)))
+		+ HalfThickness * VerticalAxisAlignment;
+	const bool bBelowTabletop = PieceLocation.Z + VerticalExtent < ArenaSurfaceZ - SafeTolerance;
+	return bOutsideRim || bBelowTabletop;
+}
+
 TArray<FVector2D> FlickModeRules::BuildMultiplayerFormationPositions(
 	const EFlickMatchVariant Variant,
 	const int32 PlayersPerTeam,

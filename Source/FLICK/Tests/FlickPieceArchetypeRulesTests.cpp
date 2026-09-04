@@ -69,6 +69,18 @@ bool FFlickPieceArchetypeRulesTest::RunTest(const FString& Parameters)
 		FlickPieceArchetypeRules::GetDisplayStats(EFlickPieceArchetype::Toppler).Stability
 		< FlickPieceArchetypeRules::GetDisplayStats(EFlickPieceArchetype::Standard).Stability);
 
+	const FLinearColor BlueTeam(0.0f, 0.82f, 1.0f, 1.0f);
+	const FLinearColor OrangeTeam(1.0f, 0.31f, 0.055f, 1.0f);
+	TestTrue(TEXT("Standard visual accent follows its team"),
+		!FlickPieceArchetypeRules::GetVisualAccent(EFlickPieceArchetype::Standard, BlueTeam).Equals(
+			FlickPieceArchetypeRules::GetVisualAccent(EFlickPieceArchetype::Standard, OrangeTeam)));
+	TestTrue(TEXT("Archetype signature color remains stable across teams"),
+		FlickPieceArchetypeRules::GetVisualAccent(EFlickPieceArchetype::Striker, BlueTeam).Equals(
+			FlickPieceArchetypeRules::GetVisualAccent(EFlickPieceArchetype::Striker, OrangeTeam)));
+	TestTrue(TEXT("Striker and Bouncer retain distinct signature colors"),
+		!FlickPieceArchetypeRules::GetVisualAccent(EFlickPieceArchetype::Striker, BlueTeam).Equals(
+			FlickPieceArchetypeRules::GetVisualAccent(EFlickPieceArchetype::Bouncer, BlueTeam)));
+
 	return true;
 }
 

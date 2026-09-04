@@ -67,6 +67,68 @@ bool FFlickModeRulesTest::RunTest(const FString& Parameters)
 			+ FlickModeRules::BuildFormationOffsets(LegacyThreePuck.StartingPiecesPerTeam).Num(),
 		Classic.StartingPiecesPerTeam + LegacyThreePuck.StartingPiecesPerTeam);
 
+	const FVector ArenaLocation = FVector::ZeroVector;
+	const float SurfaceZ = 250.0f;
+	const float ArenaRadius = Classic.ArenaRadius;
+	const float PuckRadius = Classic.PieceRadius;
+	const float PuckThickness = Classic.PieceThickness;
+	const float BoundsTolerance = 2.0f;
+	TestFalse(
+		TEXT("An upright puck may legitimately overhang the arena edge"),
+		FlickModeRules::IsPieceOutsideCircularTabletop(
+			FVector(ArenaRadius + PuckRadius - 1.0f, 0.0f, SurfaceZ + PuckThickness * 0.5f),
+			FVector::UpVector,
+			PuckRadius,
+			PuckThickness,
+			ArenaLocation,
+			ArenaRadius,
+			SurfaceZ,
+			BoundsTolerance));
+	TestTrue(
+		TEXT("An upright puck completely beyond the arena edge is knocked out"),
+		FlickModeRules::IsPieceOutsideCircularTabletop(
+			FVector(ArenaRadius + PuckRadius + BoundsTolerance + 1.0f, 0.0f, SurfaceZ + PuckThickness * 0.5f),
+			FVector::UpVector,
+			PuckRadius,
+			PuckThickness,
+			ArenaLocation,
+			ArenaRadius,
+			SurfaceZ,
+			BoundsTolerance));
+	TestFalse(
+		TEXT("A side-tipped puck touching the tabletop remains in play"),
+		FlickModeRules::IsPieceOutsideCircularTabletop(
+			FVector(ArenaRadius + PuckThickness * 0.5f, 0.0f, SurfaceZ + PuckRadius),
+			FVector::ForwardVector,
+			PuckRadius,
+			PuckThickness,
+			ArenaLocation,
+			ArenaRadius,
+			SurfaceZ,
+			BoundsTolerance));
+	TestTrue(
+		TEXT("A side-tipped puck clear of the tabletop is knocked out"),
+		FlickModeRules::IsPieceOutsideCircularTabletop(
+			FVector(ArenaRadius + PuckThickness * 0.5f + BoundsTolerance + 1.0f, 0.0f, SurfaceZ + PuckRadius),
+			FVector::ForwardVector,
+			PuckRadius,
+			PuckThickness,
+			ArenaLocation,
+			ArenaRadius,
+			SurfaceZ,
+			BoundsTolerance));
+	TestTrue(
+		TEXT("A puck completely below the tabletop is knocked out even near the rim"),
+		FlickModeRules::IsPieceOutsideCircularTabletop(
+			FVector(0.0f, 0.0f, SurfaceZ - PuckThickness * 0.5f - BoundsTolerance - 1.0f),
+			FVector::UpVector,
+			PuckRadius,
+			PuckThickness,
+			ArenaLocation,
+			ArenaRadius,
+			SurfaceZ,
+			BoundsTolerance));
+
 	return true;
 }
 

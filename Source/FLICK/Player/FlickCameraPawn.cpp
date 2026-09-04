@@ -15,26 +15,27 @@ AFlickCameraPawn::AFlickCameraPawn()
 	Camera->bUsePawnControlRotation = false;
 	Camera->PostProcessBlendWeight = 1.0f;
 	Camera->PostProcessSettings.bOverride_VignetteIntensity = true;
-	Camera->PostProcessSettings.VignetteIntensity = 0.56f;
+	Camera->PostProcessSettings.VignetteIntensity = 0.43f;
 	Camera->PostProcessSettings.bOverride_ColorContrast = true;
-	Camera->PostProcessSettings.ColorContrast = FVector4(1.3f, 1.3f, 1.3f, 1.0f);
+	Camera->PostProcessSettings.ColorContrast = FVector4(1.16f, 1.16f, 1.16f, 1.0f);
 	Camera->PostProcessSettings.bOverride_ColorSaturation = true;
 	Camera->PostProcessSettings.ColorSaturation = FVector4(1.02f, 1.02f, 1.02f, 1.0f);
 	Camera->PostProcessSettings.bOverride_ColorGamma = true;
-	Camera->PostProcessSettings.ColorGamma = FVector4(0.93f, 0.95f, 0.98f, 1.0f);
+	Camera->PostProcessSettings.ColorGamma = FVector4(0.96f, 0.975f, 1.0f, 1.0f);
 	Camera->PostProcessSettings.bOverride_BloomIntensity = true;
-	Camera->PostProcessSettings.BloomIntensity = 0.3f;
+	Camera->PostProcessSettings.BloomIntensity = ClassicBloomIntensity;
 	Camera->PostProcessSettings.bOverride_BloomThreshold = true;
-	Camera->PostProcessSettings.BloomThreshold = 1.2f;
+	Camera->PostProcessSettings.BloomThreshold = ClassicBloomThreshold;
 	Camera->PostProcessSettings.bOverride_AutoExposureBias = true;
-	Camera->PostProcessSettings.AutoExposureBias = -0.28f;
+	Camera->PostProcessSettings.AutoExposureBias = ClassicExposureBias;
 	Camera->PostProcessSettings.bOverride_AmbientOcclusionIntensity = true;
-	Camera->PostProcessSettings.AmbientOcclusionIntensity = 1.0f;
+	Camera->PostProcessSettings.AmbientOcclusionIntensity = 1.28f;
 	Camera->PostProcessSettings.bOverride_AmbientOcclusionRadius = true;
 	Camera->PostProcessSettings.AmbientOcclusionRadius = 64.0f;
 	Camera->PostProcessSettings.bOverride_LensFlareIntensity = true;
 	Camera->PostProcessSettings.LensFlareIntensity = 0.0f;
-	Camera->PostProcessSettings.bOverride_FilmGrainIntensity = false;
+	Camera->PostProcessSettings.bOverride_FilmGrainIntensity = true;
+	Camera->PostProcessSettings.FilmGrainIntensity = 0.07f;
 }
 
 void AFlickCameraPawn::BeginPlay()
@@ -125,6 +126,25 @@ void AFlickCameraPawn::SetMenuPresentation(const bool bInMenuPresentation)
 void AFlickCameraPawn::SetBobGameplayFraming(const bool bInBobGameplayFraming)
 {
 	bBobGameplayFraming = bInBobGameplayFraming;
+	ApplyArenaPostProcess();
+}
+
+void AFlickCameraPawn::ApplyArenaPostProcess()
+{
+	if (!Camera)
+	{
+		return;
+	}
+
+	Camera->PostProcessSettings.BloomIntensity = bBobGameplayFraming
+		? BobBloomIntensity
+		: ClassicBloomIntensity;
+	Camera->PostProcessSettings.BloomThreshold = bBobGameplayFraming
+		? BobBloomThreshold
+		: ClassicBloomThreshold;
+	Camera->PostProcessSettings.AutoExposureBias = bBobGameplayFraming
+		? BobExposureBias
+		: ClassicExposureBias;
 }
 
 void AFlickCameraPawn::SetCompactGameplayFraming(const bool bInCompactGameplayFraming)

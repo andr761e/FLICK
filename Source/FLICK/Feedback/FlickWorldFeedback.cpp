@@ -15,7 +15,7 @@ AFlickWorldFeedback::AFlickWorldFeedback()
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> EmissiveMaterial(TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
 	CoreFlash = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CoreFlash"));
 	CoreFlash->SetupAttachment(SceneRoot);
 	CoreFlash->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -26,9 +26,9 @@ AFlickWorldFeedback::AFlickWorldFeedback()
 	{
 		CoreFlash->SetStaticMesh(SphereMesh.Object);
 	}
-	if (BasicMaterial.Succeeded())
+	if (EmissiveMaterial.Succeeded())
 	{
-		CoreFlash->SetMaterial(0, BasicMaterial.Object);
+		CoreFlash->SetMaterial(0, EmissiveMaterial.Object);
 	}
 
 	constexpr int32 ShardCount = 10;
@@ -46,9 +46,9 @@ AFlickWorldFeedback::AFlickWorldFeedback()
 		{
 			Shard->SetStaticMesh(CubeMesh.Object);
 		}
-		if (BasicMaterial.Succeeded())
+		if (EmissiveMaterial.Succeeded())
 		{
-			Shard->SetMaterial(0, BasicMaterial.Object);
+			Shard->SetMaterial(0, EmissiveMaterial.Object);
 		}
 		Shards.Add(Shard);
 	}
@@ -97,8 +97,12 @@ void AFlickWorldFeedback::InitializeFeedback(
 		UMaterialInstanceDynamic* Material = Shard->CreateAndSetMaterialInstanceDynamic(0);
 		if (Material)
 		{
-			Material->SetVectorParameterValue(TEXT("Color"), InColor);
-			Material->SetVectorParameterValue(TEXT("BaseColor"), InColor);
+			const float EmissiveStrength = Kind == EFlickFeedbackKind::Elimination ? 6.0f : 4.2f;
+			Material->SetVectorParameterValue(TEXT("Color"), FLinearColor(
+				InColor.R * EmissiveStrength,
+				InColor.G * EmissiveStrength,
+				InColor.B * EmissiveStrength,
+				InColor.A));
 			ShardMaterials.Add(Material);
 		}
 		Shard->SetVisibility(true);
@@ -106,8 +110,13 @@ void AFlickWorldFeedback::InitializeFeedback(
 	CoreMaterial = CoreFlash->CreateAndSetMaterialInstanceDynamic(0);
 	if (CoreMaterial)
 	{
-		CoreMaterial->SetVectorParameterValue(TEXT("Color"), FMath::Lerp(InColor, FLinearColor::White, 0.58f));
-		CoreMaterial->SetVectorParameterValue(TEXT("BaseColor"), FMath::Lerp(InColor, FLinearColor::White, 0.58f));
+		const FLinearColor CoreColor = FMath::Lerp(InColor, FLinearColor::White, 0.58f);
+		const float CoreStrength = Kind == EFlickFeedbackKind::Elimination ? 8.0f : 5.5f;
+		CoreMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(
+			CoreColor.R * CoreStrength,
+			CoreColor.G * CoreStrength,
+			CoreColor.B * CoreStrength,
+			CoreColor.A));
 	}
 	CoreFlash->SetVisibility(true);
 

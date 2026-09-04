@@ -36,6 +36,39 @@ struct FFlickTrainingPieceSnapshot
 	bool bShowPlayerIdentity = false;
 };
 
+struct FFlickLockedKickoffShot
+{
+	TWeakObjectPtr<AFlickPiece> Piece;
+	FVector Direction = FVector::ZeroVector;
+	float Power = 0.0f;
+	EFlickTeam Team = EFlickTeam::None;
+	int32 PlayerSlot = INDEX_NONE;
+};
+
+USTRUCT(BlueprintType)
+struct FFlickBotDifficultySettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.1", ClampMax = "5.0"))
+	float ThinkDelay = 1.1f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float MinimumPower = 0.48f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float MaximumPower = 0.89f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "15.0"))
+	float AimErrorDegrees = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "0.25"))
+	float PowerVariation = 0.055f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "3.0"))
+	float DecisionNoise = 0.32f;
+};
+
 UCLASS()
 class FLICK_API AFlickGameMode : public AGameModeBase
 {
@@ -74,6 +107,7 @@ public:
 		AFlickPiece* OtherPiece,
 		const FVector& ImpactLocation,
 		float ImpactVelocityChange);
+	void NotifyArenaImpact(AFlickPiece* Piece, const FVector& ImpactLocation, float ImpactVelocityChange);
 
 	EFlickFrontendScreen GetFrontendScreen() const { return FrontendScreen; }
 	EFlickMatchVariant GetSelectedMatchVariant() const { return SelectedMatchVariant; }
@@ -134,6 +168,7 @@ public:
 	}
 	EFlickPieceArchetype GetLoadoutPiece(EFlickTeam Team, int32 SlotIndex) const;
 	EFlickLineupPreset GetLoadoutPreset(EFlickTeam Team) const;
+	EFlickPieceArchetype GetClassLoadoutPiece(EFlickLineupPreset Preset, int32 SlotIndex) const;
 	EFlickLineupPreset GetPlayerClass(EFlickTeam Team, int32 PlayerSlot, bool bUseDraft = false) const;
 	int32 GetClassSelectionPlayersPerTeam() const;
 	bool IsChangingClassForNextRound() const { return bClassSelectionForNextRound; }
@@ -142,6 +177,7 @@ public:
 	bool CanOpenClassChange() const;
 	int32 GetCurrentStartingPiecesPerTeam() const { return CurrentStartingPiecesPerTeam; }
 	EFlickMatchVariant GetLoadoutEditingVariant() const { return LoadoutEditingVariant; }
+	EFlickLineupPreset GetLoadoutEditingPreset() const { return LoadoutEditingPreset; }
 	int32 GetLoadoutEditingPieceCount() const;
 	int32 GetCurrentRoundsToWin() const { return CurrentRoundsToWin; }
 	bool IsBobMode() const { return ActiveMatchVariant == EFlickMatchVariant::Bob; }
@@ -149,6 +185,9 @@ public:
 	bool CanChangeCameraView() const;
 	bool IsAimGuideEnabled() const;
 	bool AreImpactEffectsEnabled() const;
+	bool IsControlOverviewEnabled() const;
+	EFlickBotDifficulty GetBotDifficulty() const;
+	FString GetBotDifficultyLabel() const { return GetBotDifficultyName(GetBotDifficulty()); }
 	float GetCameraShakeIntensity() const;
 	float GetMasterVolume() const;
 	float GetEffectsVolume() const;
@@ -165,8 +204,11 @@ public:
 	void OpenLoadout();
 	void CloseLoadout();
 	void SelectLoadoutEditingVariant(EFlickMatchVariant Variant);
+	void SelectLoadoutEditingPreset(EFlickLineupPreset Preset);
 	void OpenItemShop();
 	void CloseItemShop();
+	void OpenProfile();
+	void CloseProfile();
 	void CycleLoadoutPiece(EFlickTeam Team, int32 SlotIndex, int32 Direction);
 	void SetLoadoutPiece(EFlickTeam Team, int32 SlotIndex, EFlickPieceArchetype Archetype);
 	void ApplyLoadoutPreset(EFlickTeam Team, EFlickLineupPreset Preset);
@@ -221,6 +263,8 @@ public:
 	void QuitGame();
 	void SetAimGuideEnabled(bool bEnabled);
 	void SetImpactEffectsEnabled(bool bEnabled);
+	void SetControlOverviewEnabled(bool bEnabled);
+	void CycleBotDifficulty(int32 Direction);
 	void SetCameraShakeIntensity(float Intensity);
 	void SetMasterVolume(float Volume);
 	void SetEffectsVolume(float Volume);
@@ -246,10 +290,10 @@ public:
 	float GetResolutionElapsed() const { return ResolutionElapsed; }
 	float GetMaximumResolutionDuration() const { return MaximumResolutionDuration; }
 	bool IsResolvingKickoff() const { return bResolvingKickoff; }
-	bool HasLockedKickoffShot() const { return LockedKickoffPiece != nullptr; }
-	const AFlickPiece* GetLockedKickoffPiece() const { return LockedKickoffPiece; }
-	FVector GetLockedKickoffDirection() const { return LockedKickoffDirection; }
-	float GetLockedKickoffPower() const { return LockedKickoffPower; }
+	bool HasLockedKickoffShot() const { return !LockedKickoffShots.IsEmpty(); }
+	const AFlickPiece* GetLockedKickoffPiece() const;
+	FVector GetLockedKickoffDirection() const;
+	float GetLockedKickoffPower() const;
 	int32 CountActivePieces(EFlickTeam Team) const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena")
@@ -263,6 +307,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena")
 	float KillZ = 50.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena", meta = (ClampMin = "0.0", ClampMax = "30.0"))
+	float KnockoutBoundsTolerance = 2.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena", meta = (ClampMin = "0.2", ClampMax = "0.7"))
 	float FormationRadiusFraction = 0.45f;
@@ -321,6 +368,27 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Feedback")
 	float StrongImpactFeedback = 820.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Feedback", meta = (ClampMin = "2", ClampMax = "12"))
+	int32 DramaticChainImpactThreshold = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Feedback", meta = (ClampMin = "0.5", ClampMax = "5.0"))
+	float DramaticEventDuration = 2.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard", meta = (ClampMin = "0"))
+	int32 TradeBonusPoints = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard", meta = (ClampMin = "0"))
+	int32 DoubleKnockoutBonusPoints = 20;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard", meta = (ClampMin = "0"))
+	int32 MultiKnockoutBonusPerPuck = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard", meta = (ClampMin = "0"))
+	int32 LastPuckStandingBonusPoints = 25;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard", meta = (ClampMin = "0"))
+	int32 ChainReactionBonusPoints = 10;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Physics")
 	bool bAllowEdgeTipping = true;
 
@@ -375,8 +443,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training", meta = (ClampMin = "-30.0", ClampMax = "30.0"))
 	float TrainingEditCameraElevation = 12.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.1", ClampMax = "5.0"))
-	float TrainingBotThinkDelay = 1.05f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot")
+	FFlickBotDifficultySettings TrainingBotEasySettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot")
+	FFlickBotDifficultySettings TrainingBotNormalSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot")
+	FFlickBotDifficultySettings TrainingBotHardSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot")
+	FFlickBotDifficultySettings TrainingBotExpertSettings;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Timers", meta = (ClampMin = "3.0", ClampMax = "60.0"))
 	float ShotTimeLimit = 10.0f;
@@ -386,18 +463,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Timers", meta = (ClampMin = "3.0", ClampMax = "60.0"))
 	float RoundAdvanceTimeLimit = 10.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.05", ClampMax = "1.0"))
-	float TrainingBotMinimumPower = 0.52f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.05", ClampMax = "1.0"))
-	float TrainingBotMaximumPower = 0.92f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "12.0"))
-	float TrainingBotAimErrorDegrees = 1.35f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "0.2"))
-	float TrainingBotPowerVariation = 0.025f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Debug")
 	bool bLogPhysicsResolution = true;
@@ -424,6 +489,7 @@ private:
 	void UpdateRoundAdvanceTimer();
 	bool TryExecuteTrainingBotShot();
 	void ResetTrainingBotThinking();
+	const FFlickBotDifficultySettings& GetTrainingBotDifficultySettings() const;
 	void ResetShotClock();
 	void ExpireCurrentShot();
 	void PrepareClassSelection(bool bForNextRound);
@@ -484,8 +550,10 @@ private:
 	void BeginOpeningPhase();
 	bool ExecuteValidatedLaunch(AFlickPiece* Piece, const FVector& Direction, float NormalizedPower);
 	bool LockKickoffShot(AFlickPiece* Piece, const FVector& Direction, float NormalizedPower, bool bAnnounce = true);
-	void ReleaseKickoffPair(AFlickPiece* SecondPiece, const FVector& SecondDirection, float SecondPower);
+	void ReleaseKickoffShots();
 	void ResetKickoffState();
+	void BeginResolutionTracking(EFlickTeam ShootingTeam, bool bSimultaneousShot);
+	void PresentDramaticResolutionEvent();
 	void ApplySelectedMatchConfiguration();
 	void ApplyMatchConfiguration(EFlickMatchVariant Variant, int32 PlayersPerTeam);
 	void UpdateMainMenuPreview(float DeltaSeconds);
@@ -580,13 +648,13 @@ private:
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> Player2BobStriker;
 
-	UPROPERTY()
-	TObjectPtr<AFlickPiece> LockedKickoffPiece;
-
-	FVector LockedKickoffDirection = FVector::ZeroVector;
-	float LockedKickoffPower = 0.0f;
-	EFlickTeam LockedKickoffTeam = EFlickTeam::None;
+	TArray<FFlickLockedKickoffShot> LockedKickoffShots;
 	bool bResolvingKickoff = false;
+	int32 ResolutionPlayer1Eliminated = 0;
+	int32 ResolutionPlayer2Eliminated = 0;
+	int32 ResolutionImpactCount = 0;
+	EFlickTeam ResolutionShootingTeam = EFlickTeam::None;
+	bool bResolutionWasSimultaneous = false;
 
 	EFlickFrontendScreen FrontendScreen = EFlickFrontendScreen::MainMenu;
 	EFlickFrontendScreen SettingsReturnScreen = EFlickFrontendScreen::MainMenu;
@@ -595,6 +663,7 @@ private:
 	EFlickMatchVariant SelectedMatchVariant = EFlickMatchVariant::Classic;
 	EFlickMatchVariant ActiveMatchVariant = EFlickMatchVariant::Classic;
 	EFlickMatchVariant LoadoutEditingVariant = EFlickMatchVariant::Classic;
+	EFlickLineupPreset LoadoutEditingPreset = EFlickLineupPreset::Balanced;
 	EFlickMatchVariant MenuPreviewVariant = EFlickMatchVariant::Classic;
 	EFlickMatchVariant PendingMenuPreviewVariant = EFlickMatchVariant::Classic;
 	int32 MenuPreviewPlayersPerTeam = 1;

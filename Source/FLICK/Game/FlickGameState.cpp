@@ -28,6 +28,16 @@ void AFlickGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AFlickGameState, Player2ActivePieces);
 	DOREPLIFETIME(AFlickGameState, StartingPiecesPerTeam);
 	DOREPLIFETIME(AFlickGameState, TurnNumber);
+	DOREPLIFETIME(AFlickGameState, KickoffShotsLocked);
+	DOREPLIFETIME(AFlickGameState, KickoffShotsRequired);
+	DOREPLIFETIME(AFlickGameState, DramaticEvent);
+	DOREPLIFETIME(AFlickGameState, DramaticEventTeam);
+	DOREPLIFETIME(AFlickGameState, DramaticEventValue);
+	DOREPLIFETIME(AFlickGameState, DramaticEventImpactCount);
+	DOREPLIFETIME(AFlickGameState, DramaticEventBonusPoints);
+	DOREPLIFETIME(AFlickGameState, DramaticEventSerial);
+	DOREPLIFETIME(AFlickGameState, DramaticEventDuration);
+	DOREPLIFETIME(AFlickGameState, DramaticEventEndServerTime);
 	DOREPLIFETIME(AFlickGameState, bShotClockActive);
 	DOREPLIFETIME(AFlickGameState, ShotClockDuration);
 	DOREPLIFETIME(AFlickGameState, ShotClockEndServerTime);
@@ -100,6 +110,9 @@ void AFlickGameState::ResetRoundState()
 	Player1ActivePieces = 0;
 	Player2ActivePieces = 0;
 	TurnNumber = 1;
+	KickoffShotsLocked = 0;
+	KickoffShotsRequired = 0;
+	ClearDramaticEvent();
 	bShotClockActive = false;
 	ShotClockEndServerTime = 0.0f;
 	bRoundAdvanceTimerActive = false;
@@ -245,6 +258,51 @@ void AFlickGameState::SetStartingPiecesPerTeam(const int32 InStartingPieces)
 	StartingPiecesPerTeam = FMath::Max(1, InStartingPieces);
 }
 
+void AFlickGameState::SetKickoffProgress(const int32 InLockedShots, const int32 InRequiredShots)
+{
+	KickoffShotsRequired = FMath::Max(0, InRequiredShots);
+	KickoffShotsLocked = FMath::Clamp(InLockedShots, 0, KickoffShotsRequired);
+	ForceNetUpdate();
+}
+
+void AFlickGameState::ShowDramaticEvent(
+	const EFlickDramaticEvent InEvent,
+	const EFlickTeam InHighlightedTeam,
+	const int32 InValue,
+	const int32 InImpactCount,
+	const int32 InBonusPoints,
+	const float InDuration)
+{
+	DramaticEvent = InEvent;
+	DramaticEventTeam = InHighlightedTeam;
+	DramaticEventValue = FMath::Max(0, InValue);
+	DramaticEventImpactCount = FMath::Max(0, InImpactCount);
+	DramaticEventBonusPoints = FMath::Max(0, InBonusPoints);
+	DramaticEventDuration = FMath::Max(0.1f, InDuration);
+	DramaticEventEndServerTime = GetServerWorldTimeSeconds() + DramaticEventDuration;
+	++DramaticEventSerial;
+	ForceNetUpdate();
+}
+
+void AFlickGameState::ClearDramaticEvent()
+{
+	DramaticEvent = EFlickDramaticEvent::None;
+	DramaticEventTeam = EFlickTeam::None;
+	DramaticEventValue = 0;
+	DramaticEventImpactCount = 0;
+	DramaticEventBonusPoints = 0;
+	DramaticEventDuration = 0.0f;
+	DramaticEventEndServerTime = 0.0f;
+	ForceNetUpdate();
+}
+
+float AFlickGameState::GetDramaticEventTimeRemaining() const
+{
+	return DramaticEvent == EFlickDramaticEvent::None
+		? 0.0f
+		: FMath::Max(0.0f, DramaticEventEndServerTime - GetServerWorldTimeSeconds());
+}
+
 void AFlickGameState::BeginShot(const EFlickTeam ShootingTeam, const int32 PieceId, const float NormalizedPower)
 {
 	LastShotTeam = ShootingTeam;
@@ -353,6 +411,35 @@ void AFlickGameState::RecordPlayerKnockout(const EFlickTeam Team, const int32 Pl
 	{
 		++Stats->Knockouts;
 		Stats->Score += FMath::Max(0, ScorePerKnockout);
+		ForceNetUpdate();
+	}
+}
+
+void AFlickGameState::RecordPlayerDoubleKnockout(const EFlickTeam Team, const int32 PlayerSlot)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	if (FFlickPlayerMatchStats* Stats = FindMutablePlayerMatchStats(Team, PlayerSlot))
+	{
+		++Stats->DoubleKnockouts;
+		ForceNetUpdate();
+	}
+}
+
+void AFlickGameState::RecordPlayerBonus(
+	const EFlickTeam Team,
+	const int32 PlayerSlot,
+	const int32 BonusPoints)
+{
+	if (!HasAuthority() || BonusPoints <= 0)
+	{
+		return;
+	}
+	if (FFlickPlayerMatchStats* Stats = FindMutablePlayerMatchStats(Team, PlayerSlot))
+	{
+		Stats->Score += BonusPoints;
 		ForceNetUpdate();
 	}
 }

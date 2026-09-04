@@ -65,6 +65,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera")
 	float MenuFieldOfView = 47.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float ClassicBloomIntensity = 0.28f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "10.0"))
+	float ClassicBloomThreshold = 1.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "-3.0", ClampMax = "3.0"))
+	float ClassicExposureBias = -0.58f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float BobBloomIntensity = 0.62f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "10.0"))
+	float BobBloomThreshold = 0.72f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "-3.0", ClampMax = "3.0"))
+	float BobExposureBias = -0.2f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera")
 	float PresentationBlendSpeed = 3.8f;
 
@@ -93,6 +111,7 @@ public:
 	float ShakeDecayPerSecond = 2.8f;
 
 private:
+	void ApplyArenaPostProcess();
 	FVector GetGameplayTargetLocation() const;
 	FRotator GetGameplayTargetRotation() const;
 

@@ -111,6 +111,7 @@ private:
 	void CycleGamepadPiece(int32 Direction);
 	void SetGamepadFocusedPiece(AFlickPiece* Piece);
 	void ClearGamepadFocus();
+	void UpdateCareerStatsTracking(const AFlickGameState* FlickGameState);
 #if !UE_BUILD_SHIPPING
 	void BeginGamepadSmokeTest();
 	void CompleteGamepadSmokeTest();
@@ -264,6 +265,7 @@ private:
 	bool bNetworkAutoReadySubmitted = false;
 	bool bNetworkAutoStartSubmitted = false;
 	bool bNetworkAutoClassSubmitted = false;
+	bool bCareerStatsRecordedForCurrentSeries = false;
 	float NetworkGameplayElapsed = 0.0f;
 #if !UE_BUILD_SHIPPING
 	bool bUseGamepadAimOverride = false;

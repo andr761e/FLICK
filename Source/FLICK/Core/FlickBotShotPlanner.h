@@ -18,6 +18,7 @@ struct FFlickBotShotTuning
 	float MaximumPower = 0.92f;
 	float AimErrorDegrees = 1.35f;
 	float PowerVariation = 0.025f;
+	float DecisionNoise = 0.015f;
 };
 
 struct FFlickBotShotPlan
@@ -41,6 +42,14 @@ namespace FlickBotShotPlanner
 	FLICK_API FFlickBotShotPlan PlanShot(
 		const TArray<FFlickBotPieceState>& Pieces,
 		EFlickTeam BotTeam,
+		const FFlickBotShotTuning& Tuning,
+		FRandomStream& RandomStream);
+
+	FLICK_API FFlickBotShotPlan PlanBobShot(
+		const TArray<FFlickBotPieceState>& Pieces,
+		EFlickTeam BotTeam,
+		int32 StrikerPieceId,
+		const TArray<FVector2D>& PocketPositions,
 		const FFlickBotShotTuning& Tuning,
 		FRandomStream& RandomStream);
 }

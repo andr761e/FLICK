@@ -22,12 +22,42 @@ enum class EFlickMatchPhase : uint8
 };
 
 UENUM(BlueprintType)
+enum class EFlickBotDifficulty : uint8
+{
+	Easy UMETA(DisplayName = "Easy"),
+	Normal UMETA(DisplayName = "Normal"),
+	Hard UMETA(DisplayName = "Hard"),
+	Expert UMETA(DisplayName = "Expert")
+};
+
+UENUM(BlueprintType)
 enum class EFlickMatchOutcome : uint8
 {
 	Continue UMETA(DisplayName = "Continue"),
 	Player1Wins UMETA(DisplayName = "Player 1 Wins"),
 	Player2Wins UMETA(DisplayName = "Player 2 Wins"),
 	Draw UMETA(DisplayName = "Draw")
+};
+
+UENUM(BlueprintType)
+enum class EFlickDramaticEvent : uint8
+{
+	None UMETA(DisplayName = "None"),
+	DoubleKnockout UMETA(DisplayName = "Double Knockout"),
+	Trade UMETA(DisplayName = "Trade"),
+	MultiKnockout UMETA(DisplayName = "Multi Knockout"),
+	SelfKnockout UMETA(DisplayName = "Self Knockout"),
+	LastPuckStanding UMETA(DisplayName = "Last Puck Standing"),
+	ChainReaction UMETA(DisplayName = "Chain Reaction")
+};
+
+struct FFlickDramaticEventResult
+{
+	EFlickDramaticEvent Event = EFlickDramaticEvent::None;
+	EFlickTeam HighlightedTeam = EFlickTeam::None;
+	int32 Value = 0;
+
+	bool IsValid() const { return Event != EFlickDramaticEvent::None; }
 };
 
 UENUM(BlueprintType)
@@ -54,6 +84,7 @@ enum class EFlickFrontendScreen : uint8
 	Playing UMETA(DisplayName = "Playing"),
 	Paused UMETA(DisplayName = "Paused"),
 	Settings UMETA(DisplayName = "Settings"),
+	Profile UMETA(DisplayName = "Profile"),
 	ItemShop UMETA(DisplayName = "Item Shop"),
 	ClassSelect UMETA(DisplayName = "Class Select"),
 	PrivateMatch UMETA(DisplayName = "Private Match")
@@ -187,6 +218,22 @@ inline FString GetTeamDisplayName(const EFlickTeam Team)
 		return TEXT("Player 2");
 	default:
 		return TEXT("None");
+	}
+}
+
+inline FString GetBotDifficultyName(const EFlickBotDifficulty Difficulty)
+{
+	switch (Difficulty)
+	{
+	case EFlickBotDifficulty::Easy:
+		return TEXT("EASY");
+	case EFlickBotDifficulty::Hard:
+		return TEXT("HARD");
+	case EFlickBotDifficulty::Expert:
+		return TEXT("EXPERT");
+	case EFlickBotDifficulty::Normal:
+	default:
+		return TEXT("NORMAL");
 	}
 }
 
@@ -371,4 +418,67 @@ inline EFlickMatchOutcome EvaluateMatchOutcome(const int32 Player1Pieces, const 
 	}
 
 	return EFlickMatchOutcome::Continue;
+}
+
+inline FFlickDramaticEventResult EvaluateDramaticEvent(
+	const int32 Player1Eliminated,
+	const int32 Player2Eliminated,
+	const int32 Player1Remaining,
+	const int32 Player2Remaining,
+	const int32 ImpactCount,
+	const int32 ChainImpactThreshold,
+	const EFlickTeam ShootingTeam,
+	const bool bSimultaneousShot)
+{
+	const int32 SafePlayer1Eliminated = FMath::Max(0, Player1Eliminated);
+	const int32 SafePlayer2Eliminated = FMath::Max(0, Player2Eliminated);
+	const int32 TotalEliminated = SafePlayer1Eliminated + SafePlayer2Eliminated;
+	if (TotalEliminated >= 3)
+	{
+		const EFlickTeam HighlightedTeam = SafePlayer1Eliminated > SafePlayer2Eliminated
+			? EFlickTeam::Player2
+			: SafePlayer2Eliminated > SafePlayer1Eliminated
+				? EFlickTeam::Player1
+				: EFlickTeam::None;
+		return {EFlickDramaticEvent::MultiKnockout, HighlightedTeam, TotalEliminated};
+	}
+	if (TotalEliminated == 2 && SafePlayer1Eliminated > 0 && SafePlayer2Eliminated > 0)
+	{
+		return {EFlickDramaticEvent::Trade, EFlickTeam::None, TotalEliminated};
+	}
+	if (TotalEliminated == 2)
+	{
+		return {
+			EFlickDramaticEvent::DoubleKnockout,
+			SafePlayer1Eliminated == 2 ? EFlickTeam::Player2 : EFlickTeam::Player1,
+			TotalEliminated};
+	}
+
+	const EFlickMatchOutcome Outcome = EvaluateMatchOutcome(Player1Remaining, Player2Remaining);
+	if (TotalEliminated > 0 && Outcome == EFlickMatchOutcome::Player1Wins && Player1Remaining == 1)
+	{
+		return {EFlickDramaticEvent::LastPuckStanding, EFlickTeam::Player1, 1};
+	}
+	if (TotalEliminated > 0 && Outcome == EFlickMatchOutcome::Player2Wins && Player2Remaining == 1)
+	{
+		return {EFlickDramaticEvent::LastPuckStanding, EFlickTeam::Player2, 1};
+	}
+
+	if (!bSimultaneousShot && TotalEliminated > 0 && ShootingTeam != EFlickTeam::None)
+	{
+		const int32 OwnEliminations = ShootingTeam == EFlickTeam::Player1
+			? SafePlayer1Eliminated : SafePlayer2Eliminated;
+		const int32 OpponentEliminations = ShootingTeam == EFlickTeam::Player1
+			? SafePlayer2Eliminated : SafePlayer1Eliminated;
+		if (OwnEliminations > 0 && OpponentEliminations == 0)
+		{
+			return {EFlickDramaticEvent::SelfKnockout, ShootingTeam, OwnEliminations};
+		}
+	}
+
+	if (ImpactCount >= FMath::Max(2, ChainImpactThreshold))
+	{
+		return {EFlickDramaticEvent::ChainReaction, ShootingTeam, FMath::Max(0, ImpactCount)};
+	}
+	return {};
 }

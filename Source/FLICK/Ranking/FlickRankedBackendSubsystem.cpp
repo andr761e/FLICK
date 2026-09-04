@@ -29,7 +29,7 @@ namespace
 		return Value.Left(MaximumLength);
 	}
 
-	int32 ReadJsonInt(const TSharedPtr<FJsonObject>& Json, const TCHAR* Field, const int32 DefaultValue)
+	int32 ReadRankedJsonInt(const TSharedPtr<FJsonObject>& Json, const TCHAR* Field, const int32 DefaultValue)
 	{
 		double Value = DefaultValue;
 		return Json.IsValid() && Json->TryGetNumberField(Field, Value)
@@ -424,11 +424,11 @@ bool UFlickRankedBackendSubsystem::ParseProgress(
 	const TSharedPtr<FJsonObject> Source = Json->TryGetObjectField(TEXT("progress"), ProgressJson) && ProgressJson
 		? *ProgressJson
 		: Json;
-	OutProgress.Rating = FMath::Clamp(ReadJsonInt(Source, TEXT("rating"), FlickRankRules::DefaultRating), 0, 3000);
-	OutProgress.MatchesPlayed = FMath::Max(0, ReadJsonInt(Source, TEXT("matches_played"), 0));
-	OutProgress.Wins = FMath::Max(0, ReadJsonInt(Source, TEXT("wins"), 0));
-	OutProgress.Losses = FMath::Max(0, ReadJsonInt(Source, TEXT("losses"), 0));
-	OutProgress.Draws = FMath::Max(0, ReadJsonInt(Source, TEXT("draws"), 0));
+	OutProgress.Rating = FMath::Clamp(ReadRankedJsonInt(Source, TEXT("rating"), FlickRankRules::DefaultRating), 0, 3000);
+	OutProgress.MatchesPlayed = FMath::Max(0, ReadRankedJsonInt(Source, TEXT("matches_played"), 0));
+	OutProgress.Wins = FMath::Max(0, ReadRankedJsonInt(Source, TEXT("wins"), 0));
+	OutProgress.Losses = FMath::Max(0, ReadRankedJsonInt(Source, TEXT("losses"), 0));
+	OutProgress.Draws = FMath::Max(0, ReadRankedJsonInt(Source, TEXT("draws"), 0));
 	return true;
 }
 
@@ -463,20 +463,20 @@ bool UFlickRankedBackendSubsystem::ParseSettlement(
 		PlayerUpdate.RatingUpdate.MatchId = Request.Match.MatchId;
 		PlayerUpdate.RatingUpdate.Variant = Request.Match.Variant;
 		PlayerUpdate.RatingUpdate.PlayersPerTeam = Request.Match.PlayersPerTeam;
-		PlayerUpdate.RatingUpdate.OldRating = ReadJsonInt(UpdateJson, TEXT("old_rating"), 1000);
-		PlayerUpdate.RatingUpdate.NewRating = ReadJsonInt(UpdateJson, TEXT("new_rating"), 1000);
+		PlayerUpdate.RatingUpdate.OldRating = ReadRankedJsonInt(UpdateJson, TEXT("old_rating"), 1000);
+		PlayerUpdate.RatingUpdate.NewRating = ReadRankedJsonInt(UpdateJson, TEXT("new_rating"), 1000);
 		PlayerUpdate.RatingUpdate.RatingDelta = PlayerUpdate.RatingUpdate.NewRating - PlayerUpdate.RatingUpdate.OldRating;
-		PlayerUpdate.RatingUpdate.MatchesPlayed = ReadJsonInt(UpdateJson, TEXT("matches_played"), 0);
+		PlayerUpdate.RatingUpdate.MatchesPlayed = ReadRankedJsonInt(UpdateJson, TEXT("matches_played"), 0);
 		PlayerUpdate.RatingUpdate.OldTier = static_cast<EFlickRankTier>(FMath::Clamp(
-			ReadJsonInt(UpdateJson, TEXT("old_tier"), 0),
+			ReadRankedJsonInt(UpdateJson, TEXT("old_tier"), 0),
 			static_cast<int32>(EFlickRankTier::Unranked),
 			static_cast<int32>(EFlickRankTier::GrandChampion)));
 		PlayerUpdate.RatingUpdate.NewTier = static_cast<EFlickRankTier>(FMath::Clamp(
-			ReadJsonInt(UpdateJson, TEXT("new_tier"), 0),
+			ReadRankedJsonInt(UpdateJson, TEXT("new_tier"), 0),
 			static_cast<int32>(EFlickRankTier::Unranked),
 			static_cast<int32>(EFlickRankTier::GrandChampion)));
-		PlayerUpdate.RatingUpdate.OldDivision = FMath::Clamp(ReadJsonInt(UpdateJson, TEXT("old_division"), 0), 0, 4);
-		PlayerUpdate.RatingUpdate.NewDivision = FMath::Clamp(ReadJsonInt(UpdateJson, TEXT("new_division"), 0), 0, 4);
+		PlayerUpdate.RatingUpdate.OldDivision = FMath::Clamp(ReadRankedJsonInt(UpdateJson, TEXT("old_division"), 0), 0, 4);
+		PlayerUpdate.RatingUpdate.NewDivision = FMath::Clamp(ReadRankedJsonInt(UpdateJson, TEXT("new_division"), 0), 0, 4);
 		PlayerUpdate.RatingUpdate.bForfeit = Request.bForfeit;
 		PlayerUpdate.RatingUpdate.bAccepted = true;
 		if (PlayerUpdate.AccountId.IsEmpty())

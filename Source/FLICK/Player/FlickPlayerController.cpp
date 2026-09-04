@@ -4,6 +4,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/EngineTypes.h"
 #include "EngineUtils.h"
+#include "Game/FlickGameInstance.h"
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameState.h"
 #include "InputCoreTypes.h"
@@ -94,6 +95,7 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
 	const AFlickGameState* NetworkState = GetFlickGameState();
+	UpdateCareerStatsTracking(NetworkState);
 	if (bNetworkAutoReadyRequested && NetworkState && NetworkState->bNetworkLobbyActive)
 	{
 		const AFlickPlayerState* FlickPlayerState = GetPlayerState<AFlickPlayerState>();
@@ -254,6 +256,54 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 		UpdateHoveredPiece();
 		CurrentMouseCursor = HoveredPiece ? EMouseCursor::Hand : EMouseCursor::Default;
 	}
+}
+
+void AFlickPlayerController::UpdateCareerStatsTracking(const AFlickGameState* FlickGameState)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+	if (!FlickGameState || !FlickGameState->bSeriesComplete)
+	{
+		bCareerStatsRecordedForCurrentSeries = false;
+		return;
+	}
+	if (bCareerStatsRecordedForCurrentSeries)
+	{
+		return;
+	}
+
+	const AFlickPlayerState* LocalPlayerState = GetPlayerState<AFlickPlayerState>();
+	if (!LocalPlayerState
+		|| LocalPlayerState->GetTeam() == EFlickTeam::None
+		|| LocalPlayerState->GetTeamPlayerSlot() < 0)
+	{
+		return;
+	}
+
+	const FFlickPlayerMatchStats* MatchStats = FlickGameState->FindPlayerMatchStats(
+		LocalPlayerState->GetTeam(),
+		LocalPlayerState->GetTeamPlayerSlot());
+	UFlickGameInstance* FlickGameInstance = Cast<UFlickGameInstance>(GetGameInstance());
+	if (!MatchStats || !FlickGameInstance)
+	{
+		return;
+	}
+
+	const bool bWon = !FlickGameState->bDraw
+		&& FlickGameState->WinnerTeam == LocalPlayerState->GetTeam();
+	FlickGameInstance->RecordCompletedMatch(
+		MatchStats->Score,
+		MatchStats->Knockouts,
+		MatchStats->DoubleKnockouts,
+		MatchStats->Shots,
+		bWon,
+		FlickGameState->bDraw,
+		FlickGameState->ActiveMatchVariant,
+		FlickGameState->PlayersPerTeam,
+		FlickGameState->bRankedMatch);
+	bCareerStatsRecordedForCurrentSeries = true;
 }
 
 void AFlickPlayerController::ClearAiming()
@@ -530,6 +580,9 @@ void AFlickPlayerController::HandleCancelPressed()
 		break;
 	case EFlickFrontendScreen::ItemShop:
 		FlickGameMode->CloseItemShop();
+		break;
+	case EFlickFrontendScreen::Profile:
+		FlickGameMode->CloseProfile();
 		break;
 	case EFlickFrontendScreen::Settings:
 		FlickGameMode->CloseSettings();
@@ -1397,7 +1450,8 @@ void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 	const AFlickGameState* FlickGameState = GetFlickGameState();
 	if (!FlickGameState
 		|| (FlickGameState->MatchPhase != EFlickMatchPhase::Aiming
-			&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning))
+			&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning
+			&& FlickGameState->MatchPhase != EFlickMatchPhase::ResolvingPhysics))
 	{
 		return;
 	}

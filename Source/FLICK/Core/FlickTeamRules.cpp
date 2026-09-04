@@ -11,6 +11,11 @@ int32 FlickTeamRules::GetPieceOwnerSlot(const int32 PieceIndex, const int32 Play
 	return FMath::Max(0, PieceIndex) % ClampedTeamSize;
 }
 
+int32 FlickTeamRules::GetSimultaneousKickoffShotCount(const int32 PlayersPerTeam)
+{
+	return ClampPlayersPerTeam(PlayersPerTeam) * 2;
+}
+
 int32 FlickTeamRules::AdvancePlayerSlot(const int32 CurrentSlot, const int32 PlayersPerTeam)
 {
 	const int32 ClampedTeamSize = ClampPlayersPerTeam(PlayersPerTeam);

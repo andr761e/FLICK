@@ -10,6 +10,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FFlickTeamRulesOwnershipTest::RunTest(const FString& Parameters)
 {
+	TestEqual(TEXT("Singles kickoff launches two pucks"), FlickTeamRules::GetSimultaneousKickoffShotCount(1), 2);
+	TestEqual(TEXT("Doubles kickoff launches four pucks"), FlickTeamRules::GetSimultaneousKickoffShotCount(2), 4);
+	TestEqual(TEXT("Trios kickoff launches six pucks"), FlickTeamRules::GetSimultaneousKickoffShotCount(3), 6);
 	TestEqual(TEXT("Doubles piece 1"), FlickTeamRules::GetPieceOwnerSlot(0, 2), 0);
 	TestEqual(TEXT("Doubles piece 2"), FlickTeamRules::GetPieceOwnerSlot(1, 2), 1);
 	TestEqual(TEXT("Doubles piece 3"), FlickTeamRules::GetPieceOwnerSlot(2, 2), 0);

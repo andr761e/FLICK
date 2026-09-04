@@ -9,6 +9,7 @@ namespace FlickTeamRules
 
 	FLICK_API int32 ClampPlayersPerTeam(int32 PlayersPerTeam);
 	FLICK_API int32 GetPieceOwnerSlot(int32 PieceIndex, int32 PlayersPerTeam);
+	FLICK_API int32 GetSimultaneousKickoffShotCount(int32 PlayersPerTeam);
 	FLICK_API int32 AdvancePlayerSlot(int32 CurrentSlot, int32 PlayersPerTeam);
 	FLICK_API bool IsActivePlayerSlot(int32 PlayerSlot, int32 CurrentPlayerSlot, int32 PlayersPerTeam);
 }

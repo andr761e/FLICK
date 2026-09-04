@@ -7,14 +7,11 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
-#include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
 {
 	constexpr int32 PocketRimSegmentCount = 32;
-	constexpr int32 BoardCollisionRowCount = 48;
-	constexpr int32 MaxCollisionSegmentsPerRow = 3;
 
 	void SetMaterialColor(UMaterialInstanceDynamic* Material, const FLinearColor& Color)
 	{
@@ -60,18 +57,6 @@ AFlickBobArena::AFlickBobArena()
 	StageBase = CreateMesh(TEXT("StageBase"), CubeMesh.Object);
 	VenueBackWall = CreateMesh(TEXT("VenueBackWall"), CubeMesh.Object);
 
-	BoardCollisionMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("BoardCollisionMesh"));
-	BoardCollisionMesh->SetupAttachment(SceneRoot);
-	BoardCollisionMesh->SetCanEverAffectNavigation(false);
-	BoardCollisionMesh->SetGenerateOverlapEvents(false);
-	BoardCollisionMesh->SetVisibility(false);
-	BoardCollisionMesh->SetHiddenInGame(true);
-	BoardCollisionMesh->bUseAsyncCooking = false;
-	BoardCollisionMesh->bUseComplexAsSimpleCollision = true;
-	BoardCollisionMesh->SetCollisionObjectType(ECC_WorldStatic);
-	BoardCollisionMesh->SetCollisionResponseToAllChannels(ECR_Block);
-	BoardCollisionMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
 		Rails.Add(CreateMesh(*FString::Printf(TEXT("Rail_%d"), Index), CubeMesh.Object));
@@ -111,9 +96,12 @@ AFlickBobArena::AFlickBobArena()
 		FloorGridSegments.Add(CreateMesh(*FString::Printf(TEXT("FloorGrid_%02d"), Index), CubeMesh.Object));
 	}
 
-	// The visible slab cannot provide collision because it would seal the four pockets.
-	// ApplyBoardCollisionShape builds one continuous invisible surface with real openings.
-	BoardBase->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// A single simple box is the authoritative tabletop. Decorative markings and
+	// pocket geometry never participate in collision, so there are no hidden triangle
+	// seams or raised visual strips capable of steering a moving puck.
+	BoardBase->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	BoardBase->SetCollisionObjectType(ECC_WorldStatic);
+	BoardBase->SetCollisionResponseToAllChannels(ECR_Block);
 	BoardBase->SetGenerateOverlapEvents(false);
 	for (UStaticMeshComponent* Rail : Rails)
 	{
@@ -221,16 +209,21 @@ bool AFlickBobArena::IsInsidePocket(const FVector& WorldLocation) const
 	return false;
 }
 
-bool AFlickBobArena::HasDroppedIntoPocket(const FVector& WorldLocation, const float PieceRadius) const
+bool AFlickBobArena::IsCapturedByPocket(const FVector& WorldLocation, const float PieceRadius) const
 {
 	const FVector LocalLocation = GetActorTransform().InverseTransformPosition(WorldLocation);
-	if (LocalLocation.Z > SurfaceZ - PocketCaptureDepth)
+	const float SafePieceRadius = FMath::Max(0.0f, PieceRadius);
+	const float VerticalTolerance = FMath::Max(PocketCaptureDepth, SafePieceRadius * 0.4f);
+	if (LocalLocation.Z > SurfaceZ + VerticalTolerance
+		|| LocalLocation.Z < SurfaceZ - BoardThickness)
 	{
 		return false;
 	}
 
 	const float PocketOffset = BoardHalfExtent - PocketInset;
-	const float CaptureRadius = PocketRadius + FMath::Max(0.0f, PieceRadius) * PocketCaptureRadiusScale;
+	const float CaptureRadius = FMath::Max(
+		4.0f,
+		PocketRadius - SafePieceRadius * PocketCaptureRadiusScale);
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
 		const FVector2D Center(
@@ -304,7 +297,6 @@ void AFlickBobArena::ApplyArenaShape()
 	const float PedestalHeight = FMath::Max(80.0f, BottomZ);
 	BoardBase->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - BoardThickness * 0.5f));
 	BoardBase->SetRelativeScale3D(FVector(BoardHalfExtent / 50.0f, BoardHalfExtent / 50.0f, BoardThickness / 100.0f));
-	ApplyBoardCollisionShape();
 	PlayingSurface->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 0.8f));
 	PlayingSurface->SetRelativeScale3D(FVector((BoardHalfExtent - 18.0f) / 50.0f, (BoardHalfExtent - 18.0f) / 50.0f, 0.018f));
 	const float VisibleSurfaceTop = SurfaceZ + 1.7f;
@@ -537,161 +529,6 @@ void AFlickBobArena::ApplyArenaShape()
 	for (UStaticMeshComponent* GridLine : FloorGridSegments) ColorComponent(GridLine, FLinearColor(0.004f, 0.026f, 0.042f, 1.0f));
 }
 
-void AFlickBobArena::ApplyBoardCollisionShape()
-{
-	if (!BoardCollisionMesh || BoardHalfExtent <= 0.0f)
-	{
-		return;
-	}
-	BoardCollisionMesh->ClearAllMeshSections();
-
-	struct FBlockedInterval
-	{
-		float MinX = 0.0f;
-		float MaxX = 0.0f;
-	};
-
-	const float RowHeight = BoardHalfExtent * 2.0f / static_cast<float>(BoardCollisionRowCount);
-	const float RowHalfHeight = RowHeight * 0.5f;
-	const float PocketOffset = BoardHalfExtent - PocketInset;
-	const FVector2D PocketCenters[4] = {
-		FVector2D(-PocketOffset, -PocketOffset),
-		FVector2D(PocketOffset, -PocketOffset),
-		FVector2D(-PocketOffset, PocketOffset),
-		FVector2D(PocketOffset, PocketOffset)
-	};
-
-	TArray<FVector> Vertices;
-	TArray<int32> Triangles;
-	TArray<FVector> Normals;
-	TArray<FVector2D> UVs;
-	TArray<FLinearColor> VertexColors;
-	TArray<FProcMeshTangent> Tangents;
-	TMap<FIntVector, int32> SharedVertexIndices;
-	Vertices.Reserve(BoardCollisionRowCount * MaxCollisionSegmentsPerRow * 4);
-	Triangles.Reserve(BoardCollisionRowCount * MaxCollisionSegmentsPerRow * 6);
-	Normals.Reserve(BoardCollisionRowCount * MaxCollisionSegmentsPerRow * 4);
-	UVs.Reserve(BoardCollisionRowCount * MaxCollisionSegmentsPerRow * 4);
-	VertexColors.Reserve(BoardCollisionRowCount * MaxCollisionSegmentsPerRow * 4);
-	Tangents.Reserve(BoardCollisionRowCount * MaxCollisionSegmentsPerRow * 4);
-	SharedVertexIndices.Reserve(BoardCollisionRowCount * MaxCollisionSegmentsPerRow * 4);
-
-	const auto FindOrAddSurfaceVertex = [this, &Vertices, &Normals, &UVs, &VertexColors, &Tangents, &SharedVertexIndices](
-		const float X,
-		const float Y)
-	{
-		// Quantize to a hundredth of a unit so adjoining rectangles share the same
-		// collision vertex and Chaos can discard their coplanar internal edge.
-		const FIntVector Key(
-			FMath::RoundToInt(X * 100.0f),
-			FMath::RoundToInt(Y * 100.0f),
-			FMath::RoundToInt(SurfaceZ * 100.0f));
-		if (const int32* ExistingIndex = SharedVertexIndices.Find(Key))
-		{
-			return *ExistingIndex;
-		}
-
-		const int32 NewIndex = Vertices.Add(FVector(X, Y, SurfaceZ));
-		Normals.Add(FVector::UpVector);
-		UVs.Add(FVector2D(
-			(X + BoardHalfExtent) / FMath::Max(BoardHalfExtent * 2.0f, 1.0f),
-			(Y + BoardHalfExtent) / FMath::Max(BoardHalfExtent * 2.0f, 1.0f)));
-		VertexColors.Add(FLinearColor::White);
-		Tangents.Add(FProcMeshTangent(1.0f, 0.0f, 0.0f));
-		SharedVertexIndices.Add(Key, NewIndex);
-		return NewIndex;
-	};
-
-	const auto AddSurfaceRectangle = [&Triangles, &FindOrAddSurfaceVertex](
-		const float MinX,
-		const float MaxX,
-		const float MinY,
-		const float MaxY)
-	{
-		if (MaxX - MinX <= KINDA_SMALL_NUMBER || MaxY - MinY <= KINDA_SMALL_NUMBER)
-		{
-			return;
-		}
-
-		const int32 BottomLeft = FindOrAddSurfaceVertex(MinX, MinY);
-		const int32 BottomRight = FindOrAddSurfaceVertex(MaxX, MinY);
-		const int32 TopRight = FindOrAddSurfaceVertex(MaxX, MaxY);
-		const int32 TopLeft = FindOrAddSurfaceVertex(MinX, MaxY);
-		Triangles.Append({
-			BottomLeft,
-			TopRight,
-			BottomRight,
-			BottomLeft,
-			TopLeft,
-			TopRight
-		});
-	};
-
-	for (int32 RowIndex = 0; RowIndex < BoardCollisionRowCount; ++RowIndex)
-	{
-		const float RowCenterY = -BoardHalfExtent + RowHeight * (static_cast<float>(RowIndex) + 0.5f);
-		const float RowMinY = -BoardHalfExtent + RowHeight * static_cast<float>(RowIndex);
-		const float RowMaxY = RowMinY + RowHeight;
-		TArray<FBlockedInterval, TInlineAllocator<4>> BlockedIntervals;
-		for (const FVector2D& PocketCenter : PocketCenters)
-		{
-			// Use the closest edge of the row so the rectangular strip never protrudes
-			// across the circular opening. This makes a conservative, faceted lip.
-			const float ClosestYDistance = FMath::Max(
-				0.0f,
-				FMath::Abs(RowCenterY - PocketCenter.Y) - RowHalfHeight);
-			if (ClosestYDistance >= PocketRadius)
-			{
-				continue;
-			}
-
-			const float HalfChord = FMath::Sqrt(
-				FMath::Max(0.0f, FMath::Square(PocketRadius) - FMath::Square(ClosestYDistance)));
-			BlockedIntervals.Add({
-				FMath::Clamp(static_cast<float>(PocketCenter.X) - HalfChord, -BoardHalfExtent, BoardHalfExtent),
-				FMath::Clamp(static_cast<float>(PocketCenter.X) + HalfChord, -BoardHalfExtent, BoardHalfExtent)
-			});
-		}
-
-		BlockedIntervals.Sort([](const FBlockedInterval& Left, const FBlockedInterval& Right)
-		{
-			return Left.MinX < Right.MinX;
-		});
-
-		TArray<FBlockedInterval, TInlineAllocator<4>> MergedIntervals;
-		for (const FBlockedInterval& Interval : BlockedIntervals)
-		{
-			if (!MergedIntervals.IsEmpty() && Interval.MinX <= MergedIntervals.Last().MaxX)
-			{
-				MergedIntervals.Last().MaxX = FMath::Max(MergedIntervals.Last().MaxX, Interval.MaxX);
-			}
-			else
-			{
-				MergedIntervals.Add(Interval);
-			}
-		}
-
-		float CursorX = -BoardHalfExtent;
-		for (const FBlockedInterval& Interval : MergedIntervals)
-		{
-			AddSurfaceRectangle(CursorX, Interval.MinX, RowMinY, RowMaxY);
-			CursorX = FMath::Max(CursorX, Interval.MaxX);
-		}
-		AddSurfaceRectangle(CursorX, BoardHalfExtent, RowMinY, RowMaxY);
-	}
-
-	BoardCollisionMesh->CreateMeshSection_LinearColor(
-		0,
-		Vertices,
-		Triangles,
-		Normals,
-		UVs,
-		VertexColors,
-		Tangents,
-		true);
-	BoardCollisionMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-}
-
 void AFlickBobArena::ApplyPhysicsMaterials()
 {
 	if (!BoardBase)
@@ -718,10 +555,7 @@ void AFlickBobArena::ApplyPhysicsMaterials()
 	RailPhysicalMaterial->FrictionCombineMode = EFrictionCombineMode::Average;
 	RailPhysicalMaterial->bOverrideRestitutionCombineMode = true;
 	RailPhysicalMaterial->RestitutionCombineMode = EFrictionCombineMode::Average;
-	if (BoardCollisionMesh)
-	{
-		BoardCollisionMesh->SetPhysMaterialOverride(BoardPhysicalMaterial);
-	}
+	BoardBase->SetPhysMaterialOverride(BoardPhysicalMaterial);
 	for (UStaticMeshComponent* Rail : Rails)
 	{
 		Rail->SetPhysMaterialOverride(RailPhysicalMaterial);

@@ -967,6 +967,10 @@ void UFlickSessionSubsystem::HandleReadFriendsComplete(
 		}
 		Friends.StableSort([](const FFlickSocialPlayerEntry& Left, const FFlickSocialPlayerEntry& Right)
 		{
+			if (Left.bPlayingFlick != Right.bPlayingFlick)
+			{
+				return Left.bPlayingFlick;
+			}
 			if (Left.bOnline != Right.bOnline)
 			{
 				return Left.bOnline;

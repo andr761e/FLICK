@@ -14,6 +14,7 @@ class SWidget;
 struct FFlickHudEventMessage
 {
 	FString Message;
+	FString PointsText;
 	FLinearColor Color = FLinearColor::White;
 	float CreatedAt = 0.0f;
 	float ExpiresAt = 0.0f;
@@ -71,7 +72,11 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void DrawHUD() override;
-	void PushEventMessage(const FString& Message, const FLinearColor& Color, float Duration);
+	void PushEventMessage(
+		const FString& Message,
+		const FLinearColor& Color,
+		float Duration,
+		const FString& PointsText = FString());
 	void ResetPresentation();
 	bool HandleMenuClick(const FVector2D& ScreenPosition);
 	const TArray<FFlickHudEventMessage>& GetEventMessages() const { return EventMessages; }
@@ -81,6 +86,7 @@ private:
 	void DrawTopBar(const AFlickGameState& GameState, float Width, float Now);
 	void DrawAimPresentation(const AFlickPlayerController& Controller);
 	void DrawLockedKickoffPresentation(const AFlickGameMode& GameMode);
+	void DrawTechnicalAimArrow(const FVector2D& Start, const FVector2D& End, const FLinearColor& Accent);
 	void DrawPowerMeter(const AFlickPlayerController& Controller, float Width, float Height);
 	void DrawEventFeed(float Width, float Now);
 	void DrawTurnBanner(const AFlickGameState& GameState, float Width, float Height, float Now);
@@ -119,6 +125,7 @@ private:
 	TArray<FFlickHudEventMessage> EventMessages;
 	EFlickMatchPhase LastObservedPhase = EFlickMatchPhase::WaitingToStart;
 	EFlickTeam LastObservedTeam = EFlickTeam::None;
+	int32 LastObservedDramaticEventSerial = 0;
 	float StateChangedAt = -100.0f;
 	bool bHasObservedState = false;
 	TArray<FFlickMenuHitRegion> MenuHitRegions;

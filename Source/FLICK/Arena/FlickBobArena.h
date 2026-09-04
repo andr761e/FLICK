@@ -7,7 +7,6 @@
 
 class UMaterialInstanceDynamic;
 class UPhysicalMaterial;
-class UProceduralMeshComponent;
 class USceneComponent;
 class UStaticMeshComponent;
 
@@ -22,7 +21,7 @@ public:
 
 	void InitializeArena(float InHalfExtent, float InThickness, float InSurfaceZ);
 	bool IsInsidePocket(const FVector& WorldLocation) const;
-	bool HasDroppedIntoPocket(const FVector& WorldLocation, float PieceRadius) const;
+	bool IsCapturedByPocket(const FVector& WorldLocation, float PieceRadius) const;
 	bool IsSafeForTabletopSelfRighting(const FVector& WorldLocation, float PieceRadius) const;
 	FVector GetPocketWorldLocation(int32 PocketIndex) const;
 	FVector GetStrikerStart(EFlickTeam Team, float PieceThickness) const;
@@ -45,11 +44,11 @@ public:
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category = "FLICK|BOB")
 	float PocketInset = 150.0f;
 
-	/** How far the puck center must fall below the playing surface before the pocket is awarded. */
+	/** Minimum vertical tolerance above the flat tabletop for pocket-opening capture. */
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category = "FLICK|BOB|Pocket Physics", meta = (ClampMin = "2.0", ClampMax = "40.0"))
 	float PocketCaptureDepth = 8.0f;
 
-	/** Extra capture width for a puck that enters a pocket while tilted against its lip. */
+	/** Fraction of puck radius that must pass inside the visual pocket lip before capture. */
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category = "FLICK|BOB|Pocket Physics", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float PocketCaptureRadiusScale = 0.35f;
 
@@ -72,17 +71,12 @@ private:
 
 	void ApplyArenaShape();
 	void ApplyPhysicsMaterials();
-	void ApplyBoardCollisionShape();
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> BoardBase;
-
-	/** One continuous invisible tabletop mesh with four genuine openings. */
-	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
-	TObjectPtr<UProceduralMeshComponent> BoardCollisionMesh;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PlayingSurface;

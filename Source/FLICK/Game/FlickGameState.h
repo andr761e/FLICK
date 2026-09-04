@@ -23,6 +23,9 @@ struct FFlickPlayerMatchStats
 	int32 Knockouts = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
+	int32 DoubleKnockouts = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
 	int32 Shots = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
@@ -59,6 +62,7 @@ public:
 	void SetCurrentTeamPlayerSlot(int32 InPlayerSlot);
 	void SetActivePieceCounts(int32 InPlayer1Count, int32 InPlayer2Count);
 	void SetStartingPiecesPerTeam(int32 InStartingPieces);
+	void SetKickoffProgress(int32 InLockedShots, int32 InRequiredShots);
 	void BeginShot(EFlickTeam ShootingTeam, int32 PieceId, float NormalizedPower);
 	void RecordImpact(float ImpactStrength);
 	void RecordElimination(EFlickTeam EliminatedTeam);
@@ -66,6 +70,8 @@ public:
 	void RecordPlayerShot(EFlickTeam Team, int32 PlayerSlot);
 	void RecordPlayerImpact(EFlickTeam Team, int32 PlayerSlot);
 	void RecordPlayerKnockout(EFlickTeam Team, int32 PlayerSlot);
+	void RecordPlayerDoubleKnockout(EFlickTeam Team, int32 PlayerSlot);
+	void RecordPlayerBonus(EFlickTeam Team, int32 PlayerSlot, int32 BonusPoints);
 	void RecordPlayerSurvivingPucks(EFlickTeam Team, int32 PlayerSlot, int32 SurvivingPuckCount);
 	const FFlickPlayerMatchStats* FindPlayerMatchStats(EFlickTeam Team, int32 PlayerSlot) const;
 	int32 GetTeamScore(EFlickTeam Team) const;
@@ -90,6 +96,15 @@ public:
 	void BeginAuthoritativeMatch(const FString& InMatchId);
 	void FinalizeAuthoritativeMatch(EFlickMatchOutcome Outcome, bool bInForfeit = false);
 	void CompleteMatchByForfeit(EFlickTeam ForfeitingTeam);
+	void ShowDramaticEvent(
+		EFlickDramaticEvent InEvent,
+		EFlickTeam InHighlightedTeam,
+		int32 InValue,
+		int32 InImpactCount,
+		int32 InBonusPoints,
+		float InDuration);
+	void ClearDramaticEvent();
+	float GetDramaticEventTimeRemaining() const;
 
 	bool IsGameplayActive() const { return MatchPhase != EFlickMatchPhase::WaitingToStart; }
 
@@ -140,6 +155,36 @@ public:
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Match")
 	int32 TurnNumber = 1;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Kickoff")
+	int32 KickoffShotsLocked = 0;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Kickoff")
+	int32 KickoffShotsRequired = 0;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	EFlickDramaticEvent DramaticEvent = EFlickDramaticEvent::None;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	EFlickTeam DramaticEventTeam = EFlickTeam::None;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	int32 DramaticEventValue = 0;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	int32 DramaticEventImpactCount = 0;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	int32 DramaticEventBonusPoints = 0;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	int32 DramaticEventSerial = 0;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	float DramaticEventDuration = 0.0f;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	float DramaticEventEndServerTime = 0.0f;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Timers")
 	bool bShotClockActive = false;

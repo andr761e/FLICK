@@ -67,6 +67,12 @@ private:
 	TObjectPtr<UStaticMeshComponent> RimAccentMesh;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> OuterBezelMesh;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> LowerDeckMesh;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> CenterPlateMesh;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
@@ -124,6 +130,9 @@ private:
 	TArray<TObjectPtr<UStaticMeshComponent>> FloorGridSegments;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> FloorLightStuds;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> MultiplayerTeamArcSegments;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
@@ -146,6 +155,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> RimAccentMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> OuterBezelMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> LowerDeckMaterial;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> CenterPlateMaterial;
@@ -191,6 +206,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> FloorGridMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> FloorLightStudMaterial;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> VenueBannerMaterials;

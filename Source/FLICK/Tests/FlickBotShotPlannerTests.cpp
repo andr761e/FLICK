@@ -62,4 +62,36 @@ bool FFlickBotShotPlannerBlockerAwarenessTest::RunTest(const FString& Parameters
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFlickBotShotPlannerBobTest,
+	"FLICK.Bot.ShotPlanner.BobOwnColor",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickBotShotPlannerBobTest::RunTest(const FString& Parameters)
+{
+	TArray<FFlickBotPieceState> Pieces = {
+		{1, EFlickTeam::Player1, FVector2D(-100.0f, 0.0f), 45.0f},
+		{2, EFlickTeam::Player2, FVector2D(0.0f, 300.0f), 45.0f},
+		{3, EFlickTeam::Player2, FVector2D(0.0f, 100.0f), 45.0f}
+	};
+	TArray<FVector2D> Pockets = {FVector2D(0.0f, -500.0f)};
+	FFlickBotShotTuning Tuning;
+	Tuning.AimErrorDegrees = 0.0f;
+	Tuning.PowerVariation = 0.0f;
+	FRandomStream RandomStream(17);
+
+	const FFlickBotShotPlan Plan = FlickBotShotPlanner::PlanBobShot(
+		Pieces,
+		EFlickTeam::Player2,
+		2,
+		Pockets,
+		Tuning,
+		RandomStream);
+	TestTrue(TEXT("BOB bot creates a shot"), Plan.IsValid());
+	TestEqual(TEXT("BOB bot only shoots its striker"), Plan.ShooterPieceId, 2);
+	TestEqual(TEXT("BOB bot targets its own objective color"), Plan.TargetPieceId, 3);
+	TestTrue(TEXT("BOB bot aims through its objective toward the pocket"), Plan.Direction.Y < -0.99f);
+	return true;
+}
+
 #endif

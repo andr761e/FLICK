@@ -18,6 +18,8 @@ namespace
 	constexpr int32 ArenaVenuePylonCount = 11;
 	constexpr int32 ArenaVenueBannerCount = 10;
 	constexpr int32 ArenaFloorGridCount = 20;
+	constexpr int32 ArenaFloorStudColumns = 15;
+	constexpr int32 ArenaFloorStudRows = 9;
 	constexpr int32 MultiplayerTeamArcSegmentsPerSide = 24;
 	constexpr int32 MaximumMultiplayerPlayersPerTeam = 3;
 }
@@ -38,6 +40,10 @@ AFlickArena::AFlickArena()
 	InnerFieldMesh->SetupAttachment(SceneRoot);
 	RimAccentMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RimAccentMesh"));
 	RimAccentMesh->SetupAttachment(SceneRoot);
+	OuterBezelMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("OuterBezelMesh"));
+	OuterBezelMesh->SetupAttachment(SceneRoot);
+	LowerDeckMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LowerDeckMesh"));
+	LowerDeckMesh->SetupAttachment(SceneRoot);
 	CenterPlateMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CenterPlateMesh"));
 	CenterPlateMesh->SetupAttachment(SceneRoot);
 	PedestalMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PedestalMesh"));
@@ -62,12 +68,15 @@ AFlickArena::AFlickArena()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> EmissiveMaterial(TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
 	if (CylinderMesh.Succeeded())
 	{
 		ArenaMesh->SetStaticMesh(CylinderMesh.Object);
 		TopSurfaceMesh->SetStaticMesh(CylinderMesh.Object);
 		InnerFieldMesh->SetStaticMesh(CylinderMesh.Object);
 		RimAccentMesh->SetStaticMesh(CylinderMesh.Object);
+		OuterBezelMesh->SetStaticMesh(CylinderMesh.Object);
+		LowerDeckMesh->SetStaticMesh(CylinderMesh.Object);
 		CenterPlateMesh->SetStaticMesh(CylinderMesh.Object);
 		PedestalMesh->SetStaticMesh(CylinderMesh.Object);
 		StageBaseMesh->SetStaticMesh(CylinderMesh.Object);
@@ -84,9 +93,9 @@ AFlickArena::AFlickArena()
 		{
 			Segment->SetStaticMesh(CubeMesh.Object);
 		}
-		if (BasicMaterial.Succeeded())
+		if (EmissiveMaterial.Succeeded())
 		{
-			Segment->SetMaterial(0, BasicMaterial.Object);
+			Segment->SetMaterial(0, EmissiveMaterial.Object);
 		}
 		Segment->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Segment->SetGenerateOverlapEvents(false);
@@ -129,9 +138,9 @@ AFlickArena::AFlickArena()
 		{
 			Segment->SetStaticMesh(CubeMesh.Object);
 		}
-		if (BasicMaterial.Succeeded())
+		if (EmissiveMaterial.Succeeded())
 		{
-			Segment->SetMaterial(0, BasicMaterial.Object);
+			Segment->SetMaterial(0, EmissiveMaterial.Object);
 		}
 		Segment->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Segment->SetGenerateOverlapEvents(false);
@@ -151,9 +160,9 @@ AFlickArena::AFlickArena()
 		{
 			Segment->SetStaticMesh(CubeMesh.Object);
 		}
-		if (BasicMaterial.Succeeded())
+		if (EmissiveMaterial.Succeeded())
 		{
-			Segment->SetMaterial(0, BasicMaterial.Object);
+			Segment->SetMaterial(0, EmissiveMaterial.Object);
 		}
 		Segment->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Segment->SetGenerateOverlapEvents(false);
@@ -190,6 +199,10 @@ AFlickArena::AFlickArena()
 	{
 		VenuePylons.Add(CreateVisualCube(FString::Printf(TEXT("VenuePylon_%02d"), Index)));
 		UStaticMeshComponent* LightBar = CreateVisualCube(FString::Printf(TEXT("VenueLightBar_%02d"), Index));
+		if (EmissiveMaterial.Succeeded())
+		{
+			LightBar->SetMaterial(0, EmissiveMaterial.Object);
+		}
 		LightBar->SetCastShadow(false);
 		VenueLightBars.Add(LightBar);
 	}
@@ -203,9 +216,23 @@ AFlickArena::AFlickArena()
 		Component->SetCastShadow(false);
 		FloorGridSegments.Add(Component);
 	}
+	for (int32 Index = 0; Index < ArenaFloorStudColumns * ArenaFloorStudRows; ++Index)
+	{
+		UStaticMeshComponent* Component = CreateVisualCube(FString::Printf(TEXT("FloorLightStud_%03d"), Index));
+		if (EmissiveMaterial.Succeeded())
+		{
+			Component->SetMaterial(0, EmissiveMaterial.Object);
+		}
+		Component->SetCastShadow(false);
+		FloorLightStuds.Add(Component);
+	}
 	for (int32 Index = 0; Index < MultiplayerTeamArcSegmentsPerSide * 2; ++Index)
 	{
 		UStaticMeshComponent* Component = CreateVisualCube(FString::Printf(TEXT("MultiplayerTeamArc_%02d"), Index));
+		if (EmissiveMaterial.Succeeded())
+		{
+			Component->SetMaterial(0, EmissiveMaterial.Object);
+		}
 		Component->SetCastShadow(false);
 		MultiplayerTeamArcSegments.Add(Component);
 	}
@@ -232,8 +259,13 @@ AFlickArena::AFlickArena()
 		for (int32 PlayerSlot = 0; PlayerSlot < MaximumMultiplayerPlayersPerTeam; ++PlayerSlot)
 		{
 			const int32 ZoneIndex = TeamIndex * MaximumMultiplayerPlayersPerTeam + PlayerSlot;
-			MultiplayerPlayerZoneOutlines.Add(CreatePlayerZoneDisc(
-				FString::Printf(TEXT("MultiplayerPlayerZoneOutline_%02d"), ZoneIndex)));
+			UStaticMeshComponent* Outline = CreatePlayerZoneDisc(
+				FString::Printf(TEXT("MultiplayerPlayerZoneOutline_%02d"), ZoneIndex));
+			if (EmissiveMaterial.Succeeded())
+			{
+				Outline->SetMaterial(0, EmissiveMaterial.Object);
+			}
+			MultiplayerPlayerZoneOutlines.Add(Outline);
 			MultiplayerPlayerZoneInsets.Add(CreatePlayerZoneDisc(
 				FString::Printf(TEXT("MultiplayerPlayerZoneInset_%02d"), ZoneIndex)));
 		}
@@ -253,6 +285,8 @@ AFlickArena::AFlickArena()
 		TopSurfaceMesh,
 		InnerFieldMesh,
 		RimAccentMesh,
+		OuterBezelMesh,
+		LowerDeckMesh,
 		CenterPlateMesh,
 		PedestalMesh,
 		BackdropMesh,
@@ -272,6 +306,10 @@ AFlickArena::AFlickArena()
 		}
 		Mesh->SetCanEverAffectNavigation(false);
 	}
+	if (EmissiveMaterial.Succeeded())
+	{
+		RimAccentMesh->SetMaterial(0, EmissiveMaterial.Object);
+	}
 
 	ArenaMesh->SetSimulatePhysics(false);
 	ArenaMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -282,6 +320,8 @@ AFlickArena::AFlickArena()
 		TopSurfaceMesh.Get(),
 		InnerFieldMesh.Get(),
 		RimAccentMesh.Get(),
+		OuterBezelMesh.Get(),
+		LowerDeckMesh.Get(),
 		CenterPlateMesh.Get(),
 		PedestalMesh.Get(),
 		BackdropMesh.Get(),
@@ -298,6 +338,9 @@ AFlickArena::AFlickArena()
 	}
 
 	BackdropMesh->SetCastShadow(false);
+	RimAccentMesh->SetCastShadow(false);
+	OuterBezelMesh->SetCastShadow(true);
+	LowerDeckMesh->SetCastShadow(true);
 	StageBaseMesh->SetCastShadow(true);
 	VenueBackWallMesh->SetCastShadow(false);
 	CenterLineMesh->SetCastShadow(false);
@@ -368,22 +411,30 @@ void AFlickArena::ApplyArenaShape()
 
 	ArenaMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - ArenaThickness * 0.5f));
 	ArenaMesh->SetWorldScale3D(FVector(ArenaRadius / 50.0f, ArenaRadius / 50.0f, ArenaThickness / 100.0f));
-	TopSurfaceMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 1.0f));
-	TopSurfaceMesh->SetWorldScale3D(FVector(ArenaRadius * 0.985f / 50.0f, ArenaRadius * 0.985f / 50.0f, 0.03f));
-	RimAccentMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 3.0f));
-	RimAccentMesh->SetWorldScale3D(FVector(ArenaRadius * 1.012f / 50.0f, ArenaRadius * 1.012f / 50.0f, 0.065f));
+	TopSurfaceMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 0.65f));
+	TopSurfaceMesh->SetWorldScale3D(FVector(ArenaRadius * 0.992f / 50.0f, ArenaRadius * 0.992f / 50.0f, 0.022f));
+	RimAccentMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 4.0f));
+	RimAccentMesh->SetWorldScale3D(FVector(ArenaRadius * 1.012f / 50.0f, ArenaRadius * 1.012f / 50.0f, 0.055f));
+	OuterBezelMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - ArenaThickness * 0.61f));
+	OuterBezelMesh->SetWorldScale3D(FVector(
+		ArenaRadius * 1.035f / 50.0f,
+		ArenaRadius * 1.035f / 50.0f,
+		ArenaThickness * 0.34f / 100.0f));
+	LowerDeckMesh->SetRelativeLocation(FVector(0.0f, 0.0f, ArenaBottomZ - 7.0f));
+	LowerDeckMesh->SetWorldScale3D(FVector(ArenaRadius * 1.075f / 50.0f, ArenaRadius * 1.075f / 50.0f, 0.11f));
 	InnerFieldMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 0.05f));
-	InnerFieldMesh->SetWorldScale3D(FVector(ArenaRadius * 0.73f / 50.0f, ArenaRadius * 0.73f / 50.0f, 0.012f));
+	InnerFieldMesh->SetWorldScale3D(FVector(ArenaRadius * 0.68f / 50.0f, ArenaRadius * 0.68f / 50.0f, 0.008f));
 	CenterPlateMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 0.25f));
 	CenterPlateMesh->SetWorldScale3D(FVector(ArenaRadius * 0.14f / 50.0f, ArenaRadius * 0.14f / 50.0f, 0.012f));
 	PedestalMesh->SetRelativeLocation(FVector(0.0f, 0.0f, ArenaBottomZ - PedestalHeight * 0.5f));
 	PedestalMesh->SetWorldScale3D(FVector(ArenaRadius * 0.42f / 50.0f, ArenaRadius * 0.42f / 50.0f, PedestalHeight / 100.0f));
-	StageBaseMesh->SetRelativeLocation(FVector(0.0f, 0.0f, ArenaBottomZ - 18.0f));
-	StageBaseMesh->SetWorldScale3D(FVector(ArenaRadius * 0.88f / 50.0f, ArenaRadius * 0.88f / 50.0f, 0.36f));
+	StageBaseMesh->SetRelativeLocation(FVector(0.0f, 0.0f, ArenaBottomZ - 8.0f));
+	StageBaseMesh->SetWorldScale3D(FVector(ArenaRadius * 1.045f / 50.0f, ArenaRadius * 1.045f / 50.0f, 0.16f));
 	BackdropMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 10.0f));
 	BackdropMesh->SetWorldScale3D(FVector(120.0f, 120.0f, 0.2f));
 	VenueBackWallMesh->SetRelativeLocation(FVector(0.0f, 1280.0f * VenueScale, 290.0f * VenueScale));
 	VenueBackWallMesh->SetWorldScale3D(FVector(28.0f * VenueScale, 0.36f, 4.3f * VenueScale));
+	VenueBackWallMesh->SetVisibility(false);
 
 	for (int32 Index = 0; Index < VenuePylons.Num(); ++Index)
 	{
@@ -394,10 +445,12 @@ void AFlickArena::ApplyArenaShape()
 		const float Y = 1238.0f * VenueScale + FMath::Abs(X) * 0.035f;
 		VenuePylons[Index]->SetRelativeLocation(FVector(X, Y, 335.0f * VenueScale));
 		VenuePylons[Index]->SetWorldScale3D(FVector(0.2f, 0.38f, 6.6f * VenueScale));
+		VenuePylons[Index]->SetVisibility(false);
 		if (VenueLightBars.IsValidIndex(Index) && VenueLightBars[Index])
 		{
 			VenueLightBars[Index]->SetRelativeLocation(FVector(X, Y - 28.0f, 650.0f * VenueScale));
 			VenueLightBars[Index]->SetWorldScale3D(FVector(1.38f, 0.12f, 0.07f));
+			VenueLightBars[Index]->SetVisibility(false);
 		}
 	}
 
@@ -409,15 +462,44 @@ void AFlickArena::ApplyArenaShape()
 		const float X = FMath::Lerp(-980.0f, 980.0f, Normalized) * VenueScale;
 		VenueBannerPanels[Index]->SetRelativeLocation(FVector(X, 1190.0f * VenueScale, 350.0f * VenueScale));
 		VenueBannerPanels[Index]->SetWorldScale3D(FVector(2.35f, 0.08f, 0.62f));
+		VenueBannerPanels[Index]->SetVisibility(false);
 	}
 
 	for (int32 Index = 0; Index < FloorGridSegments.Num(); ++Index)
 	{
-		const float Normalized = FloorGridSegments.Num() > 1
-			? static_cast<float>(Index) / static_cast<float>(FloorGridSegments.Num() - 1)
+		const int32 LinesPerAxis = FMath::Max(1, FloorGridSegments.Num() / 2);
+		const int32 AxisIndex = Index % LinesPerAxis;
+		const float Normalized = LinesPerAxis > 1
+			? static_cast<float>(AxisIndex) / static_cast<float>(LinesPerAxis - 1)
 			: 0.5f;
-		FloorGridSegments[Index]->SetRelativeLocation(FVector(FMath::Lerp(-1450.0f, 1450.0f, Normalized) * VenueScale, 120.0f, 21.0f));
-		FloorGridSegments[Index]->SetWorldScale3D(FVector(0.018f, 27.0f * VenueScale, 0.012f));
+		const float LineOffset = FMath::Lerp(-1500.0f, 1500.0f, Normalized) * VenueScale;
+		if (Index < LinesPerAxis)
+		{
+			FloorGridSegments[Index]->SetRelativeLocation(FVector(LineOffset, 0.0f, 21.0f));
+			FloorGridSegments[Index]->SetWorldScale3D(FVector(0.008f, 30.0f * VenueScale, 0.006f));
+		}
+		else
+		{
+			FloorGridSegments[Index]->SetRelativeLocation(FVector(0.0f, LineOffset, 21.0f));
+			FloorGridSegments[Index]->SetWorldScale3D(FVector(30.0f * VenueScale, 0.008f, 0.006f));
+		}
+	}
+
+	for (int32 Index = 0; Index < FloorLightStuds.Num(); ++Index)
+	{
+		const int32 Column = Index % ArenaFloorStudColumns;
+		const int32 Row = Index / ArenaFloorStudColumns;
+		const float ColumnAlpha = ArenaFloorStudColumns > 1
+			? static_cast<float>(Column) / static_cast<float>(ArenaFloorStudColumns - 1)
+			: 0.5f;
+		const float RowAlpha = ArenaFloorStudRows > 1
+			? static_cast<float>(Row) / static_cast<float>(ArenaFloorStudRows - 1)
+			: 0.5f;
+		FloorLightStuds[Index]->SetRelativeLocation(FVector(
+			FMath::Lerp(-1540.0f, 1540.0f, ColumnAlpha) * VenueScale,
+			FMath::Lerp(-1220.0f, 1220.0f, RowAlpha) * VenueScale,
+			21.2f));
+		FloorLightStuds[Index]->SetWorldScale3D(FVector(0.018f, 0.018f, 0.005f));
 	}
 
 	CenterLineMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 1.0f));
@@ -439,7 +521,7 @@ void AFlickArena::ApplyArenaShape()
 	Player2HomeMarkMesh->SetVisibility(false);
 
 	const float SegmentRadius = ArenaRadius * 1.015f;
-	const float SegmentLength = 2.0f * PI * SegmentRadius / FMath::Max(1, RimSegments.Num()) * 0.72f;
+	const float SegmentLength = 2.0f * PI * SegmentRadius / FMath::Max(1, RimSegments.Num()) * 0.94f;
 	for (int32 Index = 0; Index < RimSegments.Num(); ++Index)
 	{
 		UStaticMeshComponent* Segment = RimSegments[Index];
@@ -451,12 +533,12 @@ void AFlickArena::ApplyArenaShape()
 		Segment->SetRelativeLocation(FVector(
 			FMath::Cos(Angle) * SegmentRadius,
 			FMath::Sin(Angle) * SegmentRadius,
-			SurfaceZ + 1.7f));
+			SurfaceZ + 1.3f));
 		Segment->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(Angle) + 90.0f, 0.0f));
-		Segment->SetWorldScale3D(FVector(SegmentLength / 100.0f, 0.045f, 0.035f));
+		Segment->SetWorldScale3D(FVector(SegmentLength / 100.0f, 0.026f, 0.018f));
 	}
 
-	const float RingFractions[] = {0.2f, 0.35f, 0.5f, 0.65f, 0.8f};
+	const float RingFractions[] = {0.16f, 0.68f, 0.5f, 0.65f, 0.8f};
 	for (int32 Index = 0; Index < FieldRingSegments.Num(); ++Index)
 	{
 		UStaticMeshComponent* Segment = FieldRingSegments[Index];
@@ -468,10 +550,11 @@ void AFlickArena::ApplyArenaShape()
 		const int32 SegmentIndex = Index % ArenaFieldRingSegmentCount;
 		const float Radius = ArenaRadius * RingFractions[FMath::Clamp(RingIndex, 0, UE_ARRAY_COUNT(RingFractions) - 1)];
 		const float Angle = 2.0f * PI * static_cast<float>(SegmentIndex) / ArenaFieldRingSegmentCount;
-		const float Length = 2.0f * PI * Radius / ArenaFieldRingSegmentCount * 0.76f;
+		const float Length = 2.0f * PI * Radius / ArenaFieldRingSegmentCount * 0.96f;
 		Segment->SetRelativeLocation(FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, SurfaceZ + 1.05f));
 		Segment->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(Angle) + 90.0f, 0.0f));
-		Segment->SetWorldScale3D(FVector(Length / 100.0f, 0.018f, 0.007f));
+		Segment->SetWorldScale3D(FVector(Length / 100.0f, RingIndex == 0 ? 0.014f : 0.01f, 0.006f));
+		Segment->SetVisibility(RingIndex <= 1);
 	}
 
 	const bool bMultiplayerArena = PlayersPerTeam > 1;
@@ -558,11 +641,12 @@ void AFlickArena::ApplyArenaShape()
 		const float MidRadius = (InnerRadius + OuterRadius) * 0.5f;
 		Segment->SetRelativeLocation(FVector(FMath::Cos(Angle) * MidRadius, FMath::Sin(Angle) * MidRadius, SurfaceZ + 0.72f));
 		Segment->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(Angle), 0.0f));
-		Segment->SetWorldScale3D(FVector((OuterRadius - InnerRadius) / 100.0f, 0.012f, 0.005f));
+		Segment->SetWorldScale3D(FVector((OuterRadius - InnerRadius) / 100.0f, 0.009f, 0.004f));
+		Segment->SetVisibility(Index % 5 == 0);
 	}
 
 	const float SideRadius = ArenaRadius * 1.016f;
-	const float SideLength = 2.0f * PI * SideRadius / FMath::Max(1, SideLightSegments.Num()) * 0.62f;
+	const float SideLength = 2.0f * PI * SideRadius / FMath::Max(1, SideLightSegments.Num()) * 0.88f;
 	for (int32 Index = 0; Index < SideLightSegments.Num(); ++Index)
 	{
 		UStaticMeshComponent* Segment = SideLightSegments[Index];
@@ -573,7 +657,7 @@ void AFlickArena::ApplyArenaShape()
 		const float Angle = 2.0f * PI * static_cast<float>(Index) / FMath::Max(1, SideLightSegments.Num());
 		Segment->SetRelativeLocation(FVector(FMath::Cos(Angle) * SideRadius, FMath::Sin(Angle) * SideRadius, SurfaceZ - ArenaThickness * 0.48f));
 		Segment->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(Angle) + 90.0f, 0.0f));
-		Segment->SetWorldScale3D(FVector(SideLength / 100.0f, 0.04f, ArenaThickness * 0.22f / 100.0f));
+		Segment->SetWorldScale3D(FVector(SideLength / 100.0f, 0.025f, ArenaThickness * 0.15f / 100.0f));
 	}
 
 	for (int32 DirectionIndex = 0; DirectionIndex < 4; ++DirectionIndex)
@@ -595,7 +679,7 @@ void AFlickArena::ApplyArenaShape()
 			UStaticMeshComponent* Segment = DirectionMarkerSegments[SegmentIndex];
 			Segment->SetRelativeLocation(FVector((Tip + Tail) * 0.5f, SurfaceZ + 1.35f));
 			Segment->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(FMath::Atan2(Delta.Y, Delta.X)), 0.0f));
-		Segment->SetWorldScale3D(FVector(Delta.Size() / 100.0f, 0.05f, 0.008f));
+			Segment->SetWorldScale3D(FVector(Delta.Size() / 100.0f, 0.035f, 0.006f));
 		}
 	}
 
@@ -614,6 +698,14 @@ void AFlickArena::ApplyArenaShape()
 	if (!RimAccentMaterial)
 	{
 		RimAccentMaterial = RimAccentMesh->CreateAndSetMaterialInstanceDynamic(0);
+	}
+	if (!OuterBezelMaterial)
+	{
+		OuterBezelMaterial = OuterBezelMesh->CreateAndSetMaterialInstanceDynamic(0);
+	}
+	if (!LowerDeckMaterial)
+	{
+		LowerDeckMaterial = LowerDeckMesh->CreateAndSetMaterialInstanceDynamic(0);
 	}
 	if (!CenterPlateMaterial)
 	{
@@ -681,33 +773,56 @@ void AFlickArena::ApplyArenaShape()
 			FloorGridSegments[Index]->SetMaterial(0, FloorGridMaterial);
 		}
 	}
+	if (!FloorLightStudMaterial && !FloorLightStuds.IsEmpty())
+	{
+		FloorLightStudMaterial = FloorLightStuds[0]->CreateAndSetMaterialInstanceDynamic(0);
+		for (int32 Index = 1; Index < FloorLightStuds.Num(); ++Index)
+		{
+			FloorLightStuds[Index]->SetMaterial(0, FloorLightStudMaterial);
+		}
+	}
 
-	const auto SetMaterialColor = [](UMaterialInstanceDynamic* Material, const FLinearColor& Color)
+	const auto SetMaterialColor = [](UMaterialInstanceDynamic* Material, const FLinearColor& Color, const float Roughness = 0.82f)
 	{
 		if (Material)
 		{
 			Material->SetVectorParameterValue(TEXT("Color"), Color);
 			Material->SetVectorParameterValue(TEXT("BaseColor"), Color);
-			Material->SetScalarParameterValue(TEXT("Roughness"), 0.88f);
+			Material->SetScalarParameterValue(TEXT("Roughness"), Roughness);
+		}
+	};
+	const auto SetEmissiveColor = [](UMaterialInstanceDynamic* Material, const FLinearColor& Color, const float Intensity)
+	{
+		if (Material)
+		{
+			const FLinearColor EmissiveColor(
+				Color.R * Intensity,
+				Color.G * Intensity,
+				Color.B * Intensity,
+				Color.A);
+			Material->SetVectorParameterValue(TEXT("Color"), EmissiveColor);
 		}
 	};
 
-	SetMaterialColor(BodyMaterial, FLinearColor(0.004f, 0.006f, 0.012f, 1.0f));
-	SetMaterialColor(RimAccentMaterial, FLinearColor(0.0f, 0.2f, 0.34f, 1.0f));
-	SetMaterialColor(TopMaterial, FLinearColor(0.065f, 0.085f, 0.12f, 1.0f));
-	SetMaterialColor(InnerFieldMaterial, FLinearColor(0.078f, 0.104f, 0.145f, 1.0f));
-	SetMaterialColor(CenterPlateMaterial, FLinearColor(0.105f, 0.128f, 0.16f, 1.0f));
-	SetMaterialColor(PedestalMaterial, FLinearColor(0.012f, 0.016f, 0.026f, 1.0f));
+	SetMaterialColor(BodyMaterial, FLinearColor(0.003f, 0.006f, 0.011f, 1.0f), 0.48f);
+	SetEmissiveColor(RimAccentMaterial, FLinearColor(0.035f, 0.15f, 0.22f, 1.0f), 2.4f);
+	SetMaterialColor(OuterBezelMaterial, FLinearColor(0.017f, 0.029f, 0.043f, 1.0f), 0.34f);
+	SetMaterialColor(LowerDeckMaterial, FLinearColor(0.004f, 0.008f, 0.015f, 1.0f), 0.56f);
+	SetMaterialColor(TopMaterial, FLinearColor(0.021f, 0.037f, 0.057f, 1.0f), 0.67f);
+	SetMaterialColor(InnerFieldMaterial, FLinearColor(0.025f, 0.043f, 0.064f, 1.0f), 0.73f);
+	SetMaterialColor(CenterPlateMaterial, FLinearColor(0.036f, 0.054f, 0.078f, 1.0f), 0.42f);
+	SetMaterialColor(PedestalMaterial, FLinearColor(0.005f, 0.009f, 0.016f, 1.0f), 0.52f);
 	SetMaterialColor(BackdropMaterial, FLinearColor(0.002f, 0.004f, 0.008f, 1.0f));
-	SetMaterialColor(StageBaseMaterial, FLinearColor(0.008f, 0.016f, 0.026f, 1.0f));
+	SetMaterialColor(StageBaseMaterial, FLinearColor(0.009f, 0.017f, 0.027f, 1.0f));
 	SetMaterialColor(VenueBackWallMaterial, FLinearColor(0.001f, 0.003f, 0.006f, 1.0f));
-	SetMaterialColor(NeutralMarkMaterial, FLinearColor(0.14f, 0.17f, 0.2f, 1.0f));
+	SetMaterialColor(NeutralMarkMaterial, FLinearColor(0.19f, 0.24f, 0.3f, 1.0f));
 	SetMaterialColor(Player1MarkMaterial, FLinearColor(0.0f, 0.62f, 0.9f, 1.0f));
 	SetMaterialColor(Player2MarkMaterial, FLinearColor(1.0f, 0.22f, 0.08f, 1.0f));
-	SetMaterialColor(DirectionMarkerMaterial, FLinearColor(0.42f, 0.52f, 0.62f, 1.0f));
-	SetMaterialColor(SurfaceSeamMaterial, FLinearColor(0.025f, 0.036f, 0.052f, 1.0f));
+	SetEmissiveColor(DirectionMarkerMaterial, FLinearColor(0.16f, 0.24f, 0.31f, 1.0f), 1.25f);
+	SetMaterialColor(SurfaceSeamMaterial, FLinearColor(0.035f, 0.052f, 0.075f, 1.0f));
 	SetMaterialColor(VenuePylonMaterial, FLinearColor(0.008f, 0.018f, 0.028f, 1.0f));
-	SetMaterialColor(FloorGridMaterial, FLinearColor(0.004f, 0.026f, 0.042f, 1.0f));
+	SetMaterialColor(FloorGridMaterial, FLinearColor(0.004f, 0.012f, 0.021f, 1.0f));
+	SetEmissiveColor(FloorLightStudMaterial, FLinearColor(0.018f, 0.08f, 0.12f, 1.0f), 1.25f);
 
 	if (VenueBannerMaterials.Num() != VenueBannerPanels.Num())
 	{
@@ -740,7 +855,7 @@ void AFlickArena::ApplyArenaShape()
 			: Index == VenueLightMaterials.Num() / 2
 				? FLinearColor(0.72f, 0.84f, 0.94f, 1.0f)
 				: FLinearColor(1.0f, 0.2f, 0.025f, 1.0f);
-		SetMaterialColor(VenueLightMaterials[Index], LightColor);
+		SetEmissiveColor(VenueLightMaterials[Index], LightColor, 3.4f);
 	}
 
 	if (RimSegmentMaterials.Num() != RimSegments.Num())
@@ -753,10 +868,13 @@ void AFlickArena::ApplyArenaShape()
 	}
 	for (int32 Index = 0; Index < RimSegmentMaterials.Num(); ++Index)
 	{
-		const FLinearColor SegmentColor = Index % 2 == 0
-			? FLinearColor(0.0f, 0.78f, 1.0f, 1.0f)
-			: FLinearColor(0.0f, 0.54f, 0.84f, 1.0f);
-		SetMaterialColor(RimSegmentMaterials[Index], SegmentColor);
+		const float Angle = 2.0f * PI * static_cast<float>(Index) / FMath::Max(1, RimSegmentMaterials.Num());
+		const bool bBlueSide = FMath::Cos(Angle) < 0.0f;
+		const bool bHighlight = Index % 11 == 5 || Index % 11 == 6;
+		const FLinearColor SegmentColor = bBlueSide
+			? bHighlight ? FLinearColor(0.12f, 0.96f, 1.0f, 1.0f) : FLinearColor(0.0f, 0.54f, 0.68f, 1.0f)
+			: bHighlight ? FLinearColor(1.0f, 0.5f, 0.08f, 1.0f) : FLinearColor(0.8f, 0.22f, 0.025f, 1.0f);
+		SetEmissiveColor(RimSegmentMaterials[Index], SegmentColor, bHighlight ? 5.2f : 3.1f);
 	}
 
 	if (FieldRingMaterials.Num() != FieldRingSegments.Num())
@@ -770,8 +888,10 @@ void AFlickArena::ApplyArenaShape()
 	for (int32 Index = 0; Index < FieldRingMaterials.Num(); ++Index)
 	{
 		const int32 RingIndex = Index / ArenaFieldRingSegmentCount;
-		const float Shade = RingIndex % 2 == 0 ? 1.0f : 0.72f;
-		SetMaterialColor(FieldRingMaterials[Index], FLinearColor(0.085f, 0.105f, 0.13f, 1.0f) * Shade);
+		const FLinearColor RingColor = RingIndex == 0
+			? FLinearColor(0.18f, 0.23f, 0.29f, 1.0f)
+			: FLinearColor(0.055f, 0.075f, 0.1f, 1.0f);
+		SetMaterialColor(FieldRingMaterials[Index], RingColor);
 	}
 
 	if (SideLightMaterials.Num() != SideLightSegments.Num())
@@ -785,9 +905,12 @@ void AFlickArena::ApplyArenaShape()
 	for (int32 Index = 0; Index < SideLightMaterials.Num(); ++Index)
 	{
 		const float Angle = 2.0f * PI * static_cast<float>(Index) / FMath::Max(1, SideLightMaterials.Num());
-		SetMaterialColor(SideLightMaterials[Index], FMath::Sin(Angle) < 0.0f
-			? FLinearColor(0.0f, 0.42f, 0.72f, 1.0f)
-			: FLinearColor(0.78f, 0.09f, 0.015f, 1.0f));
+		const bool bBlueSide = FMath::Cos(Angle) < 0.0f;
+		const bool bHighlight = Index % 12 == 6 || Index % 12 == 7;
+		SetEmissiveColor(SideLightMaterials[Index], bBlueSide
+			? bHighlight ? FLinearColor(0.08f, 0.88f, 1.0f, 1.0f) : FLinearColor(0.0f, 0.28f, 0.44f, 1.0f)
+			: bHighlight ? FLinearColor(1.0f, 0.4f, 0.04f, 1.0f) : FLinearColor(0.52f, 0.1f, 0.01f, 1.0f),
+			bHighlight ? 4.6f : 2.6f);
 	}
 
 	if (MultiplayerTeamArcMaterials.Num() != MultiplayerTeamArcSegments.Num())
@@ -801,9 +924,9 @@ void AFlickArena::ApplyArenaShape()
 	for (int32 Index = 0; Index < MultiplayerTeamArcMaterials.Num(); ++Index)
 	{
 		const bool bBlueTeam = Index < MultiplayerTeamArcSegmentsPerSide;
-		SetMaterialColor(MultiplayerTeamArcMaterials[Index], bBlueTeam
+		SetEmissiveColor(MultiplayerTeamArcMaterials[Index], bBlueTeam
 			? FLinearColor(0.0f, 0.31f, 0.53f, 1.0f)
-			: FLinearColor(0.58f, 0.075f, 0.008f, 1.0f));
+			: FLinearColor(0.58f, 0.075f, 0.008f, 1.0f), 2.8f);
 	}
 
 	if (MultiplayerPlayerZoneOutlineMaterials.Num() != MultiplayerPlayerZoneOutlines.Num())
@@ -822,26 +945,23 @@ void AFlickArena::ApplyArenaShape()
 			MultiplayerPlayerZoneInsetMaterials.Add(Zone ? Zone->CreateAndSetMaterialInstanceDynamic(0) : nullptr);
 		}
 	}
-	const FLinearColor PlayerZoneColors[] = {
-		FLinearColor(0.84f, 0.92f, 1.0f, 1.0f),
-		FLinearColor(1.0f, 0.04f, 0.66f, 1.0f),
-		FLinearColor(0.5f, 0.94f, 0.025f, 1.0f)};
 	for (int32 Index = 0; Index < MultiplayerPlayerZoneOutlineMaterials.Num(); ++Index)
 	{
 		const int32 TeamIndex = Index / MaximumMultiplayerPlayersPerTeam;
 		const int32 PlayerSlot = Index % MaximumMultiplayerPlayersPerTeam;
 		const FLinearColor TeamColor = TeamIndex == 0
-			? FLinearColor(0.0f, 0.52f, 0.82f, 1.0f)
-			: FLinearColor(0.92f, 0.12f, 0.015f, 1.0f);
-		const FLinearColor PlayerColor = PlayerZoneColors[PlayerSlot];
-		SetMaterialColor(
+			? FLinearColor(0.0f, 0.5f, 0.68f, 1.0f)
+			: FLinearColor(0.74f, 0.17f, 0.018f, 1.0f);
+		const float SlotShade = 1.0f - static_cast<float>(PlayerSlot) * 0.08f;
+		SetEmissiveColor(
 			MultiplayerPlayerZoneOutlineMaterials[Index],
-			FMath::Lerp(FMath::Lerp(FLinearColor(0.018f, 0.028f, 0.045f, 1.0f), TeamColor, 0.18f), PlayerColor, 0.32f));
+			TeamColor * SlotShade,
+			2.2f);
 		if (MultiplayerPlayerZoneInsetMaterials.IsValidIndex(Index))
 		{
 			SetMaterialColor(
 				MultiplayerPlayerZoneInsetMaterials[Index],
-				FMath::Lerp(FMath::Lerp(FLinearColor(0.055f, 0.073f, 0.1f, 1.0f), TeamColor, 0.12f), PlayerColor, 0.045f));
+				FMath::Lerp(FLinearColor(0.018f, 0.03f, 0.047f, 1.0f), TeamColor, 0.045f));
 		}
 	}
 }

@@ -35,6 +35,8 @@ namespace FlickPieceArchetypeRules
 {
 	inline constexpr int32 ArchetypeCount = static_cast<int32>(EFlickPieceArchetype::Toppler) + 1;
 	FLICK_API const FFlickPieceArchetypeRules& Get(EFlickPieceArchetype Archetype);
+	/** Canonical visual accent shared by arena meshes and all UI puck previews. */
+	FLICK_API FLinearColor GetVisualAccent(EFlickPieceArchetype Archetype, const FLinearColor& TeamColor);
 	FLICK_API FFlickPieceDisplayStats GetDisplayStats(EFlickPieceArchetype Archetype);
 	FLICK_API const TArray<EFlickPieceArchetype>& GetPreset(EFlickLineupPreset Preset);
 	FLICK_API EFlickPieceArchetype Cycle(EFlickPieceArchetype Archetype, int32 Direction);

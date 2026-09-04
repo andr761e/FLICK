@@ -100,6 +100,9 @@ private:
 	UFUNCTION()
 	void OnRep_Eliminated();
 
+	UFUNCTION()
+	void OnRep_KickoffLocked();
+
 	void ApplyEliminatedState();
 
 	UFUNCTION()
@@ -157,10 +160,19 @@ private:
 	TObjectPtr<UStaticMeshComponent> CoreBezel;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> SignatureRing;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> SignatureInset;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> TopTicks;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> SideLugs;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> EmblemParts;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UPointLightComponent> AccentLight;
@@ -217,10 +229,19 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> CoreBezelMaterial;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> SignatureRingMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> SignatureInsetMaterial;
+
+	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> TopTickMaterials;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> SideLugMaterials;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> EmblemPartMaterials;
 
 	UPROPERTY(ReplicatedUsing = OnRep_PieceConfiguration, VisibleAnywhere, Category = "FLICK|Piece")
 	EFlickTeam Team = EFlickTeam::None;
@@ -246,7 +267,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Piece")
 	bool bHovered = false;
 
-	UPROPERTY(VisibleAnywhere, Category = "FLICK|Piece")
+	UPROPERTY(ReplicatedUsing = OnRep_KickoffLocked, VisibleAnywhere, Category = "FLICK|Piece")
 	bool bKickoffLocked = false;
 
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Piece")
@@ -261,5 +282,6 @@ private:
 	float HitFlashStrength = 0.0f;
 	float VisualTime = 0.0f;
 	float LastImpactNotificationTime = -100.0f;
+	float LastArenaImpactNotificationTime = -100.0f;
 	FVector BaseHaloRelativeScale = FVector::OneVector;
 };

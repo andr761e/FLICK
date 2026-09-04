@@ -1,0 +1,16 @@
+Byg development build:
+.\package-flick-development.cmd
+
+Åben single spil
+.\play-flick
+
+Åben dobbelt spil
+.\play-flick-network.cmd
+
+#Controller test
+.\play-flick.cmd
+
+Things to implement;
+-
+-
+
