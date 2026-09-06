@@ -85,6 +85,7 @@ private:
 	void ObserveMatchState(const AFlickGameState& GameState, float Now);
 	void DrawTopBar(const AFlickGameState& GameState, float Width, float Now);
 	void DrawAimPresentation(const AFlickPlayerController& Controller);
+	void DrawCinematicReplayPullback(const AFlickGameMode& GameMode);
 	void DrawLockedKickoffPresentation(const AFlickGameMode& GameMode);
 	void DrawTechnicalAimArrow(const FVector2D& Start, const FVector2D& End, const FLinearColor& Accent);
 	void DrawPowerMeter(const AFlickPlayerController& Controller, float Width, float Height);
@@ -126,6 +127,7 @@ private:
 	EFlickMatchPhase LastObservedPhase = EFlickMatchPhase::WaitingToStart;
 	EFlickTeam LastObservedTeam = EFlickTeam::None;
 	int32 LastObservedDramaticEventSerial = 0;
+	int32 LastObservedAccoladeSerial = 0;
 	float StateChangedAt = -100.0f;
 	bool bHasObservedState = false;
 	TArray<FFlickMenuHitRegion> MenuHitRegions;

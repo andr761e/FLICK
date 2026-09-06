@@ -41,6 +41,9 @@ public:
 	void ApplyTabletopSelfRighting(float TorqueStrength, float DampingStrength, float MinimumTiltDegrees);
 	void ApplyTabletopFlightContainment(float SurfaceZ, float MaximumUpwardSpeed, float DownwardAcceleration);
 	void SettleFlatOnTabletop(float SurfaceZ);
+	void BeginReplayPresentation();
+	void ApplyReplayPresentation(const FTransform& Transform, bool bVisible);
+	void EndReplayPresentation();
 
 	bool IsSelectableBy(EFlickTeam Team) const;
 	bool IsActive() const { return !bEliminated; }
@@ -284,4 +287,6 @@ private:
 	float LastImpactNotificationTime = -100.0f;
 	float LastArenaImpactNotificationTime = -100.0f;
 	FVector BaseHaloRelativeScale = FVector::OneVector;
+	FTransform PreReplayTransform = FTransform::Identity;
+	bool bReplayPresentationActive = false;
 };

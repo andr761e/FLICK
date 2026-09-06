@@ -15,6 +15,13 @@ namespace
 	const TCHAR* FlickProfileSection = TEXT("FLICK.ProfileStats");
 	constexpr int32 MaxLoadoutSlots = 4;
 	constexpr int32 MaxRecentProfileMatches = 8;
+	const TCHAR* AccoladeConfigKeys[FlickAccoladeCount] =
+	{
+		TEXT("Accolade.SwitchKnockout"), TEXT("Accolade.DividerBank"), TEXT("Accolade.TrapShot"),
+		TEXT("Accolade.DominoKnockout"), TEXT("Accolade.TeamWipeout"), TEXT("Accolade.PerfectTrade"),
+		TEXT("Accolade.LongRangeKnockout"), TEXT("Accolade.Pinball"), TEXT("Accolade.PrecisionKnockout"),
+		TEXT("Accolade.BuzzerBeater"), TEXT("Accolade.FlawlessRound")
+	};
 
 	int32 AddProfileCounter(const int32 CurrentValue, const int32 AddedValue)
 	{
@@ -113,6 +120,36 @@ void FFlickProfileStats::RecordMatch(
 	Shots = AddProfileCounter(Shots, MatchShots);
 }
 
+void FFlickProfileStats::RecordAccolades(const TArray<int32>& MatchAccoladeCounts)
+{
+	if (AccoladeCounts.Num() != FlickAccoladeCount)
+	{
+		AccoladeCounts.SetNumZeroed(FlickAccoladeCount);
+	}
+	for (int32 Index = 0; Index < FlickAccoladeCount; ++Index)
+	{
+		AccoladeCounts[Index] = AddProfileCounter(
+			AccoladeCounts[Index],
+			MatchAccoladeCounts.IsValidIndex(Index) ? MatchAccoladeCounts[Index] : 0);
+	}
+}
+
+int32 FFlickProfileStats::GetTotalAccolades() const
+{
+	int32 Total = 0;
+	for (const int32 Count : AccoladeCounts)
+	{
+		Total = AddProfileCounter(Total, Count);
+	}
+	return Total;
+}
+
+int32 FFlickProfileStats::GetAccoladeCount(const EFlickAccolade Accolade) const
+{
+	const int32 Index = static_cast<int32>(Accolade);
+	return AccoladeCounts.IsValidIndex(Index) ? FMath::Max(0, AccoladeCounts[Index]) : 0;
+}
+
 void UFlickGameInstance::Init()
 {
 	Super::Init();
@@ -195,6 +232,12 @@ void UFlickGameInstance::Init()
 	GConfig->GetInt(FlickProfileSection, TEXT("Knockouts"), ProfileStats.Knockouts, GGameUserSettingsIni);
 	GConfig->GetInt(FlickProfileSection, TEXT("DoubleKnockouts"), ProfileStats.DoubleKnockouts, GGameUserSettingsIni);
 	GConfig->GetInt(FlickProfileSection, TEXT("Shots"), ProfileStats.Shots, GGameUserSettingsIni);
+	ProfileStats.AccoladeCounts.Init(0, FlickAccoladeCount);
+	for (int32 Index = 0; Index < FlickAccoladeCount; ++Index)
+	{
+		GConfig->GetInt(FlickProfileSection, AccoladeConfigKeys[Index], ProfileStats.AccoladeCounts[Index], GGameUserSettingsIni);
+		ProfileStats.AccoladeCounts[Index] = FMath::Max(0, ProfileStats.AccoladeCounts[Index]);
+	}
 	ProfileStats.MatchesPlayed = FMath::Max(0, ProfileStats.MatchesPlayed);
 	ProfileStats.Wins = FMath::Clamp(ProfileStats.Wins, 0, ProfileStats.MatchesPlayed);
 	ProfileStats.Points = FMath::Max(0, ProfileStats.Points);
@@ -435,6 +478,7 @@ void UFlickGameInstance::RecordCompletedMatch(
 	const int32 Knockouts,
 	const int32 DoubleKnockouts,
 	const int32 Shots,
+	const TArray<int32>& AccoladeCounts,
 	const bool bWon,
 	const bool bDraw,
 	const EFlickMatchVariant Variant,
@@ -442,6 +486,7 @@ void UFlickGameInstance::RecordCompletedMatch(
 	const bool bRanked)
 {
 	ProfileStats.RecordMatch(Points, Knockouts, DoubleKnockouts, Shots, bWon);
+	ProfileStats.RecordAccolades(AccoladeCounts);
 	FFlickProfileMatchRecord& Record = RecentMatches.InsertDefaulted_GetRef(0);
 	Record.CompletedUnixTime = FDateTime::UtcNow().ToUnixTimestamp();
 	Record.Variant = NormalizeMatchVariant(Variant);
@@ -468,6 +513,14 @@ void UFlickGameInstance::SaveProfileStats() const
 	GConfig->SetInt(FlickProfileSection, TEXT("Knockouts"), ProfileStats.Knockouts, GGameUserSettingsIni);
 	GConfig->SetInt(FlickProfileSection, TEXT("DoubleKnockouts"), ProfileStats.DoubleKnockouts, GGameUserSettingsIni);
 	GConfig->SetInt(FlickProfileSection, TEXT("Shots"), ProfileStats.Shots, GGameUserSettingsIni);
+	for (int32 Index = 0; Index < FlickAccoladeCount; ++Index)
+	{
+		GConfig->SetInt(
+			FlickProfileSection,
+			AccoladeConfigKeys[Index],
+			ProfileStats.GetAccoladeCount(static_cast<EFlickAccolade>(Index)),
+			GGameUserSettingsIni);
+	}
 	TArray<FString> SavedRecentMatches;
 	SavedRecentMatches.Reserve(RecentMatches.Num());
 	for (const FFlickProfileMatchRecord& Record : RecentMatches)

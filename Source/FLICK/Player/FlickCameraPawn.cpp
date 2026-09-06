@@ -2,6 +2,8 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
+#include "Core/FlickTypes.h"
+#include "Kismet/KismetMathLibrary.h"
 
 AFlickCameraPawn::AFlickCameraPawn()
 {
@@ -58,22 +60,38 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	const float MenuDepthDrift = bMenuPresentation ? FMath::Sin(ShakeTime * 0.15f + 1.1f) * 13.0f : 0.0f;
 	const float MenuLift = bMenuPresentation ? FMath::Sin(ShakeTime * 0.18f + 2.0f) * 9.0f : 0.0f;
 	const FVector ScaledMenuLocation = MenuCameraLocation * ArenaFramingScale;
-	const FVector TargetLocation = (bMenuPresentation ? ScaledMenuLocation : GetGameplayTargetLocation())
+	FVector TargetLocation = (bMenuPresentation ? ScaledMenuLocation : GetGameplayTargetLocation())
 		+ FVector(MenuDrift, MenuDepthDrift, MenuLift);
-	const FRotator TargetRotation = (bMenuPresentation ? MenuCameraRotation : GetGameplayTargetRotation())
+	FRotator TargetRotation = (bMenuPresentation ? MenuCameraRotation : GetGameplayTargetRotation())
 		+ (bMenuPresentation
 			? FRotator(FMath::Sin(ShakeTime * 0.17f) * 0.18f, FMath::Sin(ShakeTime * 0.2f + 0.8f) * 0.48f, 0.0f)
 			: FRotator::ZeroRotator);
-	const float TargetFieldOfView = bMenuPresentation
+	float TargetFieldOfView = bMenuPresentation
 		? MenuFieldOfView
 		: bBobGameplayFraming ? BobFieldOfView : bCompactGameplayFraming ? CompactFieldOfView : FieldOfView;
-	const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), TargetLocation, DeltaSeconds, PresentationBlendSpeed);
-	const FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, PresentationBlendSpeed);
+	float BlendSpeed = PresentationBlendSpeed;
+	if (bCinematicReplay)
+	{
+		const float ArcAngle = ReplayOrbitAngle + FMath::Lerp(-7.0f, 11.0f, ReplayProgress);
+		const float ReplayDistance = FMath::Lerp(720.0f, 1120.0f, ReplayPullbackAlpha) * ArenaFramingScale;
+		const float ReplayHeight = FMath::Lerp(430.0f, 650.0f, ReplayPullbackAlpha) * ArenaFramingScale;
+		const FVector CameraOffset = FVector(0.0f, -ReplayDistance, ReplayHeight)
+			.RotateAngleAxis(ArcAngle, FVector::UpVector);
+		TargetLocation = ReplayFocus + CameraOffset;
+		TargetRotation = UKismetMathLibrary::FindLookAtRotation(
+			TargetLocation,
+			ReplayFocus + FVector(0.0f, 0.0f, 28.0f));
+		const float EstablishedFieldOfView = FMath::Lerp(33.0f, 39.0f, ReplayPullbackAlpha);
+		TargetFieldOfView = EstablishedFieldOfView - 3.5f * FMath::Sin(ReplayProgress * PI);
+		BlendSpeed = 5.5f;
+	}
+	const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), TargetLocation, DeltaSeconds, BlendSpeed);
+	const FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, BlendSpeed);
 	SetActorLocation(NewLocation);
 	SetActorRotation(NewRotation);
 	bGameplayViewTransitioning = !bMenuPresentation
 		&& (!NewLocation.Equals(TargetLocation, 1.0f) || !NewRotation.Equals(TargetRotation, 0.08f));
-	CurrentFieldOfView = FMath::FInterpTo(CurrentFieldOfView, TargetFieldOfView, DeltaSeconds, PresentationBlendSpeed);
+	CurrentFieldOfView = FMath::FInterpTo(CurrentFieldOfView, TargetFieldOfView, DeltaSeconds, BlendSpeed);
 	ShakeTrauma = FMath::Max(0.0f, ShakeTrauma - ShakeDecayPerSecond * DeltaSeconds);
 	const float ShakeAmount = FMath::Square(ShakeTrauma);
 	if (ShakeAmount <= KINDA_SMALL_NUMBER)
@@ -201,14 +219,36 @@ void AFlickCameraPawn::RotateGameplayOrbit(const float Direction, const float De
 	bGameplayViewTransitioning = true;
 }
 
+void AFlickCameraPawn::ResetGameplayView(const int32 InViewIndex, const bool bResetElevation)
+{
+	bGameplayOrbitManuallyControlled = false;
+	SetGameplayViewIndex(InViewIndex, false);
+	if (bResetElevation && !bGameplayElevationLocked)
+	{
+		GameplayElevationPresetIndex = 1;
+		SetGameplayElevation(TacticalGameplayElevation, false);
+	}
+	ShakeTrauma = 0.0f;
+	bGameplayViewTransitioning = !bMenuPresentation;
+}
+
 void AFlickCameraPawn::AdjustGameplayElevation(const int32 StepDirection)
 {
 	if (StepDirection == 0 || bMenuPresentation || bGameplayElevationLocked)
 	{
 		return;
 	}
-	SetGameplayElevation(
-		GameplayElevationAngle + FMath::Sign(StepDirection) * FMath::Max(GameplayElevationStep, 0.1f));
+	GameplayElevationPresetIndex = FMath::Clamp(
+		GameplayElevationPresetIndex + (StepDirection > 0 ? 1 : -1),
+		0,
+		2);
+	const float PresetElevations[] =
+	{
+		LowGameplayElevation,
+		TacticalGameplayElevation,
+		OverviewGameplayElevation
+	};
+	SetGameplayElevation(PresetElevations[GameplayElevationPresetIndex]);
 }
 
 void AFlickCameraPawn::SetGameplayElevation(const float InElevation, const bool bSnap)
@@ -227,6 +267,22 @@ void AFlickCameraPawn::SetGameplayElevation(const float InElevation, const bool 
 	}
 
 	GameplayElevationAngle = NewElevation;
+	const float PresetElevations[] =
+	{
+		LowGameplayElevation,
+		TacticalGameplayElevation,
+		OverviewGameplayElevation
+	};
+	float ClosestDistance = TNumericLimits<float>::Max();
+	for (int32 PresetIndex = 0; PresetIndex < UE_ARRAY_COUNT(PresetElevations); ++PresetIndex)
+	{
+		const float Distance = FMath::Abs(NewElevation - PresetElevations[PresetIndex]);
+		if (Distance < ClosestDistance)
+		{
+			ClosestDistance = Distance;
+			GameplayElevationPresetIndex = PresetIndex;
+		}
+	}
 	ShakeTrauma = 0.0f;
 	bGameplayViewTransitioning = !bSnap;
 	if (bSnap)
@@ -235,6 +291,39 @@ void AFlickCameraPawn::SetGameplayElevation(const float InElevation, const bool 
 		SetActorRotation(GetGameplayTargetRotation());
 		bGameplayViewTransitioning = false;
 	}
+}
+
+void AFlickCameraPawn::BeginCinematicReplay(const FVector& InitialFocus, const EFlickTeam ShootingTeam)
+{
+	bCinematicReplay = true;
+	ReplayFocus = InitialFocus;
+	ReplayProgress = 0.0f;
+	ReplayPullbackAlpha = 0.0f;
+	ReplayOrbitAngle = ShootingTeam == EFlickTeam::Player2 ? 180.0f : 0.0f;
+	ShakeTrauma = 0.0f;
+	bGameplayViewTransitioning = true;
+}
+
+void AFlickCameraPawn::UpdateCinematicReplay(
+	const FVector& Focus,
+	const float NormalizedProgress,
+	const float PullbackAlpha)
+{
+	if (!bCinematicReplay)
+	{
+		return;
+	}
+	ReplayFocus = FMath::VInterpTo(ReplayFocus, Focus, GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.0f, 7.0f);
+	ReplayProgress = FMath::Clamp(NormalizedProgress, 0.0f, 1.0f);
+	ReplayPullbackAlpha = FMath::Clamp(PullbackAlpha, 0.0f, 1.0f);
+}
+
+void AFlickCameraPawn::EndCinematicReplay()
+{
+	bCinematicReplay = false;
+	ReplayProgress = 0.0f;
+	ReplayPullbackAlpha = 0.0f;
+	bGameplayViewTransitioning = true;
 }
 
 FVector AFlickCameraPawn::GetGameplayTargetLocation() const

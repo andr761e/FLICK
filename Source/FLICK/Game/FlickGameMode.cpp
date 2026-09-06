@@ -2,6 +2,7 @@
 
 #include "Arena/FlickArena.h"
 #include "Arena/FlickBobArena.h"
+#include "Arena/FlickTestArena.h"
 #include "Audio/FlickAudioDirector.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/PointLightComponent.h"
@@ -10,6 +11,7 @@
 #include "Core/FlickLog.h"
 #include "Core/FlickBobRules.h"
 #include "Core/FlickBotShotPlanner.h"
+#include "Core/FlickAccoladeRules.h"
 #include "Core/FlickMatchmakingRules.h"
 #include "Core/FlickModeRules.h"
 #include "Core/FlickPieceArchetypeRules.h"
@@ -716,6 +718,21 @@ void AFlickGameMode::BeginPlay()
 			}, 14.0f, false);
 		}
 	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickTestArenaPreview"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("FlickTestArenaSettingsPreview")))
+	{
+		bTestArenaMode = true;
+		SelectedMatchVariant = EFlickMatchVariant::Classic;
+		MatchmakingPlayersPerTeam = 1;
+		BeginTrainingActivity(true);
+		if (FParse::Param(FCommandLine::Get(), TEXT("FlickTestArenaSettingsPreview")))
+		{
+			// Keep preview time advancing for the capture timer, as with FlickPausePreview.
+			SettingsReturnScreen = EFlickFrontendScreen::Paused;
+			FrontendScreen = EFlickFrontendScreen::Settings;
+			SetCameraForFrontend();
+		}
+	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("Flick4v4Preview")))
 	{
 		SelectMatchVariant(EFlickMatchVariant::Classic);
@@ -1313,6 +1330,11 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 	UpdateRoundAdvanceTimer();
 	UpdateShotClock();
 	UpdateTrainingBot(DeltaSeconds);
+	if (bCinematicReplayActive)
+	{
+		UpdateCinematicRoundReplay(DeltaSeconds);
+		return;
+	}
 	if (FrontendScreen != EFlickFrontendScreen::Playing
 		|| !FlickGameState
 		|| FlickGameState->MatchPhase != EFlickMatchPhase::ResolvingPhysics)
@@ -1320,6 +1342,7 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 		return;
 	}
 
+	TrackTestArenaControlZones(DeltaSeconds);
 	ResolutionElapsed += DeltaSeconds;
 	if (IsBobMode())
 	{
@@ -1331,6 +1354,7 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 		UpdateClassicPieceStability();
 		UpdateEliminations();
 	}
+	CaptureRoundReplayFrame();
 
 	if (AreActivePiecesSettled())
 	{
@@ -1814,7 +1838,12 @@ bool AFlickGameMode::ExecuteValidatedLaunch(
 	const int32 ShootingPlayerSlot = bFreePlayTraining
 		? Piece->GetOwningPlayerSlot()
 		: FlickGameState->CurrentTeamPlayerSlot;
-	BeginResolutionTracking(ShootingTeam, false);
+	CaptureTestArenaControlZones();
+	BeginResolutionTracking(ShootingTeam, false, Piece);
+	FFlickReplayShotSetup& ReplayShot = ReplayShotSetups.AddDefaulted_GetRef();
+	ReplayShot.Piece = Piece;
+	ReplayShot.Direction = Direction.GetSafeNormal();
+	ReplayShot.Power = FMath::Clamp(NormalizedPower, 0.0f, 1.0f);
 	if (bFreePlayTraining)
 	{
 		FlickGameState->SetCurrentTeam(EFlickTeam::Player1);
@@ -2020,11 +2049,16 @@ void AFlickGameMode::ReleaseKickoffShots()
 		return;
 	}
 
-	BeginResolutionTracking(EFlickTeam::None, true);
+	CaptureTestArenaControlZones();
+	BeginResolutionTracking(EFlickTeam::None, true, nullptr);
 	float StrongestPower = 0.0f;
 	for (const FFlickLockedKickoffShot& Shot : LockedKickoffShots)
 	{
 		AFlickPiece* Piece = Shot.Piece.Get();
+		FFlickReplayShotSetup& ReplayShot = ReplayShotSetups.AddDefaulted_GetRef();
+		ReplayShot.Piece = Piece;
+		ReplayShot.Direction = Shot.Direction.GetSafeNormal();
+		ReplayShot.Power = FMath::Clamp(Shot.Power, 0.0f, 1.0f);
 		const FVector LaunchLocation = Piece->GetActorLocation() + FVector(0.0f, 0.0f, PieceThickness * 0.65f);
 		FlickGameState->BeginShot(Shot.Team, Piece->GetPieceId(), Shot.Power);
 		FlickGameState->RecordPlayerShot(Shot.Team, Shot.PlayerSlot);
@@ -2066,7 +2100,57 @@ void AFlickGameMode::NotifyPieceImpact(
 	const FVector& ImpactLocation,
 	const float ImpactVelocityChange)
 {
-	if (!Piece || !OtherPiece || ImpactVelocityChange < MinimumImpactFeedback || !GetWorld())
+	if (!Piece || !OtherPiece || ImpactVelocityChange < 35.0f || !GetWorld())
+	{
+		return;
+	}
+	const int32 PieceId = Piece->GetPieceId();
+	const int32 OtherPieceId = OtherPiece->GetPieceId();
+	if (bTestArenaMode)
+	{
+		const AFlickGameState* State = GetFlickGameState();
+		if (State && State->MatchPhase == EFlickMatchPhase::ResolvingPhysics)
+		{
+			if (!ResolutionFirstImpactTimes.Contains(PieceId))
+			{
+				ResolutionFirstImpactTimes.Add(PieceId, ResolutionElapsed);
+			}
+			if (!ResolutionFirstImpactTimes.Contains(OtherPieceId))
+			{
+				ResolutionFirstImpactTimes.Add(OtherPieceId, ResolutionElapsed);
+			}
+			if (Piece->GetTeam() != OtherPiece->GetTeam())
+			{
+				if (!ResolutionFirstOpponentImpactTimes.Contains(PieceId))
+				{
+					ResolutionFirstOpponentImpactTimes.Add(PieceId, ResolutionElapsed);
+				}
+				if (!ResolutionFirstOpponentImpactTimes.Contains(OtherPieceId))
+				{
+					ResolutionFirstOpponentImpactTimes.Add(OtherPieceId, ResolutionElapsed);
+				}
+			}
+		}
+	}
+	if (PieceId == ResolutionShotPieceId)
+	{
+		ResolutionDirectContactPieceIds.Add(OtherPieceId);
+	}
+	else if (OtherPieceId == ResolutionShotPieceId)
+	{
+		ResolutionDirectContactPieceIds.Add(PieceId);
+	}
+	const int32* PieceDepth = ResolutionContactDepths.Find(PieceId);
+	const int32* OtherDepth = ResolutionContactDepths.Find(OtherPieceId);
+	if (PieceDepth && !OtherDepth)
+	{
+		ResolutionContactDepths.Add(OtherPieceId, *PieceDepth + 1);
+	}
+	else if (OtherDepth && !PieceDepth)
+	{
+		ResolutionContactDepths.Add(PieceId, *OtherDepth + 1);
+	}
+	if (ImpactVelocityChange < MinimumImpactFeedback)
 	{
 		return;
 	}
@@ -2122,10 +2206,28 @@ void AFlickGameMode::NotifyPieceImpact(
 
 void AFlickGameMode::NotifyArenaImpact(
 	AFlickPiece* Piece,
+	UPrimitiveComponent* OtherComponent,
 	const FVector& ImpactLocation,
 	const float ImpactVelocityChange)
 {
-	if (!Piece || !AudioDirector || ImpactVelocityChange < 45.0f)
+	if (!Piece || ImpactVelocityChange < 45.0f)
+	{
+		return;
+	}
+	if (bTestArenaMode && TestArenaActor && OtherComponent)
+	{
+		int32 DividerIndex = INDEX_NONE;
+		if (TestArenaActor->FindDividerIndex(OtherComponent, DividerIndex))
+		{
+			ResolutionDividerContactPieceIds.Add(Piece->GetPieceId());
+			const uint8 DividerBit = static_cast<uint8>(1 << DividerIndex);
+			if ((ResolutionNewlyRaisedDividerMask & DividerBit) != 0)
+			{
+				ResolutionNewDividerContactPieceIds.Add(Piece->GetPieceId());
+			}
+		}
+	}
+	if (!AudioDirector)
 	{
 		return;
 	}
@@ -2767,6 +2869,7 @@ void AFlickGameMode::CancelClassSelection()
 	}
 	bInitialClassSelectionTimerActive = false;
 	bClassSelectionStartsTrainingBotMatch = false;
+	bTestArenaMode = false;
 	FrontendScreen = ClassSelectionReturnScreen;
 	SetCameraForFrontend();
 	PlayMenuSound(false);
@@ -2999,6 +3102,7 @@ void AFlickGameMode::StartSelectedMatch()
 void AFlickGameMode::BeginSelectedMatch()
 {
 	bClassSelectionStartsTrainingBotMatch = false;
+	bTestArenaMode = false;
 	if (SelectedMatchVariant == EFlickMatchVariant::Classic)
 	{
 		EnsureActivePlayerClasses(MatchmakingPlayersPerTeam);
@@ -3034,11 +3138,13 @@ void AFlickGameMode::BeginSelectedMatch()
 
 void AFlickGameMode::StartTrainingMode()
 {
+	bTestArenaMode = false;
 	BeginTrainingActivity(false);
 }
 
 void AFlickGameMode::StartTrainingBotMatch()
 {
+	bTestArenaMode = false;
 	if (GetNetMode() != NM_Standalone
 		|| bNetworkMatchRequested
 		|| bPartyRequested
@@ -3056,6 +3162,24 @@ void AFlickGameMode::StartTrainingBotMatch()
 		return;
 	}
 
+	SelectedMatchVariant = EFlickMatchVariant::Classic;
+	bClassSelectionStartsTrainingBotMatch = true;
+	PrepareClassSelection(false);
+}
+
+void AFlickGameMode::StartTestArenaBotMatch()
+{
+	if (GetNetMode() != NM_Standalone
+		|| bNetworkMatchRequested
+		|| bPartyRequested
+		|| bMatchmakingRequested)
+	{
+		UE_LOG(LogFlick, Warning, TEXT("Test arena bot match rejected because the current session is not offline"));
+		return;
+	}
+
+	bTestArenaMode = true;
+	MatchmakingPlayersPerTeam = 1;
 	SelectedMatchVariant = EFlickMatchVariant::Classic;
 	bClassSelectionStartsTrainingBotMatch = true;
 	PrepareClassSelection(false);
@@ -3119,10 +3243,12 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 	{
 		CaptureTrainingResetSnapshot();
 	}
-	PushHudEvent(
-		bAgainstBot ? TEXT("TRAINING  |  PLAY AGAINST BOT") : TEXT("TRAINING  |  FREE PLAY"),
-		bAgainstBot ? GetTeamColor(EFlickTeam::Player2) : FLinearColor(0.2f, 0.78f, 0.5f, 1.0f),
-		2.6f);
+	if (!bTestArenaMode)
+	{
+		PushHudEvent(bAgainstBot ? TEXT("TRAINING  |  PLAY AGAINST BOT") : TEXT("TRAINING  |  FREE PLAY"),
+			bAgainstBot ? GetTeamColor(EFlickTeam::Player2) : FLinearColor(0.2f, 0.78f, 0.5f, 1.0f), 2.6f);
+	}
+
 	if (AudioDirector)
 	{
 		AudioDirector->PlayTurn(EFlickTeam::Player1);
@@ -3130,8 +3256,8 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 	UE_LOG(
 		LogFlick,
 		Log,
-		TEXT("Started offline %s training in %s %dv%d"),
-		bAgainstBot ? TEXT("bot") : TEXT("free-play"),
+		TEXT("Started offline %s in %s %dv%d"),
+		bTestArenaMode ? TEXT("test arena bot match") : bAgainstBot ? TEXT("bot training") : TEXT("free-play training"),
 		*GetMatchVariantName(SelectedMatchVariant),
 		CurrentPlayersPerTeam,
 		CurrentPlayersPerTeam);
@@ -3592,6 +3718,7 @@ void AFlickGameMode::StartSelectedMatchmaking()
 	bTrainingEditMode = false;
 	bTrainingBotMatch = false;
 	bClassSelectionStartsTrainingBotMatch = false;
+	bTestArenaMode = false;
 	ResetTrainingBotThinking();
 	if (bPartyRequested)
 	{
@@ -5583,6 +5710,7 @@ void AFlickGameMode::ReturnToMainMenu()
 	bTrainingEditMode = false;
 	bTrainingBotMatch = false;
 	bClassSelectionStartsTrainingBotMatch = false;
+	bTestArenaMode = false;
 	ResetTrainingBotThinking();
 	bPlayerClassesActiveForMatch = false;
 	bClassSelectionForNextRound = false;
@@ -5950,10 +6078,28 @@ void AFlickGameMode::SpawnArenaIfNeeded()
 	{
 		return;
 	}
-	ArenaActor = GetWorld()->SpawnActor<AFlickArena>(AFlickArena::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+	if (bTestArenaMode)
+	{
+		TestArenaActor = GetWorld()->SpawnActor<AFlickTestArena>(
+			AFlickTestArena::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+		ArenaActor = TestArenaActor;
+	}
+	else
+	{
+		TestArenaActor = nullptr;
+		ArenaActor = GetWorld()->SpawnActor<AFlickArena>(
+			AFlickArena::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+	}
 	if (ArenaActor)
 	{
-		ArenaActor->InitializeArena(ArenaRadius, ArenaThickness, ArenaSurfaceZ, CurrentPlayersPerTeam);
+		if (TestArenaActor)
+		{
+			TestArenaActor->InitializeTestArena(ArenaRadius, ArenaThickness, ArenaSurfaceZ);
+		}
+		else
+		{
+			ArenaActor->InitializeArena(ArenaRadius, ArenaThickness, ArenaSurfaceZ, CurrentPlayersPerTeam);
+		}
 	}
 }
 
@@ -6075,6 +6221,10 @@ void AFlickGameMode::SpawnBobPieces()
 
 void AFlickGameMode::DestroyPieces()
 {
+	if (bCinematicReplayActive)
+	{
+		FinishCinematicRoundReplay(false);
+	}
 	ResetKickoffState();
 	Player1BobStriker = nullptr;
 	Player2BobStriker = nullptr;
@@ -6486,6 +6636,7 @@ void AFlickGameMode::RebuildMatch()
 	{
 		ArenaActor->Destroy();
 		ArenaActor = nullptr;
+		TestArenaActor = nullptr;
 	}
 	if (BobArenaActor && IsValid(BobArenaActor))
 	{
@@ -6692,16 +6843,535 @@ void AFlickGameMode::AddControllerFeedback(const float Strength, const float Dur
 
 void AFlickGameMode::BeginResolutionTracking(
 	const EFlickTeam ShootingTeam,
-	const bool bSimultaneousShot)
+	const bool bSimultaneousShot,
+	AFlickPiece* ShotPiece)
 {
+	if (bCinematicReplayActive)
+	{
+		FinishCinematicRoundReplay(false);
+	}
+	RoundReplayFrames.Reset();
+	ReplayShotSetups.Reset();
+	LastReplayCaptureTime = -100.0f;
+	bReplayPlayedForResolution = false;
+	ResolutionElapsed = 0.0f;
 	ResolutionPlayer1Eliminated = 0;
 	ResolutionPlayer2Eliminated = 0;
 	ResolutionImpactCount = 0;
 	ResolutionShootingTeam = ShootingTeam;
 	bResolutionWasSimultaneous = bSimultaneousShot;
+	ResolutionShotPieceId = ShotPiece ? ShotPiece->GetPieceId() : INDEX_NONE;
+	ResolutionShotStart = ShotPiece
+		? FVector2D(ShotPiece->GetActorLocation().X, ShotPiece->GetActorLocation().Y)
+		: FVector2D::ZeroVector;
+	ResolutionActivatedSwitchMask = 0;
+	ResolutionNewlyRaisedDividerMask = 0;
+	ResolutionInitialPieceLocations.Reset();
+	ResolutionContactDepths.Reset();
+	ResolutionDirectContactPieceIds.Reset();
+	ResolutionEliminatedPieceIds.Reset();
+	ResolutionDividerContactPieceIds.Reset();
+	ResolutionNewDividerContactPieceIds.Reset();
+	ResolutionFirstImpactTimes.Reset();
+	ResolutionFirstOpponentImpactTimes.Reset();
+	ResolutionEliminationTimes.Reset();
+	ReplayPresentedEliminationPieceIds.Reset();
+	ReplayPrimaryFocusPieceId = INDEX_NONE;
+	ReplayKnockoutFocusPieceId = INDEX_NONE;
+	ReplayFocusSwitchSourceTime = TNumericLimits<float>::Max();
 	if (AFlickGameState* FlickGameState = GetFlickGameState())
 	{
+		bResolutionBuzzerRelease = !bSimultaneousShot
+			&& FlickGameState->bShotClockActive
+			&& FlickGameState->GetShotClockTimeRemaining() <= BuzzerBeaterTimeThreshold;
 		FlickGameState->ClearDramaticEvent();
+	}
+	else
+	{
+		bResolutionBuzzerRelease = false;
+	}
+	for (const AFlickPiece* Piece : Pieces)
+	{
+		if (Piece && IsValid(Piece) && Piece->IsActive())
+		{
+			const FVector Location = Piece->GetActorLocation();
+			ResolutionInitialPieceLocations.Add(Piece->GetPieceId(), FVector2D(Location.X, Location.Y));
+		}
+	}
+	if (ResolutionShotPieceId != INDEX_NONE)
+	{
+		ResolutionContactDepths.Add(ResolutionShotPieceId, 0);
+	}
+	CaptureRoundReplayFrame(true);
+}
+
+float AFlickGameMode::GetCinematicReplayProgress() const
+{
+	return CinematicReplayPlaybackDuration > KINDA_SMALL_NUMBER
+		? FMath::Clamp(CinematicReplayElapsed / CinematicReplayPlaybackDuration, 0.0f, 1.0f)
+		: 0.0f;
+}
+
+bool AFlickGameMode::IsCinematicReplayPullbackActive() const
+{
+	return bCinematicReplayActive && CinematicReplayElapsed < ReplayPullbackDuration;
+}
+
+float AFlickGameMode::GetCinematicReplayPullbackAlpha() const
+{
+	if (!bCinematicReplayActive)
+	{
+		return 0.0f;
+	}
+	if (!IsCinematicReplayPullbackActive())
+	{
+		return 1.0f;
+	}
+	const float BuildDuration = FMath::Max(ReplayPullbackDuration * 0.7f, 0.01f);
+	const float Alpha = FMath::Clamp(CinematicReplayElapsed / BuildDuration, 0.0f, 1.0f);
+	return Alpha * Alpha * (3.0f - 2.0f * Alpha);
+}
+
+const AFlickPiece* AFlickGameMode::GetCinematicReplayShotPiece(const int32 ShotIndex) const
+{
+	return ReplayShotSetups.IsValidIndex(ShotIndex) ? ReplayShotSetups[ShotIndex].Piece.Get() : nullptr;
+}
+
+FVector AFlickGameMode::GetCinematicReplayShotDirection(const int32 ShotIndex) const
+{
+	return ReplayShotSetups.IsValidIndex(ShotIndex) ? ReplayShotSetups[ShotIndex].Direction : FVector::ZeroVector;
+}
+
+float AFlickGameMode::GetCinematicReplayShotPower(const int32 ShotIndex) const
+{
+	return ReplayShotSetups.IsValidIndex(ShotIndex) ? ReplayShotSetups[ShotIndex].Power : 0.0f;
+}
+
+void AFlickGameMode::CaptureTestArenaControlZones()
+{
+	if (bTestArenaMode && TestArenaActor && IsValid(TestArenaActor))
+	{
+		TestArenaActor->BeginControlZoneTracking(Pieces);
+	}
+}
+
+void AFlickGameMode::TrackTestArenaControlZones(const float DeltaSeconds)
+{
+	if (bTestArenaMode && IsValid(TestArenaActor))
+	{
+		uint8 DeployedMechanisms = 0;
+		ResolutionActivatedSwitchMask |= TestArenaActor->TrackControlZoneCrossings(Pieces, DeltaSeconds, DeployedMechanisms);
+		for (int32 Index = 0; Index < TestArenaActor->GetMechanismCount(); ++Index)
+		{
+			const uint8 Bit = static_cast<uint8>(1 << Index);
+			if ((DeployedMechanisms & Bit) != 0 && TestArenaActor->IsDividerRaised(Index))
+			{
+				ResolutionNewlyRaisedDividerMask |= Bit;
+			}
+		}
+	}
+}
+
+void AFlickGameMode::ResolveTestArenaControlZones()
+{
+	if (bTestArenaMode && IsValid(TestArenaActor))
+	{
+		TestArenaActor->CommitPendingControlZoneToggles(Pieces);
+	}
+}
+
+void AFlickGameMode::CaptureRoundReplayFrame(const bool bForce)
+{
+	if (!bTestArenaMode || bCinematicReplayActive || !TestArenaActor || !IsValid(TestArenaActor))
+	{
+		return;
+	}
+
+	const float CaptureInterval = 1.0f / FMath::Max(ReplayCaptureRate, 1.0f);
+	if (!bForce && ResolutionElapsed - LastReplayCaptureTime < CaptureInterval)
+	{
+		return;
+	}
+	if (bForce && !RoundReplayFrames.IsEmpty()
+		&& FMath::IsNearlyEqual(RoundReplayFrames.Last().Time, ResolutionElapsed, KINDA_SMALL_NUMBER))
+	{
+		RoundReplayFrames.Pop(EAllowShrinking::No);
+	}
+
+	FFlickRoundReplayFrame& Frame = RoundReplayFrames.AddDefaulted_GetRef();
+	Frame.Time = FMath::Max(0.0f, ResolutionElapsed);
+	Frame.RaisedDividerMask = TestArenaActor->GetRaisedDividerMask();
+	Frame.Pieces.Reserve(Pieces.Num());
+	for (AFlickPiece* Piece : Pieces)
+	{
+		if (!Piece || !IsValid(Piece))
+		{
+			continue;
+		}
+		FFlickReplayPieceState& PieceState = Frame.Pieces.AddDefaulted_GetRef();
+		PieceState.Piece = Piece;
+		PieceState.Transform = Piece->GetActorTransform();
+		PieceState.bVisible = Piece->IsActive();
+	}
+	LastReplayCaptureTime = Frame.Time;
+}
+
+void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
+{
+	if (!bTestArenaMode || bCinematicReplayActive || bReplayPlayedForResolution
+		|| !TestArenaActor || !IsValid(TestArenaActor) || RoundReplayFrames.Num() < 2
+		|| (Outcome != EFlickMatchOutcome::Player1Wins && Outcome != EFlickMatchOutcome::Player2Wins))
+	{
+		return;
+	}
+
+	const float FirstTime = RoundReplayFrames[0].Time;
+	const float LastTime = RoundReplayFrames.Last().Time;
+	CinematicReplaySourceStart = FirstTime;
+	CinematicReplaySourceDuration = FMath::Max(LastTime - FirstTime, 0.01f);
+	CinematicReplayMotionDuration = FMath::Clamp(
+		CinematicReplaySourceDuration / FMath::Clamp(ReplaySlowMotionRate, 0.25f, 1.0f),
+		1.25f,
+		FMath::Max(ReplayMaximumPlaybackDuration, 2.0f));
+	CinematicReplayPlaybackDuration = ReplayPullbackDuration + CinematicReplayMotionDuration;
+	CinematicReplayElapsed = 0.0f;
+	PendingReplayOutcome = Outcome;
+	bCinematicReplayActive = true;
+	bReplayPlayedForResolution = true;
+	bReplayLaunchCuePlayed = false;
+	ReplayPresentedEliminationPieceIds.Reset();
+	const EFlickTeam WinningTeam = Outcome == EFlickMatchOutcome::Player1Wins
+		? EFlickTeam::Player1 : EFlickTeam::Player2;
+	const EFlickTeam LosingTeam = GetOpposingTeam(WinningTeam);
+	ReplayPrimaryFocusPieceId = ResolutionShotPieceId;
+	if (ReplayPrimaryFocusPieceId == INDEX_NONE)
+	{
+		const FFlickReplayShotSetup* WinningShot = ReplayShotSetups.FindByPredicate([WinningTeam](const FFlickReplayShotSetup& Shot)
+		{
+			return Shot.Piece.IsValid() && Shot.Piece->GetTeam() == WinningTeam;
+		});
+		if (!WinningShot && !ReplayShotSetups.IsEmpty())
+		{
+			WinningShot = &ReplayShotSetups[0];
+		}
+		ReplayPrimaryFocusPieceId = WinningShot && WinningShot->Piece.IsValid()
+			? WinningShot->Piece->GetPieceId() : INDEX_NONE;
+	}
+
+	float LatestLosingElimination = -1.0f;
+	for (const AFlickPiece* Piece : Pieces)
+	{
+		if (!Piece || !IsValid(Piece) || Piece->GetTeam() != LosingTeam
+			|| !ResolutionEliminatedPieceIds.Contains(Piece->GetPieceId()))
+		{
+			continue;
+		}
+		const float EliminationTime = ResolutionEliminationTimes.FindRef(Piece->GetPieceId());
+		if (EliminationTime >= LatestLosingElimination)
+		{
+			LatestLosingElimination = EliminationTime;
+			ReplayKnockoutFocusPieceId = Piece->GetPieceId();
+		}
+	}
+
+	const FFlickReplayShotSetup* SelfKnockoutShot = ReplayShotSetups.FindByPredicate([this, LosingTeam](const FFlickReplayShotSetup& Shot)
+	{
+		if (!Shot.Piece.IsValid() || Shot.Piece->GetTeam() != LosingTeam
+			|| !ResolutionEliminatedPieceIds.Contains(Shot.Piece->GetPieceId()))
+		{
+			return false;
+		}
+		return !bResolutionWasSimultaneous
+			|| !ResolutionFirstOpponentImpactTimes.Contains(Shot.Piece->GetPieceId());
+	});
+	if (SelfKnockoutShot && SelfKnockoutShot->Piece.IsValid())
+	{
+		ReplayPrimaryFocusPieceId = SelfKnockoutShot->Piece->GetPieceId();
+	}
+
+	const AFlickPiece* PrimaryPiece = nullptr;
+	if (const TObjectPtr<AFlickPiece>* Entry = Pieces.FindByPredicate([this](const TObjectPtr<AFlickPiece>& Piece)
+	{
+		return Piece && Piece->GetPieceId() == ReplayPrimaryFocusPieceId;
+	}))
+	{
+		PrimaryPiece = Entry->Get();
+	}
+	const bool bSelfKnockout = PrimaryPiece
+		&& PrimaryPiece->GetTeam() == LosingTeam
+		&& ResolutionEliminatedPieceIds.Contains(ReplayPrimaryFocusPieceId);
+	if (bSelfKnockout)
+	{
+		ReplayKnockoutFocusPieceId = ReplayPrimaryFocusPieceId;
+		ReplayFocusSwitchSourceTime = TNumericLimits<float>::Max();
+	}
+	else if (ReplayKnockoutFocusPieceId != INDEX_NONE
+		&& ReplayKnockoutFocusPieceId != ReplayPrimaryFocusPieceId)
+	{
+		const float* FirstImpact = ResolutionFirstImpactTimes.Find(ReplayKnockoutFocusPieceId);
+		ReplayFocusSwitchSourceTime = FirstImpact
+			? *FirstImpact
+			: FMath::Max(FirstTime, LatestLosingElimination - 0.25f);
+		ReplayFocusSwitchSourceTime = FMath::Clamp(ReplayFocusSwitchSourceTime, FirstTime, LastTime);
+	}
+
+	for (AFlickPiece* Piece : Pieces)
+	{
+		if (Piece && IsValid(Piece))
+		{
+			Piece->BeginReplayPresentation();
+		}
+	}
+	TestArenaActor->BeginReplayPresentation();
+	ApplyCinematicReplayTime(CinematicReplaySourceStart);
+
+	FVector InitialFocus = ArenaActor ? ArenaActor->GetActorLocation() : FVector::ZeroVector;
+	if (const FFlickReplayPieceState* ShotState = RoundReplayFrames[0].Pieces.FindByPredicate([this](const FFlickReplayPieceState& State)
+	{
+		return State.Piece.IsValid() && State.Piece->GetPieceId() == ReplayPrimaryFocusPieceId;
+	}))
+	{
+		InitialFocus = ShotState->Transform.GetLocation();
+	}
+	const EFlickTeam ReplayTeam = ResolutionShootingTeam != EFlickTeam::None
+		? ResolutionShootingTeam
+		: Outcome == EFlickMatchOutcome::Player1Wins ? EFlickTeam::Player1 : EFlickTeam::Player2;
+	if (CameraPawn)
+	{
+		CameraPawn->BeginCinematicReplay(InitialFocus, ReplayTeam);
+	}
+	if (AudioDirector)
+	{
+		AudioDirector->PlayReplayMusic(CinematicReplayPlaybackDuration, ReplayTeam);
+	}
+	ClearControllerAiming();
+	PushHudEvent(TEXT("REPLAY  //  ROUND-WINNING SHOT"), FLinearColor::White, CinematicReplayPlaybackDuration);
+	UE_LOG(LogFlick, Log, TEXT("Test arena replay started: %.2f second pullback and %.2f seconds of shot playback"),
+		ReplayPullbackDuration, CinematicReplayMotionDuration);
+	UE_LOG(LogFlick, Log, TEXT("Replay camera narrative: primary=%d knockout=%d switch=%.2f self_ko=%d"),
+		ReplayPrimaryFocusPieceId,
+		ReplayKnockoutFocusPieceId,
+		ReplayFocusSwitchSourceTime,
+		bSelfKnockout ? 1 : 0);
+}
+
+void AFlickGameMode::UpdateCinematicRoundReplay(const float DeltaSeconds)
+{
+	if (!bCinematicReplayActive)
+	{
+		return;
+	}
+
+	CinematicReplayElapsed += FMath::Max(0.0f, DeltaSeconds);
+	if (CinematicReplayElapsed < ReplayPullbackDuration)
+	{
+		ApplyCinematicReplayTime(CinematicReplaySourceStart);
+	}
+	else
+	{
+		if (!bReplayLaunchCuePlayed)
+		{
+			bReplayLaunchCuePlayed = true;
+			if (AudioDirector)
+			{
+				for (const FFlickReplayShotSetup& ReplayShot : ReplayShotSetups)
+				{
+					if (const AFlickPiece* Piece = ReplayShot.Piece.Get())
+					{
+						AudioDirector->PlayLaunch(
+							Piece->GetArchetype(),
+							ReplayShot.Power,
+							Piece->GetActorLocation() + FVector(0.0f, 0.0f, PieceThickness * 0.65f));
+					}
+				}
+			}
+		}
+		const float MotionProgress = CinematicReplayMotionDuration > KINDA_SMALL_NUMBER
+			? FMath::Clamp((CinematicReplayElapsed - ReplayPullbackDuration) / CinematicReplayMotionDuration, 0.0f, 1.0f)
+			: 1.0f;
+		ApplyCinematicReplayTime(CinematicReplaySourceStart + CinematicReplaySourceDuration * MotionProgress);
+	}
+	if (CinematicReplayElapsed >= CinematicReplayPlaybackDuration)
+	{
+		FinishCinematicRoundReplay(true);
+	}
+}
+
+void AFlickGameMode::ApplyCinematicReplayTime(const float SourceTime)
+{
+	if (RoundReplayFrames.IsEmpty())
+	{
+		return;
+	}
+
+	int32 UpperIndex = 0;
+	while (UpperIndex < RoundReplayFrames.Num() && RoundReplayFrames[UpperIndex].Time < SourceTime)
+	{
+		++UpperIndex;
+	}
+	UpperIndex = FMath::Clamp(UpperIndex, 0, RoundReplayFrames.Num() - 1);
+	const int32 LowerIndex = FMath::Max(0, UpperIndex - 1);
+	const FFlickRoundReplayFrame& LowerFrame = RoundReplayFrames[LowerIndex];
+	const FFlickRoundReplayFrame& UpperFrame = RoundReplayFrames[UpperIndex];
+	const float FrameSpan = UpperFrame.Time - LowerFrame.Time;
+	const float Alpha = FrameSpan > KINDA_SMALL_NUMBER
+		? FMath::Clamp((SourceTime - LowerFrame.Time) / FrameSpan, 0.0f, 1.0f)
+		: 0.0f;
+
+	const bool bFollowKnockout = ReplayKnockoutFocusPieceId != INDEX_NONE
+		&& SourceTime >= ReplayFocusSwitchSourceTime;
+	const int32 FocusPieceId = bFollowKnockout
+		? ReplayKnockoutFocusPieceId
+		: ReplayPrimaryFocusPieceId;
+	FVector ReplayFocus = FVector::ZeroVector;
+	FVector VisibleCenter = FVector::ZeroVector;
+	int32 VisiblePieceCount = 0;
+	bool bFoundFocusPiece = false;
+	for (const FFlickReplayPieceState& LowerState : LowerFrame.Pieces)
+	{
+		AFlickPiece* Piece = LowerState.Piece.Get();
+		if (!Piece || !IsValid(Piece))
+		{
+			continue;
+		}
+		const FFlickReplayPieceState* UpperState = UpperFrame.Pieces.FindByPredicate([Piece](const FFlickReplayPieceState& State)
+		{
+			return State.Piece.Get() == Piece;
+		});
+		const FTransform& EndTransform = UpperState ? UpperState->Transform : LowerState.Transform;
+		FTransform BlendedTransform;
+		BlendedTransform.Blend(LowerState.Transform, EndTransform, Alpha);
+		bool bVisible = LowerState.bVisible;
+		if (const float* EliminationTime = ResolutionEliminationTimes.Find(Piece->GetPieceId()))
+		{
+			bVisible = SourceTime < *EliminationTime;
+		}
+		Piece->ApplyReplayPresentation(BlendedTransform, bVisible);
+		if (Piece->GetPieceId() == FocusPieceId)
+		{
+			ReplayFocus = BlendedTransform.GetLocation();
+			bFoundFocusPiece = true;
+		}
+		if (bVisible)
+		{
+			VisibleCenter += BlendedTransform.GetLocation();
+			++VisiblePieceCount;
+		}
+	}
+
+	// Live elimination feedback is transient and has expired by the time the
+	// replay starts. Recreate it exactly once when replay time crosses each
+	// recorded ring-out, without re-running elimination gameplay or scoring.
+	for (const TPair<int32, float>& Elimination : ResolutionEliminationTimes)
+	{
+		if (SourceTime < Elimination.Value
+			|| ReplayPresentedEliminationPieceIds.Contains(Elimination.Key))
+		{
+			continue;
+		}
+
+		AFlickPiece* EliminatedPiece = nullptr;
+		for (AFlickPiece* Piece : Pieces)
+		{
+			if (Piece && IsValid(Piece) && Piece->GetPieceId() == Elimination.Key)
+			{
+				EliminatedPiece = Piece;
+				break;
+			}
+		}
+		if (!EliminatedPiece)
+		{
+			continue;
+		}
+
+		const FVector ArenaLocation = ArenaActor ? ArenaActor->GetActorLocation() : FVector::ZeroVector;
+		const float ActiveArenaRadius = ArenaActor ? ArenaActor->GetRadius() : ArenaRadius;
+		FVector EdgeDirection(
+			EliminatedPiece->GetActorLocation().X - ArenaLocation.X,
+			EliminatedPiece->GetActorLocation().Y - ArenaLocation.Y,
+			0.0f);
+		if (!EdgeDirection.Normalize())
+		{
+			EdgeDirection = FVector::ForwardVector;
+		}
+		const FVector FeedbackLocation = ArenaLocation
+			+ EdgeDirection * (ActiveArenaRadius - 20.0f)
+			+ FVector(0.0f, 0.0f, ArenaSurfaceZ + 22.0f - ArenaLocation.Z);
+		SpawnWorldFeedback(
+			FeedbackLocation,
+			GetTeamColor(EliminatedPiece->GetTeam()),
+			EFlickFeedbackKind::Elimination,
+			1.0f,
+			EdgeDirection);
+		ReplayPresentedEliminationPieceIds.Add(Elimination.Key);
+	}
+	if (!bFoundFocusPiece && VisiblePieceCount > 0)
+	{
+		ReplayFocus = VisibleCenter / static_cast<float>(VisiblePieceCount);
+	}
+	else if (!bFoundFocusPiece)
+	{
+		ReplayFocus = ArenaActor ? ArenaActor->GetActorLocation() : FVector::ZeroVector;
+	}
+	ReplayFocus.Z = ArenaSurfaceZ + PieceThickness;
+	if (TestArenaActor)
+	{
+		TestArenaActor->ApplyReplayDividerState(LowerFrame.RaisedDividerMask);
+	}
+	if (CameraPawn)
+	{
+		CameraPawn->UpdateCinematicReplay(
+			ReplayFocus,
+			GetCinematicReplayProgress(),
+			GetCinematicReplayPullbackAlpha());
+	}
+}
+
+void AFlickGameMode::FinishCinematicRoundReplay(const bool bCompleteRound)
+{
+	if (!bCinematicReplayActive)
+	{
+		return;
+	}
+
+	const EFlickMatchOutcome CompletedOutcome = PendingReplayOutcome;
+	for (AFlickPiece* Piece : Pieces)
+	{
+		if (Piece && IsValid(Piece))
+		{
+			Piece->EndReplayPresentation();
+		}
+	}
+	if (TestArenaActor && IsValid(TestArenaActor))
+	{
+		TestArenaActor->EndReplayPresentation();
+	}
+	if (CameraPawn)
+	{
+		CameraPawn->EndCinematicReplay();
+	}
+	if (AudioDirector)
+	{
+		AudioDirector->StopReplayMusic();
+	}
+
+	bCinematicReplayActive = false;
+	CinematicReplayElapsed = 0.0f;
+	CinematicReplaySourceStart = 0.0f;
+	CinematicReplaySourceDuration = 0.0f;
+	CinematicReplayMotionDuration = 0.0f;
+	CinematicReplayPlaybackDuration = 0.0f;
+	PendingReplayOutcome = EFlickMatchOutcome::Continue;
+	RoundReplayFrames.Reset();
+	ReplayShotSetups.Reset();
+	ReplayPresentedEliminationPieceIds.Reset();
+	bReplayLaunchCuePlayed = false;
+	ReplayPrimaryFocusPieceId = INDEX_NONE;
+	ReplayKnockoutFocusPieceId = INDEX_NONE;
+	ReplayFocusSwitchSourceTime = TNumericLimits<float>::Max();
+	if (bCompleteRound)
+	{
+		CompleteRoundForOutcome(CompletedOutcome);
 	}
 }
 
@@ -6798,6 +7468,113 @@ void AFlickGameMode::PresentDramaticResolutionEvent()
 		DramaticEventDuration);
 }
 
+void AFlickGameMode::PresentShotAccolades()
+{
+	AFlickGameState* FlickGameState = GetFlickGameState();
+	if (!FlickGameState || IsBobMode() || bResolutionWasSimultaneous
+		|| ResolutionShootingTeam == EFlickTeam::None || ResolutionShotPieceId == INDEX_NONE)
+	{
+		return;
+	}
+
+	const bool bShooterIsPlayer1 = ResolutionShootingTeam == EFlickTeam::Player1;
+	const int32 OpponentEliminated = bShooterIsPlayer1
+		? ResolutionPlayer2Eliminated : ResolutionPlayer1Eliminated;
+	const int32 OwnEliminated = bShooterIsPlayer1
+		? ResolutionPlayer1Eliminated : ResolutionPlayer2Eliminated;
+	const EFlickTeam OpponentTeam = GetOpposingTeam(ResolutionShootingTeam);
+
+	bool bDominoKnockout = false;
+	bool bLongRangeKnockout = false;
+	for (const AFlickPiece* Piece : Pieces)
+	{
+		if (!Piece || !IsValid(Piece) || Piece->GetTeam() != OpponentTeam
+			|| !ResolutionEliminatedPieceIds.Contains(Piece->GetPieceId()))
+		{
+			continue;
+		}
+		if (const int32* ContactDepth = ResolutionContactDepths.Find(Piece->GetPieceId()))
+		{
+			bDominoKnockout |= *ContactDepth >= 2
+				&& !ResolutionDirectContactPieceIds.Contains(Piece->GetPieceId());
+		}
+		if (const FVector2D* InitialTargetLocation = ResolutionInitialPieceLocations.Find(Piece->GetPieceId()))
+		{
+			bLongRangeKnockout |= FVector2D::Distance(ResolutionShotStart, *InitialTargetLocation)
+				>= LongRangeKnockoutDistance;
+		}
+	}
+
+	bool bPrecisionStop = false;
+	const TObjectPtr<AFlickPiece>* ShotPieceEntry = Pieces.FindByPredicate([this](const TObjectPtr<AFlickPiece>& Piece)
+	{
+		return Piece && Piece->GetPieceId() == ResolutionShotPieceId;
+	});
+	if (const AFlickPiece* ShotPiece = ShotPieceEntry ? ShotPieceEntry->Get() : nullptr)
+	{
+		if (IsValid(ShotPiece) && ShotPiece->IsActive())
+		{
+			const FVector ArenaLocation = ArenaActor ? ArenaActor->GetActorLocation() : FVector::ZeroVector;
+			const float Radius = FVector2D::Distance(
+				FVector2D(ShotPiece->GetActorLocation().X, ShotPiece->GetActorLocation().Y),
+				FVector2D(ArenaLocation.X, ArenaLocation.Y));
+			const float ActiveRadius = ArenaActor ? ArenaActor->GetRadius() : ArenaRadius;
+			bPrecisionStop = Radius >= ActiveRadius * PrecisionStopMinimumRadiusFraction
+				&& Radius <= ActiveRadius * PrecisionStopMaximumRadiusFraction;
+		}
+	}
+
+	FFlickShotAccoladeContext Context;
+	Context.OpponentEliminated = OpponentEliminated;
+	Context.OwnEliminated = OwnEliminated;
+	Context.OpponentRemaining = CountActivePieces(OpponentTeam);
+	Context.OwnRemaining = CountActivePieces(ResolutionShootingTeam);
+	Context.DirectlyContactedPucks = ResolutionDirectContactPieceIds.Num();
+	Context.bSwitchActivated = ResolutionActivatedSwitchMask != 0;
+	Context.bShotPieceHitDivider = ResolutionDividerContactPieceIds.Contains(ResolutionShotPieceId);
+	Context.bNewDividerAffectedPlay = !ResolutionNewDividerContactPieceIds.IsEmpty();
+	Context.bDominoKnockout = bDominoKnockout;
+	Context.bLongRangeKnockout = bLongRangeKnockout;
+	Context.bShotPieceSurvivedNearEdge = bPrecisionStop;
+	Context.bBuzzerRelease = bResolutionBuzzerRelease;
+
+	const int32 ShootingPlayerSlot = FlickGameState->GetLastShootingPlayerSlot(ResolutionShootingTeam);
+	for (const EFlickAccolade Accolade : FlickAccoladeRules::EvaluateShot(Context))
+	{
+		const int32 BonusPoints = GetFlickAccoladeBonusPoints(Accolade);
+		FlickGameState->RecordPlayerAccolade(
+			ResolutionShootingTeam,
+			ShootingPlayerSlot,
+			Accolade,
+			BonusPoints);
+		FlickGameState->ShowAccolade(Accolade, ResolutionShootingTeam, BonusPoints);
+	}
+}
+
+void AFlickGameMode::AwardFlawlessRound(const EFlickMatchOutcome Outcome)
+{
+	AFlickGameState* FlickGameState = GetFlickGameState();
+	if (!FlickGameState || IsBobMode())
+	{
+		return;
+	}
+	const EFlickTeam WinningTeam = Outcome == EFlickMatchOutcome::Player1Wins
+		? EFlickTeam::Player1
+		: Outcome == EFlickMatchOutcome::Player2Wins ? EFlickTeam::Player2 : EFlickTeam::None;
+	if (WinningTeam == EFlickTeam::None
+		|| !FlickAccoladeRules::IsFlawlessRound(
+			CountActivePieces(WinningTeam),
+			CurrentStartingPiecesPerTeam))
+	{
+		return;
+	}
+	for (int32 PlayerSlot = 0; PlayerSlot < CurrentPlayersPerTeam; ++PlayerSlot)
+	{
+		FlickGameState->RecordPlayerAccolade(WinningTeam, PlayerSlot, EFlickAccolade::FlawlessRound);
+	}
+	FlickGameState->ShowAccolade(EFlickAccolade::FlawlessRound, WinningTeam);
+}
+
 void AFlickGameMode::UpdateEliminations()
 {
 	bool bAnyEliminated = false;
@@ -6823,6 +7600,8 @@ void AFlickGameMode::UpdateEliminations()
 			KnockoutBoundsTolerance);
 		if (bBelowKillPlane || bOutsideTabletop)
 		{
+			ResolutionEliminatedPieceIds.Add(Piece->GetPieceId());
+			ResolutionEliminationTimes.FindOrAdd(Piece->GetPieceId()) = ResolutionElapsed;
 			const EFlickTeam EliminatedTeam = Piece->GetTeam();
 			if (EliminatedTeam == EFlickTeam::Player1)
 			{
@@ -7122,6 +7901,9 @@ void AFlickGameMode::FinishPhysicsResolution(const bool bUsedTimeout)
 	}
 	UpdateGameStateCounts();
 	PresentDramaticResolutionEvent();
+	PresentShotAccolades();
+	ResolveTestArenaControlZones();
+	CaptureRoundReplayFrame(true);
 	// Send the authority's final sleeping/resting transforms immediately. This
 	// prevents a remote physics proxy from keeping a locally divergent tilt after
 	// the server has already declared the shot settled.
@@ -7176,6 +7958,14 @@ void AFlickGameMode::CheckWinOrAdvanceTurn()
 	case EFlickMatchOutcome::Draw:
 	case EFlickMatchOutcome::Player2Wins:
 	case EFlickMatchOutcome::Player1Wins:
+		if (bTestArenaMode && Outcome != EFlickMatchOutcome::Draw && !bReplayPlayedForResolution)
+		{
+			BeginCinematicRoundReplay(Outcome);
+			if (bCinematicReplayActive)
+			{
+				return;
+			}
+		}
 		CompleteRoundForOutcome(Outcome);
 		return;
 	case EFlickMatchOutcome::Continue:
@@ -7431,6 +8221,7 @@ void AFlickGameMode::CompleteRoundForOutcome(const EFlickMatchOutcome Outcome)
 	}
 	if (!IsBobMode())
 	{
+		AwardFlawlessRound(Outcome);
 		AwardRoundSurvivalPoints();
 	}
 	ResetShotClock();

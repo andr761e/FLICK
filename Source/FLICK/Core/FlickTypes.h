@@ -51,6 +51,67 @@ enum class EFlickDramaticEvent : uint8
 	ChainReaction UMETA(DisplayName = "Chain Reaction")
 };
 
+UENUM(BlueprintType)
+enum class EFlickAccolade : uint8
+{
+	SwitchKnockout UMETA(DisplayName = "Switch Knockout"),
+	DividerBank UMETA(DisplayName = "Divider Bank"),
+	TrapShot UMETA(DisplayName = "Trap Shot"),
+	DominoKnockout UMETA(DisplayName = "Domino Knockout"),
+	TeamWipeout UMETA(DisplayName = "Team Wipeout"),
+	PerfectTrade UMETA(DisplayName = "Perfect Trade"),
+	LongRangeKnockout UMETA(DisplayName = "Long Range Knockout"),
+	Pinball UMETA(DisplayName = "Pinball"),
+	PrecisionKnockout UMETA(DisplayName = "Precision Knockout"),
+	BuzzerBeater UMETA(DisplayName = "Buzzer Beater"),
+	FlawlessRound UMETA(DisplayName = "Flawless Round"),
+	Count UMETA(Hidden)
+};
+
+inline constexpr int32 FlickAccoladeCount = static_cast<int32>(EFlickAccolade::Count);
+
+inline const TCHAR* GetFlickAccoladeName(const EFlickAccolade Accolade)
+{
+	switch (Accolade)
+	{
+	case EFlickAccolade::SwitchKnockout: return TEXT("SWITCH KNOCKOUT");
+	case EFlickAccolade::DividerBank: return TEXT("DIVIDER BANK");
+	case EFlickAccolade::TrapShot: return TEXT("TRAP SHOT");
+	case EFlickAccolade::DominoKnockout: return TEXT("DOMINO KNOCKOUT");
+	case EFlickAccolade::TeamWipeout: return TEXT("TEAM WIPEOUT");
+	case EFlickAccolade::PerfectTrade: return TEXT("PERFECT TRADE");
+	case EFlickAccolade::LongRangeKnockout: return TEXT("LONG RANGE KNOCKOUT");
+	case EFlickAccolade::Pinball: return TEXT("PINBALL");
+	case EFlickAccolade::PrecisionKnockout: return TEXT("PRECISION KNOCKOUT");
+	case EFlickAccolade::BuzzerBeater: return TEXT("BUZZER BEATER");
+	case EFlickAccolade::FlawlessRound: return TEXT("FLAWLESS ROUND");
+	default: return TEXT("ACCOLADE");
+	}
+}
+
+inline int32 GetFlickAccoladeBonusPoints(const EFlickAccolade Accolade)
+{
+	return Accolade == EFlickAccolade::TeamWipeout ? 100 : 0;
+}
+
+USTRUCT(BlueprintType)
+struct FFlickAccoladeFeedEvent
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EFlickAccolade Accolade = EFlickAccolade::SwitchKnockout;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EFlickTeam Team = EFlickTeam::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 BonusPoints = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 Serial = 0;
+};
+
 struct FFlickDramaticEventResult
 {
 	EFlickDramaticEvent Event = EFlickDramaticEvent::None;

@@ -33,6 +33,9 @@ struct FFlickPlayerMatchStats
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
 	int32 SurvivingPucks = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
+	TArray<int32> AccoladeCounts;
 };
 
 UCLASS()
@@ -71,6 +74,7 @@ public:
 	void RecordPlayerImpact(EFlickTeam Team, int32 PlayerSlot);
 	void RecordPlayerKnockout(EFlickTeam Team, int32 PlayerSlot);
 	void RecordPlayerDoubleKnockout(EFlickTeam Team, int32 PlayerSlot);
+	void RecordPlayerAccolade(EFlickTeam Team, int32 PlayerSlot, EFlickAccolade Accolade, int32 BonusPoints = 0);
 	void RecordPlayerBonus(EFlickTeam Team, int32 PlayerSlot, int32 BonusPoints);
 	void RecordPlayerSurvivingPucks(EFlickTeam Team, int32 PlayerSlot, int32 SurvivingPuckCount);
 	const FFlickPlayerMatchStats* FindPlayerMatchStats(EFlickTeam Team, int32 PlayerSlot) const;
@@ -104,6 +108,7 @@ public:
 		int32 InBonusPoints,
 		float InDuration);
 	void ClearDramaticEvent();
+	void ShowAccolade(EFlickAccolade Accolade, EFlickTeam Team, int32 BonusPoints = 0);
 	float GetDramaticEventTimeRemaining() const;
 
 	bool IsGameplayActive() const { return MatchPhase != EFlickMatchPhase::WaitingToStart; }
@@ -185,6 +190,9 @@ public:
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
 	float DramaticEventEndServerTime = 0.0f;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	TArray<FFlickAccoladeFeedEvent> AccoladeFeedEvents;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Timers")
 	bool bShotClockActive = false;

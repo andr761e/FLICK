@@ -2,24 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Core/FlickTypes.h"
+#include "Audio/FlickSoundSynthesis.h"
 #include "GameFramework/Actor.h"
 #include "FlickAudioDirector.generated.h"
 
 class USoundWaveProcedural;
 class USoundAttenuation;
-
-enum class EFlickGeneratedSoundKind : uint8
-{
-	UiNavigate,
-	UiConfirm,
-	Launch,
-	Impact,
-	RimImpact,
-	RingOut,
-	Turn,
-	RoundWin,
-	MatchWin
-};
+class UAudioComponent;
 
 UCLASS(NotBlueprintable)
 class FLICK_API AFlickAudioDirector : public AActor
@@ -41,6 +30,8 @@ public:
 	void PlayRingOut(const FVector& Location);
 	void PlayTurn(EFlickTeam Team);
 	void PlayRoundResult(EFlickTeam Winner, bool bDraw, bool bSeriesComplete);
+	void PlayReplayMusic(float Duration, EFlickTeam WinningTeam);
+	void StopReplayMusic();
 
 private:
 	USoundWaveProcedural* CreateSound(
@@ -69,6 +60,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<USoundAttenuation> SpatialAttenuation;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> ReplayMusicComponent;
 
 	float LastImpactTime = -100.0f;
 	float LastRimImpactTime = -100.0f;

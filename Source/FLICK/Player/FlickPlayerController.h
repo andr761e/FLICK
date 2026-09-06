@@ -92,6 +92,7 @@ private:
 	void HandleNextPiecePressed();
 	void HandleCameraElevationUpPressed();
 	void HandleCameraElevationDownPressed();
+	void HandleCameraResetPressed();
 	void HandleScoreboardPressed();
 	void HandleScoreboardReleased();
 	void HandleSecondaryPressed();
@@ -257,6 +258,8 @@ private:
 	bool bHasPredictedContact = false;
 	bool bGamepadAiming = false;
 	bool bUsingGamepad = false;
+	bool bGamepadCameraInputActive = false;
+	bool bGamepadElevationInputLatched = false;
 	bool bScoreboardVisible = false;
 	bool bInitializedNetworkCamera = false;
 	bool bNetworkAutoShotRequested = false;
@@ -275,4 +278,7 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "FLICK|Controller", meta = (ClampMin = "0.0", ClampMax = "0.9"))
 	float GamepadAimDeadZone = 0.18f;
+
+	UPROPERTY(EditAnywhere, Category = "FLICK|Controller|Camera", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float GamepadCameraDeadZone = 0.24f;
 };

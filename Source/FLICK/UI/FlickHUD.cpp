@@ -160,6 +160,11 @@ void AFlickHUD::DrawHUD()
 	}
 
 	ObserveMatchState(*FlickGameState, Now);
+	if (FlickGameMode && FlickGameMode->IsCinematicReplayActive())
+	{
+		DrawCinematicReplayPullback(*FlickGameMode);
+		return;
+	}
 	if (FlickGameMode && FlickGameMode->HasLockedKickoffShot())
 	{
 		DrawLockedKickoffPresentation(*FlickGameMode);
@@ -190,6 +195,61 @@ void AFlickHUD::DrawHUD()
 		{
 			DrawControls(Height);
 		}
+	}
+}
+
+void AFlickHUD::DrawCinematicReplayPullback(const AFlickGameMode& GameMode)
+{
+	if (!GameMode.IsCinematicReplayPullbackActive())
+	{
+		return;
+	}
+	const APlayerController* Controller = GetOwningPlayerController();
+	if (!Controller)
+	{
+		return;
+	}
+
+	const float PullbackAlpha = GameMode.GetCinematicReplayPullbackAlpha();
+	for (int32 ShotIndex = 0; ShotIndex < GameMode.GetCinematicReplayShotCount(); ++ShotIndex)
+	{
+		const AFlickPiece* Piece = GameMode.GetCinematicReplayShotPiece(ShotIndex);
+		const FVector LaunchDirection = GameMode.GetCinematicReplayShotDirection(ShotIndex).GetSafeNormal2D();
+		const float Power = FMath::Clamp(GameMode.GetCinematicReplayShotPower(ShotIndex), 0.0f, 1.0f);
+		if (!Piece || LaunchDirection.IsNearlyZero())
+		{
+			continue;
+		}
+
+		const float LinearPower = FMath::Pow(Power, 1.0f / FMath::Max(GameMode.GetPowerExponent(), 0.01f));
+		const FVector PieceWorld = Piece->GetActorLocation() + FVector(0.0f, 0.0f, 28.0f);
+		const FVector PullWorld = PieceWorld
+			- LaunchDirection * GameMode.GetMaxDragDistance() * LinearPower * PullbackAlpha;
+		const float GuideLength = FMath::Lerp(260.0f, 920.0f, Power)
+			* Piece->GetLaunchSpeedMultiplier() * PullbackAlpha;
+		const FVector GuideWorld = PieceWorld + LaunchDirection * GuideLength;
+
+		FVector2D PieceScreen;
+		FVector2D PullScreen;
+		FVector2D GuideScreen;
+		if (!Controller->ProjectWorldLocationToScreen(PieceWorld, PieceScreen)
+			|| !Controller->ProjectWorldLocationToScreen(PullWorld, PullScreen)
+			|| !Controller->ProjectWorldLocationToScreen(GuideWorld, GuideScreen))
+		{
+			continue;
+		}
+
+		const FLinearColor PowerColor = GetPowerColor(Power);
+		const FLinearColor TeamColor = FMath::Lerp(GetTeamColor(Piece->GetTeam()), PowerColor, 0.28f);
+		DrawLine(PieceScreen.X, PieceScreen.Y, PullScreen.X, PullScreen.Y,
+			FLinearColor(0.0f, 0.0f, 0.0f, 0.82f), 8.0f);
+		DrawLine(PieceScreen.X, PieceScreen.Y, PullScreen.X, PullScreen.Y,
+			FLinearColor(PowerColor.R, PowerColor.G, PowerColor.B, 0.9f), 2.4f);
+		DrawCircle(PullScreen, 12.0f + PullbackAlpha * 3.0f,
+			FLinearColor(PowerColor.R, PowerColor.G, PowerColor.B, 0.92f), 36, 2.2f);
+		DrawCircle(PieceScreen, 25.0f + PullbackAlpha * 7.0f,
+			FLinearColor(TeamColor.R, TeamColor.G, TeamColor.B, 0.38f), 42, 2.0f);
+		DrawTechnicalAimArrow(PieceScreen, GuideScreen, TeamColor);
 	}
 }
 
@@ -329,12 +389,30 @@ void AFlickHUD::ResetPresentation()
 	bHasObservedState = false;
 	LastObservedTeam = EFlickTeam::None;
 	LastObservedDramaticEventSerial = 0;
+	LastObservedAccoladeSerial = 0;
 	LastObservedPhase = EFlickMatchPhase::WaitingToStart;
 	StateChangedAt = -100.0f;
 }
 
 void AFlickHUD::ObserveMatchState(const AFlickGameState& GameState, const float Now)
 {
+	for (const FFlickAccoladeFeedEvent& Event : GameState.AccoladeFeedEvents)
+	{
+		if (Event.Serial <= LastObservedAccoladeSerial)
+		{
+			continue;
+		}
+		const FLinearColor Color = Event.Team == EFlickTeam::None
+			? FLinearColor(0.96f, 0.76f, 0.18f, 1.0f)
+			: GetTeamColor(Event.Team);
+		PushEventMessage(
+			GetFlickAccoladeName(Event.Accolade),
+			Color,
+			2.4f,
+			Event.BonusPoints > 0 ? FString::Printf(TEXT("+%d"), Event.BonusPoints) : FString());
+		LastObservedAccoladeSerial = Event.Serial;
+	}
+
 	if (LastObservedDramaticEventSerial != GameState.DramaticEventSerial)
 	{
 		LastObservedDramaticEventSerial = GameState.DramaticEventSerial;

@@ -12,6 +12,8 @@ class AFlickHUD;
 class AFlickPlayerController;
 class UFlickRankingSubsystem;
 class SButton;
+class SBox;
+class SOverlay;
 class SWidget;
 struct FFlickPlayerMatchStats;
 
@@ -21,6 +23,7 @@ enum class EFlickPlayPlaylist : uint8
 	Casual,
 	Competitive,
 	Training,
+	Test,
 	PrivateMatch
 };
 
@@ -29,7 +32,8 @@ enum class EFlickTrainingActivity : uint8
 	None,
 	FreePlay,
 	BotMatch,
-	BobBotMatch
+	BobBotMatch,
+	ArenaControlBotMatch
 };
 
 enum class EFlickProfileTab : uint8
@@ -88,6 +92,7 @@ private:
 	TSharedRef<SWidget> BuildArchetypeChoice(EFlickTeam Team, EFlickPieceArchetype Archetype);
 	TSharedRef<SWidget> BuildSettings();
 	TSharedRef<SWidget> BuildMatchHud();
+	TSharedRef<SWidget> BuildCinematicReplayOverlay();
 	TSharedRef<SWidget> BuildScoreboardOverlay();
 	TSharedRef<SWidget> BuildScoreboardTeamSection(EFlickTeam Team);
 	TSharedRef<SWidget> BuildScoreboardPlayerRow(EFlickTeam Team, int32 PlayerSlot);
@@ -209,6 +214,7 @@ private:
 	TSharedPtr<SButton> ProfileDefaultButton;
 	TSharedPtr<SButton> ModeSelectDefaultButton;
 	TSharedPtr<SButton> TrainingActivityDefaultButton;
+	TSharedPtr<SButton> TestActivityDefaultButton;
 	TSharedPtr<SButton> ModeFormatDefaultButton;
 	TSharedPtr<SButton> PrivateMatchDefaultButton;
 	TSharedPtr<SButton> OnlineBrowserDefaultButton;
@@ -219,6 +225,10 @@ private:
 	TSharedPtr<SButton> PauseDefaultButton;
 	TSharedPtr<SButton> RoundOverDefaultButton;
 	TSharedPtr<SWidget> StartupOverlayWidget;
+	TSharedPtr<SBox> MainMenuScreenWidget;
+	TSharedPtr<SBox> ProfileScreenWidget;
+	TSharedPtr<SOverlay> MainMenuInteractiveWidget;
+	TSharedPtr<SBox> MainMenuSelectionWidget;
 	EFlickFrontendScreen LastFocusedScreen = EFlickFrontendScreen::Playing;
 	bool bLastRoundOverVisible = false;
 	bool bHasAppliedInitialFocus = false;

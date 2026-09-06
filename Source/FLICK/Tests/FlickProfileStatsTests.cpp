@@ -13,6 +13,11 @@ bool FFlickProfileStatsAccumulateTest::RunTest(const FString& Parameters)
 	FFlickProfileStats Stats;
 	Stats.RecordMatch(480, 3, 1, 7, true);
 	Stats.RecordMatch(260, 1, 0, 5, false);
+	TArray<int32> Accolades;
+	Accolades.Init(0, FlickAccoladeCount);
+	Accolades[static_cast<int32>(EFlickAccolade::TeamWipeout)] = 2;
+	Accolades[static_cast<int32>(EFlickAccolade::Pinball)] = 3;
+	Stats.RecordAccolades(Accolades);
 
 	TestEqual(TEXT("Matches accumulate"), Stats.MatchesPlayed, 2);
 	TestEqual(TEXT("Only wins accumulate"), Stats.Wins, 1);
@@ -20,6 +25,8 @@ bool FFlickProfileStatsAccumulateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Knockouts accumulate"), Stats.Knockouts, 4);
 	TestEqual(TEXT("Double knockouts accumulate"), Stats.DoubleKnockouts, 1);
 	TestEqual(TEXT("Shots accumulate"), Stats.Shots, 12);
+	TestEqual(TEXT("Named accolades accumulate"), Stats.GetAccoladeCount(EFlickAccolade::TeamWipeout), 2);
+	TestEqual(TEXT("Total accolades accumulate"), Stats.GetTotalAccolades(), 5);
 	return true;
 }
 

@@ -13,6 +13,8 @@ class AFlickCameraPawn;
 class AFlickGameState;
 class AFlickPiece;
 class AFlickPlayerState;
+class AFlickTestArena;
+class UPrimitiveComponent;
 class AFlickWorldFeedback;
 class ADirectionalLight;
 class APointLight;
@@ -43,6 +45,27 @@ struct FFlickLockedKickoffShot
 	float Power = 0.0f;
 	EFlickTeam Team = EFlickTeam::None;
 	int32 PlayerSlot = INDEX_NONE;
+};
+
+struct FFlickReplayPieceState
+{
+	TWeakObjectPtr<AFlickPiece> Piece;
+	FTransform Transform = FTransform::Identity;
+	bool bVisible = true;
+};
+
+struct FFlickRoundReplayFrame
+{
+	float Time = 0.0f;
+	uint8 RaisedDividerMask = 0;
+	TArray<FFlickReplayPieceState> Pieces;
+};
+
+struct FFlickReplayShotSetup
+{
+	TWeakObjectPtr<AFlickPiece> Piece;
+	FVector Direction = FVector::ZeroVector;
+	float Power = 0.0f;
 };
 
 USTRUCT(BlueprintType)
@@ -107,9 +130,10 @@ public:
 		AFlickPiece* OtherPiece,
 		const FVector& ImpactLocation,
 		float ImpactVelocityChange);
-	void NotifyArenaImpact(AFlickPiece* Piece, const FVector& ImpactLocation, float ImpactVelocityChange);
+	void NotifyArenaImpact(AFlickPiece* Piece, UPrimitiveComponent* OtherComponent, const FVector& ImpactLocation, float ImpactVelocityChange);
 
 	EFlickFrontendScreen GetFrontendScreen() const { return FrontendScreen; }
+	EFlickFrontendScreen GetSettingsReturnScreen() const { return SettingsReturnScreen; }
 	EFlickMatchVariant GetSelectedMatchVariant() const { return SelectedMatchVariant; }
 	EFlickMatchVariant GetActiveMatchVariant() const { return ActiveMatchVariant; }
 	bool IsWaitingForNetworkPlayer() const { return bNetworkMatchRequested && !bNetworkMatchStarted; }
@@ -122,6 +146,16 @@ public:
 	bool IsTrainingBotMatch() const { return bTrainingMode && bTrainingBotMatch; }
 	bool IsFreePlayTraining() const { return bTrainingMode && !bTrainingBotMatch; }
 	bool IsTrainingEditMode() const { return bTrainingMode && bTrainingEditMode; }
+	bool IsTestArenaMode() const { return bTestArenaMode; }
+	bool IsCinematicReplayActive() const { return bCinematicReplayActive; }
+	bool IsCinematicReplayPullbackActive() const;
+	float GetCinematicReplayProgress() const;
+	float GetCinematicReplayPullbackAlpha() const;
+	int32 GetCinematicReplayShotCount() const { return ReplayShotSetups.Num(); }
+	const AFlickPiece* GetCinematicReplayShotPiece(int32 ShotIndex) const;
+	FVector GetCinematicReplayShotDirection(int32 ShotIndex) const;
+	float GetCinematicReplayShotPower(int32 ShotIndex) const;
+	const AFlickTestArena* GetTestArena() const { return TestArenaActor; }
 	float GetShotTimeRemaining() const;
 	float GetShotClockFraction(EFlickTeam Team) const;
 	float GetInitialClassSelectionTimeRemaining() const { return FMath::Max(0.0f, InitialClassSelectionTimeRemaining); }
@@ -227,6 +261,7 @@ public:
 	void OpenClassChange();
 	void StartTrainingMode();
 	void StartTrainingBotMatch();
+	void StartTestArenaBotMatch();
 	void ToggleTrainingEditMode();
 	void SetTrainingPlacementTeam(EFlickTeam Team);
 	void CycleTrainingPlacementArchetype(int32 Direction);
@@ -371,6 +406,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Feedback", meta = (ClampMin = "2", ClampMax = "12"))
 	int32 DramaticChainImpactThreshold = 4;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Accolades", meta = (ClampMin = "100.0", ClampMax = "1300.0"))
+	float LongRangeKnockoutDistance = 700.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Accolades", meta = (ClampMin = "0.5", ClampMax = "3.0"))
+	float BuzzerBeaterTimeThreshold = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Accolades", meta = (ClampMin = "0.5", ClampMax = "0.98"))
+	float PrecisionStopMinimumRadiusFraction = 0.78f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Accolades", meta = (ClampMin = "0.6", ClampMax = "1.0"))
+	float PrecisionStopMaximumRadiusFraction = 0.93f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Feedback", meta = (ClampMin = "0.5", ClampMax = "5.0"))
 	float DramaticEventDuration = 2.6f;
 
@@ -462,7 +509,7 @@ public:
 	float InitialClassSelectionTimeLimit = 10.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Timers", meta = (ClampMin = "3.0", ClampMax = "60.0"))
-	float RoundAdvanceTimeLimit = 10.0f;
+	float RoundAdvanceTimeLimit = 5.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Debug")
 	bool bLogPhysicsResolution = true;
@@ -472,6 +519,18 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation", meta = (ClampMin = "0.35", ClampMax = "2.0"))
 	float MenuPreviewTransitionDuration = 0.9f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Replay", meta = (ClampMin = "12.0", ClampMax = "60.0"))
+	float ReplayCaptureRate = 30.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Replay", meta = (ClampMin = "0.25", ClampMax = "1.0"))
+	float ReplaySlowMotionRate = 0.72f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Replay", meta = (ClampMin = "2.0", ClampMax = "10.0"))
+	float ReplayMaximumPlaybackDuration = 6.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Replay", meta = (ClampMin = "0.5", ClampMax = "4.0"))
+	float ReplayPullbackDuration = 1.85f;
 
 private:
 	void SpawnCameraIfNeeded();
@@ -552,8 +611,18 @@ private:
 	bool LockKickoffShot(AFlickPiece* Piece, const FVector& Direction, float NormalizedPower, bool bAnnounce = true);
 	void ReleaseKickoffShots();
 	void ResetKickoffState();
-	void BeginResolutionTracking(EFlickTeam ShootingTeam, bool bSimultaneousShot);
+	void BeginResolutionTracking(EFlickTeam ShootingTeam, bool bSimultaneousShot, AFlickPiece* ShotPiece = nullptr);
+	void CaptureTestArenaControlZones();
+	void TrackTestArenaControlZones(float DeltaSeconds);
+	void ResolveTestArenaControlZones();
+	void CaptureRoundReplayFrame(bool bForce = false);
+	void BeginCinematicRoundReplay(EFlickMatchOutcome Outcome);
+	void UpdateCinematicRoundReplay(float DeltaSeconds);
+	void FinishCinematicRoundReplay(bool bCompleteRound);
+	void ApplyCinematicReplayTime(float SourceTime);
 	void PresentDramaticResolutionEvent();
+	void PresentShotAccolades();
+	void AwardFlawlessRound(EFlickMatchOutcome Outcome);
 	void ApplySelectedMatchConfiguration();
 	void ApplyMatchConfiguration(EFlickMatchVariant Variant, int32 PlayersPerTeam);
 	void UpdateMainMenuPreview(float DeltaSeconds);
@@ -619,6 +688,9 @@ private:
 	TObjectPtr<AFlickBobArena> BobArenaActor;
 
 	UPROPERTY()
+	TObjectPtr<AFlickTestArena> TestArenaActor;
+
+	UPROPERTY()
 	TObjectPtr<AFlickAudioDirector> AudioDirector;
 
 	UPROPERTY()
@@ -655,6 +727,36 @@ private:
 	int32 ResolutionImpactCount = 0;
 	EFlickTeam ResolutionShootingTeam = EFlickTeam::None;
 	bool bResolutionWasSimultaneous = false;
+	int32 ResolutionShotPieceId = INDEX_NONE;
+	FVector2D ResolutionShotStart = FVector2D::ZeroVector;
+	bool bResolutionBuzzerRelease = false;
+	uint8 ResolutionActivatedSwitchMask = 0;
+	uint8 ResolutionNewlyRaisedDividerMask = 0;
+	TMap<int32, FVector2D> ResolutionInitialPieceLocations;
+	TMap<int32, int32> ResolutionContactDepths;
+	TSet<int32> ResolutionDirectContactPieceIds;
+	TSet<int32> ResolutionEliminatedPieceIds;
+	TSet<int32> ResolutionDividerContactPieceIds;
+	TSet<int32> ResolutionNewDividerContactPieceIds;
+	TMap<int32, float> ResolutionFirstImpactTimes;
+	TMap<int32, float> ResolutionFirstOpponentImpactTimes;
+	TMap<int32, float> ResolutionEliminationTimes;
+	TSet<int32> ReplayPresentedEliminationPieceIds;
+	TArray<FFlickRoundReplayFrame> RoundReplayFrames;
+	TArray<FFlickReplayShotSetup> ReplayShotSetups;
+	float LastReplayCaptureTime = -100.0f;
+	float CinematicReplayElapsed = 0.0f;
+	float CinematicReplaySourceStart = 0.0f;
+	float CinematicReplaySourceDuration = 0.0f;
+	float CinematicReplayMotionDuration = 0.0f;
+	float CinematicReplayPlaybackDuration = 0.0f;
+	float ReplayFocusSwitchSourceTime = TNumericLimits<float>::Max();
+	int32 ReplayPrimaryFocusPieceId = INDEX_NONE;
+	int32 ReplayKnockoutFocusPieceId = INDEX_NONE;
+	EFlickMatchOutcome PendingReplayOutcome = EFlickMatchOutcome::Continue;
+	bool bCinematicReplayActive = false;
+	bool bReplayPlayedForResolution = false;
+	bool bReplayLaunchCuePlayed = false;
 
 	EFlickFrontendScreen FrontendScreen = EFlickFrontendScreen::MainMenu;
 	EFlickFrontendScreen SettingsReturnScreen = EFlickFrontendScreen::MainMenu;
@@ -681,6 +783,7 @@ private:
 	bool bTrainingEditMode = false;
 	bool bTrainingBotMatch = false;
 	bool bClassSelectionStartsTrainingBotMatch = false;
+	bool bTestArenaMode = false;
 	bool bPrivateMatchSetupActive = false;
 	bool bPrivateMatchActive = false;
 	FFlickPrivateMatchSettings PrivateMatchSettings;

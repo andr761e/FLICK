@@ -467,6 +467,57 @@ void AFlickPiece::SettleFlatOnTabletop(const float SurfaceZ)
 	ForceNetUpdate();
 }
 
+void AFlickPiece::BeginReplayPresentation()
+{
+	if (bReplayPresentationActive || !PieceMesh)
+	{
+		return;
+	}
+
+	PreReplayTransform = GetActorTransform();
+	bReplayPresentationActive = true;
+	PieceMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+	PieceMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+	PieceMesh->SetSimulatePhysics(false);
+	PieceMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetActorEnableCollision(false);
+}
+
+void AFlickPiece::ApplyReplayPresentation(const FTransform& Transform, const bool bVisible)
+{
+	if (!bReplayPresentationActive || !PieceMesh)
+	{
+		return;
+	}
+
+	SetActorTransform(Transform, false, nullptr, ETeleportType::TeleportPhysics);
+	SetActorHiddenInGame(!bVisible);
+}
+
+void AFlickPiece::EndReplayPresentation()
+{
+	if (!bReplayPresentationActive || !PieceMesh)
+	{
+		return;
+	}
+
+	bReplayPresentationActive = false;
+	SetActorTransform(PreReplayTransform, false, nullptr, ETeleportType::TeleportPhysics);
+	if (bEliminated)
+	{
+		ApplyEliminatedState();
+		return;
+	}
+
+	SetActorHiddenInGame(false);
+	SetActorEnableCollision(true);
+	PieceMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	PieceMesh->SetSimulatePhysics(true);
+	PieceMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+	PieceMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+	PieceMesh->PutRigidBodyToSleep();
+}
+
 void AFlickPiece::Eliminate()
 {
 	if (bEliminated)
@@ -614,7 +665,7 @@ void AFlickPiece::HandleMeshHit(
 		if (AFlickGameMode* FlickGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AFlickGameMode>() : nullptr)
 		{
 			const FVector ImpactLocation = Hit.ImpactPoint.IsNearlyZero() ? GetActorLocation() : FVector(Hit.ImpactPoint);
-			FlickGameMode->NotifyArenaImpact(this, ImpactLocation, ImpactVelocityChange);
+			FlickGameMode->NotifyArenaImpact(this, OtherComponent, ImpactLocation, ImpactVelocityChange);
 		}
 		return;
 	}

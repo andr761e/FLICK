@@ -1,4 +1,5 @@
 #include "UI/FlickGameLayer.h"
+#include "UI/FlickUITheme.h"
 
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Core/FlickRankRules.h"
@@ -41,13 +42,7 @@
 
 namespace
 {
-	const FLinearColor Ink(0.0015f, 0.004f, 0.009f, 0.975f);
-	const FLinearColor Panel(0.008f, 0.019f, 0.032f, 0.94f);
-	const FLinearColor PanelRaised(0.013f, 0.029f, 0.046f, 0.96f);
-	const FLinearColor Muted(0.56f, 0.67f, 0.75f, 1.0f);
-	const FLinearColor Cyan(0.0f, 0.82f, 1.0f, 1.0f);
-	const FLinearColor Orange(1.0f, 0.31f, 0.055f, 1.0f);
-	const FLinearColor Hairline(0.16f, 0.31f, 0.4f, 0.72f);
+	using namespace FlickUITheme;
 
 	namespace UiMetrics
 	{
@@ -63,12 +58,12 @@ namespace
 
 	namespace MainMenuStackMetrics
 	{
-		constexpr float PrimaryHeight = 90.0f;
-		constexpr float SecondaryHeight = 70.0f;
-		constexpr float Gap = 14.0f;
-		constexpr float FirstWidth = 480.0f;
-		constexpr float LeftEdgeSlope = 0.1f;
-		constexpr float RightEdgeSlope = 3.0f / 11.0f;
+		constexpr float PrimaryHeight = 86.0f;
+		constexpr float SecondaryHeight = 62.0f;
+		constexpr float Gap = 8.0f;
+		constexpr float FirstWidth = 450.0f;
+		constexpr float LeftEdgeSlope = 0.0f;
+		constexpr float RightEdgeSlope = 0.0f;
 
 		constexpr float GetRowTop(const int32 RowIndex)
 		{
@@ -198,16 +193,16 @@ namespace
 				return LayerId;
 			}
 
-			const float TopEdgeX = LocalSize.X * 0.238f;
-			const float BottomEdgeX = LocalSize.X * 0.411f;
+			const float TopEdgeX = LocalSize.X * 0.345f;
+			const float BottomEdgeX = LocalSize.X * 0.395f;
 			const float EdgeWidth = FMath::Clamp(LocalSize.X * 0.00065f, 1.1f, 1.2f);
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
-			const FLinearColor LeftPanelColor = PanelColor.Get();
+			const FLinearColor LeftPanelColor = PanelColor.Get() * InWidgetStyle.GetColorAndOpacityTint();
 			FLinearColor RightPanelColor = LeftPanelColor;
 			RightPanelColor.A *= 0.93f;
 			const FColor LeftPanelTint = LeftPanelColor.ToFColor(true);
 			const FColor RightPanelTint = RightPanelColor.ToFColor(true);
-			const FColor EdgeTint = EdgeColor.Get().ToFColor(true);
+			const FColor EdgeTint = (EdgeColor.Get() * InWidgetStyle.GetColorAndOpacityTint()).ToFColor(true);
 
 			TArray<FSlateVertex> Vertices;
 			Vertices.Reserve(8);
@@ -433,20 +428,18 @@ namespace
 			const bool bParentEnabled) const override
 		{
 			const FVector2D Size = AllottedGeometry.GetLocalSize();
-			// The menu rows are offset on a 1:10 slope. Matching each frame's corner
-			// cuts to its height keeps every left and right corner on the same two
-			// continuous guide lines across the full menu stack.
-			const float RightCut = Size.Y * (3.0f / 11.0f);
-			const float LeftSkew = Size.Y * 0.1f;
+			// A short forward cut repeats the launch-direction motif.
+			const float RightCut = 12.0f;
+			const float LeftSkew = 0.0f;
 			const TArray<FVector2D> Points = {
 				FVector2D(0.0f, 0.0f),
 				FVector2D(Size.X - RightCut, 0.0f),
 				FVector2D(Size.X, Size.Y),
 				FVector2D(LeftSkew, Size.Y)};
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
-			const FLinearColor Left = FMath::Lerp(StartColor.Get(), HoverStartColor.Get(), HighlightAlpha);
-			const FLinearColor Right = FMath::Lerp(EndColor.Get(), HoverEndColor.Get(), HighlightAlpha);
-			const FLinearColor OutlineColor = FMath::Lerp(BorderColor.Get(), HoverBorderColor.Get(), HighlightAlpha);
+			const FLinearColor Left = FMath::Lerp(StartColor.Get(), HoverStartColor.Get(), HighlightAlpha) * InWidgetStyle.GetColorAndOpacityTint();
+			const FLinearColor Right = FMath::Lerp(EndColor.Get(), HoverEndColor.Get(), HighlightAlpha) * InWidgetStyle.GetColorAndOpacityTint();
+			const FLinearColor OutlineColor = FMath::Lerp(BorderColor.Get(), HoverBorderColor.Get(), HighlightAlpha) * InWidgetStyle.GetColorAndOpacityTint();
 			TArray<FSlateVertex> Vertices;
 			Vertices.Reserve(5);
 			Vertices.Add(FSlateVertex::Make(
@@ -470,35 +463,7 @@ namespace
 
 			TArray<FVector2D> Outline = Points;
 			Outline.Add(Points[0]);
-			const float GlowStrength = BorderWidth > 1.2f
-				? 0.58f + HighlightAlpha * 0.42f
-				: HighlightAlpha * 0.48f;
-			if (GlowStrength > 0.01f)
-			{
-				FLinearColor WideGlow = OutlineColor;
-				WideGlow.A *= 0.085f * GlowStrength;
-				FSlateDrawElement::MakeLines(
-					OutDrawElements,
-					LayerId + 1,
-					AllottedGeometry.ToPaintGeometry(),
-					Outline,
-					ESlateDrawEffect::None,
-					WideGlow,
-					true,
-					8.0f);
 
-				FLinearColor TightGlow = OutlineColor;
-				TightGlow.A *= 0.24f * GlowStrength;
-				FSlateDrawElement::MakeLines(
-					OutDrawElements,
-					LayerId + 2,
-					AllottedGeometry.ToPaintGeometry(),
-					Outline,
-					ESlateDrawEffect::None,
-					TightGlow,
-					true,
-					3.5f);
-			}
 			FSlateDrawElement::MakeLines(
 				OutDrawElements,
 				LayerId + 3,
@@ -508,18 +473,6 @@ namespace
 				OutlineColor,
 				true,
 				BorderWidth);
-			if (BorderWidth > 1.2f)
-			{
-				FSlateDrawElement::MakeLines(
-					OutDrawElements,
-					LayerId + 3,
-					AllottedGeometry.ToPaintGeometry(),
-					{Points[0] + FVector2D(3.0f, 2.0f), Points[1] + FVector2D(-3.0f, 2.0f)},
-					ESlateDrawEffect::None,
-					FLinearColor(0.58f, 0.95f, 1.0f, 0.32f),
-					true,
-					1.0f);
-			}
 			return SCompoundWidget::OnPaint(
 				Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
 		}
@@ -541,6 +494,10 @@ namespace
 		Play,
 		Lineups,
 		Profile,
+		Stats,
+		Leaderboard,
+		History,
+		Back,
 		Shop,
 		Settings,
 		Quit,
@@ -627,6 +584,27 @@ namespace
 			case EFlickMainMenuIcon::Profile:
 				DrawLines(CirclePoints(Center + FVector2D(0.0f, -7.0f), 7.0f), 2.2f);
 				DrawLines({FVector2D(7.0f, 34.0f), FVector2D(8.5f, 27.0f), FVector2D(13.0f, 21.0f), FVector2D(20.0f, 19.0f), FVector2D(27.0f, 21.0f), FVector2D(31.5f, 27.0f), FVector2D(33.0f, 34.0f)}, 2.2f);
+				break;
+			case EFlickMainMenuIcon::Stats:
+				DrawLines({FVector2D(7.0f, 31.0f), FVector2D(7.0f, 22.0f), FVector2D(13.0f, 22.0f), FVector2D(13.0f, 31.0f)}, 2.2f);
+				DrawLines({FVector2D(17.0f, 31.0f), FVector2D(17.0f, 15.0f), FVector2D(23.0f, 15.0f), FVector2D(23.0f, 31.0f)}, 2.2f);
+				DrawLines({FVector2D(27.0f, 31.0f), FVector2D(27.0f, 8.0f), FVector2D(33.0f, 8.0f), FVector2D(33.0f, 31.0f)}, 2.2f);
+				DrawLines({FVector2D(5.0f, 33.0f), FVector2D(35.0f, 33.0f)}, 1.6f);
+				break;
+			case EFlickMainMenuIcon::Leaderboard:
+				DrawLines({FVector2D(10.0f, 7.0f), FVector2D(30.0f, 7.0f), FVector2D(27.0f, 19.0f), FVector2D(20.0f, 24.0f), FVector2D(13.0f, 19.0f), FVector2D(10.0f, 7.0f)}, 2.2f);
+				DrawLines({FVector2D(10.0f, 10.0f), FVector2D(5.0f, 10.0f), FVector2D(7.0f, 18.0f), FVector2D(13.0f, 20.0f)}, 1.8f);
+				DrawLines({FVector2D(30.0f, 10.0f), FVector2D(35.0f, 10.0f), FVector2D(33.0f, 18.0f), FVector2D(27.0f, 20.0f)}, 1.8f);
+				DrawLines({FVector2D(20.0f, 24.0f), FVector2D(20.0f, 30.0f), FVector2D(13.0f, 34.0f), FVector2D(27.0f, 34.0f), FVector2D(20.0f, 30.0f)}, 2.0f);
+				break;
+			case EFlickMainMenuIcon::History:
+				DrawLines(CirclePoints(Center, 13.0f), 2.2f);
+				DrawLines({Center, FVector2D(Center.X, 10.0f)}, 2.1f);
+				DrawLines({Center, FVector2D(28.0f, 24.0f)}, 2.1f);
+				break;
+			case EFlickMainMenuIcon::Back:
+				DrawLines({FVector2D(31.0f, 8.0f), FVector2D(14.0f, 19.0f), FVector2D(31.0f, 30.0f)}, 2.6f);
+				DrawLines({FVector2D(14.0f, 19.0f), FVector2D(36.0f, 19.0f)}, 2.6f);
 				break;
 			case EFlickMainMenuIcon::Rank:
 				DrawLines(CirclePoints(Center + FVector2D(0.0f, -3.0f), 12.0f), 2.2f);
@@ -751,13 +729,13 @@ namespace
 				return LayerId;
 			}
 
-			const float Alpha = FMath::Clamp(Opacity.Get(), 0.0f, 1.0f);
+			const float Alpha = FMath::Clamp(Opacity.Get() * InWidgetStyle.GetColorAndOpacityTint().A, 0.0f, 1.0f);
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			const TArray<FSlateVertex> Vertices = {
-				FSlateVertex::Make(Transform, FVector2f(0.0f, 0.0f), FVector2f(0.0f, 0.0f), FLinearColor(0.0f, 0.018f, 0.034f, 0.30f * Alpha).ToFColor(true)),
-				FSlateVertex::Make(Transform, FVector2f(Size.X, 0.0f), FVector2f(1.0f, 0.0f), FLinearColor(0.014f, 0.008f, 0.017f, 0.20f * Alpha).ToFColor(true)),
-				FSlateVertex::Make(Transform, FVector2f(Size.X, Size.Y), FVector2f(1.0f, 1.0f), FLinearColor(0.0f, 0.003f, 0.008f, 0.46f * Alpha).ToFColor(true)),
-				FSlateVertex::Make(Transform, FVector2f(0.0f, Size.Y), FVector2f(0.0f, 1.0f), FLinearColor(0.0f, 0.009f, 0.019f, 0.34f * Alpha).ToFColor(true))};
+				FSlateVertex::Make(Transform, FVector2f(0.0f, 0.0f), FVector2f(0.0f, 0.0f), FLinearColor(0.009f, 0.013f, 0.012f, 0.30f * Alpha).ToFColor(true)),
+				FSlateVertex::Make(Transform, FVector2f(Size.X, 0.0f), FVector2f(1.0f, 0.0f), FLinearColor(0.012f, 0.016f, 0.013f, 0.20f * Alpha).ToFColor(true)),
+				FSlateVertex::Make(Transform, FVector2f(Size.X, Size.Y), FVector2f(1.0f, 1.0f), FLinearColor(0.003f, 0.006f, 0.005f, 0.46f * Alpha).ToFColor(true)),
+				FSlateVertex::Make(Transform, FVector2f(0.0f, Size.Y), FVector2f(0.0f, 1.0f), FLinearColor(0.006f, 0.009f, 0.008f, 0.34f * Alpha).ToFColor(true))};
 			const TArray<SlateIndex> Indices = {0, 1, 2, 0, 2, 3};
 			FSlateDrawElement::MakeCustomVerts(
 				OutDrawElements, LayerId, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
@@ -779,24 +757,22 @@ namespace
 					Thickness);
 			};
 
-			// A quiet technical grid ties frontend screens to the physical arena without
-			// competing with text. The wide spacing keeps it legible at every resolution.
-			const FLinearColor GridColor(0.04f, 0.35f, 0.49f, 0.055f * Alpha);
-			const float GridStep = FMath::Clamp(Size.X / 20.0f, 72.0f, 112.0f);
-			for (float X = FMath::Fmod(Size.X * 0.5f, GridStep); X < Size.X; X += GridStep)
+			// The arc and tangent echo the puck and its launch path.
+			const FVector2D Center(Size.X * 0.76f, Size.Y * 0.52f);
+			for (int32 Ring = 0; Ring < 3; ++Ring)
 			{
-				DrawLine({FVector2D(X, Size.Y * 0.12f), FVector2D(X, Size.Y)}, GridColor, 0.65f);
+				TArray<FVector2D> Arc;
+				const float Radius = Size.Y * (0.30f + Ring * 0.10f);
+				for (int32 Step = 0; Step <= 80; ++Step)
+				{
+					const float Angle = FMath::DegreesToRadians(-110.0f + Step * 3.4f);
+					Arc.Add(Center + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Radius);
+				}
+				DrawLine(Arc, Paper.CopyWithNewOpacity(0.035f * Alpha), 1.0f);
 			}
-			for (float Y = Size.Y * 0.18f; Y < Size.Y; Y += GridStep)
-			{
-				DrawLine({FVector2D(0.0f, Y), FVector2D(Size.X, Y)}, GridColor, 0.65f);
-			}
+			DrawLine({{32.0f, 30.0f}, {100.0f, 30.0f}}, Brand.CopyWithNewOpacity(0.8f * Alpha), 3.0f, 2);
+			DrawLine({{Size.X - 100.0f, Size.Y - 30.0f}, {Size.X - 32.0f, Size.Y - 30.0f}}, Brand.CopyWithNewOpacity(0.6f * Alpha), 3.0f, 2);
 
-			const FLinearColor CyanRail = Cyan.CopyWithNewOpacity(0.34f * Alpha);
-			const FLinearColor OrangeRail = Orange.CopyWithNewOpacity(0.28f * Alpha);
-			DrawLine({FVector2D(24.0f, 30.0f), FVector2D(132.0f, 30.0f), FVector2D(148.0f, 46.0f)}, CyanRail, 1.25f, 2);
-			DrawLine({FVector2D(Size.X - 24.0f, Size.Y - 30.0f), FVector2D(Size.X - 132.0f, Size.Y - 30.0f), FVector2D(Size.X - 148.0f, Size.Y - 46.0f)}, OrangeRail, 1.25f, 2);
-			DrawLine({FVector2D(Size.X * 0.58f, 0.0f), FVector2D(Size.X * 0.78f, Size.Y)}, FLinearColor(0.0f, 0.58f, 0.78f, 0.045f * Alpha), 1.0f, 2);
 			return LayerId + 2;
 		}
 
@@ -868,6 +844,14 @@ namespace
 				Draw(Circle(Center, 4.0f), 2.5f);
 				Draw({Center + FVector2D(0.0f, -27.0f), Center + FVector2D(0.0f, -17.0f)});
 				Draw({Center + FVector2D(27.0f, 0.0f), Center + FVector2D(17.0f, 0.0f)});
+				break;
+			case EFlickPlayPlaylist::Test:
+				Draw(Circle(Center + FVector2D(-18.0f, 14.0f), 7.0f), 1.7f);
+				Draw(Circle(Center + FVector2D(18.0f, -14.0f), 7.0f), 1.7f);
+				Draw({Center + FVector2D(-11.0f, 14.0f), Center + FVector2D(9.0f, 14.0f), Center + FVector2D(9.0f, 2.0f)}, 1.5f, 0.78f);
+				Draw({Center + FVector2D(11.0f, -14.0f), Center + FVector2D(-9.0f, -14.0f), Center + FVector2D(-9.0f, -2.0f)}, 1.5f, 0.78f);
+				Draw({Center + FVector2D(-28.0f, 0.0f), Center + FVector2D(-5.0f, 0.0f)}, 3.0f);
+				Draw({Center + FVector2D(5.0f, 0.0f), Center + FVector2D(28.0f, 0.0f)}, 3.0f);
 				break;
 			case EFlickPlayPlaylist::PrivateMatch:
 				Draw({Center + FVector2D(-17.0f, -3.0f), Center + FVector2D(-17.0f, 20.0f), Center + FVector2D(17.0f, 20.0f), Center + FVector2D(17.0f, -3.0f), Center + FVector2D(-17.0f, -3.0f)}, 1.7f);
@@ -1351,150 +1335,48 @@ namespace
 		}
 
 		virtual int32 OnPaint(
-			const FPaintArgs& Args,
-			const FGeometry& AllottedGeometry,
-			const FSlateRect& MyCullingRect,
-			FSlateWindowElementList& OutDrawElements,
-			const int32 LayerId,
-			const FWidgetStyle& InWidgetStyle,
-			const bool bParentEnabled) const override
+			const FPaintArgs& Args, const FGeometry& AllottedGeometry,
+			const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
+			const int32 LayerId, const FWidgetStyle& InWidgetStyle, const bool bParentEnabled) const override
 		{
 			const FVector2D Size = AllottedGeometry.GetLocalSize();
-			if (Size.X < 2.0f || Size.Y < 2.0f)
-			{
-				return LayerId;
-			}
+			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
 			const float Cut = FMath::Clamp(CutSize, 0.0f, FMath::Min(Size.X, Size.Y) * 0.24f);
 			const TArray<FVector2D> Points = {
-				FVector2D(Cut, 0.0f), FVector2D(Size.X - Cut, 0.0f),
-				FVector2D(Size.X, Cut), FVector2D(Size.X, Size.Y - Cut),
-				FVector2D(Size.X - Cut, Size.Y), FVector2D(Cut, Size.Y),
-				FVector2D(0.0f, Size.Y - Cut), FVector2D(0.0f, Cut)};
-			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
-			const FLinearColor BaseFill = BackgroundColor.Get();
-			const FLinearColor Accent = AccentColor.Get();
-
-			const auto DrawPolygon = [&OutDrawElements, &Transform, &Size](
-				const int32 Layer,
-				const TArray<FVector2D>& Polygon,
-				const FLinearColor& CenterColor,
-				const FLinearColor& TopColor,
-				const FLinearColor& BottomColor)
-			{
-				TArray<FSlateVertex> Vertices;
-				TArray<SlateIndex> Indices;
-				Vertices.Reserve(Polygon.Num() + 1);
-				Indices.Reserve(Polygon.Num() * 3);
-				Vertices.Add(FSlateVertex::Make(
-					Transform,
-					FVector2f(static_cast<float>(Size.X * 0.5f), static_cast<float>(Size.Y * 0.46f)),
-					FVector2f(0.5f, 0.46f),
-					CenterColor.ToFColor(true)));
-				for (const FVector2D& Point : Polygon)
-				{
-					const float VerticalAlpha = FMath::Clamp(Point.Y / FMath::Max(Size.Y, 1.0f), 0.0f, 1.0f);
-					const FLinearColor VertexColor = FMath::Lerp(TopColor, BottomColor, VerticalAlpha);
-					Vertices.Add(FSlateVertex::Make(
-						Transform,
-						FVector2f(static_cast<float>(Point.X), static_cast<float>(Point.Y)),
-						FVector2f(static_cast<float>(Point.X / FMath::Max(Size.X, 1.0f)), VerticalAlpha),
-						VertexColor.ToFColor(true)));
-				}
-				for (int32 Index = 0; Index < Polygon.Num(); ++Index)
-				{
-					Indices.Add(0);
-					Indices.Add(static_cast<SlateIndex>(Index + 1));
-					Indices.Add(static_cast<SlateIndex>((Index + 1) % Polygon.Num() + 1));
-				}
-				FSlateDrawElement::MakeCustomVerts(
-					OutDrawElements, Layer, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
-			};
-
-			TArray<FVector2D> ShadowPoints;
-			ShadowPoints.Reserve(Points.Num());
+				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
+				{Size.X, Size.Y}, {Cut, Size.Y}, {0.0f, Size.Y - Cut}};
+			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
+			const FLinearColor Fill = BackgroundColor.Get() * Tint;
+			const FLinearColor Accent = AccentColor.Get() * Tint;
+			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
+			TArray<FSlateVertex> Vertices;
+			TArray<SlateIndex> Indices;
 			for (const FVector2D& Point : Points)
 			{
-				ShadowPoints.Add(Point + FVector2D(2.5f, 4.0f));
+				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
 			}
-			const FLinearColor Shadow(0.0f, 0.0f, 0.0f, FMath::Min(0.42f, BaseFill.A * 0.36f));
-			DrawPolygon(LayerId, ShadowPoints, Shadow, Shadow, Shadow.CopyWithNewOpacity(0.0f));
-
-			const FLinearColor TopFill = FMath::Lerp(BaseFill, FLinearColor(0.035f, 0.072f, 0.105f, BaseFill.A), 0.22f);
-			const FLinearColor CenterFill = FMath::Lerp(BaseFill, FLinearColor(0.014f, 0.038f, 0.064f, BaseFill.A), 0.13f);
-			const FLinearColor BottomFill = FMath::Lerp(BaseFill, FLinearColor(0.0f, 0.002f, 0.007f, BaseFill.A), 0.2f);
-			DrawPolygon(LayerId + 1, Points, CenterFill, TopFill, BottomFill);
-
-			TArray<FVector2D> Outline = Points;
-			Outline.Add(Points[0]);
-			const FLinearColor OutlineColor = bUseAccentForOutline
-				? Accent.CopyWithNewOpacity(FMath::Min(Accent.A, 0.82f))
-				: FLinearColor(0.31f, 0.44f, 0.54f, 0.78f);
-			if (bUseAccentForOutline && Accent.A > 0.55f)
+			for (int32 Index = 1; Index + 1 < Points.Num(); ++Index)
 			{
-				FSlateDrawElement::MakeLines(
-					OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(), Outline,
-					ESlateDrawEffect::None, Accent.CopyWithNewOpacity(Accent.A * 0.095f), true, 7.0f);
+				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
 			}
-
-			if (Size.Y >= 52.0f && BaseFill.A > 0.2f)
-			{
-				const int32 BandCount = FMath::Clamp(FMath::FloorToInt(Size.Y / 44.0f), 1, 8);
-				for (int32 Band = 1; Band <= BandCount; ++Band)
-				{
-					const float Y = Size.Y * static_cast<float>(Band) / static_cast<float>(BandCount + 1);
-					FSlateDrawElement::MakeLines(
-						OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
-						{FVector2D(Cut * 0.55f, Y), FVector2D(Size.X - Cut * 0.55f, Y)},
-						ESlateDrawEffect::None, FLinearColor(0.2f, 0.5f, 0.62f, BaseFill.A * 0.025f), true, 0.65f);
-				}
-			}
-
+			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
+			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
+				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
 			if (bDrawNeutralOutline)
 			{
-				FSlateDrawElement::MakeLines(
-					OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(), Outline,
-					ESlateDrawEffect::None, OutlineColor, true, FMath::Max(0.85f, BorderWidth));
-				const float Inset = FMath::Clamp(BorderWidth + 2.0f, 2.5f, 5.0f);
-				const float InnerCut = FMath::Max(1.0f, Cut - Inset * 0.35f);
-				TArray<FVector2D> InnerOutline = {
-					FVector2D(InnerCut + Inset, Inset), FVector2D(Size.X - InnerCut - Inset, Inset),
-					FVector2D(Size.X - Inset, InnerCut + Inset), FVector2D(Size.X - Inset, Size.Y - InnerCut - Inset),
-					FVector2D(Size.X - InnerCut - Inset, Size.Y - Inset), FVector2D(InnerCut + Inset, Size.Y - Inset),
-					FVector2D(Inset, Size.Y - InnerCut - Inset), FVector2D(Inset, InnerCut + Inset)};
-				// Copy the first point before mutating the array. Passing InnerOutline[0]
-				// directly to Add aliases the array's storage and trips TArray's debug
-				// guard when Add is allowed to reallocate during Slate painting.
-				const FVector2D FirstInnerPoint = InnerOutline[0];
-				InnerOutline.Add(FirstInnerPoint);
-				FSlateDrawElement::MakeLines(
-					OutDrawElements, LayerId + 4, AllottedGeometry.ToPaintGeometry(), InnerOutline,
-					ESlateDrawEffect::None, FLinearColor(0.58f, 0.78f, 0.88f, 0.095f), true, 0.65f);
+				TArray<FVector2D> Outline = Points;
+				Outline.Add(FVector2D::ZeroVector);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
+					Outline, Effect, bUseAccentForOutline ? Accent : Hairline * Tint, true, BorderWidth);
 			}
-
-			// FLICK's signature is a pair of short illuminated rails, rather than a
-			// uniformly neon outline. That leaves large panels feeling engineered and light.
 			if (Accent.A > KINDA_SMALL_NUMBER)
 			{
-				const float RailLength = FMath::Clamp(Size.X * 0.24f, 22.0f, 150.0f);
-				const TArray<FVector2D> LeadingRail = {
-					Points[7], Points[0], FVector2D(FMath::Min(Size.X - Cut, Cut + RailLength), 0.0f)};
-				const TArray<FVector2D> TrailingRail = {
-					FVector2D(FMath::Max(Cut, Size.X - Cut - RailLength), Size.Y), Points[4], Points[3]};
-				const float RailWidth = FMath::Max(1.15f, BorderWidth * 1.35f);
-				FSlateDrawElement::MakeLines(
-					OutDrawElements, LayerId + 5, AllottedGeometry.ToPaintGeometry(), LeadingRail,
-					ESlateDrawEffect::None, Accent, true, RailWidth);
-				FSlateDrawElement::MakeLines(
-					OutDrawElements, LayerId + 5, AllottedGeometry.ToPaintGeometry(), TrailingRail,
-					ESlateDrawEffect::None, Accent.CopyWithNewOpacity(Accent.A * 0.8f), true, RailWidth);
-				const FLinearColor Spark = FMath::Lerp(Accent, FLinearColor::White, 0.56f).CopyWithNewOpacity(Accent.A * 0.72f);
-				FSlateDrawElement::MakeLines(
-					OutDrawElements, LayerId + 5, AllottedGeometry.ToPaintGeometry(),
-					{FVector2D(Cut + 5.0f, 2.0f), FVector2D(FMath::Min(Size.X - Cut, Cut + RailLength * 0.55f), 2.0f)},
-					ESlateDrawEffect::None, Spark, true, 0.75f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
+					{FVector2D(0.0f, 0.0f), FVector2D(FMath::Min(Size.X - Cut, 36.0f), 0.0f)},
+					Effect, Accent, false, FMath::Max(2.0f, BorderWidth));
 			}
-			return SCompoundWidget::OnPaint(
-				Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 6, InWidgetStyle, bParentEnabled);
+			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
+				OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 		}
 
 	private:
@@ -1658,14 +1540,14 @@ namespace
 SFlickGameLayer::SFlickGameLayer()
 {
 	MenuButtonStyle = FButtonStyle()
-		.SetNormal(FSlateColorBrush(FLinearColor(0.008f, 0.016f, 0.027f, 0.94f)))
-		.SetHovered(FSlateColorBrush(FLinearColor(0.035f, 0.13f, 0.2f, 0.99f)))
+		.SetNormal(FSlateColorBrush(Panel))
+		.SetHovered(FSlateColorBrush(PanelRaised))
 		.SetPressed(FSlateColorBrush(FLinearColor(0.0f, 0.46f, 0.68f, 1.0f)))
 		.SetNormalPadding(FMargin(21.0f, 10.0f))
 		.SetPressedPadding(FMargin(24.0f, 11.0f, 18.0f, 9.0f));
 	PrimaryButtonStyle = FButtonStyle()
-		.SetNormal(FSlateColorBrush(FLinearColor(0.0f, 0.4f, 0.64f, 0.99f)))
-		.SetHovered(FSlateColorBrush(FLinearColor(0.0f, 0.68f, 0.94f, 1.0f)))
+		.SetNormal(FSlateColorBrush(FLinearColor(0.085f, 0.14f, 0.02f, 1.0f)))
+		.SetHovered(FSlateColorBrush(FLinearColor(0.15f, 0.24f, 0.025f, 1.0f)))
 		.SetPressed(FSlateColorBrush(FLinearColor(0.0f, 0.78f, 1.0f, 1.0f)))
 		.SetNormalPadding(FMargin(21.0f, 10.0f))
 		.SetPressedPadding(FMargin(24.0f, 11.0f, 18.0f, 9.0f));
@@ -1695,19 +1577,22 @@ SFlickGameLayer::SFlickGameLayer()
 		.SetPressedPadding(FMargin(0.0f));
 	ToggleStyle = FCheckBoxStyle()
 		.SetCheckBoxType(ESlateCheckBoxType::ToggleButton)
-		.SetUncheckedImage(FSlateColorBrush(FLinearColor(0.025f, 0.055f, 0.075f, 1.0f)))
+		.SetUncheckedImage(FSlateColorBrush(Ink))
 		.SetUncheckedHoveredImage(FSlateColorBrush(FLinearColor(0.035f, 0.16f, 0.22f, 1.0f)))
 		.SetUncheckedPressedImage(FSlateColorBrush(FLinearColor(0.02f, 0.3f, 0.4f, 1.0f)))
-		.SetCheckedImage(FSlateColorBrush(FLinearColor(0.0f, 0.62f, 0.86f, 1.0f)))
-		.SetCheckedHoveredImage(FSlateColorBrush(Cyan))
+		.SetCheckedImage(FSlateColorBrush(Brand))
+		.SetCheckedHoveredImage(FSlateColorBrush(Paper))
 		.SetCheckedPressedImage(FSlateColorBrush(FLinearColor(0.0f, 0.42f, 0.62f, 1.0f)))
 		.SetPadding(FMargin(12.0f, 5.0f));
 	SliderStyle = FSliderStyle()
 		.SetNormalBarImage(FSlateColorBrush(FLinearColor(0.05f, 0.1f, 0.135f, 1.0f)))
 		.SetHoveredBarImage(FSlateColorBrush(FLinearColor(0.07f, 0.18f, 0.24f, 1.0f)))
-		.SetNormalThumbImage(FSlateColorBrush(FLinearColor(0.72f, 0.94f, 1.0f, 1.0f)))
-		.SetHoveredThumbImage(FSlateColorBrush(Cyan))
+		.SetNormalThumbImage(FSlateColorBrush(Paper))
+		.SetHoveredThumbImage(FSlateColorBrush(Brand))
 		.SetBarThickness(5.0f);
+	SliderStyle.NormalThumbImage.ImageSize = FVector2D(12.0f, 22.0f);
+	SliderStyle.HoveredThumbImage.ImageSize = FVector2D(12.0f, 22.0f);
+	SliderStyle.SetNormalBarImage(FSlateNoResource()).SetHoveredBarImage(FSlateNoResource());
 	ShotClockBarStyle = FProgressBarStyle()
 		.SetBackgroundImage(FSlateColorBrush(FLinearColor(0.018f, 0.035f, 0.05f, 1.0f)))
 		.SetFillImage(FSlateColorBrush(FLinearColor::White))
@@ -1742,11 +1627,18 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
+		SNew(SScaleBox)
+		.Stretch(EStretch::ScaleToFit)
+		[
+		SNew(SBox)
+		.WidthOverride(FlickUITheme::ReferenceWidth)
+		.HeightOverride(FlickUITheme::ReferenceHeight)
+		[
 		SNew(SOverlay)
 
 		+ SOverlay::Slot()
 		[
-			SNew(SBox)
+			SAssignNew(MainMenuScreenWidget, SBox)
 			.Visibility_Lambda([this]() { return GetScreenVisibility(EFlickFrontendScreen::MainMenu); })
 			[
 				BuildMainMenu()
@@ -1800,7 +1692,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 		+ SOverlay::Slot()
 		[
-			SNew(SBox)
+			SAssignNew(ProfileScreenWidget, SBox)
 			.Visibility_Lambda([this]() { return GetScreenVisibility(EFlickFrontendScreen::Profile); })
 			[
 				BuildProfile()
@@ -1846,6 +1738,20 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot()
 		[
 			SNew(SBox)
+			.Visibility_Lambda([this]()
+			{
+				return GameMode.IsValid() && GameMode->IsCinematicReplayActive()
+					? EVisibility::HitTestInvisible
+					: EVisibility::Collapsed;
+			})
+			[
+				BuildCinematicReplayOverlay()
+			]
+		]
+
+		+ SOverlay::Slot()
+		[
+			SNew(SBox)
 			.Visibility_Lambda([this]() { return GetScoreboardVisibility(); })
 			[
 				BuildScoreboardOverlay()
@@ -1877,6 +1783,8 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			[
 				BuildStartupOverlay()
 			]
+		]
+		]
 		]
 	];
 }
@@ -1955,6 +1863,9 @@ void SFlickGameLayer::Tick(
 			break;
 		case EFlickFrontendScreen::ModeSelect:
 			TargetButton = ModeSelectDefaultButton;
+			break;
+		case EFlickFrontendScreen::PrivateMatch:
+			TargetButton = PrivateMatchDefaultButton;
 			break;
 		case EFlickFrontendScreen::OnlineBrowser:
 			TargetButton = OnlineBrowserDefaultButton;
@@ -2035,38 +1946,45 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		]
 		+ SOverlay::Slot()
 		[
-			SNew(SFlickMainMenuImageOverlay)
+			SNew(SFlickDiagonalPanel)
 			.Visibility(EVisibility::HitTestInvisible)
-			.Opacity(0.8f)
+			.PanelColor(Ink)
+			.EdgeColor(Hairline)
 		]
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Top)
-		.Padding(65.0f, 45.0f, 0.0f, 0.0f)
+		.Padding(52.0f, 62.0f, 0.0f, 0.0f)
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
-			[
-				SNew(SBox)
-				.WidthOverride(390.0f)
-				.HeightOverride(126.0f)
-				.RenderTransform(FSlateRenderTransform(FVector2D(0.0f, 24.0f)))
-				[
-					SNew(SFlickLogoWidget)
-					.CropToArtwork(true)
-				]
-			]
+			[SNew(STextBlock).Text(FText::FromString(TEXT("PHYSICS. PRECISION. RIVALRY."))).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
+			+ SVerticalBox::Slot().AutoHeight().Padding(-5.0f, 0.0f, 0.0f, 0.0f)
+			[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK"))).Font(DisplayFont(116, true)).ColorAndOpacity(Paper)]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+			[SNew(STextBlock).Text(FText::FromString(TEXT("Small move. Big consequences."))).Font(UiFont(16)).ColorAndOpacity(Muted)
+				.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->GetFrontendScreen() == EFlickFrontendScreen::Profile ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })]
 		]
+
+		+ SOverlay::Slot()
+		[
+			SAssignNew(MainMenuInteractiveWidget, SOverlay)
+			.Visibility_Lambda([this]()
+			{
+				if (!GameMode.IsValid()) return EVisibility::Collapsed;
+				if (GameMode->GetFrontendScreen() == EFlickFrontendScreen::MainMenu) return EVisibility::Visible;
+				return EVisibility::Collapsed;
+			})
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Top)
-		.Padding(70.0f, 330.0f, 0.0f, 0.0f)
+		.Padding(52.0f, 298.0f, 0.0f, 0.0f)
 		[
-			SNew(SBox)
-			.WidthOverride(600.0f)
+			SAssignNew(MainMenuSelectionWidget, SBox)
+			.WidthOverride(450.0f)
 			[
 				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, 0.0f, 0.0f, 14.0f)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, 0.0f, 0.0f, MainMenuStackMetrics::Gap)
 				[
 					SNew(SBox).WidthOverride(MainMenuStackMetrics::GetRowWidth(0))
 					[
@@ -2141,15 +2059,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 				+ SOverlay::Slot()
 			.HAlign(HAlign_Right)
 		.VAlign(VAlign_Bottom)
-		.Padding(0.0f, 0.0f, 52.0f, 126.0f)
+		.Padding(0.0f, 0.0f, 52.0f, 124.0f)
 		[
 			SNew(SBox)
 			.WidthOverride(500.0f)
-			.HeightOverride(218.0f)
+			.HeightOverride(186.0f)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.001f, 0.005f, 0.012f, 0.9f))
-				.AccentColor(Cyan.CopyWithNewOpacity(0.84f))
+				.BackgroundColor(Ink)
+				.AccentColor(Brand)
 				.CutSize(10.0f)
 				.BorderWidth(1.15f)
 				.Padding(FMargin(34.0f, 22.0f, 34.0f, 20.0f))
@@ -2161,16 +2079,16 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 							+ SHorizontalBox::Slot().FillWidth(1.0f)
 							[
 								SNew(STextBlock)
-								.Text(FText::FromString(TEXT("ARENA SHOWCASE")))
+								.Text(FText::FromString(TEXT("ON THE TABLE")))
 								.Font(UiFont(14, true))
 								.ColorAndOpacity(FLinearColor(0.72f, 0.77f, 0.82f, 0.96f))
 							]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
 								SNew(STextBlock)
-								.Text(FText::FromString(TEXT("LIVE \u2022")))
+								.Text(FText::FromString(TEXT("PREVIEW  /  01")))
 								.Font(UiFont(15, true))
-								.ColorAndOpacity(Cyan)
+								.ColorAndOpacity(Brand)
 							]
 						]
 						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 9.0f, 0.0f, 0.0f)
@@ -2185,8 +2103,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 									? TEXT("BOB")
 									: FString::Printf(TEXT("%dV%d KNOCKOUT"), TeamSize, TeamSize));
 							})
-						.Font(DisplayFont(48))
-						.ColorAndOpacity(FLinearColor(0.0f, 0.78f, 1.0f, 1.0f))
+						.Font(DisplayFont(38))
+						.ColorAndOpacity(Paper)
 						]
 						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
 						[
@@ -2197,7 +2115,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 									? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
 								return FText::FromString(Variant == EFlickMatchVariant::Bob
 									? GetMatchVariantSummary(Variant)
-									: TEXT("4 PUCKS PER PLAYER  |  BEST OF 5"));
+									: TEXT("Hold your ground. Knock out the opposition."));
 							})
 						.Font(UiFont(13))
 						.ColorAndOpacity(FLinearColor(0.67f, 0.72f, 0.78f, 0.96f))
@@ -2221,7 +2139,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			SNew(SBox).HeightOverride(59.0f)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.0002f, 0.0025f, 0.008f, 0.76f))
+				.BackgroundColor(Ink)
 				.AccentColor(FLinearColor(0.16f, 0.38f, 0.5f, 0.45f))
 				.CutSize(3.0f)
 				.BorderWidth(0.7f)
@@ -2234,7 +2152,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("LOCAL COMPETITION"))).Font(UiFont(11, true)).ColorAndOpacity(Cyan)
+						SNew(STextBlock).Text(FText::FromString(TEXT("READY TO FLICK"))).Font(UiFont(11, true)).ColorAndOpacity(Brand)
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(28.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(0)]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(1)]
@@ -2248,7 +2166,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth()
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("NOW SHOWCASING"))).Font(UiFont(10, true)).ColorAndOpacity(FLinearColor(0.84f, 0.89f, 0.93f, 0.94f))
+							SNew(STextBlock).Text(FText::FromString(TEXT("TABLE RULES"))).Font(UiFont(10, true)).ColorAndOpacity(FLinearColor(0.84f, 0.89f, 0.93f, 0.94f))
 						]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(11.0f, 0.0f)
 						[
@@ -2286,7 +2204,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(11.0f, 0.0f)
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(10, true)).ColorAndOpacity(Cyan)
+							SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)
 						]
 						+ SHorizontalBox::Slot().AutoWidth()
 						[
@@ -2313,9 +2231,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			.Visibility_Lambda([this]() { return bSocialPanelOpen ? EVisibility::Collapsed : EVisibility::Visible; })
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.001f, 0.008f, 0.017f, 0.94f))
-				.AccentColor(Cyan.CopyWithNewOpacity(0.66f))
-				.UseAccentForOutline(true)
+				.BackgroundColor(Panel)
+				.AccentColor(Hairline)
+				.UseAccentForOutline(false)
 				.CutSize(12.0f)
 				.BorderWidth(1.3f)
 				.Padding(FMargin(20.0f, 9.0f, 12.0f, 9.0f))
@@ -2328,14 +2246,23 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						[
 							SNew(SFlickMainMenuIcon)
 							.Icon(EFlickMainMenuIcon::Rank)
-							.Color(Cyan)
+							.Color(Brand)
 						]
 						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 						[
 							SNew(SVerticalBox)
 							+ SVerticalBox::Slot().AutoHeight()
 							[
-								SNew(STextBlock).Text(FText::FromString(TEXT("CURRENT RANK"))).Font(UiFont(11, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
+								SNew(STextBlock)
+								.Text_Lambda([this]()
+								{
+									if (!GameMode.IsValid()) return FText::FromString(TEXT("CURRENT RANK"));
+									const EFlickMatchVariant Variant = GameMode->GetActiveMatchVariant();
+									return FText::FromString(Variant == EFlickMatchVariant::Bob
+										? TEXT("BOB RANK")
+										: FString::Printf(TEXT("%dV%d CURRENT RANK"), GameMode->GetPlayersPerTeam(), GameMode->GetPlayersPerTeam()));
+								})
+								.Font(UiFont(11, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
 							]
 							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
 							[
@@ -2344,19 +2271,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 								{
 									const UFlickRankingSubsystem* Ranking = GetRankingSubsystem();
 									const EFlickMatchVariant Variant = GameMode.IsValid()
-										? GameMode->GetSelectedMatchVariant() : EFlickMatchVariant::Classic;
-									const int32 TeamSize = GameMode.IsValid() ? GameMode->GetMatchmakingPlayersPerTeam() : 1;
+										? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
+									const int32 TeamSize = GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1;
 									return FText::FromString(Ranking
 										? Ranking->GetProgressLabel(Variant, TeamSize)
 										: TEXT("UNAVAILABLE"));
 								})
-								.Font(UiFont(14, true)).ColorAndOpacity(Cyan)
+								.Font(UiFont(14, true)).ColorAndOpacity(Brand)
 							]
 						]
-					]
-					+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 0.0f, 1.0f)
-					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("/"))).Font(UiFont(20, true)).ColorAndOpacity(Orange)
 					]
 				]
 			]
@@ -2370,9 +2293,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			.Visibility_Lambda([this]() { return bSocialPanelOpen ? EVisibility::Collapsed : EVisibility::Visible; })
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.001f, 0.008f, 0.017f, 0.94f))
+				.BackgroundColor(Panel)
 				.AccentColor(FLinearColor(0.43f, 0.8f, 0.88f, 0.82f))
-				.UseAccentForOutline(true)
+				.UseAccentForOutline(false)
 				.CutSize(12.0f)
 				.BorderWidth(1.3f)
 				.Padding(FMargin(1.5f))
@@ -2443,6 +2366,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			[
 				BuildSocialPanel()
 			]
+		]
 		];
 }
 
@@ -2451,11 +2375,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 	auto MakeStatCell = [this](const FString& Label, const FString& Detail, const int32 StatIndex, const FLinearColor& Accent) -> TSharedRef<SWidget>
 	{
 		return SNew(SFlickAngularBorder)
-			.BackgroundColor(FLinearColor(0.004f, 0.015f, 0.026f, 0.92f))
-			.AccentColor(Accent.CopyWithNewOpacity(0.6f))
+			.BackgroundColor(PanelRaised)
+			.AccentColor(Hairline)
 			.CutSize(9.0f)
 			.BorderWidth(0.9f)
-			.Padding(FMargin(22.0f, 16.0f))
+			.Padding(FMargin(18.0f, 11.0f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
@@ -2463,7 +2387,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 					SNew(STextBlock)
 					.Text(FText::FromString(Label))
 					.Font(UiFont(10, true))
-					.ColorAndOpacity(Accent)
+					.ColorAndOpacity(Brand)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
 				[
@@ -2486,29 +2410,32 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 						case 3: return FText::AsNumber(Stats.Knockouts);
 						case 4: return FText::AsNumber(Stats.DoubleKnockouts);
 						case 5: return FText::AsNumber(Stats.Shots);
+						case 6: return FText::AsNumber(Stats.GetTotalAccolades());
+						case 7: return FText::AsNumber(Stats.GetAccoladeCount(EFlickAccolade::TeamWipeout));
+						case 8: return FText::AsNumber(Stats.GetAccoladeCount(EFlickAccolade::FlawlessRound));
 						default: return FText::AsNumber(0);
 						}
 					})
-					.Font(DisplayFont(30))
-					.ColorAndOpacity(FLinearColor::White)
+					.Font(DisplayFont(38))
+					.ColorAndOpacity(Paper)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
 				[
 					SNew(STextBlock)
 					.Text(FText::FromString(Detail))
-					.Font(UiFont(7, true))
+					.Font(UiFont(10))
 					.ColorAndOpacity(Muted)
 				]
 			];
 	};
 
 	return SNew(SFlickAngularBorder)
-		.BackgroundColor(FLinearColor(0.001f, 0.008f, 0.017f, 0.94f))
-		.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
-		.UseAccentForOutline(true)
+		.BackgroundColor(Panel)
+		.AccentColor(Hairline)
+		.UseAccentForOutline(false)
 		.CutSize(14.0f)
 		.BorderWidth(1.1f)
-		.Padding(FMargin(28.0f, 22.0f))
+		.Padding(FMargin(22.0f, 17.0f))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
@@ -2518,8 +2445,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 				[
 					SNew(STextBlock)
 					.Text(FText::FromString(TEXT("CAREER OVERVIEW")))
-					.Font(UiFont(15, true))
-					.ColorAndOpacity(FLinearColor::White)
+					.Font(DisplayFont(24))
+					.ColorAndOpacity(Paper)
 				]
 				+ SHorizontalBox::Slot().AutoWidth()
 				[
@@ -2534,10 +2461,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 						return FText::FromString(FString::Printf(TEXT("ALL MODES  //  %d%% WIN RATE"), WinRate));
 					})
 					.Font(UiFont(9, true))
-					.ColorAndOpacity(Cyan)
+					.ColorAndOpacity(Brand)
 				]
 			]
-			+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 16.0f, 0.0f, 0.0f)
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 11.0f, 0.0f, 0.0f)
 			[
 				SNew(SUniformGridPanel)
 				.SlotPadding(FMargin(6.0f))
@@ -2547,61 +2474,21 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 				+ SUniformGridPanel::Slot(0, 1)[MakeStatCell(TEXT("KNOCKOUTS"), TEXT("OPPONENT PUCKS REMOVED"), 3, Cyan)]
 				+ SUniformGridPanel::Slot(1, 1)[MakeStatCell(TEXT("DOUBLE KOS"), TEXT("TWO PUCKS IN ONE SHOT"), 4, Orange)]
 				+ SUniformGridPanel::Slot(2, 1)[MakeStatCell(TEXT("SHOTS TAKEN"), TEXT("ALL COMPLETED MATCHES"), 5, FLinearColor(0.68f, 0.77f, 0.86f, 1.0f))]
+				+ SUniformGridPanel::Slot(0, 2)[MakeStatCell(TEXT("STYLE ACCOLADES"), TEXT("SPECIAL SHOTS AND PLAYS"), 6, FLinearColor(0.72f, 0.48f, 0.96f, 1.0f))]
+				+ SUniformGridPanel::Slot(1, 2)[MakeStatCell(TEXT("TEAM WIPEOUTS"), TEXT("MULTI-KO ROUND FINISHES"), 7, Orange)]
+				+ SUniformGridPanel::Slot(2, 2)[MakeStatCell(TEXT("FLAWLESS ROUNDS"), TEXT("NO FRIENDLY PUCKS LOST"), 8, Cyan)]
 			]
 		];
 }
 
 TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 {
-	auto MakeTab = [this](const FString& Label, const EFlickProfileTab Tab, TSharedPtr<SButton>* OutButton = nullptr) -> TSharedRef<SWidget>
-	{
-		TSharedRef<SButton> Button = SNew(SButton)
-			.ButtonStyle(&TransparentButtonStyle)
-			.ContentPadding(FMargin(0.0f))
-			.Cursor(EMouseCursor::Hand)
-			.OnClicked_Lambda([this, Tab]()
-			{
-				SelectedProfileTab = Tab;
-				return FReply::Handled();
-			});
-		const TWeakPtr<SButton> WeakButton = Button;
-		Button->SetContent(
-			SNew(SFlickAngularBorder)
-			.BackgroundColor_Lambda([this, Tab, WeakButton]()
-			{
-				const TSharedPtr<SButton> Pinned = WeakButton.Pin();
-				return SelectedProfileTab == Tab || (Pinned.IsValid() && Pinned->IsHovered())
-					? FLinearColor(0.0f, 0.095f, 0.14f, 0.98f)
-					: FLinearColor(0.003f, 0.014f, 0.024f, 0.9f);
-			})
-			.AccentColor_Lambda([this, Tab]()
-			{
-				return (SelectedProfileTab == Tab ? Cyan : Hairline).CopyWithNewOpacity(0.94f);
-			})
-			.UseAccentForOutline(true)
-			.CutSize(7.0f)
-			.BorderWidth(1.0f)
-			.Padding(FMargin(22.0f, 13.0f))
-			[
-				SNew(STextBlock)
-				.Text(FText::FromString(Label))
-				.Font(UiFont(11, true))
-				.Justification(ETextJustify::Center)
-				.ColorAndOpacity_Lambda([this, Tab]() { return SelectedProfileTab == Tab ? FSlateColor(Cyan) : FSlateColor(FLinearColor::White); })
-			]);
-		if (OutButton)
-		{
-			*OutButton = Button;
-		}
-		return SNew(SBox).WidthOverride(260.0f).HeightOverride(52.0f)[Button];
-	};
-
 	auto MakeRankCard = [this](const int32 PlayersPerTeam, const FString& Label) -> TSharedRef<SWidget>
 	{
 		return SNew(SFlickAngularBorder)
-			.BackgroundColor(FLinearColor(0.003f, 0.014f, 0.025f, 0.95f))
-			.AccentColor(PlayersPerTeam == 2 ? Orange.CopyWithNewOpacity(0.72f) : Cyan.CopyWithNewOpacity(0.68f))
-			.UseAccentForOutline(true).CutSize(12.0f).BorderWidth(1.0f).Padding(FMargin(26.0f, 24.0f))
+			.BackgroundColor(PanelRaised)
+			.AccentColor(Brand)
+			.UseAccentForOutline(false).CutSize(12.0f).BorderWidth(1.0f).Padding(FMargin(26.0f, 24.0f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(11, true)).ColorAndOpacity(Muted)]
@@ -2615,7 +2502,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 							? Ranking->GetProgressLabel(EFlickMatchVariant::Classic, PlayersPerTeam)
 							: TEXT("UNAVAILABLE"));
 					})
-					.Font(DisplayFont(24)).ColorAndOpacity(PlayersPerTeam == 2 ? Orange : Cyan)
+					.Font(DisplayFont(24)).ColorAndOpacity(Paper)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 7.0f, 0.0f, 0.0f)
 				[
@@ -2638,7 +2525,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			})
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.003f, 0.014f, 0.025f, 0.93f))
+				.BackgroundColor(PanelRaised)
 				.AccentColor_Lambda([this, MatchIndex]()
 				{
 					const UFlickGameInstance* Instance = PlayerController.IsValid()
@@ -2663,7 +2550,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 								const FFlickProfileMatchRecord& Record = Instance->GetRecentMatches()[MatchIndex];
 								return FText::FromString(Record.bDraw ? TEXT("DRAW") : Record.bWon ? TEXT("WIN") : TEXT("LOSS"));
 							})
-							.Font(UiFont(12, true)).ColorAndOpacity(FLinearColor::White)
+							.Font(UiFont(12, true)).ColorAndOpacity(Paper)
 						]
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
@@ -2678,7 +2565,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 								? TEXT("BOB") : FString::Printf(TEXT("%dV%d KNOCKOUT"), Record.PlayersPerTeam, Record.PlayersPerTeam);
 							return FText::FromString(FString::Printf(TEXT("%s  //  %s"), Record.bRanked ? TEXT("COMPETITIVE") : TEXT("CASUAL"), *Mode));
 						})
-						.Font(UiFont(10, true)).ColorAndOpacity(Cyan)
+						.Font(UiFont(10, true)).ColorAndOpacity(Brand)
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
@@ -2697,109 +2584,144 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		];
 	}
 
+	const auto MakeTab = [this](EFlickProfileTab Tab, const FString& Label) -> TSharedRef<SWidget>
+	{
+		TSharedRef<SButton> Button = SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0.0f)
+			.OnClicked_Lambda([this, Tab]() { SelectedProfileTab = Tab; return FReply::Handled(); });
+		const TWeakPtr<SButton> WeakButton = Button;
+		Button->SetContent(SNew(SBorder).BorderImage(WhiteBrush()).Padding(FMargin(18.0f, 9.0f))
+			.BorderBackgroundColor_Lambda([this, Tab, WeakButton]()
+			{
+				const auto Pinned = WeakButton.Pin();
+				return SelectedProfileTab == Tab ? Brand : Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus()) ? PanelRaised : Panel;
+			})
+			[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(11, true))
+			.ColorAndOpacity_Lambda([this, Tab]() { return SelectedProfileTab == Tab ? Ink : Paper; })]);
+		if (Tab == EFlickProfileTab::Stats) ProfileDefaultButton = Button;
+		return Button;
+	};
 	return SNew(SOverlay)
-		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.001f, 0.005f, 0.011f, 0.94f))]
-		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility(EVisibility::HitTestInvisible).Opacity(0.55f)]
-		+ SOverlay::Slot().VAlign(VAlign_Top)
+		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.004f, 0.012f, 0.02f, 0.82f))]
+		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility(EVisibility::HitTestInvisible).Opacity(0.22f)]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(42.0f)
 		[
-			SNew(SBox).HeightOverride(116.0f)
+			SNew(SBox)
+			.MaxDesiredWidth(1180.0f)
+			.MaxDesiredHeight(760.0f)
 			[
-				SNew(SFlickAngularBorder).BackgroundColor(FLinearColor(0.002f, 0.008f, 0.016f, 0.96f)).AccentColor(Cyan.CopyWithNewOpacity(0.76f)).CutSize(10.0f).BorderWidth(1.1f).Padding(FMargin(44.0f, 20.0f))
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(6.0f).HeightOverride(56.0f)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan)]]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(16.0f, 0.0f)
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PROFILE"))).Font(DisplayFont(36)).ColorAndOpacity(FLinearColor::White)]
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("CAREER  //  COMPETITIVE IDENTITY"))).Font(UiFont(9, true)).ColorAndOpacity(Cyan)]
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("LOCAL PROFILE"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)]
-				]
-			]
-		]
-		+ SOverlay::Slot().Padding(44.0f, 138.0f, 44.0f, 104.0f)
-		[
+			SNew(SFlickAngularBorder)
+			.BackgroundColor(Panel.CopyWithNewOpacity(0.97f))
+			.AccentColor(Brand)
+			.UseAccentForOutline(false)
+			.CutSize(18.0f)
+			.BorderWidth(1.2f)
+			.Padding(FMargin(28.0f, 22.0f))
+			[
 			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+			+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK  /  YOUR RECORD"))).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 14.0f)
+			[SNew(STextBlock).Text(FText::FromString(TEXT("PROFILE"))).Font(DisplayFont(36)).ColorAndOpacity(Paper)]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 14.0f)
 			[
 				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().Padding(4.0f, 0.0f)[MakeTab(TEXT("STATS"), EFlickProfileTab::Stats, &ProfileDefaultButton)]
-				+ SHorizontalBox::Slot().AutoWidth().Padding(4.0f, 0.0f)[MakeTab(TEXT("LEADERBOARDS"), EFlickProfileTab::Leaderboards)]
-				+ SHorizontalBox::Slot().AutoWidth().Padding(4.0f, 0.0f)[MakeTab(TEXT("MATCH HISTORY"), EFlickProfileTab::MatchHistory)]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 0.0f)[MakeTab(EFlickProfileTab::Stats, TEXT("STATS"))]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 0.0f)[MakeTab(EFlickProfileTab::Leaderboards, TEXT("LEADERBOARDS"))]
+				+ SHorizontalBox::Slot().AutoWidth()[MakeTab(EFlickProfileTab::MatchHistory, TEXT("MATCH HISTORY"))]
 			]
-			+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 18.0f, 0.0f, 0.0f)
+			+ SVerticalBox::Slot().AutoHeight()
 			[
+				SNew(SBox)
+				.HeightOverride(500.0f)
+				[
 				SNew(SOverlay)
 				+ SOverlay::Slot()
 				[
-					SNew(SBox).WidthOverride(1120.0f).Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Stats ? EVisibility::Visible : EVisibility::Collapsed; })[BuildProfileStatsPanel()]
-				]
-				+ SOverlay::Slot()
-				[
-					SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Leaderboards ? EVisibility::Visible : EVisibility::Collapsed; })
+					SNew(SBox)
+					.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Stats ? EVisibility::Visible : EVisibility::Collapsed; })
 					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR RANKED PLAYLISTS"))).Font(UiFont(16, true)).ColorAndOpacity(FLinearColor::White)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 18.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("PLACEMENT AND MMR PROGRESS ACROSS EACH TEAM SIZE"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
-						+ SVerticalBox::Slot().AutoHeight()
-						[
-							SNew(SUniformGridPanel).SlotPadding(FMargin(7.0f))
-							+ SUniformGridPanel::Slot(0, 0)[MakeRankCard(1, TEXT("1V1 DUEL"))]
-							+ SUniformGridPanel::Slot(1, 0)[MakeRankCard(2, TEXT("2V2 DOUBLES"))]
-							+ SUniformGridPanel::Slot(2, 0)[MakeRankCard(3, TEXT("3V3 CHAOS"))]
-						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(7.0f, 18.0f, 7.0f, 0.0f)
-						[
-							SNew(SFlickAngularBorder).BackgroundColor(FLinearColor(0.004f, 0.013f, 0.022f, 0.82f)).AccentColor(Hairline).CutSize(7.0f).BorderWidth(0.8f).Padding(FMargin(20.0f, 14.0f))
-							[
-								SNew(STextBlock).Text(FText::FromString(TEXT("GLOBAL PLAYER TABLES WILL APPEAR HERE WHEN THE LIVE LEADERBOARD SERVICE IS CONNECTED."))).Font(UiFont(9, true)).ColorAndOpacity(Muted)
-							]
-						]
+						BuildProfileStatsPanel()
 					]
 				]
 				+ SOverlay::Slot()
 				[
-					SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::MatchHistory ? EVisibility::Visible : EVisibility::Collapsed; })
+					SNew(SBox)
+					.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Leaderboards ? EVisibility::Visible : EVisibility::Collapsed; })
 					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()
+						SNew(SFlickAngularBorder)
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Hairline)
+						.UseAccentForOutline(false)
+						.CutSize(14.0f)
+						.BorderWidth(1.1f)
+						.Padding(FMargin(28.0f, 24.0f))
 						[
-							SNew(SHorizontalBox)
-							+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("RECENT MATCHES"))).Font(UiFont(16, true)).ColorAndOpacity(FLinearColor::White)]
-							+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("LAST 8  //  STORED LOCALLY"))).Font(UiFont(9, true)).ColorAndOpacity(Cyan)]
-						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
-						[
-							SNew(SBox).Visibility_Lambda([this]()
-							{
-								const UFlickGameInstance* Instance = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr;
-								return !Instance || Instance->GetRecentMatches().IsEmpty() ? EVisibility::Visible : EVisibility::Collapsed;
-							})
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR RANKED PLAYLISTS"))).Font(UiFont(16, true)).ColorAndOpacity(Paper)]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 18.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("PLACEMENT AND MMR PROGRESS ACROSS EACH TEAM SIZE"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
+							+ SVerticalBox::Slot().AutoHeight()
 							[
-								SNew(SFlickAngularBorder).BackgroundColor(FLinearColor(0.003f, 0.014f, 0.025f, 0.9f)).AccentColor(Hairline).CutSize(10.0f).BorderWidth(0.9f).Padding(FMargin(28.0f, 38.0f))
+								SNew(SUniformGridPanel).SlotPadding(FMargin(7.0f))
+								+ SUniformGridPanel::Slot(0, 0)[MakeRankCard(1, TEXT("1V1 DUEL"))]
+								+ SUniformGridPanel::Slot(1, 0)[MakeRankCard(2, TEXT("2V2 DOUBLES"))]
+								+ SUniformGridPanel::Slot(2, 0)[MakeRankCard(3, TEXT("3V3 CHAOS"))]
+							]
+							+ SVerticalBox::Slot().AutoHeight().Padding(7.0f, 18.0f, 7.0f, 0.0f)
+							[
+								SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(7.0f).BorderWidth(0.8f).Padding(FMargin(20.0f, 14.0f))
 								[
-									SNew(STextBlock).Text(FText::FromString(TEXT("NO COMPLETED MATCHES YET  //  FINISH A SERIES TO START YOUR HISTORY"))).Font(UiFont(11, true)).Justification(ETextJustify::Center).ColorAndOpacity(Muted)
+									SNew(STextBlock).Text(FText::FromString(TEXT("GLOBAL PLAYER TABLES WILL APPEAR HERE WHEN THE LIVE LEADERBOARD SERVICE IS CONNECTED."))).Font(UiFont(9, true)).ColorAndOpacity(Muted)
 								]
 							]
 						]
-						+ SVerticalBox::Slot().AutoHeight()[HistoryRows]
 					]
 				]
-			]
-		]
-		+ SOverlay::Slot().VAlign(VAlign_Bottom)
-		[
-			SNew(SBox).HeightOverride(82.0f)
-			[
-				SNew(SFlickAngularBorder).BackgroundColor(FLinearColor(0.002f, 0.007f, 0.014f, 0.95f)).AccentColor(Hairline).CutSize(8.0f).BorderWidth(1.0f).Padding(FMargin(34.0f, 14.0f))
+				+ SOverlay::Slot()
 				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(170.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseProfile(); return FReply::Handled(); }), false, false, 50.0f)]]
-					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("PROFILE DATA SAVES AUTOMATICALLY"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
+					SNew(SBox)
+					.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::MatchHistory ? EVisibility::Visible : EVisibility::Collapsed; })
+					[
+						SNew(SFlickAngularBorder)
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Hairline)
+						.UseAccentForOutline(false)
+						.CutSize(14.0f)
+						.BorderWidth(1.1f)
+						.Padding(FMargin(28.0f, 24.0f))
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()
+							[
+								SNew(SHorizontalBox)
+								+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("RECENT MATCHES"))).Font(UiFont(16, true)).ColorAndOpacity(Paper)]
+								+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("LAST 8  //  STORED LOCALLY"))).Font(UiFont(9, true)).ColorAndOpacity(Brand)]
+							]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
+							[
+								SNew(SBox)
+								.Visibility_Lambda([this]()
+								{
+									const UFlickGameInstance* Instance = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr;
+									return !Instance || Instance->GetRecentMatches().IsEmpty() ? EVisibility::Visible : EVisibility::Collapsed;
+								})
+								[
+									SNew(STextBlock).Text(FText::FromString(TEXT("NO COMPLETED MATCHES YET  //  FINISH A SERIES TO START YOUR HISTORY"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)
+								]
+							]
+							+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 12.0f, 0.0f, 0.0f)
+							[SNew(SScrollBox) + SScrollBox::Slot()[HistoryRows]]
+						]
+					]
 				]
+				]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(160.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseProfile(); return FReply::Handled(); }))]]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).HAlign(HAlign_Right).VAlign(VAlign_Center)
+				[SNew(STextBlock).Text(FText::FromString(TEXT("PROFILE DATA SAVES AUTOMATICALLY"))).Font(UiFont(10)).ColorAndOpacity(Muted)]
+			]
+			]
 			]
 		];
 }
@@ -2819,16 +2741,16 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 		})
 		[
 			SNew(SFlickAngularBorder)
-			.BackgroundColor(FLinearColor(0.003f, 0.016f, 0.027f, 0.9f))
+			.BackgroundColor(PanelRaised)
 			.AccentColor_Lambda([this, PartySlot]()
 			{
 				const AFlickPlayerState* Member = GameMode.IsValid() && GameMode->IsPartySession()
 					? GameMode->GetPartyMember(PartySlot) : nullptr;
 				return Member && Member->IsPartyLeader()
-					? Orange.CopyWithNewOpacity(0.82f)
-					: Cyan.CopyWithNewOpacity(0.58f);
+					? Brand
+					: Hairline;
 			})
-			.UseAccentForOutline(true)
+			.UseAccentForOutline(false)
 			.CutSize(5.0f)
 			.BorderWidth(0.9f)
 			.Padding(FMargin(7.0f, 4.0f))
@@ -2839,13 +2761,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 					SNew(SBox).WidthOverride(26.0f).HeightOverride(26.0f)
 					[
 						SNew(SFlickAngularBorder)
-						.BackgroundColor(FLinearColor(0.0f, 0.07f, 0.1f, 0.94f))
-						.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
+						.BackgroundColor(Panel)
+						.AccentColor(Hairline)
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(1.0f))
 						[
 							SNew(STextBlock)
 							.Text(FText::FromString(FString::Printf(TEXT("%02d"), PartySlot + 1)))
-							.Font(UiFont(8, true)).Justification(ETextJustify::Center).ColorAndOpacity(Cyan)
+							.Font(UiFont(8, true)).Justification(ETextJustify::Center).ColorAndOpacity(Brand)
 						]
 					]
 				]
@@ -2865,7 +2787,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 							const UFlickSessionSubsystem* Sessions = GameMode.IsValid() ? GameMode->GetFlickSessionSubsystem() : nullptr;
 							return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER"));
 						})
-						.Font(UiFont(8, true)).ColorAndOpacity(FLinearColor::White).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+						.Font(UiFont(8, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 					]
 					+ SVerticalBox::Slot().AutoHeight()
 					[
@@ -2876,7 +2798,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 								? GameMode->GetPartyMember(PartySlot) : nullptr;
 							return FText::FromString(Member && Member->IsPartyLeader() ? TEXT("LEADER") : TEXT("IN PARTY"));
 						})
-						.Font(UiFont(6, true)).ColorAndOpacity(Muted)
+						.Font(UiFont(7, true)).ColorAndOpacity(Muted)
 					]
 				]
 			]
@@ -2894,14 +2816,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 				{
 					const bool bSelected = bShowingRecentPlayers == bRecentTab;
 					return bSelected
-						? FLinearColor(0.0f, 0.12f, 0.19f, 0.88f)
-						: FLinearColor(0.006f, 0.016f, 0.028f, 0.82f);
+						? Brand : PanelRaised;
 				})
 				.AccentColor_Lambda([this, bRecentTab]()
 				{
-					return bShowingRecentPlayers == bRecentTab ? Cyan : Hairline;
+					return bShowingRecentPlayers == bRecentTab ? Brand : Hairline;
 				})
-				.UseAccentForOutline(true)
+				.UseAccentForOutline(false)
 				.CutSize(6.0f)
 				.BorderWidth(1.15f)
 				.Padding(FMargin(1.0f))
@@ -2928,7 +2849,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 						.Font(UiFont(11, true))
 						.ColorAndOpacity_Lambda([this, bRecentTab]()
 						{
-							return FSlateColor(bShowingRecentPlayers == bRecentTab ? Cyan : FLinearColor(0.72f, 0.78f, 0.84f, 1.0f));
+							return FSlateColor(bShowingRecentPlayers == bRecentTab ? Ink : Paper);
 						})
 					]
 				]
@@ -2944,9 +2865,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 			})
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.002f, 0.028f, 0.045f, 0.94f))
-				.AccentColor(Cyan.CopyWithNewOpacity(0.82f))
-				.UseAccentForOutline(true)
+				.BackgroundColor(PanelRaised)
+				.AccentColor(Hairline)
+				.UseAccentForOutline(false)
 				.CutSize(7.0f)
 				.BorderWidth(1.15f)
 				.Padding(FMargin(1.0f))
@@ -2964,14 +2885,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("\u25B8"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
+							SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(9, true)).ColorAndOpacity(Paper)
 						]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
 							SNew(STextBlock)
 							.Text(FText::FromString(FString::Printf(TEXT("QUEUE %dV%d"), PlayersPerTeam, PlayersPerTeam)))
 							.Font(UiFont(11, true))
-							.ColorAndOpacity(FLinearColor::White)
+							.ColorAndOpacity(Paper)
 						]
 					]
 				]
@@ -2979,9 +2900,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 	};
 
 	return SNew(SFlickAngularBorder)
-		.BackgroundColor(FLinearColor(0.001f, 0.008f, 0.016f, 0.965f))
-		.AccentColor(Cyan.CopyWithNewOpacity(0.9f))
-		.UseAccentForOutline(true)
+		.BackgroundColor(Panel.CopyWithNewOpacity(1.0f))
+		.AccentColor(Hairline)
+		.UseAccentForOutline(false)
 		.CutSize(14.0f)
 		.BorderWidth(1.25f)
 		.Padding(FMargin(18.0f, 18.0f, 18.0f, 16.0f))
@@ -2998,11 +2919,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 						SNew(SBox).WidthOverride(54.0f).HeightOverride(54.0f)
 						[
 							SNew(SFlickAngularBorder)
-							.BackgroundColor(FLinearColor(0.0f, 0.06f, 0.095f, 0.96f))
-							.AccentColor(Cyan.CopyWithNewOpacity(0.88f))
-							.UseAccentForOutline(true).CutSize(7.0f).BorderWidth(1.0f).Padding(FMargin(8.0f))
+							.BackgroundColor(PanelRaised)
+							.AccentColor(Hairline)
+							.UseAccentForOutline(false).CutSize(7.0f).BorderWidth(1.0f).Padding(FMargin(8.0f))
 							[
-								SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Cyan)
+								SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Brand)
 							]
 						]
 					]
@@ -3017,7 +2938,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 								const UFlickSessionSubsystem* Sessions = GameMode.IsValid() ? GameMode->GetFlickSessionSubsystem() : nullptr;
 								return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER"));
 							})
-							.Font(UiFont(18, true)).ColorAndOpacity(FLinearColor::White).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+							.Font(DisplayFont(22)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 						]
 						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
 						[
@@ -3028,7 +2949,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 								const FString Service = Sessions ? Sessions->GetOnlineServiceName().ToUpper() : TEXT("LOCAL");
 								return FText::FromString(FString::Printf(TEXT("%s  //  ONLINE  //  MAIN MENU"), *Service));
 							})
-							.Font(UiFont(7, true)).ColorAndOpacity(Cyan)
+							.Font(UiFont(8, true)).ColorAndOpacity(Brand)
 						]
 					]
 				]
@@ -3037,9 +2958,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					SNew(SBox).WidthOverride(44.0f).HeightOverride(44.0f)
 					[
 						SNew(SFlickAngularBorder)
-						.BackgroundColor(FLinearColor(0.01f, 0.025f, 0.04f, 0.92f))
-						.AccentColor(FLinearColor(0.24f, 0.38f, 0.47f, 0.78f))
-						.UseAccentForOutline(true)
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Hairline)
+						.UseAccentForOutline(false)
 						.CutSize(7.0f)
 						.BorderWidth(1.0f)
 						.Padding(FMargin(1.0f))
@@ -3056,7 +2977,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 								return FReply::Handled();
 							})
 							[
-								SNew(STextBlock).Text(FText::FromString(TEXT("X"))).Font(UiFont(16, true)).ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.93f, 1.0f))
+								SNew(STextBlock).Text(FText::FromString(TEXT("X"))).Font(UiFont(16, true)).ColorAndOpacity(Paper)
 							]
 						]
 					]
@@ -3089,16 +3010,16 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					})
 					[
 						SNew(SFlickAngularBorder)
-						.BackgroundColor(FLinearColor(0.0f, 0.075f, 0.12f, 0.92f))
-						.AccentColor(Cyan.CopyWithNewOpacity(0.62f))
-						.UseAccentForOutline(true).CutSize(3.0f).BorderWidth(0.75f).Padding(FMargin(9.0f, 4.0f))
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Hairline)
+						.UseAccentForOutline(false).CutSize(3.0f).BorderWidth(0.75f).Padding(FMargin(9.0f, 4.0f))
 						[
 							SNew(SHorizontalBox)
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 8.0f, 0.0f)
 							[
 								SNew(STextBlock)
-								.Text_Lambda([this]() { return FText::FromString(bSocialPartyExpanded ? TEXT("\u25BE") : TEXT("\u25B8")); })
-								.Font(UiFont(8, true)).ColorAndOpacity(Cyan)
+								.Text_Lambda([this]() { return FText::FromString(bSocialPartyExpanded ? TEXT("v") : TEXT(">")); })
+								.Font(UiFont(8, true)).ColorAndOpacity(Brand)
 							]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
@@ -3108,12 +3029,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 									const int32 Members = GameMode.IsValid() && GameMode->IsPartySession() ? GameMode->GetPartyMemberCount() : 1;
 									return FText::FromString(FString::Printf(TEXT("PARTY  (%d)"), Members));
 								})
-								.Font(UiFont(8, true)).ColorAndOpacity(FLinearColor(0.76f, 0.9f, 0.96f, 1.0f))
+								.Font(UiFont(8, true)).ColorAndOpacity(Paper)
 							]
 							+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
-								SNew(STextBlock).Text(FText::FromString(TEXT("MAIN MENU"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)
+								SNew(STextBlock).Text(FText::FromString(TEXT("MAIN MENU"))).Font(UiFont(8, true)).ColorAndOpacity(Muted)
 							]
 						]
 					]
@@ -3146,9 +3067,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					})
 					[
 						SNew(SFlickAngularBorder)
-						.BackgroundColor(FLinearColor(0.0f, 0.075f, 0.12f, 0.92f))
-						.AccentColor(Cyan.CopyWithNewOpacity(0.58f))
-						.UseAccentForOutline(true).CutSize(3.0f).BorderWidth(0.7f).Padding(FMargin(10.0f, 4.0f))
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Hairline)
+						.UseAccentForOutline(false).CutSize(3.0f).BorderWidth(0.7f).Padding(FMargin(10.0f, 4.0f))
 						[
 							SNew(STextBlock)
 							.Text_Lambda([this]()
@@ -3159,7 +3080,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 									const int32 Count = Sessions ? Sessions->GetRecentPlayers().Num() : 0;
 									return FText::FromString(FString::Printf(
 										TEXT("%s  RECENT PLAYERS  (%d)"),
-										bSocialRecentExpanded ? TEXT("\u25BE") : TEXT("\u25B8"), Count));
+										bSocialRecentExpanded ? TEXT("v") : TEXT(">"), Count));
 								}
 								int32 OnlineCount = 0;
 								if (Sessions)
@@ -3171,9 +3092,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 								}
 								return FText::FromString(FString::Printf(
 									TEXT("%s  PLATFORM FRIENDS  //  %d ONLINE"),
-									bSocialFriendsExpanded ? TEXT("\u25BE") : TEXT("\u25B8"), OnlineCount));
+									bSocialFriendsExpanded ? TEXT("v") : TEXT(">"), OnlineCount));
 							})
-							.Font(UiFont(8, true)).ColorAndOpacity(FLinearColor(0.76f, 0.9f, 0.96f, 1.0f))
+							.Font(UiFont(8, true)).ColorAndOpacity(Paper)
 						]
 					]
 				]
@@ -3199,7 +3120,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 						})
 						[
 							SNew(SFlickAngularBorder)
-							.BackgroundColor(FLinearColor(0.004f, 0.013f, 0.023f, 0.88f))
+							.BackgroundColor(PanelRaised)
 							.AccentColor(Hairline.CopyWithNewOpacity(0.42f))
 							.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(14.0f, 10.0f))
 							[
@@ -3306,7 +3227,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 						SNew(SBox).HeightOverride(44.0f)
 						[
 							SNew(SFlickAngularBorder)
-							.BackgroundColor(FLinearColor(0.003f, 0.014f, 0.025f, 0.92f))
+							.BackgroundColor(PanelRaised)
 							.AccentColor(Hairline)
 							.CutSize(6.0f)
 							.BorderWidth(1.0f)
@@ -3325,11 +3246,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 									SNew(SHorizontalBox)
 									+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
 									[
-										SNew(STextBlock).Text(FText::FromString(TEXT("\u21BB"))).Font(UiFont(17, true)).ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.93f, 1.0f))
+										SNew(STextBlock).Text(FText::FromString(TEXT("\u21BB"))).Font(UiFont(17, true)).ColorAndOpacity(Paper)
 									]
 									+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 									[
-										SNew(STextBlock).Text(FText::FromString(TEXT("REFRESH"))).Font(UiFont(11, true)).ColorAndOpacity(FLinearColor::White)
+										SNew(STextBlock).Text(FText::FromString(TEXT("REFRESH"))).Font(UiFont(11, true)).ColorAndOpacity(Paper)
 									]
 								]
 							]
@@ -3369,8 +3290,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 		})
 		[
 			SNew(SFlickAngularBorder)
-			.BackgroundColor(FLinearColor(0.007f, 0.022f, 0.038f, 0.94f))
-			.AccentColor(FLinearColor(0.19f, 0.36f, 0.46f, 0.86f))
+			.BackgroundColor(PanelRaised)
+			.AccentColor(Hairline)
 			.CutSize(5.0f)
 			.BorderWidth(0.9f)
 			.Padding(FMargin(9.0f, 4.0f))
@@ -3385,7 +3306,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 						{
 							const bool bOccupied = GameMode.IsValid() && GameMode->IsPartySession()
 								? GameMode->GetPartyMember(PartySlot) != nullptr : PartySlot == 0;
-							return bOccupied ? FLinearColor(0.12f, 0.96f, 0.27f, 1.0f) : Cyan;
+							return bOccupied ? Brand : Muted;
 						})
 						.Filled_Lambda([this, PartySlot]()
 						{
@@ -3399,8 +3320,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					SNew(SBox).WidthOverride(44.0f).HeightOverride(36.0f)
 					[
 						SNew(SFlickAngularBorder)
-						.BackgroundColor(FLinearColor(0.0f, 0.055f, 0.09f, 0.92f))
-						.AccentColor(Cyan.CopyWithNewOpacity(0.58f))
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Hairline)
 						.CutSize(6.0f)
 						.BorderWidth(1.0f)
 						.Padding(FMargin(1.0f))
@@ -3409,7 +3330,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 							.Text(FText::FromString(FString::Printf(TEXT("%02d"), PartySlot + 1)))
 							.Font(UiFont(10, true))
 							.Justification(ETextJustify::Center)
-							.ColorAndOpacity(Cyan)
+							.ColorAndOpacity(Brand)
 						]
 					]
 				]
@@ -3419,7 +3340,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					+ SVerticalBox::Slot().AutoHeight()
 					[
 						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 						[
 							SNew(STextBlock).Text_Lambda([this, PartySlot]()
 							{
@@ -3434,12 +3355,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 									return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER"));
 								}
 								return FText::FromString(TEXT("OPEN PARTY SLOT"));
-							}).Font(UiFont(11, true)).ColorAndOpacity(FLinearColor::White).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+							}).Font(UiFont(11, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 						]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)
 						[
 							SNew(STextBlock)
-							.Text(FText::FromString(TEXT("\u265B")))
+							.Text(FText::FromString(TEXT("*")))
 							.Font(UiFont(10, true))
 							.ColorAndOpacity(Orange)
 							.Visibility_Lambda([this, PartySlot]()
@@ -3521,7 +3442,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 				[
 					SNew(SBorder)
 					.BorderImage(WhiteBrush())
-					.BorderBackgroundColor(FLinearColor(0.0f, 0.07f, 0.115f, 0.88f))
+					.BorderBackgroundColor(PanelRaised)
 					.Padding(FMargin(9.0f, 3.0f))
 					[
 						SNew(STextBlock)
@@ -3544,9 +3465,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 							}
 							const TCHAR* Label = bPlaying ? TEXT("IN-GAME") : bOnline ? TEXT("ONLINE") : TEXT("OFFLINE");
 							return FText::FromString(FString::Printf(
-								TEXT("%s  %s  (%d)"), bExpanded ? TEXT("\u25BE") : TEXT("\u25B8"), Label, Count));
+								TEXT("%s  %s  (%d)"), bExpanded ? TEXT("v") : TEXT(">"), Label, Count));
 						})
-						.Font(UiFont(7, true)).ColorAndOpacity(FLinearColor(0.64f, 0.84f, 0.93f, 1.0f))
+						.Font(UiFont(8, true)).ColorAndOpacity(Paper)
 					]
 				]
 			]
@@ -3570,8 +3491,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 			{
 				const UFlickSessionSubsystem* Sessions = GameMode.IsValid() ? GameMode->GetFlickSessionSubsystem() : nullptr;
 				return Sessions && Sessions->GetFriends().IsValidIndex(FriendIndex) && Sessions->GetFriends()[FriendIndex].bPlayingFlick
-					? FLinearColor(0.0f, 0.045f, 0.07f, 0.97f)
-					: FLinearColor(0.005f, 0.016f, 0.027f, 0.95f);
+					? PanelRaised : Panel;
 			})
 			.AccentColor_Lambda([this, FriendIndex]()
 			{
@@ -3579,10 +3499,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 				if (!Sessions || !Sessions->GetFriends().IsValidIndex(FriendIndex)) return Hairline;
 				const FFlickSocialPlayerEntry& Friend = Sessions->GetFriends()[FriendIndex];
 				return Friend.bPlayingFlick
-					? Cyan.CopyWithNewOpacity(0.82f)
-					: Friend.bOnline ? FLinearColor(0.12f, 0.8f, 0.35f, 0.72f) : Hairline.CopyWithNewOpacity(0.46f);
+					? Brand
+					: Friend.bOnline ? Muted : Hairline.CopyWithNewOpacity(0.46f);
 			})
-			.UseAccentForOutline(true)
+			.UseAccentForOutline(false)
 			.CutSize(6.0f)
 			.BorderWidth(0.9f)
 			.Padding(FMargin(9.0f, 6.0f))
@@ -3596,11 +3516,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 						+ SOverlay::Slot()
 						[
 							SNew(SFlickAngularBorder)
-							.BackgroundColor(FLinearColor(0.0f, 0.055f, 0.085f, 0.96f))
-							.AccentColor(Cyan.CopyWithNewOpacity(0.48f))
+							.BackgroundColor(PanelRaised)
+							.AccentColor(Hairline)
 							.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(7.0f))
 							[
-								SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(FLinearColor(0.68f, 0.82f, 0.9f, 1.0f))
+								SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Muted)
 							]
 						]
 						+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, -2.0f, -2.0f)
@@ -3612,7 +3532,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 								{
 									const UFlickSessionSubsystem* Sessions = GameMode.IsValid() ? GameMode->GetFlickSessionSubsystem() : nullptr;
 									return Sessions && Sessions->GetFriends().IsValidIndex(FriendIndex) && Sessions->GetFriends()[FriendIndex].bOnline
-										? FLinearColor(0.12f, 0.96f, 0.27f, 1.0f) : Muted;
+										? Brand : Muted;
 								})
 								.Filled_Lambda([this, FriendIndex]()
 								{
@@ -3632,7 +3552,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 						{
 							const UFlickSessionSubsystem* Sessions = GameMode.IsValid() ? GameMode->GetFlickSessionSubsystem() : nullptr;
 							return FText::FromString(Sessions && Sessions->GetFriends().IsValidIndex(FriendIndex) ? Sessions->GetFriends()[FriendIndex].DisplayName : FString());
-						}).Font(UiFont(11, true)).ColorAndOpacity(FLinearColor::White).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+						}).Font(UiFont(11, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 					]
 					+ SVerticalBox::Slot().AutoHeight()
 					[
@@ -3660,8 +3580,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 					})
 					[
 						SNew(SFlickAngularBorder)
-						.BackgroundColor(FLinearColor(0.0f, 0.055f, 0.085f, 0.86f))
-						.AccentColor(Cyan.CopyWithNewOpacity(0.7f))
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Hairline)
 						.CutSize(5.0f)
 						.BorderWidth(1.0f)
 						.Padding(FMargin(1.0f))
@@ -3676,7 +3596,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 								return FReply::Handled();
 							})
 							[
-								SNew(STextBlock).Text(FText::FromString(TEXT("INVITE"))).Font(UiFont(8, true)).ColorAndOpacity(Cyan)
+								SNew(STextBlock).Text(FText::FromString(TEXT("INVITE"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)
 							]
 						]
 					]
@@ -3697,9 +3617,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 		})
 		[
 			SNew(SFlickAngularBorder)
-			.BackgroundColor(FLinearColor(0.005f, 0.016f, 0.027f, 0.95f))
+			.BackgroundColor(PanelRaised)
 			.AccentColor(Hairline.CopyWithNewOpacity(0.62f))
-			.UseAccentForOutline(true)
+			.UseAccentForOutline(false)
 			.CutSize(6.0f)
 			.BorderWidth(0.9f)
 			.Padding(FMargin(9.0f, 6.0f))
@@ -3710,11 +3630,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 					SNew(SBox).WidthOverride(38.0f).HeightOverride(38.0f)
 					[
 						SNew(SFlickAngularBorder)
-						.BackgroundColor(FLinearColor(0.018f, 0.034f, 0.05f, 0.96f))
+						.BackgroundColor(PanelRaised)
 						.AccentColor(Hairline.CopyWithNewOpacity(0.7f))
 						.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(7.0f))
 						[
-							SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(FLinearColor(0.52f, 0.64f, 0.72f, 1.0f))
+							SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Muted)
 						]
 					]
 				]
@@ -3727,7 +3647,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 						{
 							const UFlickSessionSubsystem* Sessions = GameMode.IsValid() ? GameMode->GetFlickSessionSubsystem() : nullptr;
 							return FText::FromString(Sessions && Sessions->GetRecentPlayers().IsValidIndex(RecentIndex) ? Sessions->GetRecentPlayers()[RecentIndex].DisplayName : FString());
-						}).Font(UiFont(11, true)).ColorAndOpacity(FLinearColor::White).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+						}).Font(UiFont(11, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 					]
 					+ SVerticalBox::Slot().AutoHeight()
 					[
@@ -3740,8 +3660,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 					.IsEnabled_Lambda([this]() { return !GameMode.IsValid() || !GameMode->IsPartySession() || GameMode->GetPartyMemberCount() < FlickMaximumPartyMembers; })
 					[
 						SNew(SFlickAngularBorder)
-						.BackgroundColor(FLinearColor(0.0f, 0.055f, 0.085f, 0.86f))
-						.AccentColor(Cyan.CopyWithNewOpacity(0.7f))
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Hairline)
 						.CutSize(5.0f)
 						.BorderWidth(1.0f)
 						.Padding(FMargin(1.0f))
@@ -3756,7 +3676,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 								return FReply::Handled();
 							})
 							[
-								SNew(STextBlock).Text(FText::FromString(TEXT("INVITE"))).Font(UiFont(8, true)).ColorAndOpacity(Cyan)
+								SNew(STextBlock).Text(FText::FromString(TEXT("INVITE"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)
 							]
 						]
 					]
@@ -3978,23 +3898,25 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 		]
 		+ SOverlay::Slot()
 		[
-			SNew(SFlickMainMenuImageOverlay)
+			SNew(SFlickInterfaceBackdrop)
 			.Visibility(EVisibility::HitTestInvisible)
-			.Opacity(0.48f)
+			.Opacity(0.2f)
 		]
 		+ SOverlay::Slot().VAlign(VAlign_Top)
 		[
 			SNew(SBox).HeightOverride(UiMetrics::ModeHeaderHeight)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.001f, 0.008f, 0.016f, 0.94f))
+				.BackgroundColor(Panel)
 				.AccentColor_Lambda([this]()
 				{
 					return SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive
 						? Orange.CopyWithNewOpacity(0.88f)
 						: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
 							? FLinearColor(0.2f, 0.78f, 0.5f, 0.88f)
-							: Cyan.CopyWithNewOpacity(0.82f);
+							: SelectedPlayPlaylist == EFlickPlayPlaylist::Test
+								? FLinearColor(0.62f, 0.36f, 0.95f, 0.88f)
+							: Brand.CopyWithNewOpacity(0.82f);
 				})
 				.UseAccentForOutline(true)
 				.CutSize(11.0f)
@@ -4006,7 +3928,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 					[
 						SNew(SBox).WidthOverride(190.0f).HeightOverride(62.0f)
 						[
-							SNew(SFlickLogoWidget).CropToArtwork(true)
+							SNew(STextBlock).Text(FText::FromString(TEXT("FLICK"))).Font(DisplayFont(42, true)).ColorAndOpacity(Paper)
 						]
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(20.0f, 6.0f, 20.0f, 6.0f)
@@ -4024,8 +3946,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							SNew(STextBlock)
 							.Text_Lambda([this]()
 							{
-								if (SelectedPlayPlaylist == EFlickPlayPlaylist::None) return FText::FromString(TEXT("SELECT GAME MODE"));
+								if (SelectedPlayPlaylist == EFlickPlayPlaylist::None) return FText::FromString(TEXT("FIND YOUR NEXT RIVALRY."));
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training && SelectedTrainingActivity == EFlickTrainingActivity::None) return FText::FromString(TEXT("TRAINING"));
+								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Test) return FText::FromString(TEXT("TEST"));
 								return FText::FromString(TEXT("SELECT MATCH FORMAT"));
 							})
 							.Font(DisplayFont(30))
@@ -4038,10 +3961,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							{
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::None) return FText::FromString(TEXT("CHOOSE HOW YOU WANT TO PLAY"));
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training && SelectedTrainingActivity == EFlickTrainingActivity::None) return FText::FromString(TEXT("CHOOSE A TRAINING ACTIVITY"));
+								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Test) return FText::FromString(TEXT("SWITCHYARD  /  THE DIVIDER EXPERIMENT"));
 								return FText::FromString(TEXT("SET THE ARENA RULESET AND TEAM SIZE"));
 							})
 							.Font(UiFont(10, true))
-							.ColorAndOpacity(Cyan)
+							.ColorAndOpacity(Brand)
 						]
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -4056,11 +3980,66 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							SNew(STextBlock)
 							.Text_Lambda([this]()
 							{
-								return FText::FromString(SelectedPlayPlaylist == EFlickPlayPlaylist::None ? TEXT("01  //  MODE") : TEXT("02  //  FORMAT"));
+								return FText::FromString(SelectedPlayPlaylist == EFlickPlayPlaylist::None
+									? TEXT("01  //  MODE")
+									: SelectedPlayPlaylist == EFlickPlayPlaylist::Test
+										? TEXT("02  //  EXPERIMENT")
+										: TEXT("02  //  FORMAT"));
 							})
-							.Font(UiFont(13, true)).ColorAndOpacity(Cyan)
+							.Font(UiFont(13, true)).ColorAndOpacity(Brand)
 						]
 					]
+				]
+			]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(28.0f, 116.0f, 28.0f, 98.0f)
+		[
+			SNew(SBox)
+			.WidthOverride(720.0f)
+			.Visibility_Lambda([this]()
+			{
+				return SelectedPlayPlaylist == EFlickPlayPlaylist::Test
+					? EVisibility::Visible
+					: EVisibility::Collapsed;
+			})
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(UiMetrics::CardGap)
+				[
+					SNew(SFlickAngularBorder)
+					.BackgroundColor(PanelRaised)
+					.AccentColor(FLinearColor(0.62f, 0.36f, 0.95f, 0.72f))
+					.CutSize(8.0f)
+					.BorderWidth(0.9f)
+					.Padding(FMargin(18.0f, 2.0f))
+					[
+						MakeCycleRow(
+							TEXT("BOT DIFFICULTY"),
+							TAttribute<FText>::CreateLambda([this]()
+							{
+								return FText::FromString(GameMode.IsValid() ? GameMode->GetBotDifficultyLabel() : TEXT("NORMAL"));
+							}),
+							FOnClicked::CreateLambda([this]()
+							{
+								if (GameMode.IsValid()) GameMode->CycleBotDifficulty(-1);
+								return FReply::Handled();
+							}),
+							FOnClicked::CreateLambda([this]()
+							{
+								if (GameMode.IsValid()) GameMode->CycleBotDifficulty(1);
+								return FReply::Handled();
+							}))
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(UiMetrics::CardGap)
+				[
+					BuildTrainingActivityCard(
+						EFlickTrainingActivity::ArenaControlBotMatch,
+						TEXT("SWITCHYARD"),
+						TEXT("Hit a numbered dot to toggle its matching divider. Shape the board, then beat the bot."),
+						TEXT("8 LINKED SWITCHES  /  20 SOCKETS  /  1V1 VS BOT"),
+						FLinearColor(0.62f, 0.36f, 0.95f, 1.0f),
+						&TestActivityDefaultButton)
 				]
 			]
 		]
@@ -4070,12 +4049,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 			.WidthOverride(UiMetrics::ModeContentWidth)
 			.Visibility_Lambda([this]() { return SelectedPlayPlaylist == EFlickPlayPlaylist::None ? EVisibility::Visible : EVisibility::Collapsed; })
 			[
-				SNew(SUniformGridPanel)
-				.SlotPadding(FMargin(UiMetrics::CardGap))
-				+ SUniformGridPanel::Slot(0, 0)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Casual, TEXT("CASUAL"), TEXT("LOCAL PLAY OR RELAXED ONLINE MATCHMAKING"), Cyan, true, &ModeSelectDefaultButton)]
-				+ SUniformGridPanel::Slot(1, 0)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Competitive, TEXT("COMPETITIVE"), TEXT("RANKED ONLINE MATCHES WITH MMR"), Orange, true)]
-				+ SUniformGridPanel::Slot(0, 1)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Training, TEXT("TRAINING"), TEXT("PRACTICE FREELY OR PLAY KNOCKOUT AND BOB AGAINST THE BOT"), FLinearColor(0.2f, 0.78f, 0.5f, 1.0f), true)]
-				+ SUniformGridPanel::Slot(1, 1)[BuildPlayPlaylistCard(EFlickPlayPlaylist::PrivateMatch, TEXT("PRIVATE MATCH"), TEXT("CUSTOM RULES, FLEXIBLE TEAMS, AND SPECTATORS"), FLinearColor(0.65f, 0.72f, 0.8f, 1.0f), true)]
+				SNew(SGridPanel).FillColumn(0, 1.0f).FillColumn(1, 1.0f)
+				+ SGridPanel::Slot(0, 0).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Casual, TEXT("CASUAL"), TEXT("LOCAL PLAY OR RELAXED ONLINE MATCHMAKING"), Cyan, true, &ModeSelectDefaultButton)]
+				+ SGridPanel::Slot(1, 0).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Competitive, TEXT("COMPETITIVE"), TEXT("RANKED ONLINE MATCHES WITH MMR"), Orange, true)]
+				+ SGridPanel::Slot(0, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Training, TEXT("TRAINING"), TEXT("PRACTICE FREELY OR PLAY KNOCKOUT AND BOB AGAINST THE BOT"), FLinearColor(0.2f, 0.78f, 0.5f, 1.0f), true)]
+				+ SGridPanel::Slot(1, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::PrivateMatch, TEXT("PRIVATE MATCH"), TEXT("CUSTOM RULES, FLEXIBLE TEAMS, AND SPECTATORS"), FLinearColor(0.65f, 0.72f, 0.8f, 1.0f), true)]
+				+ SGridPanel::Slot(0, 2).ColumnSpan(2).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Test, TEXT("TEST"), TEXT("SWITCHYARD  /  LINKED SWITCHES. MOVING DIVIDERS. NEW ANGLES."), FLinearColor(0.62f, 0.36f, 0.95f, 1.0f), true)]
 			]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(28.0f, 116.0f, 28.0f, 98.0f)
@@ -4159,9 +4138,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 			.WidthOverride(UiMetrics::ModeContentWidth)
 			.Visibility_Lambda([this]()
 			{
-				return SelectedPlayPlaylist != EFlickPlayPlaylist::None
-					&& (SelectedPlayPlaylist != EFlickPlayPlaylist::Training
-						|| SelectedTrainingActivity == EFlickTrainingActivity::FreePlay)
+				return (SelectedPlayPlaylist == EFlickPlayPlaylist::Casual
+					|| SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive
+					|| (SelectedPlayPlaylist == EFlickPlayPlaylist::Training
+						&& SelectedTrainingActivity == EFlickTrainingActivity::FreePlay))
 					? EVisibility::Visible
 					: EVisibility::Collapsed;
 			})
@@ -4221,6 +4201,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 						{
 							return SelectedPlayPlaylist != EFlickPlayPlaylist::None
 								&& SelectedPlayPlaylist != EFlickPlayPlaylist::Training
+								&& SelectedPlayPlaylist != EFlickPlayPlaylist::Test
 								&& GameMode.IsValid()
 								&& GameMode->DoesSelectedModeSupportLoadouts()
 								? EVisibility::Visible
@@ -4530,9 +4511,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayPlaylistCard(
 	const FString PlaylistCode = Playlist == EFlickPlayPlaylist::Casual ? TEXT("01")
 		: Playlist == EFlickPlayPlaylist::Competitive ? TEXT("02")
 		: Playlist == EFlickPlayPlaylist::Training ? TEXT("03")
-		: TEXT("04");
+		: Playlist == EFlickPlayPlaylist::PrivateMatch ? TEXT("04") : TEXT("05");
+	const FString PlaylistTag = Playlist == EFlickPlayPlaylist::Casual ? TEXT("LOCAL + ONLINE")
+		: Playlist == EFlickPlayPlaylist::Competitive ? TEXT("RANKED ONLINE")
+		: Playlist == EFlickPlayPlaylist::Training ? TEXT("OFFLINE PRACTICE")
+		: Playlist == EFlickPlayPlaylist::PrivateMatch ? TEXT("YOUR RULES") : TEXT("EXPERIMENTAL");
 	TSharedRef<SButton> CardButton = SNew(SButton)
 		.ButtonStyle(&TransparentButtonStyle)
+		.ContentPadding(0.0f)
 		.IsEnabled(bAvailable)
 		.Cursor(bAvailable ? EMouseCursor::Hand : EMouseCursor::Default)
 		.OnClicked_Lambda([this, Playlist]()
@@ -4552,7 +4538,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayPlaylistCard(
 			}
 			const TSharedPtr<SButton> FocusTarget = Playlist == EFlickPlayPlaylist::Training
 				? TrainingActivityDefaultButton
-				: ModeFormatDefaultButton;
+				: Playlist == EFlickPlayPlaylist::Test
+					? TestActivityDefaultButton
+					: ModeFormatDefaultButton;
 			if (FocusTarget.IsValid() && FSlateApplication::IsInitialized())
 			{
 				FSlateApplication::Get().SetKeyboardFocus(FocusTarget, EFocusCause::SetDirectly);
@@ -4560,75 +4548,57 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayPlaylistCard(
 			return FReply::Handled();
 		});
 	const TWeakPtr<SButton> WeakCardButton = CardButton;
+	const auto IsActive = [WeakCardButton, bAvailable]()
+	{
+		const TSharedPtr<SButton> Button = WeakCardButton.Pin();
+		return bAvailable && Button.IsValid() && (Button->IsHovered() || Button->HasKeyboardFocus());
+	};
 	CardButton->SetContent(
-		SNew(SFlickAngularBorder)
-		.BackgroundColor_Lambda([WeakCardButton, Accent, bAvailable]()
-		{
-			const TSharedPtr<SButton> Pinned = WeakCardButton.Pin();
-			const bool bActive = bAvailable && Pinned.IsValid() && Pinned->IsHovered();
-			return bActive
-				? FMath::Lerp(PanelRaised, Accent, 0.12f).CopyWithNewOpacity(0.98f)
-				: FLinearColor(0.002f, 0.011f, 0.021f, bAvailable ? 0.94f : 0.74f);
-		})
-		.AccentColor_Lambda([WeakCardButton, Accent, bAvailable]()
-		{
-			const TSharedPtr<SButton> Pinned = WeakCardButton.Pin();
-			const bool bActive = bAvailable && Pinned.IsValid() && Pinned->IsHovered();
-			return Accent.CopyWithNewOpacity(bActive ? 1.0f : bAvailable ? 0.68f : 0.3f);
-		})
-		.UseAccentForOutline(true)
-		.CutSize(13.0f)
-		.BorderWidth(bAvailable ? 1.35f : 0.9f)
-		.Padding(FMargin(20.0f, 13.0f))
+		SNew(SBorder)
+		.BorderImage(WhiteBrush())
+		.BorderBackgroundColor_Lambda([IsActive]() { return IsActive() ? Brand : Hairline.CopyWithNewOpacity(0.5f); })
+		.Padding(1.0f)
 		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 18.0f, 0.0f)
+			SNew(SBorder)
+			.BorderImage(WhiteBrush())
+			.BorderBackgroundColor_Lambda([IsActive]() { return IsActive() ? FMath::Lerp(PanelRaised, Brand, 0.04f) : Panel; })
+			.Padding(FMargin(24.0f, 17.0f))
 			[
-				SNew(SBox).WidthOverride(74.0f).HeightOverride(72.0f)
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 				[
-					SNew(SFlickPlaylistGlyph)
-					.Playlist(Playlist)
-					.Color(Accent.CopyWithNewOpacity(bAvailable ? 0.82f : 0.25f))
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(STextBlock).Text(FText::FromString(PlaylistCode + TEXT("   /   ") + PlaylistTag))
+						.Font(UiFont(10, true)).ColorAndOpacity(Brand)
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+					[
+						SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(34)).ColorAndOpacity(bAvailable ? Paper : Muted)
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 14.0f, 0.0f)
+					[
+						SNew(STextBlock).Text(FText::FromString(Summary)).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)
+					]
 				]
-			]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight()
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.0f, 0.0f, 0.0f, 0.0f)
 				[
-					SNew(STextBlock)
-					.Text(FText::FromString(FString::Printf(TEXT("%s  //  %s"), bAvailable ? TEXT("PLAYLIST") : TEXT("FUTURE"), *PlaylistCode)))
-					.Font(UiFont(8, true))
-					.ColorAndOpacity(bAvailable ? Accent : Muted)
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
-				[
-					SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(28)).ColorAndOpacity(bAvailable ? FLinearColor::White : Muted)
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 12.0f, 0.0f)
-				[
-					SNew(STextBlock).Text(FText::FromString(Summary)).Font(UiFont(10)).ColorAndOpacity(Muted).AutoWrapText(true)
-				]
-			]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(FMath::Lerp(PanelRaised, Accent, 0.07f))
-				.AccentColor(Accent.CopyWithNewOpacity(0.62f))
-				.CutSize(5.0f)
-				.BorderWidth(0.8f)
-				.Padding(FMargin(13.0f, 8.0f))
-				[
-					SNew(STextBlock)
-					.Text(FText::FromString(bAvailable ? TEXT("SELECT  >") : TEXT("SOON")))
-					.Font(UiFont(8, true)).ColorAndOpacity(bAvailable ? Accent : Muted)
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SBox).WidthOverride(58.0f).HeightOverride(58.0f)
+						[SNew(SFlickPlaylistGlyph).Playlist(Playlist).Color(Accent.CopyWithNewOpacity(bAvailable ? 0.72f : 0.25f))]
+					]
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, 7.0f, 0.0f, 0.0f)
+					[
+						SNew(STextBlock).Text(FText::FromString(bAvailable ? TEXT("PLAY  >") : TEXT("SOON")))
+						.Font(UiFont(10, true)).ColorAndOpacity_Lambda([IsActive]() { return IsActive() ? Brand : Muted; })
+					]
 				]
 			]
 		]);
-	if (OutButton)
-	{
-		*OutButton = CardButton;
-	}
+	if (OutButton) *OutButton = CardButton;
 	return SNew(SBox).HeightOverride(UiMetrics::PlaylistCardHeight)[CardButton];
 }
 
@@ -4640,23 +4610,33 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 	const FLinearColor& Accent,
 	TSharedPtr<SButton>* OutButton)
 {
+	const bool bTestActivity = Activity == EFlickTrainingActivity::ArenaControlBotMatch;
 	TSharedRef<SButton> CardButton = SNew(SButton)
 		.ButtonStyle(&TransparentButtonStyle)
+		.ContentPadding(0.0f)
 		.Cursor(EMouseCursor::Hand)
-		.OnClicked_Lambda([this, Activity]()
+		.OnClicked_Lambda([this, Activity, bTestActivity]()
 		{
 			if (GameMode.IsValid())
 			{
 				GameMode->SetMatchmakingPlayersPerTeam(1);
 				const bool bBotMatch = Activity == EFlickTrainingActivity::BotMatch
-					|| Activity == EFlickTrainingActivity::BobBotMatch;
+					|| Activity == EFlickTrainingActivity::BobBotMatch
+					|| bTestActivity;
 				GameMode->SelectMatchVariant(
 					Activity == EFlickTrainingActivity::BobBotMatch
 						? EFlickMatchVariant::Bob
 						: EFlickMatchVariant::Classic);
 				if (bBotMatch)
 				{
-					GameMode->StartTrainingBotMatch();
+					if (bTestActivity)
+					{
+						GameMode->StartTestArenaBotMatch();
+					}
+					else
+					{
+						GameMode->StartTrainingBotMatch();
+					}
 					return FReply::Handled();
 				}
 			}
@@ -4667,70 +4647,57 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 				FSlateApplication::Get().SetKeyboardFocus(ModeFormatDefaultButton, EFocusCause::SetDirectly);
 			}
 			return FReply::Handled();
-		})
+		});
+	const TWeakPtr<SButton> WeakCardButton = CardButton;
+	const auto IsActive = [WeakCardButton]()
+	{
+		const TSharedPtr<SButton> Button = WeakCardButton.Pin();
+		return Button.IsValid() && (Button->IsHovered() || Button->HasKeyboardFocus());
+	};
+	CardButton->SetContent(
+		SNew(SBorder)
+		.BorderImage(WhiteBrush())
+		.BorderBackgroundColor_Lambda([IsActive]() { return IsActive() ? Brand : Hairline.CopyWithNewOpacity(0.5f); })
+		.Padding(1.0f)
 		[
-			SNew(SFlickAngularBorder)
-			.BackgroundColor(FLinearColor(0.003f, 0.01f, 0.018f, 0.94f))
-			.AccentColor(Accent.CopyWithNewOpacity(0.92f))
-			.UseAccentForOutline(true)
-			.CutSize(13.0f)
-			.BorderWidth(1.25f)
-			.Padding(FMargin(24.0f, 19.0f))
+			SNew(SBorder)
+			.BorderImage(WhiteBrush())
+			.BorderBackgroundColor_Lambda([IsActive]() { return IsActive() ? FMath::Lerp(PanelRaised, Brand, 0.04f) : Panel; })
+			.Padding(FMargin(24.0f, 20.0f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
-					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("TRAINING ACTIVITY")))
-					.Font(UiFont(9, true))
-					.ColorAndOpacity(Accent)
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.0f)
+					[SNew(STextBlock).Text(FText::FromString(bTestActivity ? TEXT("THE LAB  /  EXPERIMENTAL") : TEXT("PRACTICE  /  OFFLINE"))).Font(UiFont(10, true)).ColorAndOpacity(Accent)]
+					+ SHorizontalBox::Slot().AutoWidth()
+					[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(12, true)).ColorAndOpacity(Brand)]
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
 				[
-					SNew(STextBlock)
-					.Text(FText::FromString(Label))
-					.Font(DisplayFont(27))
-					.ColorAndOpacity(FLinearColor::White)
+					SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(30)).ColorAndOpacity(Paper).AutoWrapText(true)
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 6.0f, 0.0f, 0.0f)
 				[
-					SNew(STextBlock)
-					.Text(FText::FromString(Summary))
-					.Font(UiFont(10))
-					.ColorAndOpacity(Muted)
-					.AutoWrapText(true)
+					SNew(STextBlock).Text(FText::FromString(Summary)).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)
 				]
 				+ SVerticalBox::Slot().FillHeight(1.0f)[SNew(SSpacer)]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
-				[
-					SNew(SFlickAngularBorder)
-					.BackgroundColor(PanelRaised)
-					.AccentColor(Accent.CopyWithNewOpacity(0.62f))
-					.CutSize(5.0f)
-					.BorderWidth(0.9f)
-					.Padding(FMargin(11.0f, 8.0f))
-					[
-						SNew(STextBlock)
-						.Text(FText::FromString(Detail))
-						.Font(UiFont(9, true))
-						.Justification(ETextJustify::Center)
-						.ColorAndOpacity(Accent)
-					]
-				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 10.0f)
+				[SNew(SBox).HeightOverride(1.0f)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline.CopyWithNewOpacity(0.45f))]]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
+					SNew(STextBlock).Text(FText::FromString(Detail)).Font(UiFont(10)).ColorAndOpacity(Muted).AutoWrapText(true)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 0.0f)
+				[
 					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("SELECT ACTIVITY")))
-					.Font(UiFont(9, true))
-					.Justification(ETextJustify::Center)
-					.ColorAndOpacity(Accent)
+					.Text(FText::FromString(Activity == EFlickTrainingActivity::FreePlay ? TEXT("CHOOSE YOUR ARENA  >") : TEXT("START MATCH  >")))
+					.Font(UiFont(11, true)).ColorAndOpacity(Brand)
 				]
 			]
-		];
-	if (OutButton)
-	{
-		*OutButton = CardButton;
-	}
+		]);
+	if (OutButton) *OutButton = CardButton;
 	return SNew(SBox).HeightOverride(UiMetrics::TrainingCardHeight)[CardButton];
 }
 
@@ -4740,15 +4707,17 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayFormatCard(
 	TSharedPtr<SButton>* OutButton)
 {
 	const bool bAvailable = bBob || (PlayersPerTeam >= 1 && PlayersPerTeam <= 3);
-	const FString Title = bBob
-		? TEXT("BOB")
-		: FString::Printf(TEXT("%dV%d KNOCKOUT"), PlayersPerTeam, PlayersPerTeam);
-	const FString Summary = bBob
-		? TEXT("POCKET YOUR COLOR  |  STANDARD PUCKS ONLY")
-		: TEXT("4 PUCKS PER PLAYER  |  BEST OF 5");
-	const FString Format = bBob ? TEXT("BOB") : TEXT("4 PUCKS / PLAYER");
+	const FString Title = bBob ? TEXT("BOB") : FString::Printf(TEXT("%dV%d KNOCKOUT"), PlayersPerTeam, PlayersPerTeam);
+	const auto IsSelected = [this, PlayersPerTeam, bBob]()
+	{
+		return GameMode.IsValid() && (bBob
+			? GameMode->GetSelectedMatchVariant() == EFlickMatchVariant::Bob
+			: GameMode->GetSelectedMatchVariant() == EFlickMatchVariant::Classic
+				&& GameMode->GetMatchmakingPlayersPerTeam() == PlayersPerTeam);
+	};
 	TSharedRef<SButton> CardButton = SNew(SButton)
 		.ButtonStyle(&TransparentButtonStyle)
+		.ContentPadding(0.0f)
 		.IsEnabled(bAvailable)
 		.Cursor(bAvailable ? EMouseCursor::Hand : EMouseCursor::Default)
 		.OnClicked_Lambda([this, PlayersPerTeam, bBob]()
@@ -4759,180 +4728,81 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayFormatCard(
 				GameMode->SelectMatchVariant(bBob ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic);
 			}
 			return FReply::Handled();
-		})
+		});
+	const TWeakPtr<SButton> WeakCardButton = CardButton;
+	const auto IsActive = [WeakCardButton, bAvailable]()
+	{
+		const TSharedPtr<SButton> Button = WeakCardButton.Pin();
+		return bAvailable && Button.IsValid() && (Button->IsHovered() || Button->HasKeyboardFocus());
+	};
+	CardButton->SetContent(
+		SNew(SBorder)
+		.BorderImage(WhiteBrush())
+		.BorderBackgroundColor_Lambda([IsActive, IsSelected]() { return IsSelected() || IsActive() ? Brand : Hairline.CopyWithNewOpacity(0.5f); })
+		.Padding(1.0f)
 		[
-			SNew(SFlickAngularBorder)
-			.BackgroundColor(FLinearColor(0.003f, 0.01f, 0.018f, bAvailable ? 0.92f : 0.72f))
-			.AccentColor_Lambda([this, PlayersPerTeam, bBob, bAvailable]()
-			{
-				const FLinearColor CurrentAccent = bBob
-					? FLinearColor(0.18f, 0.82f, 0.48f, 1.0f)
-					: SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive
-						? Orange
-						: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
-							? SelectedTrainingActivity == EFlickTrainingActivity::BotMatch
-								? Orange
-								: FLinearColor(0.2f, 0.78f, 0.5f, 1.0f)
-							: Cyan;
-				const bool bSelected = GameMode.IsValid()
-					&& (bBob
-						? GameMode->GetSelectedMatchVariant() == EFlickMatchVariant::Bob
-						: GameMode->GetSelectedMatchVariant() == EFlickMatchVariant::Classic
-							&& GameMode->GetMatchmakingPlayersPerTeam() == PlayersPerTeam);
-				return CurrentAccent.CopyWithNewOpacity(bSelected ? 1.0f : bAvailable ? 0.62f : 0.3f);
-			})
-			.UseAccentForOutline(true)
-			.CutSize(13.0f)
-			.BorderWidth(1.25f)
-			.Padding(FMargin(22.0f, 16.0f))
+			SNew(SBorder)
+			.BorderImage(WhiteBrush())
+			.BorderBackgroundColor_Lambda([IsSelected, IsActive]() { return IsSelected() ? FMath::Lerp(Panel, Brand, 0.065f) : IsActive() ? PanelRaised : Panel; })
+			.Padding(FMargin(24.0f, 17.0f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
 					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.0f)
+					[SNew(STextBlock).Text(FText::FromString(bBob ? TEXT("POCKET GAME  /  1V1") : TEXT("4 PUCKS PER PLAYER"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)]
 					+ SHorizontalBox::Slot().AutoWidth()
 					[
-						SNew(STextBlock).Text(FText::FromString(Format)).Font(UiFont(9, true)).ColorAndOpacity_Lambda([this, bBob]()
-						{
-							return FSlateColor(bBob
-								? FLinearColor(0.18f, 0.82f, 0.48f, 1.0f)
-								: SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive
-									? Orange
-									: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
-										? SelectedTrainingActivity == EFlickTrainingActivity::BotMatch
-											? Orange
-											: FLinearColor(0.2f, 0.78f, 0.5f, 1.0f)
-										: Cyan);
-						})
+						SNew(STextBlock).Text_Lambda([IsSelected]() { return FText::FromString(IsSelected() ? TEXT("[ SELECTED ]") : TEXT("[ SELECT ]")); })
+						.Font(UiFont(10, true)).ColorAndOpacity_Lambda([IsSelected]() { return IsSelected() ? Brand : Muted; })
 					]
-					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 					[
-						SNew(SOverlay)
-						+ SOverlay::Slot()
-						[
-							SNew(SFlickArenaDiagram)
-							.PlayersPerTeam(PlayersPerTeam)
-							.Bob(bBob)
-						]
-						+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)
-						[
-							SNew(STextBlock)
-							.Text_Lambda([this, PlayersPerTeam, bBob]()
-							{
-								const bool bSelected = GameMode.IsValid()
-									&& (bBob
-										? GameMode->GetSelectedMatchVariant() == EFlickMatchVariant::Bob
-										: GameMode->GetSelectedMatchVariant() == EFlickMatchVariant::Classic
-											&& GameMode->GetMatchmakingPlayersPerTeam() == PlayersPerTeam);
-								return FText::FromString(bSelected ? TEXT("SELECTED") : TEXT(""));
-							})
-							.Font(UiFont(8, true)).ColorAndOpacity_Lambda([this, bBob]()
-							{
-								return FSlateColor(bBob
-									? FLinearColor(0.18f, 0.82f, 0.48f, 1.0f)
-									: SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive
-										? Orange
-										: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
-											? SelectedTrainingActivity == EFlickTrainingActivity::BotMatch
-												? Orange
-												: FLinearColor(0.2f, 0.78f, 0.5f, 1.0f)
-											: Cyan);
-							})
-						]
+						SNew(STextBlock)
+						.Text_Lambda([this, PlayersPerTeam, bBob, Title]()
+						{
+							if (SelectedPlayPlaylist != EFlickPlayPlaylist::Training) return FText::FromString(Title);
+							if (SelectedTrainingActivity == EFlickTrainingActivity::BotMatch) return FText::FromString(TEXT("1V1 VS BOT"));
+							return FText::FromString(bBob ? TEXT("BOB PRACTICE") : FString::Printf(TEXT("%dV%d ARENA"), PlayersPerTeam, PlayersPerTeam));
+						})
+						.Font(DisplayFont(32)).ColorAndOpacity(bAvailable ? Paper : Muted)
 					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.0f, 0.0f, 0.0f, 0.0f)
+					[SNew(SFlickArenaDiagram).PlayersPerTeam(PlayersPerTeam).Bob(bBob)]
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 6.0f, 0.0f, 0.0f)
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this, PlayersPerTeam, bBob, Title]()
-					{
-						if (SelectedPlayPlaylist != EFlickPlayPlaylist::Training)
-						{
-							return FText::FromString(Title);
-						}
-						if (SelectedTrainingActivity == EFlickTrainingActivity::BotMatch)
-						{
-							return FText::FromString(TEXT("1V1 VS BOT"));
-						}
-						return FText::FromString(bBob
-							? TEXT("BOB PRACTICE")
-							: FString::Printf(TEXT("%dV%d ARENA"), PlayersPerTeam, PlayersPerTeam));
-					})
-					.Font(DisplayFont(25)).ColorAndOpacity_Lambda([this, bBob, bAvailable]()
-					{
-						if (!bAvailable) return FSlateColor(Muted);
-						return FSlateColor(bBob
-							? FLinearColor(0.18f, 0.82f, 0.48f, 1.0f)
-							: SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive
-								? Orange
-								: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
-									? SelectedTrainingActivity == EFlickTrainingActivity::BotMatch
-										? Orange
-										: FLinearColor(0.2f, 0.78f, 0.5f, 1.0f)
-									: Cyan);
-					})
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 7.0f, 0.0f, 0.0f)
-				[
-					SNew(STextBlock)
-					.Text_Lambda([this, Summary]()
+					.Text_Lambda([this, bBob]()
 					{
 						return FText::FromString(SelectedPlayPlaylist == EFlickPlayPlaylist::Training
 							? SelectedTrainingActivity == EFlickTrainingActivity::BotMatch
-								? TEXT("YOU PLAY BLUE  |  BOT CONTROLS ORANGE  |  BEST OF 5")
-								: TEXT("CONTROL BLUE PUCKS  |  CLEAR THE TARGETS")
-							: Summary);
+								? TEXT("You play blue. The bot plays orange.")
+								: TEXT("Set up the board. Find your shot. Repeat.")
+							: bBob ? TEXT("Pocket your color before your opponent clears theirs.") : TEXT("Clear the opposing team. First to three rounds wins."));
 					})
-					.Font(UiFont(10)).ColorAndOpacity(Muted).AutoWrapText(true)
+					.Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)
 				]
 				+ SVerticalBox::Slot().FillHeight(1.0f)[SNew(SSpacer)]
-				+ SVerticalBox::Slot().AutoHeight()
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 0.0f)
 				[
-					SNew(SFlickAngularBorder)
-					.BackgroundColor(PanelRaised)
-					.AccentColor_Lambda([this, bBob]()
+					SNew(STextBlock)
+					.Text_Lambda([this, bBob, bAvailable]()
 					{
-						return (bBob
-							? FLinearColor(0.18f, 0.82f, 0.48f, 1.0f)
-							: SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive ? Orange : Cyan).CopyWithNewOpacity(0.58f);
+						return FText::FromString(!bAvailable ? TEXT("UNAVAILABLE")
+							: SelectedPlayPlaylist == EFlickPlayPlaylist::Training ? TEXT("OFFLINE PRACTICE")
+							: bBob ? TEXT("ONE BOARD  /  STANDARD PUCKS") : TEXT("BEST OF FIVE  /  TEAM KNOCKOUT"));
 					})
-					.CutSize(5.0f)
-					.BorderWidth(0.85f)
-					.Padding(FMargin(10.0f, 7.0f))
-					[
-						SNew(STextBlock)
-						.Text_Lambda([this, bAvailable]()
-						{
-							return FText::FromString(!bAvailable
-								? TEXT("MULTIPLAYER SUPPORT COMING SOON")
-								: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
-									? SelectedTrainingActivity == EFlickTrainingActivity::BotMatch
-										? TEXT("FULL MATCH RULES  |  PHYSICS-DRIVEN BOT")
-										: TEXT("OFFLINE FREE PLAY")
-									: TEXT("READY"));
-						})
-						.Font(UiFont(8, true)).Justification(ETextJustify::Center).ColorAndOpacity_Lambda([this, bBob, bAvailable]()
-						{
-							if (!bAvailable) return FSlateColor(Muted);
-							return FSlateColor(bBob
-								? FLinearColor(0.18f, 0.82f, 0.48f, 1.0f)
-								: SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive
-									? Orange
-								: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
-									? SelectedTrainingActivity == EFlickTrainingActivity::BotMatch
-										? Orange
-										: FLinearColor(0.2f, 0.78f, 0.5f, 1.0f)
-									: Cyan);
-						})
-					]
+					.Font(UiFont(10, true)).ColorAndOpacity(Brand)
+				]
 			]
-		]
-		];
-	if (OutButton)
-	{
-		*OutButton = CardButton;
-	}
+		]);
+	if (OutButton) *OutButton = CardButton;
 	return SNew(SBox).HeightOverride(UiMetrics::FormatCardHeight)[CardButton];
 }
 
@@ -6845,91 +6715,104 @@ TSharedRef<SWidget> SFlickGameLayer::BuildArchetypeChoice(
 TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 {
 	const auto Checked = [](const bool bValue) { return bValue ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; };
-	return SNew(SFlickAngularBorder)
-		.BackgroundColor(FLinearColor(0.002f, 0.006f, 0.012f, 0.86f))
-		.AccentColor(Cyan.CopyWithNewOpacity(0.68f))
-		.CutSize(16.0f)
-		.BorderWidth(1.1f)
-		.Padding(FMargin(52.0f, 30.0f))
-		[
-			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 22.0f)
+	const auto SectionHeading = [](const FString& Number, const FString& Title, const FString& Description) -> TSharedRef<SWidget>
+	{
+		return SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()
 			[
 				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-				[
-					SNew(SBox).WidthOverride(7.0f).HeightOverride(52.0f)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan)]
-				]
-				+ SHorizontalBox::Slot().AutoWidth().Padding(17.0f, 0.0f)
-				[
-					SNew(STextBlock).Text(FText::FromString(TEXT("SETTINGS"))).Font(UiFont(40, true)).ColorAndOpacity(FLinearColor::White)
-				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
+				[SNew(STextBlock).Text(FText::FromString(Number)).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
+				+ SHorizontalBox::Slot().FillWidth(1.0f)
+				[SNew(STextBlock).Text(FText::FromString(Title)).Font(DisplayFont(25)).ColorAndOpacity(Paper)]
 			]
-			+ SVerticalBox::Slot().FillHeight(1.0f)
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 10.0f)
+			[SNew(STextBlock).Text(FText::FromString(Description)).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)];
+	};
+	return SNew(SOverlay)
+		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Ink.CopyWithNewOpacity(0.88f))]
+		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility(EVisibility::HitTestInvisible).Opacity(0.35f)]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SNew(SBox).WidthOverride(1320.0f).HeightOverride(820.0f)
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 22.0f, 0.0f)
+				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Panel).Padding(FMargin(36.0f, 24.0f))
 				[
 					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()[MakeSectionLabel(TEXT("GAMEPLAY"))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("AIM AND CONTACT GUIDE"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsAimGuideEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetAimGuideEnabled(!GameMode->IsAimGuideEnabled()); }))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("WORLD IMPACT EFFECTS"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->AreImpactEffectsEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetImpactEffectsEnabled(!GameMode->AreImpactEffectsEnabled()); }))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("CONTROL OVERVIEW"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsControlOverviewEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetControlOverviewEnabled(!GameMode->IsControlOverviewEnabled()); }))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("CAMERA SHAKE"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetCameraShakeIntensity() : 0.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetCameraShakeIntensity(Value); }))]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 28.0f, 0.0f, 0.0f)[MakeSectionLabel(TEXT("AUDIO"))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("MASTER"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetMasterVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetMasterVolume(Value); }))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("PHYSICS EFFECTS"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetEffectsVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetEffectsVolume(Value); }))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("INTERFACE"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetInterfaceVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetInterfaceVolume(Value); }))]
-				]
-				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(22.0f, 0.0f, 0.0f, 0.0f)
-				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()[MakeSectionLabel(TEXT("DISPLAY"))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("V-SYNC"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsVSyncEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->ToggleVSync(); }))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("WINDOW MODE"), TAttribute<FText>::CreateLambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetWindowModeLabel() : TEXT("WINDOWED")); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleWindowMode(-1); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleWindowMode(1); return FReply::Handled(); }))]
-					+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("RESOLUTION"), TAttribute<FText>::CreateLambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetResolutionLabel() : TEXT("1920 x 1080")); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleResolution(-1); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleResolution(1); return FReply::Handled(); }))]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 28.0f, 0.0f, 0.0f)
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 20.0f)
 					[
-						SNew(SFlickAngularBorder)
-						.BackgroundColor(PanelRaised)
-						.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
-						.CutSize(10.0f)
-						.Padding(FMargin(22.0f))
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.0f)
 						[
 							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("MATCH FORMAT"))).Font(UiFont(11, true)).ColorAndOpacity(Muted)]
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 7.0f)
+							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK  /  YOUR SETUP"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("MAKE IT YOURS."))).Font(DisplayFont(46)).ColorAndOpacity(Paper)]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(16.0f, 0.0f, 0.0f, 8.0f)
+						[SNew(STextBlock).Text(FText::FromString(TEXT("SETTINGS"))).Font(UiFont(12, true)).ColorAndOpacity(Muted)]
+					]
+					+ SVerticalBox::Slot().FillHeight(1.0f)
+					[
+						SNew(SScrollBox)
+						+ SScrollBox::Slot()
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 10.0f, 0.0f)
 							[
-								SNew(STextBlock)
-								.Text_Lambda([this]()
-								{
-									return FText::FromString(GameMode.IsValid()
-										&& GameMode->GetSelectedMatchVariant() == EFlickMatchVariant::Bob
-										? TEXT("ONE BOARD") : TEXT("BEST OF FIVE"));
-								})
-								.Font(UiFont(22, true)).ColorAndOpacity(FLinearColor::White)
+								SNew(SVerticalBox)
+								+ SVerticalBox::Slot().AutoHeight()
+								[
+									SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
+									[
+										SNew(SVerticalBox)
+										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("01"), TEXT("GAME FEEL"), TEXT("Keep the feedback that helps you read the board."))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("AIM AND CONTACT GUIDE"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsAimGuideEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetAimGuideEnabled(!GameMode->IsAimGuideEnabled()); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("WORLD IMPACT EFFECTS"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->AreImpactEffectsEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetImpactEffectsEnabled(!GameMode->AreImpactEffectsEnabled()); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("CONTROL OVERVIEW"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsControlOverviewEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetControlOverviewEnabled(!GameMode->IsControlOverviewEnabled()); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("CAMERA SHAKE"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetCameraShakeIntensity() : 0.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetCameraShakeIntensity(Value); }))]
+									]
+								]
+
 							]
-							+ SVerticalBox::Slot().AutoHeight()
+							+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(10.0f, 0.0f, 0.0f, 0.0f)
 							[
-								SNew(STextBlock)
-								.Text_Lambda([this]()
-								{
-									return FText::FromString(GameMode.IsValid()
-										&& GameMode->GetSelectedMatchVariant() == EFlickMatchVariant::Bob
-										? TEXT("STANDARD PUCKS ONLY") : TEXT("FIRST TO THREE ROUNDS"));
-								})
-								.Font(UiFont(12, true)).ColorAndOpacity(Cyan)
+								SNew(SVerticalBox)
+								+ SVerticalBox::Slot().AutoHeight()
+								[
+									SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
+									[
+										SNew(SVerticalBox)
+										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("02"), TEXT("SOUND"), TEXT("Set the balance of the arena and the interface."))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("MASTER"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetMasterVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetMasterVolume(Value); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("PHYSICS EFFECTS"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetEffectsVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetEffectsVolume(Value); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("INTERFACE"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetInterfaceVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetInterfaceVolume(Value); }))]
+									]
+								]
+								+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 18.0f, 0.0f, 0.0f)
+								[
+									SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
+									[
+										SNew(SVerticalBox)
+										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("03"), TEXT("DISPLAY"), TEXT("Choose your screen setup, then apply below."))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("V-SYNC"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsVSyncEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->ToggleVSync(); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("WINDOW MODE"), TAttribute<FText>::CreateLambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetWindowModeLabel() : TEXT("WINDOWED")); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleWindowMode(-1); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleWindowMode(1); return FReply::Handled(); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("RESOLUTION"), TAttribute<FText>::CreateLambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetResolutionLabel() : TEXT("1920 x 1080")); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleResolution(-1); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleResolution(1); return FReply::Handled(); }))]
+									]
+								]
 							]
 						]
 					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 18.0f, 0.0f, 18.0f)
+					[SNew(SBox).HeightOverride(1.0f)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline.CopyWithNewOpacity(0.55f))]]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(150.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseSettings(); return FReply::Handled(); }), false, false, 52.0f)]]
+						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(24.0f, 0.0f)
+						[SNew(STextBlock).Text(FText::FromString(TEXT("Gameplay and audio update immediately."))).Font(UiFont(11)).ColorAndOpacity(Muted)]
+						+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(280.0f)[MakeMenuButton(TEXT("APPLY DISPLAY"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->ApplyDisplaySettings(); return FReply::Handled(); }), true, false, 52.0f, &SettingsDefaultButton)]]
+					]
 				]
-			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 20.0f, 0.0f, 0.0f)
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(170.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseSettings(); return FReply::Handled(); }))]]
-				+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-				+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(340.0f)[MakeMenuButton(TEXT("APPLY CHANGES"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->ApplyDisplaySettings(); return FReply::Handled(); }), true, false, 50.0f, &SettingsDefaultButton)]]
 			]
 		];
 }
@@ -6938,42 +6821,42 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 {
 	return SNew(SOverlay)
 		.Visibility(EVisibility::SelfHitTestInvisible)
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(34.0f, 28.0f, 0.0f, 0.0f)
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
 			.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->IsFreePlayTraining() ? EVisibility::Collapsed : EVisibility::Visible; })
 			[BuildTeamPlate(EFlickTeam::Player1)]
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 28.0f, 34.0f, 0.0f)
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 16.0f, 24.0f, 0.0f)
 		[
 			SNew(SBox)
 			.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->IsFreePlayTraining() ? EVisibility::Collapsed : EVisibility::Visible; })
 			[BuildTeamPlate(EFlickTeam::Player2)]
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(34.0f, 28.0f, 0.0f, 0.0f)[BuildTrainingToolsPanel()]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 14.0f, 0.0f, 0.0f)
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)[BuildTrainingToolsPanel()]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 16.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
-			.WidthOverride(580.0f)
-			.HeightOverride(150.0f)
+			.WidthOverride(560.0f)
+			.HeightOverride(84.0f)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.002f, 0.01f, 0.019f, 0.94f))
-				.AccentColor(Cyan.CopyWithNewOpacity(0.76f))
-				.CutSize(18.0f)
-				.BorderWidth(1.2f)
-				.Padding(FMargin(54.0f, 22.0f, 54.0f, 20.0f))
+				.BackgroundColor(Panel)
+				.AccentColor(Brand.CopyWithNewOpacity(0.72f))
+				.CutSize(0.0f)
+				.BorderWidth(1.0f)
+				.Padding(FMargin(18.0f, 6.0f, 18.0f, 6.0f))
 				[
 					SNew(SOverlay)
 					+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(0.0f, 3.0f, 0.0f, 0.0f)
 					[
-						SNew(SBox).WidthOverride(92.0f).HeightOverride(2.0f)
-						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(0.82f))]
+						SNew(SBox).WidthOverride(100.0f).HeightOverride(1.0f)
+						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline)]
 					]
 					+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 3.0f, 0.0f, 0.0f)
 					[
-						SNew(SBox).WidthOverride(92.0f).HeightOverride(2.0f)
-						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Orange.CopyWithNewOpacity(0.82f))]
+						SNew(SBox).WidthOverride(100.0f).HeightOverride(1.0f)
+						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline)]
 					]
 					+ SOverlay::Slot()
 					[
@@ -6992,12 +6875,21 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 										? TEXT("TRAINING")
 										: State && State->ActiveMatchVariant == EFlickMatchVariant::Bob ? TEXT("BOB") : TEXT("FLICK"));
 							})
-							.Font(UiFont(40, true))
-							.ColorAndOpacity(FLinearColor(0.94f, 0.98f, 1.0f, 1.0f))
+							.Font(UiFont(11, true))
+							.ColorAndOpacity(Brand)
 						]
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, -4.0f, 0.0f, 0.0f)
+						+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 5.0f, 0.0f, 5.0f)
 						[
-							SNew(STextBlock).Text_Lambda([this]() { return GetMatchStatusText(); }).Font(UiFont(15, true)).ColorAndOpacity_Lambda([this]() { return GetMatchStatusColor(); })
+							SNew(SScaleBox)
+							.Stretch(EStretch::ScaleToFit)
+							.StretchDirection(EStretchDirection::DownOnly)
+							.HAlign(HAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text_Lambda([this]() { return GetMatchStatusText(); })
+								.Font(DisplayFont(20))
+								.ColorAndOpacity_Lambda([this]() { return GetMatchStatusColor(); })
+							]
 						]
 						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 3.0f, 0.0f, 0.0f)
 						[
@@ -7062,7 +6954,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 									: FString::Printf(TEXT("ROUND %d   /   SHOT %d"), State->RoundNumber, State->TurnNumber));
 							})
 							.Font(UiFont(10, true))
-							.ColorAndOpacity(FLinearColor(0.70f, 0.76f, 0.82f, 1.0f))
+							.ColorAndOpacity(Muted)
 						]
 					]
 				]
@@ -7082,7 +6974,61 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 24.0f, 36.0f)[BuildControlHintPanel(true)]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 0.0f, 36.0f)[BuildCameraOrbitHint()]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 190.0f, 30.0f, 0.0f)[BuildEventFeed()];
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 112.0f, 24.0f, 0.0f)[BuildEventFeed()];
+}
+
+TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
+{
+	return SNew(SOverlay)
+		.Visibility(EVisibility::HitTestInvisible)
+		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Top)
+		[
+			SNew(SBox).HeightOverride(78.0f)
+			[
+				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.0f, 0.002f, 0.006f, 0.97f))
+			]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom)
+		[
+			SNew(SBox).HeightOverride(78.0f)
+			[
+				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.0f, 0.002f, 0.006f, 0.97f))
+			]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(30.0f, 23.0f, 0.0f, 0.0f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
+			[
+				SNew(SBox).WidthOverride(42.0f).HeightOverride(3.0f)
+				[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Orange)]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(FText::FromString(TEXT("CINEMATIC REPLAY"))).Font(UiFont(12, true)).ColorAndOpacity(Paper)
+			]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 24.0f, 30.0f, 0.0f)
+		[
+			SNew(STextBlock).Text(FText::FromString(TEXT("ROUND-WINNING SHOT  //  TEST ARENA"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(30.0f, 0.0f, 30.0f, 31.0f)
+		[
+			SNew(SBox).HeightOverride(3.0f)
+			[
+				SNew(SProgressBar)
+				.Style(&ShotClockBarStyle)
+				.Percent_Lambda([this]()
+				{
+					return TOptional<float>(GameMode.IsValid() ? GameMode->GetCinematicReplayProgress() : 0.0f);
+				})
+				.FillColorAndOpacity(Orange)
+			]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 30.0f, 46.0f)
+		[
+			SNew(STextBlock).Text(FText::FromString(TEXT("SLOW MOTION  //  PLAYBACK"))).Font(UiFont(9, true)).ColorAndOpacity(Orange)
+		];
 }
 
 TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardOverlay()
@@ -7354,6 +7300,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 
 TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 {
+	const auto IsTeamToPlay = [this, Team]()
+	{
+		const AFlickGameState* State = GetScoreboardGameState();
+		return State && State->CurrentTeam == Team
+			&& (State->MatchPhase == EFlickMatchPhase::Aiming
+				|| State->MatchPhase == EFlickMatchPhase::KickoffPlanning);
+	};
 	TSharedRef<SHorizontalBox> SeriesPips = SNew(SHorizontalBox);
 	for (int32 PipIndex = 0; PipIndex < 3; ++PipIndex)
 	{
@@ -7371,19 +7324,18 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 	}
 
 	return SNew(SBox)
-		.WidthOverride(320.0f)
-		.HeightOverride(128.0f)
+		.WidthOverride(290.0f)
+		.HeightOverride(84.0f)
 		[
 			SNew(SOverlay)
 			+ SOverlay::Slot()
 			[
 				SNew(SFlickAngularBorder)
-			.BackgroundColor(FLinearColor(0.002f, 0.01f, 0.018f, 0.94f))
-			.AccentColor(GetTeamAccent(Team).CopyWithNewOpacity(0.92f))
-			.CutSize(15.0f)
-			.BorderWidth(1.2f)
-			.UseAccentForOutline(true)
-			.Padding(FMargin(22.0f, 16.0f, 20.0f, 14.0f))
+			.BackgroundColor_Lambda([IsTeamToPlay]() { return IsTeamToPlay() ? PanelRaised : Panel; })
+			.AccentColor_Lambda([this, Team, IsTeamToPlay]() { return GetTeamAccent(Team).CopyWithNewOpacity(IsTeamToPlay() ? 1.0f : 0.28f); })
+			.CutSize(0.0f)
+			.BorderWidth(1.0f)
+			.Padding(FMargin(14.0f, 6.0f, 14.0f, 8.0f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.0f)
@@ -7407,10 +7359,17 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 								? FString::Printf(TEXT("TEAM %d"), GetTeamNumber(Team))
 								: FString::Printf(TEXT("PLAYER %d"), GetTeamNumber(Team)));
 						})
-						.Font(UiFont(15, true))
+						.Font(UiFont(11, true))
 						.ColorAndOpacity(GetTeamAccent(Team))
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 7.0f, 0.0f, 0.0f)
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 1.0f, 0.0f, 0.0f)
+					[
+						SNew(STextBlock)
+						.Text_Lambda([IsTeamToPlay]() { return FText::FromString(IsTeamToPlay() ? TEXT("TO PLAY") : TEXT("")); })
+						.Font(UiFont(8, true))
+						.ColorAndOpacity(Paper)
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
 					[
 						SNew(SBox)
 						.Visibility_Lambda([this]()
@@ -7428,18 +7387,18 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 						SNew(STextBlock)
 						.Text_Lambda([this, Team]() { return GetRoundsText(Team); })
 						.Font(UiFont(9, true))
-						.ColorAndOpacity(FLinearColor(0.70f, 0.76f, 0.82f, 1.0f))
+						.ColorAndOpacity(Muted)
 					]
 				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(0.0f, -6.0f, 0.0f, 0.0f)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(12.0f, -6.0f, 0.0f, 0.0f)
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
 					[
 						SNew(STextBlock)
 						.Text_Lambda([this, Team]() { return GetPieceCountText(Team); })
-						.Font(UiFont(48, true))
-						.ColorAndOpacity(FLinearColor(0.96f, 0.98f, 1.0f, 1.0f))
+						.Font(DisplayFont(32))
+						.ColorAndOpacity(Paper)
 					]
 					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, -5.0f, 0.0f, 0.0f)
 					[
@@ -7447,18 +7406,29 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 						.Text_Lambda([this]()
 						{
 							const AFlickGameState* State = GetScoreboardGameState();
-							return FText::FromString(State && State->ActiveMatchVariant == EFlickMatchVariant::Bob ? TEXT("LEFT") : TEXT("ACTIVE"));
+							return FText::FromString(State && State->ActiveMatchVariant == EFlickMatchVariant::Bob ? TEXT("LEFT TO POCKET") : TEXT("PUCKS IN PLAY"));
 						})
 						.Font(UiFont(9, true))
-						.ColorAndOpacity(FLinearColor(0.72f, 0.78f, 0.83f, 1.0f))
+						.ColorAndOpacity(Muted)
 					]
 				]
 			]
 			]
-			+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(12.0f, 0.0f, 12.0f, 3.0f)
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Fill)
+			[
+				SNew(SBox).WidthOverride(4.0f)
+				[
+					SNew(SBorder).BorderImage(WhiteBrush())
+					.BorderBackgroundColor_Lambda([this, Team, IsTeamToPlay]()
+					{
+						return GetTeamAccent(Team).CopyWithNewOpacity(IsTeamToPlay() ? 1.0f : 0.35f);
+					})
+				]
+			]
+			+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(4.0f, 0.0f, 0.0f, 0.0f)
 			[
 				SNew(SBox)
-				.HeightOverride(8.0f)
+				.HeightOverride(3.0f)
 				.Visibility_Lambda([this]()
 				{
 					const AFlickGameState* State = PlayerController.IsValid()
@@ -7570,8 +7540,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 						if (GameMode.IsValid() && GameMode->IsTrainingEditMode())
 						{
 							return FText::FromString(GameMode->IsBobMode()
-								? TEXT("1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  RMB REMOVE NON-STRIKERS")
-								: TEXT("WHEEL TYPE  |  1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  RMB REMOVE"));
+								? TEXT("1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  DEL REMOVE NON-STRIKERS")
+								: TEXT("WHEEL TYPE  |  1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  DEL REMOVE"));
 						}
 						return FText::FromString(TEXT("Aim and shoot normally   |   R restores your saved setup"));
 					})
@@ -7634,7 +7604,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 		else if (bTraining && bEditing)
 		{
 			AddHint(TEXT("LMB"), TEXT("PLACE / DRAG"), false);
-			AddHint(TEXT("RMB"), TEXT("REMOVE"), false);
+			AddHint(TEXT("DEL"), TEXT("REMOVE"), false);
 			AddHint(TEXT("1 / 2"), TEXT("OWN / TARGET"), true);
 		}
 		else if (bTraining)
@@ -7730,7 +7700,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPowerMeter()
 			SegmentIndex == 9 ? 0.0f : 3.0f,
 			0.0f)
 		[
-			SNew(SBox).HeightOverride(11.0f)
+			SNew(SBox).HeightOverride(14.0f)
 			[
 				SNew(SBorder)
 				.BorderImage(WhiteBrush())
@@ -7741,7 +7711,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPowerMeter()
 						: 0.0f;
 					return Power >= static_cast<float>(SegmentIndex + 1) / 10.0f
 						? GetPowerColor().GetSpecifiedColor()
-						: FLinearColor(0.075f, 0.085f, 0.1f, 1.0f);
+						: FLinearColor(0.065f, 0.068f, 0.06f, 1.0f);
 				})
 			]
 		];
@@ -7753,20 +7723,38 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPowerMeter()
 		[
 			SNew(SFlickAngularBorder)
 			.BackgroundColor(Panel)
-			.AccentColor(Cyan.CopyWithNewOpacity(0.66f))
-			.CutSize(9.0f)
-			.Padding(FMargin(16.0f, 12.0f))
+			.AccentColor(Brand)
+			.CutSize(0.0f)
+			.Padding(FMargin(18.0f, 14.0f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("POWER"))).Font(UiFont(11, true)).ColorAndOpacity(Muted)]
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text_Lambda([this]() { return GetPowerText(); }).Font(UiFont(13, true)).ColorAndOpacity_Lambda([this]() { return GetPowerColor(); })]
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(FText::FromString(TEXT("SHOT POWER"))).Font(UiFont(10, true)).ColorAndOpacity(Paper)
+					]
+					+ SHorizontalBox::Slot().AutoWidth()
+					[
+						SNew(STextBlock).Text_Lambda([this]() { return GetPowerText(); }).Font(DisplayFont(28)).ColorAndOpacity_Lambda([this]() { return GetPowerColor(); })
+					]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 9.0f, 0.0f, 0.0f)
 				[
 					PowerSegments
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.0f)
+					[
+						SNew(STextBlock).Text(FText::FromString(TEXT("RELEASE TO FLICK"))).Font(UiFont(8, true)).ColorAndOpacity(Muted)
+					]
+					+ SHorizontalBox::Slot().AutoWidth()
+					[
+						SNew(STextBlock).Text(FText::FromString(TEXT("RMB / ESC / B  CANCEL"))).Font(UiFont(8, true)).ColorAndOpacity(Muted)
+					]
 				]
 			]
 		];
@@ -7775,7 +7763,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPowerMeter()
 TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 {
 	return SNew(SBox)
-		.WidthOverride(400.0f)
+		.WidthOverride(610.0f)
 		.HeightOverride(66.0f)
 		.Visibility_Lambda([this]()
 		{
@@ -7842,7 +7830,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 							]
 						]
 					]
-					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(7.0f, 0.0f, 0.0f, 0.0f)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(7.0f, 0.0f, 14.0f, 0.0f)
 					[
 						SNew(STextBlock)
 						.Text_Lambda([this]()
@@ -7862,6 +7850,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 						.Font(UiFont(9, true))
 						.ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
 					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SFlickAngularBorder)
+						.BackgroundColor(FLinearColor(0.014f, 0.03f, 0.045f, 0.98f))
+						.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
+						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
+						[
+							SNew(STextBlock).Text(FText::FromString(TEXT("F"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
+						]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(7.0f, 0.0f, 0.0f, 0.0f)
+					[
+						SNew(STextBlock).Text(FText::FromString(TEXT("RESET"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
+					]
 				]
 			]
 		];
@@ -7872,34 +7874,41 @@ TSharedRef<SWidget> SFlickGameLayer::BuildEventFeed()
 	TSharedRef<SVerticalBox> Feed = SNew(SVerticalBox);
 	for (int32 Index = 0; Index < 3; ++Index)
 	{
-		Feed->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 7.0f)
+		Feed->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 5.0f)
 		[
 			SNew(SBox)
-			.WidthOverride(292.0f)
+			.WidthOverride(320.0f)
 			.Visibility_Lambda([this, Index]() { return GetEventVisibility(Index); })
 			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(Panel.CopyWithNewOpacity(0.9f))
-				.AccentColor_Lambda([this, Index]() { return GetEventColor(Index).GetSpecifiedColor().CopyWithNewOpacity(0.72f); })
-				.CutSize(6.0f)
-				.BorderWidth(0.9f)
-				.Padding(FMargin(12.0f, 8.0f))
+				SNew(SBorder)
+				.BorderImage(WhiteBrush())
+				.BorderBackgroundColor(Panel.CopyWithNewOpacity(0.95f))
+				.Padding(FMargin(0.0f))
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+					+ SHorizontalBox::Slot().AutoWidth()
+					[
+						SNew(SBox).WidthOverride(3.0f)
+						[
+							SNew(SBorder).BorderImage(WhiteBrush())
+							.BorderBackgroundColor_Lambda([this, Index]() { return GetEventColor(Index).GetSpecifiedColor(); })
+						]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(13.0f, 12.0f, 0.0f, 12.0f)
 					[
 						SNew(STextBlock)
 						.Text_Lambda([this, Index]() { return GetEventText(Index); })
 						.Font(UiFont(10, true))
-						.ColorAndOpacity_Lambda([this, Index]() { return GetEventColor(Index); })
+						.AutoWrapText(true)
+						.ColorAndOpacity(Paper)
 					]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.0f, 0.0f, 0.0f, 0.0f)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12.0f)
 					[
 						SNew(STextBlock)
 						.Visibility_Lambda([this, Index]() { return GetEventPointsVisibility(Index); })
 						.Text_Lambda([this, Index]() { return GetEventPointsText(Index); })
-						.Font(UiFont(12, true))
-						.ColorAndOpacity(FLinearColor(0.3f, 1.0f, 0.58f, 1.0f))
+						.Font(UiFont(14, true))
+						.ColorAndOpacity(Brand)
 					]
 				]
 			]
@@ -7916,6 +7925,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 		const FOnClicked& OnClicked,
 		TSharedPtr<SButton>* OutButton = nullptr) -> TSharedRef<SWidget>
 	{
+		const bool bPrimary = Label == TEXT("RESUME");
 		TSharedRef<SButton> Button = SNew(SButton)
 			.ButtonStyle(&TransparentButtonStyle)
 			.ContentPadding(0.0f)
@@ -7930,36 +7940,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 		}
 
 		const TWeakPtr<SButton> WeakButton = Button;
-		TSharedRef<SUniformGridPanel> DotField = SNew(SUniformGridPanel).SlotPadding(FMargin(2.0f, 1.5f));
-		for (int32 Row = 0; Row < 4; ++Row)
-		{
-			for (int32 Column = 0; Column < 7; ++Column)
-			{
-				DotField->AddSlot(Column, Row)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SBox).WidthOverride(2.0f).HeightOverride(2.0f)
-					[
-						SNew(SBorder)
-						.BorderImage(WhiteBrush())
-						.BorderBackgroundColor_Lambda([WeakButton, bDanger, Row, Column]()
-						{
-							const TSharedPtr<SButton> PinnedButton = WeakButton.Pin();
-							const bool bActive = PinnedButton.IsValid()
-								&& (PinnedButton->IsHovered() || PinnedButton->HasKeyboardFocus());
-							const float PatternFade = FMath::Clamp(1.0f - (static_cast<float>(Column) * 0.075f + static_cast<float>(Row) * 0.04f), 0.32f, 1.0f);
-							const FLinearColor Base = bDanger ? Orange : Cyan;
-							return Base.CopyWithNewOpacity(PatternFade * (bActive ? 0.72f : 0.28f));
-						})
-					]
-				];
-			}
-		}
-
 		Button->SetContent(
 			SNew(SFlickAngularBorder)
-			.BackgroundColor_Lambda([WeakButton, bDanger]()
+			.BackgroundColor_Lambda([WeakButton, bDanger, bPrimary]()
 			{
 				const TSharedPtr<SButton> PinnedButton = WeakButton.Pin();
 				const bool bActive = PinnedButton.IsValid()
@@ -7967,56 +7950,37 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 				if (bDanger)
 				{
 					return bActive
-						? FLinearColor(0.62f, 0.085f, 0.018f, 0.98f)
-						: FLinearColor(0.19f, 0.035f, 0.012f, 0.96f);
+						? FLinearColor(0.15f, 0.041f, 0.022f, 1.0f)
+						: PanelRaised;
 				}
-				return bActive
-					? FLinearColor(0.0f, 0.48f, 0.7f, 0.98f)
-					: FLinearColor(0.018f, 0.055f, 0.086f, 0.96f);
+				if (bPrimary) return bActive ? Paper : Brand;
+				return bActive ? FLinearColor(0.085f, 0.09f, 0.078f, 1.0f) : PanelRaised;
 			})
-			.AccentColor_Lambda([WeakButton, bDanger]()
+			.AccentColor_Lambda([WeakButton, bDanger, bPrimary]()
 			{
 				const TSharedPtr<SButton> PinnedButton = WeakButton.Pin();
 				const bool bActive = PinnedButton.IsValid()
 					&& (PinnedButton->IsHovered() || PinnedButton->HasKeyboardFocus());
 				if (bDanger)
 				{
-					return bActive ? FLinearColor(1.0f, 0.48f, 0.08f, 1.0f) : Orange.CopyWithNewOpacity(0.92f);
+					return Orange.CopyWithNewOpacity(bActive ? 1.0f : 0.38f);
 				}
-				return bActive ? FLinearColor(0.2f, 0.94f, 1.0f, 1.0f) : FLinearColor(0.34f, 0.58f, 0.7f, 0.92f);
+				return bPrimary || bActive ? Brand : Hairline;
 			})
-			.CutSize(9.0f)
-			.BorderWidth(1.15f)
+			.CutSize(5.0f)
+			.BorderWidth(1.0f)
 			.UseAccentForOutline(true)
 			.Padding(FMargin(2.0f))
 			[
 				SNew(SOverlay)
-				+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Center).Padding(0.0f, 0.0f, 24.0f, 0.0f)
+				+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Center).Padding(0.0f, 0.0f, 20.0f, 0.0f)
 				[
-					SNew(SBox).WidthOverride(58.0f).HeightOverride(28.0f)
-					[
-						DotField
-					]
+					SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(17, true)).ColorAndOpacity(bPrimary ? Ink : bDanger ? Orange : Muted)
 				]
 				+ SOverlay::Slot()
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(28.0f, 0.0f, 18.0f, 0.0f)
-					[
-						SNew(SBox).WidthOverride(4.0f).HeightOverride(28.0f)
-						[
-							SNew(SBorder)
-							.BorderImage(WhiteBrush())
-							.BorderBackgroundColor_Lambda([WeakButton, bDanger]()
-							{
-								const TSharedPtr<SButton> PinnedButton = WeakButton.Pin();
-								const bool bActive = PinnedButton.IsValid()
-									&& (PinnedButton->IsHovered() || PinnedButton->HasKeyboardFocus());
-								return bDanger ? Orange : bActive ? FLinearColor::White : Cyan;
-							})
-						]
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(22.0f, 0.0f, 42.0f, 0.0f)
 					[
 						SNew(STextBlock)
 						.Text_Lambda([this, Label]()
@@ -8033,36 +7997,38 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 									? TEXT("EXIT TRAINING")
 									: Label);
 						})
-						.Font(UiFont(18, true))
-						.ColorAndOpacity(FLinearColor::White)
+						.Font(UiFont(15, true))
+						.ColorAndOpacity(bPrimary ? Ink : bDanger ? Orange : Paper)
 					]
 				]
 			]
 		);
 
-		return SNew(SBox).HeightOverride(62.0f)[Button];
+		return SNew(SBox).HeightOverride(bPrimary ? 64.0f : 54.0f)[Button];
 	};
 
 	return SNew(SOverlay)
-		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.0f, 0.003f, 0.008f, 0.78f))]
+		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.003f, 0.004f, 0.003f, 0.8f))]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
 			SNew(SBox).WidthOverride(500.0f)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.002f, 0.016f, 0.03f, 0.985f))
-				.AccentColor(Cyan.CopyWithNewOpacity(0.78f))
-				.CutSize(16.0f)
-				.BorderWidth(1.25f)
-				.UseAccentForOutline(true)
-				.Padding(FMargin(45.0f, 22.0f))
+				.BackgroundColor(Panel.CopyWithNewOpacity(0.985f))
+				.AccentColor(Brand)
+				.CutSize(10.0f)
+				.BorderWidth(1.0f)
+				.Padding(FMargin(32.0f))
 				[
 					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+					+ SVerticalBox::Slot().AutoHeight()
 					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("OPTIONS"))).Font(UiFont(31, true)).ColorAndOpacity(FLinearColor::White)
+						SNew(STextBlock).Text(FText::FromString(TEXT("FLICK / IN SESSION"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)
 					]
-					+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).HeightOverride(16.0f)]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 24.0f)
+					[
+						SNew(STextBlock).Text(FText::FromString(TEXT("MATCH MENU"))).Font(DisplayFont(34)).ColorAndOpacity(Paper)
+					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
 					[
 						MakePauseButton(TEXT("RESUME"), false, FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->TogglePauseMenu(); return FReply::Handled(); }), &PauseDefaultButton)
@@ -8088,6 +8054,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 					[
 						MakePauseButton(TEXT("FORFEIT"), true, FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->ReturnToMainMenu(); return FReply::Handled(); }))
 					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 20.0f, 0.0f, 0.0f)
+					[
+						SNew(STextBlock).Text(FText::FromString(TEXT("ESC / B   RETURN TO GAME"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)
+					]
 				]
 			]
 		];
@@ -8096,11 +8066,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 {
 	FSlateFontInfo RoundHeaderFont = UiFont(11, true);
-	RoundHeaderFont.LetterSpacing = 160;
-	FSlateFontInfo RoundScoreFont = UiFont(20, true);
-	RoundScoreFont.LetterSpacing = 180;
-	FSlateFontInfo RoundButtonFont = UiFont(19, true);
-	RoundButtonFont.LetterSpacing = 80;
+	RoundHeaderFont.LetterSpacing = 120;
+	FSlateFontInfo RoundScoreFont = UiFont(18, true);
+	RoundScoreFont.LetterSpacing = 40;
+	FSlateFontInfo RoundButtonFont = UiFont(17, true);
+	RoundButtonFont.LetterSpacing = 30;
 
 	TSharedRef<SButton> NextActionButton = SAssignNew(RoundOverDefaultButton, SButton)
 		.ButtonStyle(&TransparentButtonStyle)
@@ -8133,19 +8103,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 			const TSharedPtr<SButton> PinnedButton = WeakNextActionButton.Pin();
 			return PinnedButton.IsValid()
 				&& (PinnedButton->IsHovered() || PinnedButton->HasKeyboardFocus())
-				? FLinearColor(0.0f, 0.34f, 0.52f, 0.98f)
-				: FLinearColor(0.005f, 0.09f, 0.15f, 0.98f);
+				? Paper : Brand;
 		})
-		.AccentColor_Lambda([WeakNextActionButton]()
-		{
-			const TSharedPtr<SButton> PinnedButton = WeakNextActionButton.Pin();
-			return PinnedButton.IsValid()
-				&& (PinnedButton->IsHovered() || PinnedButton->HasKeyboardFocus())
-				? FLinearColor(0.28f, 0.96f, 1.0f, 1.0f)
-				: Cyan.CopyWithNewOpacity(0.88f);
-		})
-		.CutSize(10.0f)
-		.BorderWidth(1.2f)
+		.AccentColor(Brand)
+		.CutSize(5.0f)
+		.BorderWidth(1.0f)
 		.UseAccentForOutline(true)
 		.Padding(FMargin(22.0f, 0.0f))
 		[
@@ -8169,17 +8131,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 				})
 				.Font(RoundButtonFont)
 				.Justification(ETextJustify::Center)
-				.ColorAndOpacity(FLinearColor::White)
+				.ColorAndOpacity(Ink)
 			]
 		]
 	);
 
-	TSharedRef<SConstraintCanvas> ResultLayout = SNew(SConstraintCanvas);
-	ResultLayout->AddSlot()
-		.Anchors(FAnchors(0.5f, 0.15f))
-		.Alignment(FVector2D(0.5f, 0.5f))
-		.Offset(FMargin(0.0f, 0.0f, 420.0f, 22.0f))
-		.AutoSize(false)
+	TSharedRef<SVerticalBox> ResultLayout = SNew(SVerticalBox);
+	ResultLayout->AddSlot().AutoHeight()
 	[
 		SNew(SBox)
 		.HAlign(HAlign_Fill)
@@ -8189,43 +8147,42 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 			.Text_Lambda([this]()
 			{
 				const AFlickGameState* State = GetScoreboardGameState();
+				if (State && State->bSeriesComplete) return FText::FromString(TEXT("MATCH COMPLETE"));
 				return FText::FromString(State && State->ActiveMatchVariant == EFlickMatchVariant::Bob
 					? TEXT("BOB COMPLETE") : TEXT("ROUND COMPLETE"));
 			})
 			.Font(RoundHeaderFont)
 			.Justification(ETextJustify::Center)
-			.ColorAndOpacity(FLinearColor(0.84f, 0.9f, 0.95f, 0.96f))
+			.ColorAndOpacity(Brand)
 		]
 	];
-	ResultLayout->AddSlot()
-		.Anchors(FAnchors(0.5f, 0.33f))
-		.Alignment(FVector2D(0.5f, 0.5f))
-		.Offset(FMargin(0.0f, 0.0f, 500.0f, 60.0f))
-		.AutoSize(false)
+	ResultLayout->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 22.0f)
 	[
-		SNew(STextBlock)
-		.Text_Lambda([this]() { return GetRoundResultText(); })
-		.Font(DisplayFont(38))
-		.Justification(ETextJustify::Center)
-		.ColorAndOpacity_Lambda([this]() { return GetMatchStatusColor(); })
+		SNew(SBox).HeightOverride(76.0f)
+		[
+			SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly).HAlign(HAlign_Center)
+			[
+				SNew(STextBlock)
+				.Text_Lambda([this]() { return GetRoundResultText(); })
+				.Font(DisplayFont(44))
+				.Justification(ETextJustify::Center)
+				.ColorAndOpacity_Lambda([this]() { return GetMatchStatusColor(); })
+			]
+		]
 	];
-	ResultLayout->AddSlot()
-		.Anchors(FAnchors(0.5f, 0.64f))
-		.Alignment(FVector2D(0.5f, 0.5f))
-		.Offset(FMargin(0.0f, 0.0f, 440.0f, 34.0f))
-		.AutoSize(false)
+	ResultLayout->AddSlot().AutoHeight()
 	[
-		SNew(STextBlock)
-		.Text_Lambda([this]() { return GetRoundScoreText(); })
-		.Font(RoundScoreFont)
-		.Justification(ETextJustify::Center)
-		.ColorAndOpacity(FLinearColor::White)
+		SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(18.0f, 16.0f))
+		[
+			SNew(STextBlock)
+			.Text_Lambda([this]() { return GetRoundScoreText(); })
+			.Font(RoundScoreFont)
+			.AutoWrapText(true)
+			.Justification(ETextJustify::Center)
+			.ColorAndOpacity(Paper)
+		]
 	];
-	ResultLayout->AddSlot()
-		.Anchors(FAnchors(0.5f, 0.70f))
-		.Alignment(FVector2D(0.5f, 0.5f))
-		.Offset(FMargin(0.0f, 0.0f, 440.0f, 20.0f))
-		.AutoSize(false)
+	ResultLayout->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 0.0f)
 	[
 		SNew(STextBlock)
 		.Visibility_Lambda([this]()
@@ -8254,55 +8211,33 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 				Update.bForfeit ? TEXT("  /  FORFEIT") : TEXT("")));
 		})
 		.Font(UiFont(11, true))
+		.AutoWrapText(true)
 		.Justification(ETextJustify::Center)
 		.ColorAndOpacity_Lambda([this]()
 		{
 			const UFlickRankingSubsystem* Ranking = GetRankingSubsystem();
-			return FSlateColor(Ranking && Ranking->GetLastRatingUpdate().RatingDelta < 0 ? Orange : Cyan);
+			return FSlateColor(Ranking && Ranking->GetLastRatingUpdate().RatingDelta < 0 ? Orange : Brand);
 		})
 	];
-	ResultLayout->AddSlot()
-		.Anchors(FAnchors(0.5f, 0.84f))
-		.Alignment(FVector2D(0.5f, 0.5f))
-		.Offset(FMargin(0.0f, 0.0f, 360.0f, 60.0f))
-		.AutoSize(false)
+	ResultLayout->AddSlot().AutoHeight().Padding(0.0f, 22.0f, 0.0f, 0.0f)
 	[
-		NextActionButton
+		SNew(SBox).HeightOverride(62.0f)[NextActionButton]
 	];
 
 	return SNew(SOverlay)
 		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.72f))]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
-			SNew(SBox).WidthOverride(560.0f).HeightOverride(280.0f)
+			SNew(SBox).WidthOverride(640.0f)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.001f, 0.009f, 0.016f, 0.985f))
-				.AccentColor(Cyan.CopyWithNewOpacity(0.86f))
-				.CutSize(18.0f)
-				.BorderWidth(1.25f)
-				.Padding(FMargin(20.0f, 10.0f))
+				.BackgroundColor(Panel.CopyWithNewOpacity(0.985f))
+				.AccentColor(Brand)
+				.CutSize(10.0f)
+				.BorderWidth(1.0f)
+				.Padding(FMargin(40.0f, 32.0f))
 				[
-					SNew(SOverlay)
-					+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(8.0f, 8.0f, 0.0f, 0.0f)
-					[
-						SNew(SBox).WidthOverride(118.0f).HeightOverride(2.0f)
-						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(0.86f))]
-					]
-					+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 8.0f, 8.0f, 0.0f)
-					[
-						SNew(SBox).WidthOverride(118.0f).HeightOverride(2.0f)
-						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Orange.CopyWithNewOpacity(0.9f))]
-					]
-					+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 8.0f, 8.0f)
-					[
-						SNew(SBox).WidthOverride(118.0f).HeightOverride(2.0f)
-						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Orange.CopyWithNewOpacity(0.74f))]
-					]
-					+ SOverlay::Slot()
-					[
-						ResultLayout
-					]
+					ResultLayout
 				]
 			]
 		];
@@ -8317,80 +8252,54 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMainMenuButton(
 	TSharedPtr<SButton>* OutButton)
 {
 	EFlickMainMenuIcon Icon = EFlickMainMenuIcon::Play;
-	if (Label.Contains(TEXT("LINEUP"))) Icon = EFlickMainMenuIcon::Lineups;
+	if (Label == TEXT("STATS")) Icon = EFlickMainMenuIcon::Stats;
+	else if (Label.Contains(TEXT("LEADERBOARD"))) Icon = EFlickMainMenuIcon::Leaderboard;
+	else if (Label.Contains(TEXT("HISTORY"))) Icon = EFlickMainMenuIcon::History;
+	else if (Label == TEXT("BACK")) Icon = EFlickMainMenuIcon::Back;
+	else if (Label.Contains(TEXT("LINEUP"))) Icon = EFlickMainMenuIcon::Lineups;
 	else if (Label.Contains(TEXT("PROFILE"))) Icon = EFlickMainMenuIcon::Profile;
 	else if (Label.Contains(TEXT("SHOP"))) Icon = EFlickMainMenuIcon::Shop;
 	else if (Label.Contains(TEXT("SETTINGS"))) Icon = EFlickMainMenuIcon::Settings;
 	else if (Label.Contains(TEXT("QUIT"))) Icon = EFlickMainMenuIcon::Quit;
 
+	const FString Detail = Label == TEXT("PLAY") ? TEXT("Find your next rivalry")
+		: Label == TEXT("LINEUPS") ? TEXT("Build your advantage")
+		: Label == TEXT("PROFILE") ? TEXT("Your record. Your progress.")
+		: Label == TEXT("ITEM SHOP") ? TEXT("Explore the collection")
+		: Label == TEXT("SETTINGS") ? TEXT("Make yourself comfortable") : FString();
 	TSharedRef<SButton> Button = SNew(SButton)
-		.ButtonStyle(&TransparentButtonStyle)
-		.ContentPadding(FMargin(34.0f, 0.0f, 26.0f, 0.0f))
-		.HAlign(HAlign_Fill)
-		.VAlign(VAlign_Center)
-		.OnClicked(OnClicked);
+		.ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(22.0f, 0.0f, 24.0f, 0.0f))
+		.HAlign(HAlign_Fill).VAlign(VAlign_Center).OnClicked(OnClicked);
 	const TWeakPtr<SButton> WeakButton = Button;
 	Button->SetContent(
 		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 18.0f, 0.0f)
+		[SNew(SFlickMainMenuIcon).Icon(Icon).Color(bPrimary ? Ink : bDanger ? Muted : Brand)]
+		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
-			SNew(SBox).WidthOverride(44.0f).HeightOverride(40.0f)
-			[
-				SNew(SFlickMainMenuIcon)
-				.Icon(Icon)
-				.Color_Lambda([WeakButton, bDanger]()
-				{
-					const TSharedPtr<SButton> Pinned = WeakButton.Pin();
-					const bool bActive = Pinned.IsValid() && Pinned->IsHovered();
-					return bActive ? FLinearColor::White : bDanger ? Orange : FLinearColor(0.62f, 0.73f, 0.8f, 1.0f);
-				})
-			]
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()
+			[SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(bPrimary ? 30 : 21)).ColorAndOpacity(bPrimary ? Ink : Paper)]
+			+ SVerticalBox::Slot().AutoHeight()
+			[SNew(STextBlock).Text(FText::FromString(Detail)).Font(UiFont(10)).ColorAndOpacity(bPrimary ? Ink : Muted)
+				.Visibility(Detail.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible)]
 		]
-		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(20.0f, 0.0f, 0.0f, 0.0f)
-		[
-			SNew(STextBlock)
-			.Text(FText::FromString(Label))
-			.Font(DisplayFont(bPrimary ? 24 : 20))
-			.ColorAndOpacity_Lambda([WeakButton, bPrimary, bDanger]()
-			{
-				const TSharedPtr<SButton> Pinned = WeakButton.Pin();
-				const bool bActive = Pinned.IsValid() && (Pinned->HasKeyboardFocus() || Pinned->IsHovered());
-				return bDanger && !bActive ? FSlateColor(Orange) : FSlateColor(FLinearColor::White);
-			})
-		]);
-
-	if (OutButton)
-	{
-		*OutButton = Button;
-	}
-
-	return SNew(SBox)
-		.HeightOverride(Height)
-		[
-			SNew(SFlickMainMenuFrame)
-			.StartColor(bDanger
-				? FLinearColor(0.008f, 0.003f, 0.002f, 0.42f)
-				: FLinearColor(0.0003f, 0.002f, 0.006f, 0.4f))
-			.EndColor(bDanger
-				? FLinearColor(0.04f, 0.009f, 0.003f, 0.48f)
-				: FLinearColor(0.003f, 0.011f, 0.022f, 0.48f))
-			.HoverStartColor(FLinearColor(0.0f, 0.2f, 0.46f, 0.99f))
-			.HoverEndColor(FLinearColor(0.0f, 0.66f, 0.96f, 1.0f))
-			.BorderColor(bDanger
-				? Orange.CopyWithNewOpacity(0.7f)
-				: FLinearColor(0.16f, 0.32f, 0.42f, 0.52f))
-			.HoverBorderColor(FLinearColor(0.36f, 0.92f, 1.0f, 1.0f))
-			.Highlighted_Lambda([WeakButton]()
-			{
-				const TSharedPtr<SButton> Pinned = WeakButton.Pin();
-				return Pinned.IsValid() && Pinned->IsHovered();
-			})
-			.BorderWidth(0.9f)
-			.Padding(FMargin(2.0f))
-			[
-				Button
-			]
-		];
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+		[SNew(STextBlock).Text(FText::FromString(TEXT("\u2197"))).Font(UiFont(20)).ColorAndOpacity(bPrimary ? Ink : Brand)]);
+	if (OutButton) *OutButton = Button;
+	return SNew(SBox).HeightOverride(Height)
+	[
+		SNew(SFlickMainMenuFrame)
+		.StartColor(bPrimary ? Brand : Panel).EndColor(bPrimary ? Brand : Panel)
+		.HoverStartColor(bPrimary ? FMath::Lerp(Brand, Paper, 0.16f) : PanelRaised).HoverEndColor(bPrimary ? FMath::Lerp(Brand, Paper, 0.16f) : PanelRaised)
+		.BorderColor(bPrimary ? Brand : Hairline).HoverBorderColor(bDanger ? Orange : Brand)
+		.Highlighted_Lambda([WeakButton]()
+		{
+			const TSharedPtr<SButton> Pinned = WeakButton.Pin();
+			return Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus());
+		})
+		.BorderWidth(1.0f).Padding(FMargin(1.0f))[Button]
+	];
 }
 
 TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
@@ -8424,7 +8333,7 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 				[
 					SNew(SBorder)
 					.BorderImage(WhiteBrush())
-					.BorderBackgroundColor(bPrimary ? FLinearColor::White : bDanger ? Orange : Cyan)
+					.BorderBackgroundColor(bPrimary ? Ink : bDanger ? Orange : Brand)
 				]
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 10.0f, 0.0f)
@@ -8435,7 +8344,7 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 					.Text(FText::FromString(Icon))
 					.Font(UiFont(11, true))
 					.Justification(ETextJustify::Center)
-					.ColorAndOpacity(bDanger ? Orange : bPrimary ? FLinearColor::White : Cyan)
+					.ColorAndOpacity(bDanger ? Orange : bPrimary ? Ink : Brand)
 				]
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
@@ -8443,7 +8352,7 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 				SNew(STextBlock)
 				.Text(FText::FromString(Label))
 				.Font(UiFont(15, true))
-				.ColorAndOpacity(FLinearColor::White)
+				.ColorAndOpacity(bPrimary ? Ink : Paper)
 			]
 		];
 	if (OutButton)
@@ -8469,25 +8378,23 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 				if (bPrimary)
 				{
 					return bActive
-						? FLinearColor(0.0f, 0.13f, 0.2f, 0.96f)
-						: FLinearColor(0.002f, 0.045f, 0.075f, 0.86f);
+						? FMath::Lerp(Brand, Paper, 0.16f) : Brand;
 				}
 				return bActive
-					? FLinearColor(0.012f, 0.064f, 0.094f, 0.92f)
-					: FLinearColor(0.004f, 0.014f, 0.024f, 0.72f);
+					? PanelRaised : Panel;
 			})
 			.AccentColor_Lambda([WeakButton, bPrimary, bDanger]()
 			{
 				const TSharedPtr<SButton> PinnedButton = WeakButton.Pin();
 				if (PinnedButton.IsValid() && (PinnedButton->HasKeyboardFocus() || PinnedButton->IsHovered()))
 				{
-					return FLinearColor::White;
+					return Brand;
 				}
-				return bPrimary ? Cyan : bDanger ? Orange : Hairline;
+				return bPrimary ? Brand : bDanger ? Orange : Hairline;
 			})
 			.CutSize(8.0f)
-			.BorderWidth(bPrimary ? 2.0f : 1.0f)
-			.Padding(FMargin(bPrimary ? 2.0f : 1.0f))
+			.BorderWidth(1.0f)
+			.Padding(FMargin(1.0f))
 			[
 				Button
 			]
@@ -8497,12 +8404,12 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 TSharedRef<SWidget> SFlickGameLayer::MakeSectionLabel(const FString& Label) const
 {
 	return SNew(SFlickAngularBorder)
-		.BackgroundColor(FLinearColor(0.002f, 0.01f, 0.019f, 0.92f))
-		.AccentColor(Cyan.CopyWithNewOpacity(0.76f))
+		.BackgroundColor(PanelRaised)
+		.AccentColor(Brand)
 		.CutSize(7.0f)
 		.Padding(FMargin(14.0f, 8.0f))
 		[
-			SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(12, true)).ColorAndOpacity(Cyan)
+			SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(12, true)).ColorAndOpacity(Brand)
 		];
 }
 
@@ -8527,7 +8434,7 @@ TSharedRef<SWidget> SFlickGameLayer::MakeToggleRow(
 					[
 						SNew(STextBlock)
 						.Text_Lambda([State]() { return FText::FromString(State.Get() == ECheckBoxState::Checked ? TEXT("ON") : TEXT("OFF")); })
-						.Font(UiFont(8, true)).ColorAndOpacity(FLinearColor::White)
+						.Font(UiFont(10, true)).ColorAndOpacity_Lambda([State]() { return State.Get() == ECheckBoxState::Checked ? Ink : Paper; })
 					]
 				]
 			]
@@ -8551,8 +8458,9 @@ TSharedRef<SWidget> SFlickGameLayer::MakeSliderRow(
 					SNew(SBox).HeightOverride(6.0f)
 					[
 						SNew(SProgressBar)
+						.Style(&ShotClockBarStyle)
 						.Percent_Lambda([Value]() { return TOptional<float>(Value.Get()); })
-						.FillColorAndOpacity(Cyan)
+						.FillColorAndOpacity(Brand)
 					]
 				]
 				+ SOverlay::Slot()
@@ -8564,7 +8472,7 @@ TSharedRef<SWidget> SFlickGameLayer::MakeSliderRow(
 			[
 				SNew(STextBlock)
 				.Text_Lambda([Value]() { return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Value.Get() * 100.0f))); })
-				.Font(UiFont(11, true)).ColorAndOpacity(Cyan)
+				.Font(UiFont(11, true)).ColorAndOpacity(Brand)
 			]
 		];
 }
@@ -8579,9 +8487,9 @@ TSharedRef<SWidget> SFlickGameLayer::MakeCycleRow(
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(13, true)).ColorAndOpacity(FLinearColor::White)]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(36.0f).HeightOverride(34.0f)[SNew(SButton).ButtonStyle(&MenuButtonStyle).ContentPadding(0.0f).OnClicked(Previous)[SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(13, true))]]]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(154.0f)[SNew(STextBlock).Text(Value).Font(UiFont(12, true)).Justification(ETextJustify::Center).ColorAndOpacity(Cyan)]]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(36.0f).HeightOverride(34.0f)[SNew(SButton).ButtonStyle(&MenuButtonStyle).ContentPadding(0.0f).OnClicked(Next)[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(13, true))]]]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(36.0f).HeightOverride(34.0f)[SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).ContentPadding(0.0f).OnClicked(Previous)[SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(13, true)).ColorAndOpacity(Paper).Justification(ETextJustify::Center)]]]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(154.0f)[SNew(STextBlock).Text(Value).Font(UiFont(12, true)).Justification(ETextJustify::Center).ColorAndOpacity(Brand)]]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(36.0f).HeightOverride(34.0f)[SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).ContentPadding(0.0f).OnClicked(Next)[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(13, true)).ColorAndOpacity(Paper).Justification(ETextJustify::Center)]]]
 		];
 }
 
@@ -8593,13 +8501,32 @@ EVisibility SFlickGameLayer::GetScreenVisibility(const EFlickFrontendScreen Scre
 		return Screen == EFlickFrontendScreen::ClassSelect
 			? EVisibility::Visible : EVisibility::Collapsed;
 	}
-	return GameMode.IsValid() && GameMode->GetFrontendScreen() == Screen ? EVisibility::Visible : EVisibility::Collapsed;
+	if (!GameMode.IsValid())
+	{
+		return EVisibility::Collapsed;
+	}
+	const EFlickFrontendScreen CurrentScreen = GameMode->GetFrontendScreen();
+	if (CurrentScreen == Screen)
+	{
+		return EVisibility::Visible;
+	}
+	if (CurrentScreen == EFlickFrontendScreen::Settings
+		&& GameMode->GetSettingsReturnScreen() == Screen
+		&& Screen != EFlickFrontendScreen::Paused)
+	{
+		return EVisibility::HitTestInvisible;
+	}
+	return EVisibility::Collapsed;
 }
 
 EVisibility SFlickGameLayer::GetMatchHudVisibility() const
 {
 	if (GameMode.IsValid())
 	{
+		if (GameMode->IsCinematicReplayActive())
+		{
+			return EVisibility::Collapsed;
+		}
 		const EFlickFrontendScreen Screen = GameMode->GetFrontendScreen();
 		return Screen == EFlickFrontendScreen::Playing || Screen == EFlickFrontendScreen::Paused
 			? EVisibility::SelfHitTestInvisible
@@ -8851,6 +8778,10 @@ FText SFlickGameLayer::GetMatchStatusText() const
 {
 	const AFlickGameState* State = GetScoreboardGameState();
 	if (!State) return FText::GetEmpty();
+	if (GameMode.IsValid() && GameMode->IsCinematicReplayActive())
+	{
+		return FText::FromString(TEXT("ROUND-WINNING SHOT"));
+	}
 	if (GameMode.IsValid() && GameMode->IsTrainingBotMatch())
 	{
 		if (State->MatchPhase == EFlickMatchPhase::RoundOver)

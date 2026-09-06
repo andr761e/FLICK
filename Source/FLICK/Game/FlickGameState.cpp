@@ -38,6 +38,7 @@ void AFlickGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AFlickGameState, DramaticEventSerial);
 	DOREPLIFETIME(AFlickGameState, DramaticEventDuration);
 	DOREPLIFETIME(AFlickGameState, DramaticEventEndServerTime);
+	DOREPLIFETIME(AFlickGameState, AccoladeFeedEvents);
 	DOREPLIFETIME(AFlickGameState, bShotClockActive);
 	DOREPLIFETIME(AFlickGameState, ShotClockDuration);
 	DOREPLIFETIME(AFlickGameState, ShotClockEndServerTime);
@@ -113,6 +114,7 @@ void AFlickGameState::ResetRoundState()
 	KickoffShotsLocked = 0;
 	KickoffShotsRequired = 0;
 	ClearDramaticEvent();
+	AccoladeFeedEvents.Reset();
 	bShotClockActive = false;
 	ShotClockEndServerTime = 0.0f;
 	bRoundAdvanceTimerActive = false;
@@ -296,6 +298,30 @@ void AFlickGameState::ClearDramaticEvent()
 	ForceNetUpdate();
 }
 
+void AFlickGameState::ShowAccolade(
+	const EFlickAccolade Accolade,
+	const EFlickTeam Team,
+	const int32 BonusPoints)
+{
+	if (!HasAuthority() || Accolade == EFlickAccolade::Count)
+	{
+		return;
+	}
+	const int32 NextSerial = AccoladeFeedEvents.IsEmpty()
+		? 1
+		: AccoladeFeedEvents.Last().Serial + 1;
+	FFlickAccoladeFeedEvent& Event = AccoladeFeedEvents.AddDefaulted_GetRef();
+	Event.Accolade = Accolade;
+	Event.Team = Team;
+	Event.BonusPoints = FMath::Max(0, BonusPoints);
+	Event.Serial = NextSerial;
+	if (AccoladeFeedEvents.Num() > 16)
+	{
+		AccoladeFeedEvents.RemoveAt(0, AccoladeFeedEvents.Num() - 16);
+	}
+	ForceNetUpdate();
+}
+
 float AFlickGameState::GetDramaticEventTimeRemaining() const
 {
 	return DramaticEvent == EFlickDramaticEvent::None
@@ -358,6 +384,7 @@ void AFlickGameState::InitializePlayerMatchStats(const int32 InPlayersPerTeam)
 			FFlickPlayerMatchStats& Stats = PlayerMatchStats.AddDefaulted_GetRef();
 			Stats.Team = Team;
 			Stats.PlayerSlot = PlayerSlot;
+			Stats.AccoladeCounts.Init(0, FlickAccoladeCount);
 		}
 	}
 	Player1LastShootingPlayerSlot = 0;
@@ -425,6 +452,32 @@ void AFlickGameState::RecordPlayerDoubleKnockout(const EFlickTeam Team, const in
 	{
 		++Stats->DoubleKnockouts;
 		ForceNetUpdate();
+	}
+}
+
+void AFlickGameState::RecordPlayerAccolade(
+	const EFlickTeam Team,
+	const int32 PlayerSlot,
+	const EFlickAccolade Accolade,
+	const int32 BonusPoints)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	if (FFlickPlayerMatchStats* Stats = FindMutablePlayerMatchStats(Team, PlayerSlot))
+	{
+		if (Stats->AccoladeCounts.Num() != FlickAccoladeCount)
+		{
+			Stats->AccoladeCounts.SetNumZeroed(FlickAccoladeCount);
+		}
+		const int32 AccoladeIndex = static_cast<int32>(Accolade);
+		if (Stats->AccoladeCounts.IsValidIndex(AccoladeIndex))
+		{
+			++Stats->AccoladeCounts[AccoladeIndex];
+			Stats->Score += FMath::Max(0, BonusPoints);
+			ForceNetUpdate();
+		}
 	}
 }
 

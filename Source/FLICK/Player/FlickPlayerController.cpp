@@ -87,6 +87,8 @@ void AFlickPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Gamepad_DPad_Right, IE_Pressed, this, &AFlickPlayerController::HandleNextPiecePressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationUpPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationDownPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(EKeys::Gamepad_RightThumbstick, IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AFlickPlayerController::HandleScoreboardPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::Tab, IE_Released, this, &AFlickPlayerController::HandleScoreboardReleased).bExecuteWhenPaused = true;
 }
@@ -136,6 +138,7 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 		}
 		NetworkGameplayElapsed = 0.0f;
 		bScoreboardVisible = false;
+		bGamepadElevationInputLatched = false;
 		ClearAiming();
 		ClearGamepadFocus();
 		bShowMouseCursor = true;
@@ -248,7 +251,10 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 	}
 	else if (bUsingGamepad)
 	{
-		RefreshGamepadFocus();
+		if (!bGamepadCameraInputActive)
+		{
+			RefreshGamepadFocus();
+		}
 		CurrentMouseCursor = EMouseCursor::Default;
 	}
 	else
@@ -298,6 +304,7 @@ void AFlickPlayerController::UpdateCareerStatsTracking(const AFlickGameState* Fl
 		MatchStats->Knockouts,
 		MatchStats->DoubleKnockouts,
 		MatchStats->Shots,
+		MatchStats->AccoladeCounts,
 		bWon,
 		FlickGameState->bDraw,
 		FlickGameState->ActiveMatchVariant,
@@ -510,6 +517,36 @@ void AFlickPlayerController::HandleCameraElevationDownPressed()
 	AdjustLocalCameraElevation(-1);
 }
 
+void AFlickPlayerController::HandleCameraResetPressed()
+{
+	AFlickGameMode* FlickGameMode = GetFlickGameMode();
+	if (!IsGameplayActive()
+		|| !FlickGameMode
+		|| !FlickGameMode->CanChangeCameraView()
+		|| FlickGameMode->IsCinematicReplayActive())
+	{
+		return;
+	}
+
+	EFlickTeam ViewTeam = GetLocalTeam();
+	if (ViewTeam == EFlickTeam::None)
+	{
+		if (const AFlickGameState* FlickGameState = GetFlickGameState())
+		{
+			ViewTeam = FlickGameState->CurrentTeam;
+		}
+	}
+
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
+	{
+		ClearHoveredPiece();
+		ClearGamepadFocus();
+		CameraPawn->ResetGameplayView(
+			ViewTeam == EFlickTeam::Player2 ? 2 : 0,
+			!FlickGameMode->IsTrainingEditMode());
+	}
+}
+
 void AFlickPlayerController::HandleScoreboardPressed()
 {
 	const AFlickGameMode* FlickGameMode = GetFlickGameMode();
@@ -524,24 +561,12 @@ void AFlickPlayerController::HandleScoreboardReleased()
 
 void AFlickPlayerController::HandleSecondaryPressed()
 {
-	AFlickGameMode* FlickGameMode = GetFlickGameMode();
-	if (FlickGameMode
-		&& FlickGameMode->IsTrainingEditMode()
-		&& FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing)
+	// Right click is deliberately scoped to cancelling a prepared mouse shot.
+	// It must not double as pause or camera input.
+	if (bAimingShot)
 	{
-		if (TrainingDraggedPiece)
-		{
-			FlickGameMode->FinishTrainingPuckMove(TrainingDraggedPiece);
-			TrainingDraggedPiece = nullptr;
-		}
-		else if (AFlickPiece* HitPiece = FindPieceUnderCursor())
-		{
-			ClearHoveredPiece();
-			FlickGameMode->RemoveTrainingPuck(HitPiece);
-		}
-		return;
+		ClearAiming();
 	}
-	HandleCancelPressed();
 }
 
 void AFlickPlayerController::HandleCancelPressed()
@@ -1442,13 +1467,16 @@ void AFlickPlayerController::ApplyTrustedRankedUpdateFromServer(const FFlickRati
 
 void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 {
+	bGamepadCameraInputActive = false;
 	if (DeltaSeconds <= 0.0f || !IsGameplayActive())
 	{
 		return;
 	}
 
+	const AFlickGameMode* FlickGameMode = GetFlickGameMode();
 	const AFlickGameState* FlickGameState = GetFlickGameState();
 	if (!FlickGameState
+		|| (FlickGameMode && FlickGameMode->IsCinematicReplayActive())
 		|| (FlickGameState->MatchPhase != EFlickMatchPhase::Aiming
 			&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning
 			&& FlickGameState->MatchPhase != EFlickMatchPhase::ResolvingPhysics))
@@ -1460,20 +1488,45 @@ void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 	const bool bKeyboardClockwise = IsInputKeyDown(EKeys::E);
 	const bool bGamepadCounterClockwise = IsInputKeyDown(EKeys::Gamepad_DPad_Up);
 	const bool bGamepadClockwise = IsInputKeyDown(EKeys::Gamepad_DPad_Down);
-	const float Direction =
+	float Direction =
 		(bKeyboardCounterClockwise || bGamepadCounterClockwise ? 1.0f : 0.0f)
 		- (bKeyboardClockwise || bGamepadClockwise ? 1.0f : 0.0f);
-	if (FMath::IsNearlyZero(Direction))
-	{
-		return;
-	}
 
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
 	{
-		bUsingGamepad = bGamepadCounterClockwise || bGamepadClockwise;
-		ClearHoveredPiece();
-		ClearGamepadFocus();
-		CameraPawn->RotateGameplayOrbit(Direction, DeltaSeconds);
+		const float RightStickX = GetInputAnalogKeyState(EKeys::Gamepad_RightX);
+		const float RightStickY = GetInputAnalogKeyState(EKeys::Gamepad_RightY);
+		if (!bAimingShot && FMath::Abs(RightStickX) > GamepadCameraDeadZone)
+		{
+			Direction += RightStickX;
+			bGamepadCameraInputActive = true;
+			bUsingGamepad = true;
+		}
+		if (!bAimingShot && FMath::Abs(RightStickY) > GamepadCameraDeadZone)
+		{
+			if (!bGamepadElevationInputLatched)
+			{
+				CameraPawn->AdjustGameplayElevation(RightStickY > 0.0f ? 1 : -1);
+				bGamepadElevationInputLatched = true;
+			}
+			bGamepadCameraInputActive = true;
+			bUsingGamepad = true;
+		}
+		else if (FMath::Abs(RightStickY) < GamepadCameraDeadZone * 0.65f)
+		{
+			bGamepadElevationInputLatched = false;
+		}
+
+		if (!FMath::IsNearlyZero(Direction))
+		{
+			bUsingGamepad = bGamepadCameraInputActive || bGamepadCounterClockwise || bGamepadClockwise;
+			CameraPawn->RotateGameplayOrbit(FMath::Clamp(Direction, -1.0f, 1.0f), DeltaSeconds);
+		}
+		if (bGamepadCameraInputActive || !FMath::IsNearlyZero(Direction))
+		{
+			ClearHoveredPiece();
+			ClearGamepadFocus();
+		}
 	}
 }
 

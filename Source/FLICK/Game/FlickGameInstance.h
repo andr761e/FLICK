@@ -64,7 +64,13 @@ struct FFlickProfileStats
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Profile")
 	int32 Shots = 0;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Profile")
+	TArray<int32> AccoladeCounts;
+
 	void RecordMatch(int32 MatchPoints, int32 MatchKnockouts, int32 MatchDoubleKnockouts, int32 MatchShots, bool bWon);
+	void RecordAccolades(const TArray<int32>& MatchAccoladeCounts);
+	int32 GetTotalAccolades() const;
+	int32 GetAccoladeCount(EFlickAccolade Accolade) const;
 };
 
 UCLASS()
@@ -111,6 +117,7 @@ public:
 		int32 Knockouts,
 		int32 DoubleKnockouts,
 		int32 Shots,
+		const TArray<int32>& AccoladeCounts,
 		bool bWon,
 		bool bDraw,
 		EFlickMatchVariant Variant,
