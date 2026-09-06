@@ -90,6 +90,12 @@ struct FFlickBotDifficultySettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "3.0"))
 	float DecisionNoise = 0.32f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float DividerAwareness = 0.45f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float BankShotSkill = 0.12f;
 };
 
 UCLASS()

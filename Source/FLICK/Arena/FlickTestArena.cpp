@@ -416,6 +416,39 @@ FVector AFlickTestArena::GetDividerLabelLocation(const int32 Index) const
 		Center - Center.GetSafeNormal() * (DividerThickness + 30.0f), SurfaceZ + 5.0f));
 }
 
+FVector AFlickTestArena::GetDividerWorldCenter(const int32 Index) const
+{
+	if (!DividerCenters.IsValidIndex(Index))
+	{
+		return GetActorLocation();
+	}
+	return GetActorTransform().TransformPosition(FVector(DividerCenters[Index], SurfaceZ));
+}
+
+FVector AFlickTestArena::GetSwitchWorldCenter(const int32 Index) const
+{
+	const FVector2D Center = GetZoneLocalCenter(Index);
+	return GetActorTransform().TransformPosition(FVector(Center, SurfaceZ));
+}
+
+FVector2D AFlickTestArena::GetDividerWorldTangent(const int32 Index) const
+{
+	if (!DividerAngles.IsValidIndex(Index))
+	{
+		return FVector2D(1.0f, 0.0f);
+	}
+	const FVector LocalTangent(FMath::Cos(DividerAngles[Index]), FMath::Sin(DividerAngles[Index]), 0.0f);
+	const FVector WorldTangent = GetActorTransform().TransformVectorNoScale(LocalTangent).GetSafeNormal();
+	return FVector2D(WorldTangent.X, WorldTangent.Y);
+}
+
+float AFlickTestArena::GetDividerLength(const int32 Index) const
+{
+	return RandomizedDividerLengths.IsValidIndex(Index)
+		? RandomizedDividerLengths[Index]
+		: DividerLength;
+}
+
 FString AFlickTestArena::GetDividerLabel(const int32 DividerIndex) const
 {
 	static const TCHAR* Labels[8] =

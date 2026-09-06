@@ -63,6 +63,48 @@ bool FFlickBotShotPlannerBlockerAwarenessTest::RunTest(const FString& Parameters
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFlickBotShotPlannerDividerAwarenessTest,
+	"FLICK.Bot.ShotPlanner.DividerAwareness",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickBotShotPlannerDividerAwarenessTest::RunTest(const FString& Parameters)
+{
+	TArray<FFlickBotPieceState> Pieces = {
+		{10, EFlickTeam::Player2, FVector2D(0.0f, 300.0f), 40.0f},
+		{11, EFlickTeam::Player2, FVector2D(400.0f, 300.0f), 40.0f},
+		{20, EFlickTeam::Player1, FVector2D(0.0f, -220.0f), 40.0f}
+	};
+	FFlickBotDividerState RaisedDivider;
+	RaisedDivider.Center = FVector2D(0.0f, 30.0f);
+	RaisedDivider.Tangent = FVector2D(1.0f, 0.0f);
+	RaisedDivider.HalfLength = 105.0f;
+	RaisedDivider.HalfThickness = 9.0f;
+	RaisedDivider.bRaised = true;
+
+	FFlickBotShotTuning UnawareTuning;
+	UnawareTuning.AimErrorDegrees = 0.0f;
+	UnawareTuning.PowerVariation = 0.0f;
+	UnawareTuning.DecisionNoise = 0.0f;
+	UnawareTuning.DividerAwareness = 0.0f;
+	UnawareTuning.BankShotSkill = 0.0f;
+	UnawareTuning.Dividers.Add(RaisedDivider);
+	FRandomStream UnawareRandom(23);
+	const FFlickBotShotPlan UnawarePlan = FlickBotShotPlanner::PlanShot(
+		Pieces, EFlickTeam::Player2, UnawareTuning, UnawareRandom);
+	TestEqual(TEXT("An unaware bot prefers the otherwise strongest blocked lane"), UnawarePlan.ShooterPieceId, 10);
+
+	FFlickBotShotTuning ExpertTuning = UnawareTuning;
+	ExpertTuning.DividerAwareness = 1.0f;
+	ExpertTuning.BankShotSkill = 1.0f;
+	FRandomStream ExpertRandom(23);
+	const FFlickBotShotPlan ExpertPlan = FlickBotShotPlanner::PlanShot(
+		Pieces, EFlickTeam::Player2, ExpertTuning, ExpertRandom);
+	TestTrue(TEXT("An expert bot rejects the divider-blocked approach"), ExpertPlan.IsValid());
+	TestEqual(TEXT("An expert bot selects the clear shooter"), ExpertPlan.ShooterPieceId, 11);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFlickBotShotPlannerBobTest,
 	"FLICK.Bot.ShotPlanner.BobOwnColor",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

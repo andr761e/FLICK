@@ -40,6 +40,11 @@ public:
 	bool FindDividerIndex(const UPrimitiveComponent* Component, int32& OutDividerIndex) const;
 	FVector GetSwitchLabelLocation(int32 Index) const;
 	FVector GetDividerLabelLocation(int32 Index) const;
+	FVector GetDividerWorldCenter(int32 Index) const;
+	FVector GetSwitchWorldCenter(int32 Index) const;
+	FVector2D GetDividerWorldTangent(int32 Index) const;
+	float GetDividerLength(int32 Index) const;
+	float GetDividerCollisionThickness() const { return DividerThickness; }
 	int32 GetMechanismCount() const { return FMath::Clamp(ActiveMechanismCount, 1, MechanismCount); }
 	FString GetDividerLabel(int32 DividerIndex) const;
 	FLinearColor GetMechanismColor(int32 MechanismIndex) const;

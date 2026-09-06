@@ -7,14 +7,8 @@ Byg development build:
 Åben dobbelt spil
 .\play-flick-network.cmd
 
-#Controller test
-.\play-flick.cmd
+Currently we are testing what the final arenas should look like in the test arena.
+Once that is perfected, we will add 
 
 Things to implement;
-Okay, the usage ran out again. Finish the UI change you were implementing above. Here are some things i especially noticed:
-- The player cards at the top of the screen in-game in the test game with the dividers take up way too much space on the screen. You can barerly see what's happening on the other side of the board. So keep their contents, but make it take up less space. 
-- Clicking "Profile" in the main menu still produces an awkwards transition. And the Profile display does not match the rest of the UI system currently 
-- If you enter "Settings" in-game, the player cards at the top are placed above settings. This is of course a mistake
-- Remove all the text on the screen related to the dividers. Its just distracting. Also, make the dot inside the circle (the switch itself) smaller
-- Remove the "Current ruleset - Best of five" box from settings.  
-
+- Better visuals

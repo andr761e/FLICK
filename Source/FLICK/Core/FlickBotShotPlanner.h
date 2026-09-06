@@ -11,6 +11,16 @@ struct FFlickBotPieceState
 	float Radius = 0.0f;
 };
 
+struct FFlickBotDividerState
+{
+	FVector2D Center = FVector2D::ZeroVector;
+	FVector2D Tangent = FVector2D(1.0f, 0.0f);
+	FVector2D SwitchPosition = FVector2D::ZeroVector;
+	float HalfLength = 70.0f;
+	float HalfThickness = 10.0f;
+	bool bRaised = false;
+};
+
 struct FFlickBotShotTuning
 {
 	float ArenaRadius = 650.0f;
@@ -19,6 +29,9 @@ struct FFlickBotShotTuning
 	float AimErrorDegrees = 1.35f;
 	float PowerVariation = 0.025f;
 	float DecisionNoise = 0.015f;
+	float DividerAwareness = 1.0f;
+	float BankShotSkill = 0.8f;
+	TArray<FFlickBotDividerState> Dividers;
 };
 
 struct FFlickBotShotPlan

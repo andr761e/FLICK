@@ -72,12 +72,14 @@ AFlickGameMode::AFlickGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	TrainingBotEasySettings.ThinkDelay = 1.35f;
-	TrainingBotEasySettings.MinimumPower = 0.42f;
-	TrainingBotEasySettings.MaximumPower = 0.82f;
-	TrainingBotEasySettings.AimErrorDegrees = 7.0f;
-	TrainingBotEasySettings.PowerVariation = 0.11f;
-	TrainingBotEasySettings.DecisionNoise = 1.1f;
+	TrainingBotEasySettings.ThinkDelay = 1.65f;
+	TrainingBotEasySettings.MinimumPower = 0.34f;
+	TrainingBotEasySettings.MaximumPower = 0.78f;
+	TrainingBotEasySettings.AimErrorDegrees = 12.0f;
+	TrainingBotEasySettings.PowerVariation = 0.17f;
+	TrainingBotEasySettings.DecisionNoise = 1.9f;
+	TrainingBotEasySettings.DividerAwareness = 0.05f;
+	TrainingBotEasySettings.BankShotSkill = 0.0f;
 
 	TrainingBotNormalSettings.ThinkDelay = 1.1f;
 	TrainingBotNormalSettings.MinimumPower = 0.48f;
@@ -85,6 +87,8 @@ AFlickGameMode::AFlickGameMode()
 	TrainingBotNormalSettings.AimErrorDegrees = 3.0f;
 	TrainingBotNormalSettings.PowerVariation = 0.055f;
 	TrainingBotNormalSettings.DecisionNoise = 0.32f;
+	TrainingBotNormalSettings.DividerAwareness = 0.42f;
+	TrainingBotNormalSettings.BankShotSkill = 0.1f;
 
 	TrainingBotHardSettings.ThinkDelay = 0.9f;
 	TrainingBotHardSettings.MinimumPower = 0.52f;
@@ -92,13 +96,17 @@ AFlickGameMode::AFlickGameMode()
 	TrainingBotHardSettings.AimErrorDegrees = 1.1f;
 	TrainingBotHardSettings.PowerVariation = 0.024f;
 	TrainingBotHardSettings.DecisionNoise = 0.08f;
+	TrainingBotHardSettings.DividerAwareness = 0.82f;
+	TrainingBotHardSettings.BankShotSkill = 0.52f;
 
 	TrainingBotExpertSettings.ThinkDelay = 0.72f;
 	TrainingBotExpertSettings.MinimumPower = 0.55f;
 	TrainingBotExpertSettings.MaximumPower = 0.98f;
-	TrainingBotExpertSettings.AimErrorDegrees = 0.3f;
-	TrainingBotExpertSettings.PowerVariation = 0.008f;
-	TrainingBotExpertSettings.DecisionNoise = 0.015f;
+	TrainingBotExpertSettings.AimErrorDegrees = 0.12f;
+	TrainingBotExpertSettings.PowerVariation = 0.004f;
+	TrainingBotExpertSettings.DecisionNoise = 0.004f;
+	TrainingBotExpertSettings.DividerAwareness = 1.0f;
+	TrainingBotExpertSettings.BankShotSkill = 1.0f;
 
 	GameStateClass = AFlickGameState::StaticClass();
 	PlayerControllerClass = AFlickPlayerController::StaticClass();
@@ -1675,6 +1683,24 @@ bool AFlickGameMode::TryExecuteTrainingBotShot()
 	BotTuning.AimErrorDegrees = FMath::Max(0.0f, DifficultySettings.AimErrorDegrees);
 	BotTuning.PowerVariation = FMath::Max(0.0f, DifficultySettings.PowerVariation);
 	BotTuning.DecisionNoise = FMath::Max(0.0f, DifficultySettings.DecisionNoise);
+	BotTuning.DividerAwareness = FMath::Clamp(DifficultySettings.DividerAwareness, 0.0f, 1.0f);
+	BotTuning.BankShotSkill = FMath::Clamp(DifficultySettings.BankShotSkill, 0.0f, 1.0f);
+	if (bTestArenaMode && TestArenaActor && IsValid(TestArenaActor))
+	{
+		BotTuning.Dividers.Reserve(TestArenaActor->GetMechanismCount());
+		for (int32 DividerIndex = 0; DividerIndex < TestArenaActor->GetMechanismCount(); ++DividerIndex)
+		{
+			const FVector DividerCenter = TestArenaActor->GetDividerWorldCenter(DividerIndex);
+			const FVector SwitchCenter = TestArenaActor->GetSwitchWorldCenter(DividerIndex);
+			FFlickBotDividerState& Divider = BotTuning.Dividers.AddDefaulted_GetRef();
+			Divider.Center = FVector2D(DividerCenter.X, DividerCenter.Y);
+			Divider.Tangent = TestArenaActor->GetDividerWorldTangent(DividerIndex);
+			Divider.SwitchPosition = FVector2D(SwitchCenter.X, SwitchCenter.Y);
+			Divider.HalfLength = TestArenaActor->GetDividerLength(DividerIndex) * 0.5f;
+			Divider.HalfThickness = TestArenaActor->GetDividerCollisionThickness() * 0.5f;
+			Divider.bRaised = TestArenaActor->IsDividerRaised(DividerIndex);
+		}
+	}
 	FFlickBotShotPlan Plan;
 	if (IsBobMode())
 	{
