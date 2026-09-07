@@ -86,10 +86,6 @@ public:
 private:
 	void HandlePrimaryPressed();
 	void HandlePrimaryReleased();
-	void HandleGamepadPrimaryPressed();
-	void HandleGamepadPrimaryReleased();
-	void HandlePreviousPiecePressed();
-	void HandleNextPiecePressed();
 	void HandleCameraElevationUpPressed();
 	void HandleCameraElevationDownPressed();
 	void HandleCameraResetPressed();
@@ -104,19 +100,10 @@ private:
 	void HandleTrainingClearPressed();
 	void HandleTrainingRemovePressed();
 	void UpdateAimFromCursor();
-	void UpdateAimFromGamepad();
 	void UpdatePredictedContact();
 	void UpdateHoveredPiece();
 	void ClearHoveredPiece();
-	void RefreshGamepadFocus();
-	void CycleGamepadPiece(int32 Direction);
-	void SetGamepadFocusedPiece(AFlickPiece* Piece);
-	void ClearGamepadFocus();
 	void UpdateCareerStatsTracking(const AFlickGameState* FlickGameState);
-#if !UE_BUILD_SHIPPING
-	void BeginGamepadSmokeTest();
-	void CompleteGamepadSmokeTest();
-#endif
 	void DrawAimDebug() const;
 	bool IsGameplayActive() const;
 	float GetArenaSurfaceZ() const;
@@ -244,9 +231,6 @@ private:
 	TObjectPtr<AFlickPiece> PredictedContactPiece;
 
 	UPROPERTY()
-	TObjectPtr<AFlickPiece> GamepadFocusedPiece;
-
-	UPROPERTY()
 	TObjectPtr<AFlickPiece> TrainingDraggedPiece;
 
 	FFlickLaunchResult CurrentLaunchResult;
@@ -256,10 +240,6 @@ private:
 	bool bAimingShot = false;
 	bool bHasAimCursorPoint = false;
 	bool bHasPredictedContact = false;
-	bool bGamepadAiming = false;
-	bool bUsingGamepad = false;
-	bool bGamepadCameraInputActive = false;
-	bool bGamepadElevationInputLatched = false;
 	bool bScoreboardVisible = false;
 	bool bInitializedNetworkCamera = false;
 	bool bNetworkAutoShotRequested = false;
@@ -270,15 +250,4 @@ private:
 	bool bNetworkAutoClassSubmitted = false;
 	bool bCareerStatsRecordedForCurrentSeries = false;
 	float NetworkGameplayElapsed = 0.0f;
-#if !UE_BUILD_SHIPPING
-	bool bUseGamepadAimOverride = false;
-	bool bGamepadSmokeAimWasValid = false;
-	FVector2D GamepadAimOverride = FVector2D::ZeroVector;
-#endif
-
-	UPROPERTY(EditAnywhere, Category = "FLICK|Controller", meta = (ClampMin = "0.0", ClampMax = "0.9"))
-	float GamepadAimDeadZone = 0.18f;
-
-	UPROPERTY(EditAnywhere, Category = "FLICK|Controller|Camera", meta = (ClampMin = "0.05", ClampMax = "1.0"))
-	float GamepadCameraDeadZone = 0.24f;
 };

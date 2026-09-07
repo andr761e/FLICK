@@ -48,18 +48,6 @@ void AFlickPlayerController::BeginPlay()
 	bNetworkAutoShotRequested = FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkAutoShot"));
 	bNetworkAutoReadyRequested = FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkAutoReady"));
 
-#if !UE_BUILD_SHIPPING
-	if (FParse::Param(FCommandLine::Get(), TEXT("FlickGamepadSmokeTest")))
-	{
-		FTimerHandle SmokeTimer;
-		GetWorldTimerManager().SetTimer(
-			SmokeTimer,
-			this,
-			&AFlickPlayerController::BeginGamepadSmokeTest,
-			1.0f,
-			false);
-	}
-#endif
 }
 
 void AFlickPlayerController::SetupInputComponent()
@@ -76,19 +64,9 @@ void AFlickPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &AFlickPlayerController::HandleTrainingTargetPuckPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::C, IE_Pressed, this, &AFlickPlayerController::HandleTrainingClearPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::Delete, IE_Pressed, this, &AFlickPlayerController::HandleTrainingRemovePressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &AFlickPlayerController::HandleGamepadPrimaryPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &AFlickPlayerController::HandleGamepadPrimaryReleased).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_FaceButton_Right, IE_Pressed, this, &AFlickPlayerController::HandleCancelPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_Special_Right, IE_Pressed, this, &AFlickPlayerController::HandleCancelPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_FaceButton_Top, IE_Pressed, this, &AFlickPlayerController::HandleRestartPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_LeftShoulder, IE_Pressed, this, &AFlickPlayerController::HandlePreviousPiecePressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_RightShoulder, IE_Pressed, this, &AFlickPlayerController::HandleNextPiecePressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_DPad_Left, IE_Pressed, this, &AFlickPlayerController::HandlePreviousPiecePressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_DPad_Right, IE_Pressed, this, &AFlickPlayerController::HandleNextPiecePressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationUpPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationDownPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Gamepad_RightThumbstick, IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AFlickPlayerController::HandleScoreboardPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::Tab, IE_Released, this, &AFlickPlayerController::HandleScoreboardReleased).bExecuteWhenPaused = true;
 }
@@ -138,9 +116,7 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 		}
 		NetworkGameplayElapsed = 0.0f;
 		bScoreboardVisible = false;
-		bGamepadElevationInputLatched = false;
 		ClearAiming();
-		ClearGamepadFocus();
 		bShowMouseCursor = true;
 		CurrentMouseCursor = EMouseCursor::Default;
 		return;
@@ -161,10 +137,8 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 		&& FlickGameMode->IsTrainingEditMode()
 		&& FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing)
 	{
-		bUsingGamepad = false;
 		bShowMouseCursor = true;
 		bScoreboardVisible = false;
-		ClearGamepadFocus();
 		if (TrainingDraggedPiece)
 		{
 			FVector CursorPoint;
@@ -217,45 +191,11 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 		}
 	}
 
-	float MouseDeltaX = 0.0f;
-	float MouseDeltaY = 0.0f;
-	GetInputMouseDelta(MouseDeltaX, MouseDeltaY);
-	if (!bGamepadAiming && (FMath::Abs(MouseDeltaX) > 0.1f || FMath::Abs(MouseDeltaY) > 0.1f))
-	{
-		bUsingGamepad = false;
-		ClearGamepadFocus();
-	}
-	const FVector2D RightStick(
-		GetInputAnalogKeyState(EKeys::Gamepad_RightX),
-		GetInputAnalogKeyState(EKeys::Gamepad_RightY));
-	if (RightStick.SizeSquared() > FMath::Square(GamepadAimDeadZone)
-		|| IsInputKeyDown(EKeys::Gamepad_LeftShoulder)
-		|| IsInputKeyDown(EKeys::Gamepad_RightShoulder))
-	{
-		bUsingGamepad = true;
-	}
-	bShowMouseCursor = !bUsingGamepad;
-
 	if (bAimingShot)
 	{
-		if (bGamepadAiming)
-		{
-			UpdateAimFromGamepad();
-		}
-		else
-		{
-			UpdateAimFromCursor();
-		}
+		UpdateAimFromCursor();
 		DrawAimDebug();
 		CurrentMouseCursor = EMouseCursor::Crosshairs;
-	}
-	else if (bUsingGamepad)
-	{
-		if (!bGamepadCameraInputActive)
-		{
-			RefreshGamepadFocus();
-		}
-		CurrentMouseCursor = EMouseCursor::Default;
 	}
 	else
 	{
@@ -328,15 +268,12 @@ void AFlickPlayerController::ClearAiming()
 	PredictedContactPiece = nullptr;
 	AimGuideDistance = 0.0f;
 	bAimingShot = false;
-	bGamepadAiming = false;
 	bHasAimCursorPoint = false;
 	bHasPredictedContact = false;
 }
 
 void AFlickPlayerController::HandlePrimaryPressed()
 {
-	bUsingGamepad = false;
-	ClearGamepadFocus();
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
 	const AFlickGameState* FlickGameState = GetFlickGameState();
 	if (!IsGameplayActive()
@@ -427,70 +364,6 @@ void AFlickPlayerController::HandlePrimaryReleased()
 	ClearAiming();
 }
 
-void AFlickPlayerController::HandleGamepadPrimaryPressed()
-{
-	AFlickGameMode* FlickGameMode = GetFlickGameMode();
-	if (!IsGameplayActive() || (FlickGameMode && FlickGameMode->IsTrainingEditMode()))
-	{
-		return;
-	}
-
-	const AFlickGameState* FlickGameState = GetFlickGameState();
-	if (FlickGameState && FlickGameState->MatchPhase == EFlickMatchPhase::RoundOver)
-	{
-		return;
-	}
-
-	bUsingGamepad = true;
-	ClearAiming();
-	RefreshGamepadFocus();
-	if (!CanSelectPieceLocally(GamepadFocusedPiece))
-	{
-		return;
-	}
-
-	SelectedPiece = GamepadFocusedPiece;
-	ClearHoveredPiece();
-	SelectedPiece->SetSelected(true);
-	bAimingShot = true;
-	bGamepadAiming = true;
-	UpdateAimFromGamepad();
-	if (FlickGameMode)
-	{
-		FlickGameMode->NotifyPieceSelected(SelectedPiece);
-	}
-}
-
-void AFlickPlayerController::HandleGamepadPrimaryReleased()
-{
-	if (!IsGameplayActive()
-		|| !bGamepadAiming || !bAimingShot || !SelectedPiece)
-	{
-		return;
-	}
-
-	UpdateAimFromGamepad();
-	if (CurrentLaunchResult.bValidShot)
-	{
-		SubmitLaunch(
-			SelectedPiece,
-			CurrentLaunchResult.Direction,
-			CurrentLaunchResult.NormalizedPower);
-	}
-	ClearAiming();
-	RefreshGamepadFocus();
-}
-
-void AFlickPlayerController::HandlePreviousPiecePressed()
-{
-	CycleGamepadPiece(-1);
-}
-
-void AFlickPlayerController::HandleNextPiecePressed()
-{
-	CycleGamepadPiece(1);
-}
-
 void AFlickPlayerController::HandleCameraElevationUpPressed()
 {
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode();
@@ -540,7 +413,6 @@ void AFlickPlayerController::HandleCameraResetPressed()
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		ClearHoveredPiece();
-		ClearGamepadFocus();
 		CameraPawn->ResetGameplayView(
 			ViewTeam == EFlickTeam::Player2 ? 2 : 0,
 			!FlickGameMode->IsTrainingEditMode());
@@ -596,6 +468,9 @@ void AFlickPlayerController::HandleCancelPressed()
 		break;
 	case EFlickFrontendScreen::ModeSelect:
 		FlickGameMode->CloseModeSelect();
+		break;
+	case EFlickFrontendScreen::PrivateMatch:
+		FlickGameMode->ClosePrivateMatchSetup();
 		break;
 	case EFlickFrontendScreen::Loadout:
 		FlickGameMode->CloseLoadout();
@@ -735,60 +610,6 @@ void AFlickPlayerController::UpdateAimFromCursor()
 	UpdatePredictedContact();
 }
 
-void AFlickPlayerController::UpdateAimFromGamepad()
-{
-	CurrentLaunchResult = FFlickLaunchResult();
-	bHasAimCursorPoint = false;
-	if (!SelectedPiece)
-	{
-		return;
-	}
-
-	FVector2D RawStick(
-		GetInputAnalogKeyState(EKeys::Gamepad_RightX),
-		GetInputAnalogKeyState(EKeys::Gamepad_RightY));
-#if !UE_BUILD_SHIPPING
-	if (bUseGamepadAimOverride)
-	{
-		RawStick = GamepadAimOverride;
-	}
-#endif
-	const float RawMagnitude = FMath::Clamp(RawStick.Size(), 0.0f, 1.0f);
-	const float SafeDeadZone = FMath::Clamp(GamepadAimDeadZone, 0.0f, 0.9f);
-	const float DragAlpha = FMath::Clamp(
-		(RawMagnitude - SafeDeadZone) / FMath::Max(1.0f - SafeDeadZone, KINDA_SMALL_NUMBER),
-		0.0f,
-		1.0f);
-
-	FVector ScreenRight = FVector(0.0f, -1.0f, 0.0f);
-	FVector ScreenUp = FVector(1.0f, 0.0f, 0.0f);
-	if (PlayerCameraManager)
-	{
-		const FRotationMatrix CameraRotation(PlayerCameraManager->GetCameraRotation());
-		ScreenRight = CameraRotation.GetUnitAxis(EAxis::Y);
-		ScreenUp = CameraRotation.GetUnitAxis(EAxis::Z);
-		ScreenRight.Z = 0.0f;
-		ScreenUp.Z = 0.0f;
-		ScreenRight.Normalize();
-		ScreenUp.Normalize();
-	}
-
-	const FVector2D StickDirection = RawStick.GetSafeNormal();
-	const FVector PullDirection = (ScreenRight * StickDirection.X + ScreenUp * StickDirection.Y).GetSafeNormal();
-	AimCursorWorldPoint = SelectedPiece->GetActorLocation()
-		+ PullDirection * GetMaxDragDistance() * DragAlpha;
-	AimCursorWorldPoint.Z = GetArenaSurfaceZ();
-	bHasAimCursorPoint = true;
-
-	CurrentLaunchResult = FlickLaunchMath::CalculateLaunch(
-		SelectedPiece->GetActorLocation(),
-		AimCursorWorldPoint,
-		GetMaxDragDistance(),
-		GetMinDragDistance(),
-		GetPowerExponent());
-	UpdatePredictedContact();
-}
-
 void AFlickPlayerController::UpdatePredictedContact()
 {
 	bHasPredictedContact = false;
@@ -864,181 +685,6 @@ void AFlickPlayerController::ClearHoveredPiece()
 	}
 	HoveredPiece = nullptr;
 }
-
-void AFlickPlayerController::RefreshGamepadFocus()
-{
-	if (!IsGameplayActive())
-	{
-		ClearGamepadFocus();
-		return;
-	}
-
-	if (!CanSelectPieceLocally(GamepadFocusedPiece))
-	{
-		GamepadFocusedPiece = nullptr;
-	}
-	if (!GamepadFocusedPiece)
-	{
-		TArray<AFlickPiece*> SelectablePieces;
-		for (TActorIterator<AFlickPiece> It(GetWorld()); It; ++It)
-		{
-			AFlickPiece* Piece = *It;
-			if (CanSelectPieceLocally(Piece))
-			{
-				SelectablePieces.Add(Piece);
-			}
-		}
-		SelectablePieces.Sort([](const AFlickPiece& A, const AFlickPiece& B)
-		{
-			return A.GetPieceId() < B.GetPieceId();
-		});
-		if (!SelectablePieces.IsEmpty())
-		{
-			GamepadFocusedPiece = SelectablePieces[0];
-		}
-	}
-
-	if (!bAimingShot && HoveredPiece != GamepadFocusedPiece)
-	{
-		ClearHoveredPiece();
-		HoveredPiece = GamepadFocusedPiece;
-		if (HoveredPiece)
-		{
-			HoveredPiece->SetHovered(true);
-		}
-	}
-}
-
-void AFlickPlayerController::CycleGamepadPiece(const int32 Direction)
-{
-	AFlickGameMode* FlickGameMode = GetFlickGameMode();
-	if (!IsGameplayActive() || bAimingShot)
-	{
-		return;
-	}
-
-	bUsingGamepad = true;
-	TArray<AFlickPiece*> SelectablePieces;
-	for (TActorIterator<AFlickPiece> It(GetWorld()); It; ++It)
-	{
-		AFlickPiece* Piece = *It;
-		if (CanSelectPieceLocally(Piece))
-		{
-			SelectablePieces.Add(Piece);
-		}
-	}
-	SelectablePieces.Sort([](const AFlickPiece& A, const AFlickPiece& B)
-	{
-		return A.GetPieceId() < B.GetPieceId();
-	});
-	if (SelectablePieces.IsEmpty())
-	{
-		ClearGamepadFocus();
-		return;
-	}
-
-	int32 CurrentIndex = SelectablePieces.IndexOfByKey(GamepadFocusedPiece.Get());
-	if (CurrentIndex == INDEX_NONE)
-	{
-		CurrentIndex = Direction >= 0 ? -1 : 0;
-	}
-	const int32 Step = Direction >= 0 ? 1 : -1;
-	const int32 NextIndex = (CurrentIndex + Step + SelectablePieces.Num()) % SelectablePieces.Num();
-	SetGamepadFocusedPiece(SelectablePieces[NextIndex]);
-	if (FlickGameMode)
-	{
-		FlickGameMode->PlayMenuSound(false);
-	}
-}
-
-void AFlickPlayerController::SetGamepadFocusedPiece(AFlickPiece* Piece)
-{
-	if (GamepadFocusedPiece == Piece && HoveredPiece == Piece)
-	{
-		return;
-	}
-	ClearHoveredPiece();
-	GamepadFocusedPiece = Piece;
-	HoveredPiece = Piece;
-	if (HoveredPiece)
-	{
-		HoveredPiece->SetHovered(true);
-	}
-}
-
-void AFlickPlayerController::ClearGamepadFocus()
-{
-	if (HoveredPiece && HoveredPiece == GamepadFocusedPiece)
-	{
-		ClearHoveredPiece();
-	}
-	GamepadFocusedPiece = nullptr;
-}
-
-#if !UE_BUILD_SHIPPING
-void AFlickPlayerController::BeginGamepadSmokeTest()
-{
-	AFlickGameMode* FlickGameMode = GetFlickGameMode();
-	if (!FlickGameMode || FlickGameMode->GetFrontendScreen() != EFlickFrontendScreen::Playing)
-	{
-		UE_LOG(LogFlick, Error, TEXT("GAMEPAD_SMOKE_TEST FAIL: gameplay was not active"));
-		if (FlickGameMode)
-		{
-			FlickGameMode->QuitGame();
-		}
-		return;
-	}
-
-	bUsingGamepad = true;
-	bUseGamepadAimOverride = true;
-	GamepadAimOverride = FVector2D(0.0f, -0.78f);
-	RefreshGamepadFocus();
-	HandleGamepadPrimaryPressed();
-	bGamepadSmokeAimWasValid = bGamepadAiming
-		&& bAimingShot
-		&& SelectedPiece
-		&& CurrentLaunchResult.bValidShot;
-
-	FTimerHandle ReleaseTimer;
-	GetWorldTimerManager().SetTimer(
-		ReleaseTimer,
-		this,
-		&AFlickPlayerController::CompleteGamepadSmokeTest,
-		0.15f,
-		false);
-}
-
-void AFlickPlayerController::CompleteGamepadSmokeTest()
-{
-	AFlickGameMode* FlickGameMode = GetFlickGameMode();
-	HandleGamepadPrimaryReleased();
-	bUseGamepadAimOverride = false;
-
-	const AFlickGameState* FlickGameState = FlickGameMode ? FlickGameMode->GetFlickGameState() : nullptr;
-	const bool bLaunchAccepted = FlickGameMode
-		&& (FlickGameMode->HasLockedKickoffShot()
-			|| (FlickGameState && FlickGameState->MatchPhase == EFlickMatchPhase::ResolvingPhysics));
-	if (bGamepadSmokeAimWasValid && bLaunchAccepted)
-	{
-		UE_LOG(LogFlick, Log, TEXT("GAMEPAD_SMOKE_TEST PASS: controller focus, analog drag, and release launched a valid puck"));
-	}
-	else
-	{
-		UE_LOG(
-			LogFlick,
-			Error,
-			TEXT("GAMEPAD_SMOKE_TEST FAIL: validAim=%d launchAccepted=%d phase=%d"),
-			bGamepadSmokeAimWasValid ? 1 : 0,
-			bLaunchAccepted ? 1 : 0,
-			FlickGameState ? static_cast<int32>(FlickGameState->MatchPhase) : -1);
-	}
-
-	if (FlickGameMode)
-	{
-		FlickGameMode->QuitGame();
-	}
-}
-#endif
 
 void AFlickPlayerController::DrawAimDebug() const
 {
@@ -1467,7 +1113,6 @@ void AFlickPlayerController::ApplyTrustedRankedUpdateFromServer(const FFlickRati
 
 void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 {
-	bGamepadCameraInputActive = false;
 	if (DeltaSeconds <= 0.0f || !IsGameplayActive())
 	{
 		return;
@@ -1484,49 +1129,15 @@ void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 		return;
 	}
 
-	const bool bKeyboardCounterClockwise = IsInputKeyDown(EKeys::Q);
-	const bool bKeyboardClockwise = IsInputKeyDown(EKeys::E);
-	const bool bGamepadCounterClockwise = IsInputKeyDown(EKeys::Gamepad_DPad_Up);
-	const bool bGamepadClockwise = IsInputKeyDown(EKeys::Gamepad_DPad_Down);
-	float Direction =
-		(bKeyboardCounterClockwise || bGamepadCounterClockwise ? 1.0f : 0.0f)
-		- (bKeyboardClockwise || bGamepadClockwise ? 1.0f : 0.0f);
+	const float Direction =
+		(IsInputKeyDown(EKeys::Q) ? 1.0f : 0.0f)
+		- (IsInputKeyDown(EKeys::E) ? 1.0f : 0.0f);
 
-	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
+		CameraPawn && !FMath::IsNearlyZero(Direction))
 	{
-		const float RightStickX = GetInputAnalogKeyState(EKeys::Gamepad_RightX);
-		const float RightStickY = GetInputAnalogKeyState(EKeys::Gamepad_RightY);
-		if (!bAimingShot && FMath::Abs(RightStickX) > GamepadCameraDeadZone)
-		{
-			Direction += RightStickX;
-			bGamepadCameraInputActive = true;
-			bUsingGamepad = true;
-		}
-		if (!bAimingShot && FMath::Abs(RightStickY) > GamepadCameraDeadZone)
-		{
-			if (!bGamepadElevationInputLatched)
-			{
-				CameraPawn->AdjustGameplayElevation(RightStickY > 0.0f ? 1 : -1);
-				bGamepadElevationInputLatched = true;
-			}
-			bGamepadCameraInputActive = true;
-			bUsingGamepad = true;
-		}
-		else if (FMath::Abs(RightStickY) < GamepadCameraDeadZone * 0.65f)
-		{
-			bGamepadElevationInputLatched = false;
-		}
-
-		if (!FMath::IsNearlyZero(Direction))
-		{
-			bUsingGamepad = bGamepadCameraInputActive || bGamepadCounterClockwise || bGamepadClockwise;
-			CameraPawn->RotateGameplayOrbit(FMath::Clamp(Direction, -1.0f, 1.0f), DeltaSeconds);
-		}
-		if (bGamepadCameraInputActive || !FMath::IsNearlyZero(Direction))
-		{
-			ClearHoveredPiece();
-			ClearGamepadFocus();
-		}
+		CameraPawn->RotateGameplayOrbit(Direction, DeltaSeconds);
+		ClearHoveredPiece();
 	}
 }
 
@@ -1540,8 +1151,6 @@ void AFlickPlayerController::AdjustLocalCameraElevation(const int32 Direction)
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		ClearHoveredPiece();
-		ClearGamepadFocus();
-		bUsingGamepad = false;
 		CameraPawn->AdjustGameplayElevation(Direction);
 	}
 }

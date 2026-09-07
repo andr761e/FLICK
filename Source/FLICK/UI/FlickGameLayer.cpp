@@ -12,7 +12,6 @@
 #include "Player/FlickPlayerState.h"
 #include "Ranking/FlickRankingSubsystem.h"
 #include "Pieces/FlickPiece.h"
-#include "Framework/Application/SlateApplication.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Online/FlickSessionSubsystem.h"
@@ -1787,6 +1786,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		]
 		]
 	];
+
 }
 
 void SFlickGameLayer::Tick(
@@ -1821,24 +1821,14 @@ void SFlickGameLayer::Tick(
 			}
 		}
 	}
-	if (!GameMode.IsValid() || !FSlateApplication::IsInitialized())
+	if (!GameMode.IsValid())
 	{
 		return;
 	}
 
 	const EFlickFrontendScreen CurrentScreen = GameMode->GetFrontendScreen();
-	const AFlickGameState* State = GameMode->GetFlickGameState();
-	const bool bRoundOverVisible = CurrentScreen == EFlickFrontendScreen::Playing
-		&& State
-		&& State->MatchPhase == EFlickMatchPhase::RoundOver;
-	if (bHasAppliedInitialFocus
-		&& CurrentScreen == LastFocusedScreen
-		&& bRoundOverVisible == bLastRoundOverVisible)
-	{
-		return;
-	}
 	if (CurrentScreen == EFlickFrontendScreen::Loadout
-		&& (!bHasAppliedInitialFocus || LastFocusedScreen != EFlickFrontendScreen::Loadout))
+		&& LastFocusedScreen != EFlickFrontendScreen::Loadout)
 	{
 		Player1SelectedLoadoutSlot = 0;
 		Player2SelectedLoadoutSlot = 0;
@@ -1846,65 +1836,7 @@ void SFlickGameLayer::Tick(
 		Player2HoveredLoadoutArchetype.Reset();
 	}
 
-	bHasAppliedInitialFocus = true;
 	LastFocusedScreen = CurrentScreen;
-	bLastRoundOverVisible = bRoundOverVisible;
-	TSharedPtr<SButton> TargetButton;
-	if (bRoundOverVisible)
-	{
-		TargetButton = RoundOverDefaultButton;
-	}
-	else
-	{
-		switch (CurrentScreen)
-		{
-		case EFlickFrontendScreen::MainMenu:
-			TargetButton = MainMenuDefaultButton;
-			break;
-		case EFlickFrontendScreen::ModeSelect:
-			TargetButton = ModeSelectDefaultButton;
-			break;
-		case EFlickFrontendScreen::PrivateMatch:
-			TargetButton = PrivateMatchDefaultButton;
-			break;
-		case EFlickFrontendScreen::OnlineBrowser:
-			TargetButton = OnlineBrowserDefaultButton;
-			break;
-		case EFlickFrontendScreen::NetworkLobby:
-			TargetButton = LobbyDefaultButton;
-			break;
-		case EFlickFrontendScreen::ItemShop:
-			TargetButton = ItemShopDefaultButton;
-			break;
-		case EFlickFrontendScreen::Profile:
-			TargetButton = ProfileDefaultButton;
-			break;
-		case EFlickFrontendScreen::Loadout:
-			TargetButton = LoadoutDefaultButton;
-			break;
-		case EFlickFrontendScreen::ClassSelect:
-			TargetButton = ClassSelectDefaultButton;
-			break;
-		case EFlickFrontendScreen::Settings:
-			TargetButton = SettingsDefaultButton;
-			break;
-		case EFlickFrontendScreen::Paused:
-			TargetButton = PauseDefaultButton;
-			break;
-		case EFlickFrontendScreen::Playing:
-		default:
-			break;
-		}
-	}
-
-	if (TargetButton.IsValid())
-	{
-		FSlateApplication::Get().SetKeyboardFocus(TargetButton, EFocusCause::SetDirectly);
-	}
-	else if (CurrentScreen == EFlickFrontendScreen::Playing)
-	{
-		FSlateApplication::Get().SetAllUserFocusToGameViewport(EFocusCause::SetDirectly);
-	}
 }
 
 TSharedRef<SWidget> SFlickGameLayer::BuildStartupOverlay()
@@ -4173,19 +4105,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							&& SelectedTrainingActivity != EFlickTrainingActivity::None)
 						{
 							SelectedTrainingActivity = EFlickTrainingActivity::None;
-							if (TrainingActivityDefaultButton.IsValid() && FSlateApplication::IsInitialized())
-							{
-								FSlateApplication::Get().SetKeyboardFocus(TrainingActivityDefaultButton, EFocusCause::SetDirectly);
-							}
 						}
 						else if (SelectedPlayPlaylist != EFlickPlayPlaylist::None)
 						{
 							SelectedPlayPlaylist = EFlickPlayPlaylist::None;
 							SelectedTrainingActivity = EFlickTrainingActivity::None;
-							if (ModeSelectDefaultButton.IsValid() && FSlateApplication::IsInitialized())
-							{
-								FSlateApplication::Get().SetKeyboardFocus(ModeSelectDefaultButton, EFocusCause::SetDirectly);
-							}
 						}
 						else if (GameMode.IsValid())
 						{
@@ -4536,15 +4460,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayPlaylistCard(
 				GameMode->SetMatchmakingPlayersPerTeam(1);
 				GameMode->SelectMatchVariant(EFlickMatchVariant::Classic);
 			}
-			const TSharedPtr<SButton> FocusTarget = Playlist == EFlickPlayPlaylist::Training
-				? TrainingActivityDefaultButton
-				: Playlist == EFlickPlayPlaylist::Test
-					? TestActivityDefaultButton
-					: ModeFormatDefaultButton;
-			if (FocusTarget.IsValid() && FSlateApplication::IsInitialized())
-			{
-				FSlateApplication::Get().SetKeyboardFocus(FocusTarget, EFocusCause::SetDirectly);
-			}
 			return FReply::Handled();
 		});
 	const TWeakPtr<SButton> WeakCardButton = CardButton;
@@ -4642,10 +4557,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 			}
 
 			SelectedTrainingActivity = Activity;
-			if (ModeFormatDefaultButton.IsValid() && FSlateApplication::IsInitialized())
-			{
-				FSlateApplication::Get().SetKeyboardFocus(ModeFormatDefaultButton, EFocusCause::SetDirectly);
-			}
 			return FReply::Handled();
 		});
 	const TWeakPtr<SButton> WeakCardButton = CardButton;
@@ -7571,7 +7482,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 				.BorderWidth(0.8f)
 				.Padding(FMargin(7.0f, 3.0f))
 				[
-					SNew(STextBlock).Text(FText::FromString(Key)).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
+					SNew(STextBlock)
+					.Text(FText::FromString(Key))
+					.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 				]
 			];
 			HintRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, bLast ? 0.0f : 14.0f, 0.0f)
@@ -7749,11 +7662,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPowerMeter()
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().FillWidth(1.0f)
 					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("RELEASE TO FLICK"))).Font(UiFont(8, true)).ColorAndOpacity(Muted)
+					SNew(STextBlock)
+					.Text(FText::FromString(TEXT("RELEASE TO FLICK")))
+					.Font(UiFont(8, true)).ColorAndOpacity(Muted)
 					]
 					+ SHorizontalBox::Slot().AutoWidth()
 					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("RMB / ESC / B  CANCEL"))).Font(UiFont(8, true)).ColorAndOpacity(Muted)
+						SNew(STextBlock)
+						.Text(FText::FromString(TEXT("RMB / ESC  CANCEL")))
+						.Font(UiFont(8, true)).ColorAndOpacity(Muted)
 					]
 				]
 			]
@@ -7804,7 +7721,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 						.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("Q / E"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
+							SNew(STextBlock)
+							.Text(FText::FromString(TEXT("Q / E")))
+							.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 						]
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(7.0f, 0.0f, 14.0f, 0.0f)
@@ -7826,7 +7745,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 							.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
 							.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
 							[
-								SNew(STextBlock).Text(FText::FromString(TEXT("WHEEL"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("WHEEL")))
+								.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 							]
 						]
 					]
@@ -7857,7 +7778,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 						.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("F"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
+							SNew(STextBlock)
+							.Text(FText::FromString(TEXT("F")))
+							.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 						]
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(7.0f, 0.0f, 0.0f, 0.0f)
@@ -8056,7 +7979,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 20.0f, 0.0f, 0.0f)
 					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("ESC / B   RETURN TO GAME"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)
+						SNew(STextBlock)
+						.Text(FText::FromString(TEXT("ESC   RETURN TO GAME")))
+						.Font(UiFont(9, true)).ColorAndOpacity(Muted)
 					]
 				]
 			]

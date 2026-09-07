@@ -12,3 +12,5 @@ Once that is perfected, we will add
 
 Things to implement;
 - Better visuals
+-Divider logic can be improved. You should be able to turn a switch on and off with one shot if multiple pucks pass over. 
+-Make the switches smaller. 
