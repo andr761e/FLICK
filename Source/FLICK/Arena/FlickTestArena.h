@@ -74,6 +74,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "90.0", ClampMax = "260.0"))
 	float SwitchDistanceFromDivider = 145.0f;
 
+	// Leaves a readable strip of playing surface between edge mechanisms and
+	// the authored rim while retaining their edge-control role.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "0.88", ClampMax = "0.95"))
+	float OuterDividerRadiusFraction = 0.935f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "0.0", ClampMax = "30.0"))
 	float DividerDeploymentClearance = 8.0f;
 
@@ -99,6 +104,9 @@ private:
 	// All presentation additions are non-colliding and read the authoritative state.
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TObjectPtr<UStaticMeshComponent> InstrumentDeckMesh;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
+	TObjectPtr<UStaticMeshComponent> WorkshopArenaMesh;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> DividerCapMeshes;
@@ -145,6 +153,11 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> DividerMeshes;
 
+	// Authored presentation follows DividerMeshes, which remain the simple and
+	// predictable authoritative collision bodies.
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> DividerVisualMeshes;
+
 	UPROPERTY(ReplicatedUsing = OnRep_DividerState)
 	uint8 RaisedDividerMask = 0;
 
@@ -184,4 +197,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPhysicalMaterial> RuntimeDividerPhysicalMaterial;
+
+	bool bUsingWorkshopAssets = false;
 };

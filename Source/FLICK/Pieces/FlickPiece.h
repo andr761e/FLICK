@@ -32,6 +32,9 @@ public:
 		int32 InOwningPlayerSlot = 0,
 		bool bInShowPlayerIdentity = false);
 	void ApplyPhysicsSettings();
+	/** Cosmetic mesh for the divider test arena; the existing root remains the physics body. */
+	void EnableTestArenaVisuals();
+	bool HasTestArenaVisuals() const;
 	void Launch(const FVector& Direction, float NormalizedPower, float MaxLaunchSpeed);
 	void Eliminate();
 	void SetSelected(bool bInSelected);
@@ -119,6 +122,13 @@ private:
 	void EnsureVisualMaterials();
 	void UpdateVisualTransforms();
 	void ApplyVisuals();
+	void UpdateTestArenaVisuals();
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> WorkshopMesh;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> WorkshopTeamMaterial;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PieceMesh;

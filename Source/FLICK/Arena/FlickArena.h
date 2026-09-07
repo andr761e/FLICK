@@ -43,6 +43,9 @@ public:
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
+	// Allows specialized arenas to replace the generated presentation without
+	// disabling the authoritative circular floor collision.
+	void SetArenaPresentationVisible(bool bVisible);
 
 private:
 	UFUNCTION()

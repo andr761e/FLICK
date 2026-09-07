@@ -1,0 +1,275 @@
+{
+  "arena_radius_cm": 650.0,
+  "arena_thickness_cm": 50.0,
+  "divider_nominal_cm": [
+    146.0,
+    18.0,
+    56.00000000000001
+  ],
+  "switch_radius_cm": 40.0,
+  "activation_dot_radius_cm": 8.0,
+  "rim_inner_radius_cm": 635.0500000000001,
+  "outer_divider_radius_fraction": 0.935,
+  "possible_locations": [
+    {
+      "index": 0,
+      "outer": true,
+      "center_cm": [
+        607.75,
+        0.0
+      ],
+      "angle_degrees": 90.0,
+      "length_cm": 134.32,
+      "active": true,
+      "switch_center_cm": [
+        462.116,
+        24.218
+      ]
+    },
+    {
+      "index": 1,
+      "outer": false,
+      "center_cm": [
+        506.913,
+        164.706
+      ],
+      "angle_degrees": 119.0,
+      "length_cm": 157.68,
+      "active": false
+    },
+    {
+      "index": 2,
+      "outer": true,
+      "center_cm": [
+        491.68,
+        357.226
+      ],
+      "angle_degrees": 126.0,
+      "length_cm": 134.32,
+      "active": true,
+      "switch_center_cm": [
+        388.095,
+        252.032
+      ]
+    },
+    {
+      "index": 3,
+      "outer": false,
+      "center_cm": [
+        313.29,
+        431.206
+      ],
+      "angle_degrees": 133.0,
+      "length_cm": 157.68,
+      "active": false
+    },
+    {
+      "index": 4,
+      "outer": true,
+      "center_cm": [
+        187.805,
+        578.005
+      ],
+      "angle_degrees": 162.0,
+      "length_cm": 134.32,
+      "active": false
+    },
+    {
+      "index": 5,
+      "outer": false,
+      "center_cm": [
+        0.0,
+        533.0
+      ],
+      "angle_degrees": 191.0,
+      "length_cm": 157.68,
+      "active": true,
+      "switch_center_cm": [
+        -20.306,
+        387.468
+      ]
+    },
+    {
+      "index": 6,
+      "outer": true,
+      "center_cm": [
+        -187.805,
+        578.005
+      ],
+      "angle_degrees": 198.0,
+      "length_cm": 134.32,
+      "active": false
+    },
+    {
+      "index": 7,
+      "outer": false,
+      "center_cm": [
+        -313.29,
+        431.206
+      ],
+      "angle_degrees": 205.0,
+      "length_cm": 157.68,
+      "active": true,
+      "switch_center_cm": [
+        -211.32,
+        325.404
+      ]
+    },
+    {
+      "index": 8,
+      "outer": true,
+      "center_cm": [
+        -491.68,
+        357.226
+      ],
+      "angle_degrees": 234.0,
+      "length_cm": 134.32,
+      "active": false
+    },
+    {
+      "index": 9,
+      "outer": false,
+      "center_cm": [
+        -506.913,
+        164.706
+      ],
+      "angle_degrees": 263.0,
+      "length_cm": 157.68,
+      "active": false
+    },
+    {
+      "index": 10,
+      "outer": true,
+      "center_cm": [
+        -607.75,
+        0.0
+      ],
+      "angle_degrees": 270.0,
+      "length_cm": 134.32,
+      "active": true,
+      "switch_center_cm": [
+        -462.116,
+        24.218
+      ]
+    },
+    {
+      "index": 11,
+      "outer": false,
+      "center_cm": [
+        -506.913,
+        -164.706
+      ],
+      "angle_degrees": 277.0,
+      "length_cm": 157.68,
+      "active": false
+    },
+    {
+      "index": 12,
+      "outer": true,
+      "center_cm": [
+        -491.68,
+        -357.226
+      ],
+      "angle_degrees": 306.0,
+      "length_cm": 134.32,
+      "active": true,
+      "switch_center_cm": [
+        -359.624,
+        -291.218
+      ]
+    },
+    {
+      "index": 13,
+      "outer": false,
+      "center_cm": [
+        -313.29,
+        -431.206
+      ],
+      "angle_degrees": 335.0,
+      "length_cm": 157.68,
+      "active": false
+    },
+    {
+      "index": 14,
+      "outer": true,
+      "center_cm": [
+        -187.805,
+        -578.005
+      ],
+      "angle_degrees": 342.0,
+      "length_cm": 134.32,
+      "active": false
+    },
+    {
+      "index": 15,
+      "outer": false,
+      "center_cm": [
+        -0.0,
+        -533.0
+      ],
+      "angle_degrees": 349.0,
+      "length_cm": 157.68,
+      "active": true,
+      "switch_center_cm": [
+        -20.306,
+        -387.468
+      ]
+    },
+    {
+      "index": 16,
+      "outer": true,
+      "center_cm": [
+        187.805,
+        -578.005
+      ],
+      "angle_degrees": 378.0,
+      "length_cm": 134.32,
+      "active": false
+    },
+    {
+      "index": 17,
+      "outer": false,
+      "center_cm": [
+        313.29,
+        -431.206
+      ],
+      "angle_degrees": 407.0,
+      "length_cm": 157.68,
+      "active": true,
+      "switch_center_cm": [
+        244.176,
+        -301.533
+      ]
+    },
+    {
+      "index": 18,
+      "outer": true,
+      "center_cm": [
+        491.68,
+        -357.226
+      ],
+      "angle_degrees": 414.0,
+      "length_cm": 134.32,
+      "active": false
+    },
+    {
+      "index": 19,
+      "outer": false,
+      "center_cm": [
+        506.913,
+        -164.706
+      ],
+      "angle_degrees": 421.0,
+      "length_cm": 157.68,
+      "active": false
+    }
+  ],
+  "exports": [
+    "SM_TestArena_Static",
+    "SM_TestArena_Divider",
+    "SM_TestArena_DividerSocket",
+    "SM_TestArena_SwitchHousing",
+    "SM_TestArena_SwitchDot",
+    "SM_TestArena_SignalTrace"
+  ]
+}

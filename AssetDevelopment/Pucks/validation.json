@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Standard",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  },
+  {
+    "name": "Toppler",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  },
+  {
+    "name": "Bouncer",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  },
+  {
+    "name": "Compact",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  },
+  {
+    "name": "Blocker",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  },
+  {
+    "name": "Slider",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  },
+  {
+    "name": "Grippy",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  },
+  {
+    "name": "Striker",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  },
+  {
+    "name": "Heavy",
+    "shared_geometry": true,
+    "team_material_only": true,
+    "bounds_passed": true,
+    "exports": [
+      "Blue",
+      "Orange"
+    ]
+  }
+]

@@ -391,6 +391,42 @@ void AFlickArena::InitializeArena(
 	ForceNetUpdate();
 }
 
+void AFlickArena::SetArenaPresentationVisible(const bool bVisible)
+{
+	const TArray<UStaticMeshComponent*> SingularMeshes = {
+		ArenaMesh, TopSurfaceMesh, InnerFieldMesh, RimAccentMesh, OuterBezelMesh,
+		LowerDeckMesh, CenterPlateMesh, PedestalMesh, BackdropMesh, StageBaseMesh,
+		VenueBackWallMesh, CenterLineMesh, CrossLineMesh, CenterMarkMesh,
+		Player1HomeMarkMesh, Player2HomeMarkMesh
+	};
+	for (UStaticMeshComponent* Mesh : SingularMeshes)
+	{
+		if (Mesh)
+		{
+			Mesh->SetVisibility(bVisible, true);
+			Mesh->SetHiddenInGame(!bVisible, true);
+		}
+	}
+
+	const TArray<const TArray<TObjectPtr<UStaticMeshComponent>>*> MeshArrays = {
+		&RimSegments, &FieldRingSegments, &SideLightSegments, &DirectionMarkerSegments,
+		&SurfaceSeamSegments, &VenuePylons, &VenueBannerPanels, &VenueLightBars,
+		&FloorGridSegments, &FloorLightStuds, &MultiplayerTeamArcSegments,
+		&MultiplayerPlayerZoneOutlines, &MultiplayerPlayerZoneInsets
+	};
+	for (const TArray<TObjectPtr<UStaticMeshComponent>>* MeshArray : MeshArrays)
+	{
+		for (UStaticMeshComponent* Mesh : *MeshArray)
+		{
+			if (Mesh)
+			{
+				Mesh->SetVisibility(bVisible, true);
+				Mesh->SetHiddenInGame(!bVisible, true);
+			}
+		}
+	}
+}
+
 void AFlickArena::OnRep_ArenaConfiguration()
 {
 	ApplyArenaShape();

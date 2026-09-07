@@ -1,0 +1,111 @@
+{
+  "status": "passed",
+  "blend_file": "C:\\Users\\andre\\Desktop\\FLICK\\AssetDevelopment\\Arena\\TestArenaWorkshop.blend",
+  "asset_count": 6,
+  "possible_locations": 20,
+  "active_switches": 8,
+  "objects": {
+    "SM_TestArena_Divider": {
+      "bounds_min_m": [
+        -0.73,
+        -0.09,
+        0.0168
+      ],
+      "bounds_max_m": [
+        0.73,
+        0.09,
+        0.56
+      ],
+      "dimensions_m": [
+        1.46,
+        0.18,
+        0.5432
+      ]
+    },
+    "SM_TestArena_DividerSocket": {
+      "bounds_min_m": [
+        -0.73,
+        -0.13,
+        0.0
+      ],
+      "bounds_max_m": [
+        0.73,
+        0.13,
+        0.024
+      ],
+      "dimensions_m": [
+        1.46,
+        0.26,
+        0.024
+      ]
+    },
+    "SM_TestArena_SignalTrace": {
+      "bounds_min_m": [
+        0.0,
+        -0.02,
+        0.0
+      ],
+      "bounds_max_m": [
+        1.0,
+        0.02,
+        0.015
+      ],
+      "dimensions_m": [
+        1.0,
+        0.04,
+        0.015
+      ]
+    },
+    "SM_TestArena_Static": {
+      "bounds_min_m": [
+        -6.5,
+        -6.5,
+        -0.5
+      ],
+      "bounds_max_m": [
+        6.5,
+        6.5,
+        0.1145
+      ],
+      "dimensions_m": [
+        13.0,
+        13.0,
+        0.6145
+      ]
+    },
+    "SM_TestArena_SwitchDot": {
+      "bounds_min_m": [
+        -0.1024,
+        -0.1024,
+        0.0
+      ],
+      "bounds_max_m": [
+        0.1024,
+        0.1024,
+        0.031
+      ],
+      "dimensions_m": [
+        0.2048,
+        0.2048,
+        0.031
+      ]
+    },
+    "SM_TestArena_SwitchHousing": {
+      "bounds_min_m": [
+        -0.4,
+        -0.4,
+        0.0
+      ],
+      "bounds_max_m": [
+        0.4,
+        0.4,
+        0.034
+      ],
+      "dimensions_m": [
+        0.8,
+        0.8,
+        0.034
+      ]
+    }
+  }
+}

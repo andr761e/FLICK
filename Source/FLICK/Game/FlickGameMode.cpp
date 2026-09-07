@@ -21,6 +21,7 @@
 #include "Engine/Engine.h"
 #include "Engine/PointLight.h"
 #include "Engine/SkyLight.h"
+#include "Engine/TextureCube.h"
 #include "EngineUtils.h"
 #include "Feedback/FlickWorldFeedback.h"
 #include "Game/FlickGameState.h"
@@ -6008,18 +6009,38 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 	{
 		Light->SetMobility(EComponentMobility::Movable);
 		DirectionalLightActor->SetActorRotation(FRotator(-72.0f, -25.0f, 0.0f));
-		Light->SetLightColor(bClassicArenaLighting
-			? FLinearColor(0.82f, 0.88f, 0.96f)
-			: FLinearColor(0.9f, 0.94f, 1.0f));
-		Light->SetIntensity(bClassicArenaLighting ? 0.78f : 1.15f);
-		Light->SetLightSourceAngle(3.0f);
-		Light->SetSpecularScale(bClassicArenaLighting ? 0.14f : 0.32f);
+		Light->SetLightColor(bTestArenaMode
+			? FLinearColor(0.78f, 0.87f, 1.0f)
+			: bClassicArenaLighting
+				? FLinearColor(0.82f, 0.88f, 0.96f)
+				: FLinearColor(0.9f, 0.94f, 1.0f));
+		Light->SetIntensity(bTestArenaMode ? 1.1f : bClassicArenaLighting ? 0.78f : 1.15f);
+		Light->SetLightSourceAngle(bTestArenaMode ? 5.0f : 3.0f);
+		Light->SetSpecularScale(bTestArenaMode ? 0.60f : bClassicArenaLighting ? 0.14f : 0.32f);
 		Light->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.72f : 0.8f);
 		Light->SetCastShadows(true);
 	}
 	if (SkyLightActor && SkyLightActor->GetLightComponent())
 	{
-		SkyLightActor->GetLightComponent()->SetIntensity(bClassicArenaLighting ? 0.34f : 0.28f);
+		auto* Sky = SkyLightActor->GetLightComponent();
+		Sky->SetMobility(EComponentMobility::Movable);
+		// Metallic workshop surfaces need an environment to reflect even on an empty map.
+		if (bTestArenaMode)
+		{
+			if (auto* Environment = LoadObject<UTextureCube>(nullptr,
+				TEXT("/Game/TestArena/Pucks/T_PuckEnvironment.T_PuckEnvironment")))
+			{
+				Sky->SourceType = SLS_SpecifiedCubemap;
+				Sky->SetCubemap(Environment);
+			}
+		}
+		else if (Sky->SourceType == SLS_SpecifiedCubemap && Sky->Cubemap
+			&& Sky->Cubemap->GetPathName().StartsWith(TEXT("/Game/TestArena/Pucks/")))
+		{
+			Sky->SourceType = SLS_CapturedScene;
+			Sky->SetCubemap(nullptr);
+		}
+		Sky->SetIntensity(bTestArenaMode ? 0.82f : bClassicArenaLighting ? 0.34f : 0.28f);
 	}
 
 	const auto SpawnAccentLight = [this, bClassicArenaLighting](
@@ -6039,14 +6060,16 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			LightActor->SetActorLocation(Location);
 			// Classic formations sit directly below these fixtures. Keep them as a
 			// soft neutral wash so their highlights cannot bleach the puck markings.
-			Light->SetLightColor(FMath::Lerp(Color, FLinearColor::White, bClassicArenaLighting ? 0.88f : 0.72f));
-			Light->SetIntensity(bClassicArenaLighting ? 52.0f : 165.0f);
+			Light->SetLightColor(FMath::Lerp(
+				Color, FLinearColor::White,
+				bTestArenaMode ? 0.38f : bClassicArenaLighting ? 0.88f : 0.72f));
+			Light->SetIntensity(bTestArenaMode ? 220.0f : bClassicArenaLighting ? 52.0f : 165.0f);
 			Light->SetAttenuationRadius(
 				(bClassicArenaLighting ? 720.0f : 820.0f)
 				* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
-			Light->SetSourceRadius((bClassicArenaLighting ? 260.0f : 120.0f)
+			Light->SetSourceRadius((bTestArenaMode ? 125.0f : bClassicArenaLighting ? 260.0f : 120.0f)
 				* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
-			Light->SetSpecularScale(bClassicArenaLighting ? 0.04f : 0.48f);
+			Light->SetSpecularScale(bTestArenaMode ? 0.52f : bClassicArenaLighting ? 0.04f : 0.48f);
 			Light->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.15f : 0.42f);
 			Light->SetCastShadows(false);
 		}
@@ -6069,10 +6092,10 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		ArenaFillLight->PointLightComponent->SetLightColor(bClassicArenaLighting
 			? FLinearColor(0.62f, 0.7f, 0.82f)
 			: FLinearColor(0.72f, 0.78f, 0.88f));
-		ArenaFillLight->PointLightComponent->SetIntensity(bClassicArenaLighting ? 112.0f : 190.0f);
+		ArenaFillLight->PointLightComponent->SetIntensity(bTestArenaMode ? 300.0f : bClassicArenaLighting ? 112.0f : 190.0f);
 		ArenaFillLight->PointLightComponent->SetAttenuationRadius(1280.0f * ArenaScale);
-		ArenaFillLight->PointLightComponent->SetSourceRadius(180.0f * ArenaScale);
-		ArenaFillLight->PointLightComponent->SetSpecularScale(bClassicArenaLighting ? 0.06f : 0.26f);
+		ArenaFillLight->PointLightComponent->SetSourceRadius((bTestArenaMode ? 240.0f : 180.0f) * ArenaScale);
+		ArenaFillLight->PointLightComponent->SetSpecularScale(bTestArenaMode ? 0.38f : bClassicArenaLighting ? 0.06f : 0.26f);
 		ArenaFillLight->PointLightComponent->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.45f : 0.34f);
 		ArenaFillLight->PointLightComponent->SetCastShadows(false);
 	}
@@ -8527,6 +8550,10 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 		bIsBobStriker,
 		OwningPlayerSlot,
 		bShowPlayerIdentity);
+	if (bTestArenaMode)
+	{
+		Piece->EnableTestArenaVisuals();
+	}
 	Pieces.Add(Piece);
 	return Piece;
 }

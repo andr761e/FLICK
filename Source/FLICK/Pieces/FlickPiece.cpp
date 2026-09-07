@@ -6,6 +6,7 @@
 #include "Core/FlickLog.h"
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Engine/Font.h"
+#include "Engine/StaticMesh.h"
 #include "Game/FlickGameMode.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -28,6 +29,12 @@ AFlickPiece::AFlickPiece()
 	PieceMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PieceMesh"));
 	SetRootComponent(PieceMesh);
 	PieceMesh->SetIsReplicated(true);
+	WorkshopMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorkshopMesh"));
+	WorkshopMesh->SetupAttachment(PieceMesh);
+	WorkshopMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WorkshopMesh->SetGenerateOverlapEvents(false);
+	WorkshopMesh->SetCanEverAffectNavigation(false);
+	WorkshopMesh->SetVisibility(false);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	if (CylinderMesh.Succeeded())
@@ -1116,6 +1123,78 @@ void AFlickPiece::UpdateVisualTransforms()
 	AccentLight->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 22.0f) / ParentZScale));
 }
 
+bool AFlickPiece::HasTestArenaVisuals() const
+{
+	return WorkshopMesh && WorkshopMesh->GetStaticMesh() != nullptr;
+}
+
+void AFlickPiece::EnableTestArenaVisuals()
+{
+	if (GetNetMode() == NM_DedicatedServer || bBobStriker || HasTestArenaVisuals()) return;
+	static const TCHAR* Names[] = {TEXT("Standard"), TEXT("Heavy"), TEXT("Striker"),
+		TEXT("Grippy"), TEXT("Slider"), TEXT("Blocker"), TEXT("Compact"), TEXT("Bouncer"), TEXT("Toppler")};
+	const int32 Index = static_cast<int32>(Archetype);
+	if (Index < 0 || Index >= UE_ARRAY_COUNT(Names)) return;
+	const FString Path = FString::Printf(TEXT("/Game/TestArena/Pucks/SM_Puck_%s.SM_Puck_%s"), Names[Index], Names[Index]);
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *Path);
+	if (!Mesh)
+	{
+		UE_LOG(LogFlick, Warning, TEXT("Test arena puck mesh missing: %s; keeping procedural visuals"), *Path);
+		return;
+	}
+	WorkshopMesh->SetStaticMesh(Mesh);
+	for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
+	{
+		if (Mesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString().Contains(TEXT("05_Team")))
+		{
+			WorkshopTeamMaterial = WorkshopMesh->CreateDynamicMaterialInstance(Slot);
+			break;
+		}
+	}
+	// Cancel only the legacy cylinder's inherited scale. The imported mesh then renders
+	// at its authored dimensions: diameter still matches gameplay, while art-only Z
+	// proportions can distinguish low and tall classes without touching Chaos collision.
+	WorkshopMesh->SetRelativeScale3D(FVector(
+		50.0f / FMath::Max(PieceRadius, 1.0f),
+		50.0f / FMath::Max(PieceRadius, 1.0f),
+		100.0f / FMath::Max(PieceThickness, 1.0f)));
+	// A broad, low-energy local light gives the machined rings a controlled
+	// highlight and a small pool of team colour on the deck. It deliberately
+	// carries little specular energy so it cannot bleach the puck markings.
+	AccentLight->SetAttenuationRadius(118.0f);
+	AccentLight->SetSourceRadius(18.0f);
+	AccentLight->SetSpecularScale(0.32f);
+	AccentLight->SetIndirectLightingIntensity(0.18f);
+	AccentLight->SetVolumetricScatteringIntensity(0.0f);
+	PieceMesh->SetCastShadow(false);
+	ApplyVisuals();
+	UE_LOG(LogFlick, Log, TEXT("Test arena Blender puck ready: %s, team %d"), Names[Index], static_cast<int32>(Team));
+}
+
+void AFlickPiece::UpdateTestArenaVisuals()
+{
+	if (!HasTestArenaVisuals()) return;
+	PieceMesh->SetVisibility(false);
+	for (USceneComponent* Child : PieceMesh->GetAttachChildren())
+	{
+		if (Child != WorkshopMesh && Child != SelectionHalo && Child != PlayerLabel && Child != AccentLight)
+		{
+			Child->SetVisibility(false);
+		}
+	}
+	AccentLight->SetVisibility(!bEliminated);
+	WorkshopMesh->SetVisibility(!bEliminated);
+	if (WorkshopTeamMaterial)
+	{
+		const FLinearColor Color = Team == EFlickTeam::Player2
+			? FLinearColor(1.0f, 0.18f, 0.003f) : FLinearColor(0.0f, 0.5f, 1.0f);
+		WorkshopTeamMaterial->SetVectorParameterValue(TEXT("TeamColor"), Color);
+		const float Flash = FMath::Clamp(HitFlashRemaining / 0.2f, 0.0f, 1.0f) * HitFlashStrength;
+		WorkshopTeamMaterial->SetScalarParameterValue(TEXT("Emission"), (bSelected || bHovered ? 2.0f : 1.6f) + Flash);
+	}
+	AccentLight->SetIntensity(bEliminated ? 0.0f : (bSelected || bHovered || bKickoffLocked ? 28.0f : 17.0f));
+}
+
 void AFlickPiece::ApplyVisuals()
 {
 	if (!PieceMesh || !TopDisc || !OuterTrim || !SideBand || !Underglow || !SelectionHalo || !CenterPip
@@ -1307,4 +1386,5 @@ void AFlickPiece::ApplyVisuals()
 		: FLinearColor(0.005f, 0.01f, 0.018f, 1.0f)).ToFColor(true));
 	PlayerLabel->SetWorldSize(bSelected ? 29.0f : 26.0f);
 	PlayerLabel->SetVisibility(bShowPlayerIdentity && !bEliminated);
+	UpdateTestArenaVisuals();
 }

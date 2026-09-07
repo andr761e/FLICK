@@ -45,6 +45,47 @@ namespace
 		Bar->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(FMath::Atan2(Delta.Y, Delta.X)), 0.0f));
 		Bar->SetRelativeScale3D(FVector(Delta.Size() / 100.0f, Width / 100.0f, Height / 100.0f));
 	}
+
+	void PlaceWorkshopTraceBetween(
+		UStaticMeshComponent* Trace,
+		const FVector2D& Start,
+		const FVector2D& End,
+		const float Z)
+	{
+		const FVector2D Delta = End - Start;
+		Trace->SetRelativeLocation(FVector(Start, Z));
+		Trace->SetRelativeRotation(FRotator(
+			0.0f, FMath::RadiansToDegrees(FMath::Atan2(Delta.Y, Delta.X)), 0.0f));
+		// The authored trace is one metre long and has its pivot at its start.
+		Trace->SetRelativeScale3D(FVector(Delta.Size() / 100.0f, 1.0f, 1.0f));
+	}
+
+	int32 GetAccentMaterialIndex(const UStaticMeshComponent* Component)
+	{
+		if (!Component)
+		{
+			return INDEX_NONE;
+		}
+		const int32 Index = Component->GetMaterialIndex(TEXT("09_Switch_Accent"));
+		return Index != INDEX_NONE ? Index : 0;
+	}
+
+	UMaterialInstanceDynamic* CreateAccentMaterial(UStaticMeshComponent* Component)
+	{
+		const int32 MaterialIndex = GetAccentMaterialIndex(Component);
+		return Component && MaterialIndex != INDEX_NONE
+			? Component->CreateAndSetMaterialInstanceDynamic(MaterialIndex)
+			: nullptr;
+	}
+
+	void SetAccentMaterial(UStaticMeshComponent* Component, UMaterialInterface* Material)
+	{
+		const int32 MaterialIndex = GetAccentMaterialIndex(Component);
+		if (Component && Material && MaterialIndex != INDEX_NONE)
+		{
+			Component->SetMaterial(MaterialIndex, Material);
+		}
+	}
 }
 
 AFlickTestArena::AFlickTestArena()
@@ -52,6 +93,22 @@ AFlickTestArena::AFlickTestArena()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopArenaAsset(
+		TEXT("/Game/TestArena/Arena/SM_TestArena_Static.SM_TestArena_Static"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopDividerAsset(
+		TEXT("/Game/TestArena/Arena/SM_TestArena_Divider.SM_TestArena_Divider"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopSocketAsset(
+		TEXT("/Game/TestArena/Arena/SM_TestArena_DividerSocket.SM_TestArena_DividerSocket"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopSwitchAsset(
+		TEXT("/Game/TestArena/Arena/SM_TestArena_SwitchHousing.SM_TestArena_SwitchHousing"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopDotAsset(
+		TEXT("/Game/TestArena/Arena/SM_TestArena_SwitchDot.SM_TestArena_SwitchDot"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopTraceAsset(
+		TEXT("/Game/TestArena/Arena/SM_TestArena_SignalTrace.SM_TestArena_SignalTrace"));
+	bUsingWorkshopAssets = WorkshopArenaAsset.Succeeded()
+		&& WorkshopDividerAsset.Succeeded() && WorkshopSocketAsset.Succeeded()
+		&& WorkshopSwitchAsset.Succeeded() && WorkshopDotAsset.Succeeded()
+		&& WorkshopTraceAsset.Succeeded();
 
 	auto CreateBar = [this](const FString& Name, const bool bCollision)
 	{
@@ -91,11 +148,20 @@ AFlickTestArena::AFlickTestArena()
 
 	ZoneOuterMeshes.Reserve(MechanismCount);
 	InstrumentDeckMesh = CreateDisc(TEXT("SwitchyardInstrumentDeck"));
+	WorkshopArenaMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorkshopArenaMesh"));
+	WorkshopArenaMesh->SetupAttachment(GetRootComponent());
+	ConfigureVisualComponent(WorkshopArenaMesh);
+	WorkshopArenaMesh->SetCastShadow(true);
+	if (bUsingWorkshopAssets)
+	{
+		WorkshopArenaMesh->SetStaticMesh(WorkshopArenaAsset.Object);
+	}
 	DividerCapMeshes.Reserve(MechanismCount);
 	ZoneInnerMeshes.Reserve(MechanismCount);
 	ZoneDotMeshes.Reserve(MechanismCount);
 	SignalTraceMeshes.Reserve(MechanismCount);
 	DividerMeshes.Reserve(MechanismCount);
+	DividerVisualMeshes.Reserve(MechanismCount);
 	for (int32 Index = 0; Index < MechanismCount; ++Index)
 	{
 		ZoneOuterMeshes.Add(CreateDisc(FString::Printf(TEXT("ControlSwitchOuter_%02d"), Index)));
@@ -104,11 +170,49 @@ AFlickTestArena::AFlickTestArena()
 		SignalTraceMeshes.Add(CreateBar(FString::Printf(TEXT("ControlSignalTrace_%02d"), Index), false));
 		DividerMeshes.Add(CreateBar(FString::Printf(TEXT("EdgeDivider_%02d"), Index), true));
 		DividerCapMeshes.Add(CreateBar(FString::Printf(TEXT("DividerCap_%02d"), Index), false));
+		UStaticMeshComponent* DividerVisual = CreateDefaultSubobject<UStaticMeshComponent>(
+			*FString::Printf(TEXT("WorkshopDivider_%02d"), Index));
+		DividerVisual->SetupAttachment(GetRootComponent());
+		ConfigureVisualComponent(DividerVisual);
+		DividerVisual->SetCastShadow(true);
+		if (bUsingWorkshopAssets)
+		{
+			DividerVisual->SetStaticMesh(WorkshopDividerAsset.Object);
+		}
+		DividerVisualMeshes.Add(DividerVisual);
 	}
 	DividerBaseMeshes.Reserve(PossibleLocationCount);
 	for (int32 LocationIndex = 0; LocationIndex < PossibleLocationCount; ++LocationIndex)
 	{
 		DividerBaseMeshes.Add(CreateBar(FString::Printf(TEXT("DividerSocket_%02d"), LocationIndex), false));
+	}
+
+	if (bUsingWorkshopAssets)
+	{
+		InstrumentDeckMesh->SetVisibility(false, true);
+		InstrumentDeckMesh->SetHiddenInGame(true, true);
+		for (int32 Index = 0; Index < MechanismCount; ++Index)
+		{
+			ZoneOuterMeshes[Index]->SetStaticMesh(WorkshopSwitchAsset.Object);
+			ZoneInnerMeshes[Index]->SetVisibility(false, true);
+			ZoneInnerMeshes[Index]->SetHiddenInGame(true, true);
+			ZoneDotMeshes[Index]->SetStaticMesh(WorkshopDotAsset.Object);
+			SignalTraceMeshes[Index]->SetStaticMesh(WorkshopTraceAsset.Object);
+			DividerCapMeshes[Index]->SetVisibility(false, true);
+			DividerCapMeshes[Index]->SetHiddenInGame(true, true);
+			// The decorative divider never participates in collision.
+			DividerMeshes[Index]->SetVisibility(false, true);
+			DividerMeshes[Index]->SetHiddenInGame(true, true);
+		}
+		for (UStaticMeshComponent* Socket : DividerBaseMeshes)
+		{
+			Socket->SetStaticMesh(WorkshopSocketAsset.Object);
+		}
+	}
+	else
+	{
+		WorkshopArenaMesh->SetVisibility(false, true);
+		WorkshopArenaMesh->SetHiddenInGame(true, true);
 	}
 }
 
@@ -616,7 +720,7 @@ void AFlickTestArena::BuildLayoutFromSeed()
 		const bool bOuter = (LocationIndex % 2) == 0;
 		const float RadialAngle = FMath::DegreesToRadians(LocationIndex * (360.0f / PossibleLocationCount));
 		const FVector2D Radial(FMath::Cos(RadialAngle), FMath::Sin(RadialAngle));
-		PossibleDividerCenters[LocationIndex] = Radial * ArenaRadius * (bOuter ? 0.955f : 0.82f);
+		PossibleDividerCenters[LocationIndex] = Radial * ArenaRadius * (bOuter ? OuterDividerRadiusFraction : 0.82f);
 		PossibleDividerAngles[LocationIndex] = RadialAngle + PI * 0.5f
 			+ (bOuter ? 0.0f : FMath::DegreesToRadians((LocationIndex % 4) == 1 ? 11.0f : -11.0f));
 		PossibleDividerLengths[LocationIndex] = DividerLength * (bOuter ? 0.92f : 1.08f);
@@ -674,8 +778,18 @@ void AFlickTestArena::ApplyTestLayout()
 	{
 		BuildLayoutFromSeed();
 	}
-	// A dedicated matte face covers the standard arena's decorative grid only.
-	// The inherited deck remains the sole play-surface collider.
+	// In both paths the inherited cylinder remains the sole play-surface collider.
+	// Workshop art is visual-only and is authored around Z=0 (the play surface).
+	SetArenaPresentationVisible(!bUsingWorkshopAssets);
+	WorkshopArenaMesh->SetVisibility(bUsingWorkshopAssets, true);
+	WorkshopArenaMesh->SetHiddenInGame(!bUsingWorkshopAssets, true);
+	WorkshopArenaMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ));
+	WorkshopArenaMesh->SetRelativeScale3D(FVector(
+		ArenaRadius / 650.0f,
+		ArenaRadius / 650.0f,
+		ArenaThickness / 50.0f));
+	InstrumentDeckMesh->SetVisibility(!bUsingWorkshopAssets, true);
+	InstrumentDeckMesh->SetHiddenInGame(bUsingWorkshopAssets, true);
 	InstrumentDeckMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 2.1f));
 	InstrumentDeckMesh->SetRelativeScale3D(FVector(ArenaRadius * 1.98f / 100.0f, ArenaRadius * 1.98f / 100.0f, 0.004f));
 	const float SwitchSurfaceZ = SurfaceZ + 2.5f;
@@ -686,13 +800,15 @@ void AFlickTestArena::ApplyTestLayout()
 		Socket->SetHiddenInGame(false, true);
 		Socket->SetRelativeLocation(FVector(PossibleDividerCenters[LocationIndex], SwitchSurfaceZ + 0.25f));
 		Socket->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(PossibleDividerAngles[LocationIndex]), 0.0f));
-		Socket->SetRelativeScale3D(FVector(
-			PossibleDividerLengths[LocationIndex] / 100.0f,
-			(DividerThickness + 8.0f) / 100.0f,
-			0.008f));
+		Socket->SetRelativeScale3D(bUsingWorkshopAssets
+			? FVector(PossibleDividerLengths[LocationIndex] / DividerLength, 1.0f, 1.0f)
+			: FVector(
+				PossibleDividerLengths[LocationIndex] / 100.0f,
+				(DividerThickness + 8.0f) / 100.0f,
+				0.008f));
 		if (DormantSocketMaterial)
 		{
-			Socket->SetMaterial(0, DormantSocketMaterial);
+			SetAccentMaterial(Socket, DormantSocketMaterial);
 		}
 	}
 
@@ -700,19 +816,22 @@ void AFlickTestArena::ApplyTestLayout()
 	{
 		const bool bActive = Index < GetMechanismCount();
 		for (UStaticMeshComponent* Component : {
-			ZoneOuterMeshes[Index].Get(), ZoneInnerMeshes[Index].Get(),
-			ZoneDotMeshes[Index].Get(),
+			ZoneOuterMeshes[Index].Get(), ZoneDotMeshes[Index].Get(),
 			SignalTraceMeshes[Index].Get()})
 		{
 			Component->SetVisibility(bActive, true);
 			Component->SetHiddenInGame(!bActive, true);
 		}
+		ZoneInnerMeshes[Index]->SetVisibility(bActive && !bUsingWorkshopAssets, true);
+		ZoneInnerMeshes[Index]->SetHiddenInGame(!bActive || bUsingWorkshopAssets, true);
 		if (!bActive)
 		{
 			DividerCapMeshes[Index]->SetVisibility(false);
 			DividerMeshes[Index]->SetVisibility(false, true);
 			DividerMeshes[Index]->SetHiddenInGame(true, true);
 			DividerMeshes[Index]->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			DividerVisualMeshes[Index]->SetVisibility(false, true);
+			DividerVisualMeshes[Index]->SetHiddenInGame(true, true);
 			continue;
 		}
 
@@ -722,31 +841,41 @@ void AFlickTestArena::ApplyTestLayout()
 		const FVector2D ToDivider = (DividerCenter - ZoneCenter).GetSafeNormal();
 
 		ZoneOuterMeshes[Index]->SetRelativeLocation(FVector(ZoneCenter, SwitchSurfaceZ));
-		ZoneOuterMeshes[Index]->SetRelativeScale3D(FVector(ControlZoneRadius * 2.0f / 100.0f, ControlZoneRadius * 2.0f / 100.0f, 0.008f));
+		ZoneOuterMeshes[Index]->SetRelativeScale3D(bUsingWorkshopAssets
+			? FVector(ControlZoneRadius / 40.0f)
+			: FVector(ControlZoneRadius * 2.0f / 100.0f, ControlZoneRadius * 2.0f / 100.0f, 0.008f));
 		ZoneInnerMeshes[Index]->SetRelativeLocation(FVector(ZoneCenter, SwitchSurfaceZ + 0.5f));
 		const float InnerRadius = FMath::Max(SwitchActivationDotRadius + 5.0f, ControlZoneRadius - 7.0f);
 		ZoneInnerMeshes[Index]->SetRelativeScale3D(FVector(InnerRadius * 2.0f / 100.0f, InnerRadius * 2.0f / 100.0f, 0.008f));
 		ZoneDotMeshes[Index]->SetRelativeLocation(FVector(ZoneCenter, SwitchSurfaceZ + 1.0f));
-		ZoneDotMeshes[Index]->SetRelativeScale3D(FVector(
-			SwitchActivationDotRadius * 2.0f / 100.0f,
-			SwitchActivationDotRadius * 2.0f / 100.0f,
-			0.009f));
-		PlaceBarBetween(
-			SignalTraceMeshes[Index],
-			ZoneCenter + ToDivider * (ControlZoneRadius + 7.0f),
-			DividerCenter - ToDivider * (DividerThickness * 0.5f + 8.0f),
-			SwitchSurfaceZ + 0.2f,
-			2.5f,
-			0.6f);
+		ZoneDotMeshes[Index]->SetRelativeScale3D(bUsingWorkshopAssets
+			? FVector(SwitchActivationDotRadius / 8.0f)
+			: FVector(
+				SwitchActivationDotRadius * 2.0f / 100.0f,
+				SwitchActivationDotRadius * 2.0f / 100.0f,
+				0.009f));
+		const FVector2D TraceStart = ZoneCenter + ToDivider * (ControlZoneRadius + 7.0f);
+		const FVector2D TraceEnd = DividerCenter - ToDivider * (DividerThickness * 0.5f + 8.0f);
+		if (bUsingWorkshopAssets)
+		{
+			PlaceWorkshopTraceBetween(SignalTraceMeshes[Index], TraceStart, TraceEnd, SwitchSurfaceZ + 0.2f);
+		}
+		else
+		{
+			PlaceBarBetween(SignalTraceMeshes[Index], TraceStart, TraceEnd,
+				SwitchSurfaceZ + 0.2f, 2.5f, 0.6f);
+		}
 
 		if (ActiveLocationIndices.IsValidIndex(Index)
 			&& DividerBaseMeshes.IsValidIndex(ActiveLocationIndices[Index]))
 		{
-			DividerBaseMeshes[ActiveLocationIndices[Index]]->SetMaterial(0, AccentMaterials[Index]);
-			DividerBaseMeshes[ActiveLocationIndices[Index]]->SetRelativeScale3D(FVector(
-				RandomizedDividerLengths[Index] / 100.0f,
-				(DividerThickness + 8.0f) / 100.0f,
-				0.012f));
+			SetAccentMaterial(DividerBaseMeshes[ActiveLocationIndices[Index]], AccentMaterials[Index]);
+			DividerBaseMeshes[ActiveLocationIndices[Index]]->SetRelativeScale3D(bUsingWorkshopAssets
+				? FVector(RandomizedDividerLengths[Index] / DividerLength, 1.0f, 1.0f)
+				: FVector(
+					RandomizedDividerLengths[Index] / 100.0f,
+					(DividerThickness + 8.0f) / 100.0f,
+					0.012f));
 		}
 		DividerMeshes[Index]->SetRelativeLocation(FVector(DividerCenter, SurfaceZ + DividerHeight * 0.5f + 1.0f));
 		DividerMeshes[Index]->SetRelativeRotation(FRotator(0.0f, DividerYaw, 0.0f));
@@ -755,6 +884,12 @@ void AFlickTestArena::ApplyTestLayout()
 		DividerCapMeshes[Index]->SetRelativeRotation(FRotator(0.0f, DividerYaw, 0.0f));
 		DividerCapMeshes[Index]->SetRelativeScale3D(FVector(
 			(RandomizedDividerLengths[Index] - 8.0f) / 100.0f, DividerThickness * 0.62f / 100.0f, 0.012f));
+		DividerVisualMeshes[Index]->SetRelativeLocation(FVector(DividerCenter, SurfaceZ));
+		DividerVisualMeshes[Index]->SetRelativeRotation(FRotator(0.0f, DividerYaw, 0.0f));
+		DividerVisualMeshes[Index]->SetRelativeScale3D(FVector(
+			RandomizedDividerLengths[Index] / DividerLength,
+			DividerThickness / 18.0f,
+			DividerHeight / 56.0f));
 	}
 }
 
@@ -771,12 +906,23 @@ void AFlickTestArena::CreateRuntimeMaterials()
 		DividerMaterials.Reserve(MechanismCount);
 		for (int32 Index = 0; Index < MechanismCount; ++Index)
 		{
-			UMaterialInstanceDynamic* Accent = ZoneOuterMeshes[Index]->CreateAndSetMaterialInstanceDynamic(0);
+			UMaterialInstanceDynamic* Accent = bUsingWorkshopAssets
+				? CreateAccentMaterial(ZoneOuterMeshes[Index])
+				: ZoneOuterMeshes[Index]->CreateAndSetMaterialInstanceDynamic(0);
 			AccentMaterials.Add(Accent);
-			DotMaterials.Add(ZoneDotMeshes[Index]->CreateAndSetMaterialInstanceDynamic(0));
-			TraceMaterials.Add(SignalTraceMeshes[Index]->CreateAndSetMaterialInstanceDynamic(0));
-			DividerCapMeshes[Index]->SetMaterial(0, Accent);
-			DividerMaterials.Add(DividerMeshes[Index]->CreateAndSetMaterialInstanceDynamic(0));
+			DotMaterials.Add(bUsingWorkshopAssets
+				? CreateAccentMaterial(ZoneDotMeshes[Index])
+				: ZoneDotMeshes[Index]->CreateAndSetMaterialInstanceDynamic(0));
+			TraceMaterials.Add(bUsingWorkshopAssets
+				? CreateAccentMaterial(SignalTraceMeshes[Index])
+				: SignalTraceMeshes[Index]->CreateAndSetMaterialInstanceDynamic(0));
+			if (!bUsingWorkshopAssets)
+			{
+				DividerCapMeshes[Index]->SetMaterial(0, Accent);
+			}
+			DividerMaterials.Add(bUsingWorkshopAssets
+				? CreateAccentMaterial(DividerVisualMeshes[Index])
+				: DividerMeshes[Index]->CreateAndSetMaterialInstanceDynamic(0));
 		}
 	}
 	if (!ZoneInsetMaterial)
@@ -789,10 +935,12 @@ void AFlickTestArena::CreateRuntimeMaterials()
 	}
 	if (!DormantSocketMaterial)
 	{
-		DormantSocketMaterial = DividerBaseMeshes[0]->CreateAndSetMaterialInstanceDynamic(0);
+		DormantSocketMaterial = bUsingWorkshopAssets
+			? CreateAccentMaterial(DividerBaseMeshes[0])
+			: DividerBaseMeshes[0]->CreateAndSetMaterialInstanceDynamic(0);
 		for (int32 Index = 1; Index < DividerBaseMeshes.Num(); ++Index)
 		{
-			DividerBaseMeshes[Index]->SetMaterial(0, DormantSocketMaterial);
+			SetAccentMaterial(DividerBaseMeshes[Index], DormantSocketMaterial);
 		}
 	}
 	// Matte, non-emissive surfaces preserve puck readability and avoid adding bloom.
@@ -848,12 +996,18 @@ void AFlickTestArena::ApplyMechanismState()
 			bPending ? FLinearColor(0.95f, 0.96f, 0.87f, 1.0f) : BaseColor, 0.72f);
 		SetMaterialColor(TraceMaterials.IsValidIndex(Index) ? TraceMaterials[Index] : nullptr,
 			FLinearColor(BaseColor.R, BaseColor.G, BaseColor.B, 1.0f) * (bPending ? 0.65f : bRaised ? 0.4f : 0.18f), 0.9f);
-		DividerCapMeshes[Index]->SetVisibility(bRaised);
+		DividerCapMeshes[Index]->SetVisibility(bRaised && !bUsingWorkshopAssets);
+		DividerCapMeshes[Index]->SetHiddenInGame(!bRaised || bUsingWorkshopAssets);
+		if (DividerVisualMeshes.IsValidIndex(Index) && DividerVisualMeshes[Index])
+		{
+			DividerVisualMeshes[Index]->SetVisibility(bRaised && bUsingWorkshopAssets, true);
+			DividerVisualMeshes[Index]->SetHiddenInGame(!bRaised || !bUsingWorkshopAssets, true);
+		}
 
 		if (DividerMeshes.IsValidIndex(Index) && DividerMeshes[Index])
 		{
-			DividerMeshes[Index]->SetVisibility(bRaised, true);
-			DividerMeshes[Index]->SetHiddenInGame(!bRaised, true);
+			DividerMeshes[Index]->SetVisibility(bRaised && !bUsingWorkshopAssets, true);
+			DividerMeshes[Index]->SetHiddenInGame(!bRaised || bUsingWorkshopAssets, true);
 			DividerMeshes[Index]->SetCollisionEnabled(
 				bRaised ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 		}
