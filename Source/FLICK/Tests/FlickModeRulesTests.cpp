@@ -56,6 +56,8 @@ bool FFlickModeRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("BOB starts with twelve objective pucks per team"), Bob.StartingPiecesPerTeam, 12);
 	TestEqual(TEXT("BOB is a single-board match"), Bob.RoundsToWin, 1);
 	TestEqual(TEXT("BOB uses its isolated ruleset"), Bob.Ruleset, EFlickRuleset::Bob);
+	TestTrue(TEXT("Knockout playlists use the promoted Switchyard arena"), Classic.bUseSwitchyardArena);
+	TestFalse(TEXT("BOB retains its dedicated pocket board"), Bob.bUseSwitchyardArena);
 	TestFalse(TEXT("BOB disables simultaneous Knockout kickoff"), Bob.bUseSimultaneousKickoff);
 	TestFalse(TEXT("BOB disables special-puck loadouts"), Bob.bSupportsLoadouts);
 	TestTrue(TEXT("BOB pucks use less surface friction than Knockout"), Bob.PieceFriction < Classic.PieceFriction);

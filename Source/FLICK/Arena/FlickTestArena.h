@@ -10,7 +10,7 @@ class UPrimitiveComponent;
 class UStaticMeshComponent;
 
 /**
- * Isolated arena-mechanic prototype used only by the Test playlist.
+ * Switchyard arena presentation and divider mechanics used by Knockout playlists.
  * Switch graphics are non-colliding; their edge dividers are the only added physics.
  */
 UCLASS()

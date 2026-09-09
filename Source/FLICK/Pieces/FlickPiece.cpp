@@ -4,6 +4,7 @@
 #include "Components/TextRenderComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Core/FlickLog.h"
+#include "Core/FlickModeRules.h"
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Engine/Font.h"
 #include "Engine/StaticMesh.h"
@@ -263,6 +264,7 @@ void AFlickPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AFlickPiece, bEliminated);
 	DOREPLIFETIME(AFlickPiece, bKickoffLocked);
 	DOREPLIFETIME(AFlickPiece, bBobStriker);
+	DOREPLIFETIME(AFlickPiece, bHighDetailVisualsEnabled);
 	DOREPLIFETIME(AFlickPiece, PieceRadius);
 	DOREPLIFETIME(AFlickPiece, PieceThickness);
 	DOREPLIFETIME(AFlickPiece, PieceMassKg);
@@ -609,6 +611,14 @@ void AFlickPiece::SetKickoffLocked(const bool bInKickoffLocked)
 void AFlickPiece::OnRep_KickoffLocked()
 {
 	ApplyVisuals();
+}
+
+void AFlickPiece::OnRep_HighDetailVisuals()
+{
+	if (bHighDetailVisualsEnabled)
+	{
+		EnableTestArenaVisuals();
+	}
 }
 
 void AFlickPiece::PlayImpactFlash(const float Strength)
@@ -1130,7 +1140,13 @@ bool AFlickPiece::HasTestArenaVisuals() const
 
 void AFlickPiece::EnableTestArenaVisuals()
 {
-	if (GetNetMode() == NM_DedicatedServer || bBobStriker || HasTestArenaVisuals()) return;
+	if (HasTestArenaVisuals()) return;
+	bHighDetailVisualsEnabled = true;
+	if (HasAuthority())
+	{
+		ForceNetUpdate();
+	}
+	if (GetNetMode() == NM_DedicatedServer) return;
 	static const TCHAR* Names[] = {TEXT("Standard"), TEXT("Heavy"), TEXT("Striker"),
 		TEXT("Grippy"), TEXT("Slider"), TEXT("Blocker"), TEXT("Compact"), TEXT("Bouncer"), TEXT("Toppler")};
 	const int32 Index = static_cast<int32>(Archetype);
@@ -1199,13 +1215,17 @@ void AFlickPiece::EnableTestArenaVisuals()
 			}
 		}
 	}
-	// Cancel only the legacy cylinder's inherited scale. The imported mesh then renders
-	// at its authored dimensions: diameter still matches gameplay, while art-only Z
-	// proportions can distinguish low and tall classes without touching Chaos collision.
+	// Convert from the root cylinder's gameplay scale to the high-detail mesh's authored
+	// Classic dimensions. This is normally an identity transform, but it also scales the
+	// Standard art down correctly for BOB's smaller physics pucks.
+	const FFlickModeRules& ClassicRules = FlickModeRules::Get(EFlickMatchVariant::Classic);
+	const FFlickPieceArchetypeRules& ArchetypeRules = FlickPieceArchetypeRules::Get(Archetype);
+	const float AuthoredRadius = ClassicRules.PieceRadius * ArchetypeRules.RadiusMultiplier;
+	const float AuthoredThickness = ClassicRules.PieceThickness * ArchetypeRules.ThicknessMultiplier;
 	WorkshopMesh->SetRelativeScale3D(FVector(
-		50.0f / FMath::Max(PieceRadius, 1.0f),
-		50.0f / FMath::Max(PieceRadius, 1.0f),
-		100.0f / FMath::Max(PieceThickness, 1.0f)));
+		50.0f / FMath::Max(AuthoredRadius, 1.0f),
+		50.0f / FMath::Max(AuthoredRadius, 1.0f),
+		100.0f / FMath::Max(AuthoredThickness, 1.0f)));
 	// A compact, low-energy local light gives the machined rings a controlled
 	// highlight and confines team colour to the deck immediately below the puck.
 	AccentLight->SetAttenuationRadius(64.0f);
@@ -1452,6 +1472,6 @@ void AFlickPiece::ApplyVisuals()
 		: FLinearColor(0.005f, 0.01f, 0.018f, 1.0f)).ToFColor(true));
 	PlayerLabel->SetWorldSize(bSelected ? 29.0f : 26.0f);
 	PlayerLabel->SetVisibility(
-		bShowPlayerIdentity && !bUsingHighDetailPlayerIdentity && !bEliminated);
+		(bBobStriker || (bShowPlayerIdentity && !bUsingHighDetailPlayerIdentity)) && !bEliminated);
 	UpdateTestArenaVisuals();
 }

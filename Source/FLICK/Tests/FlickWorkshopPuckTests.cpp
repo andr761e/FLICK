@@ -158,6 +158,28 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 			Piece->Destroy();
 		}
 	}
+
+	AFlickPiece* BobStriker = World->SpawnActor<AFlickPiece>();
+	if (TestNotNull(TEXT("Spawned BOB striker"), BobStriker))
+	{
+		BobStriker->InitializePiece(
+			EFlickTeam::Player1, 99, 24.0f, 14.0f,
+			EFlickPieceArchetype::Standard, true);
+		BobStriker->EnableTestArenaVisuals();
+		TestTrue(TEXT("BOB striker uses the premium Standard puck mesh"),
+			BobStriker->HasTestArenaVisuals());
+		TInlineComponentArray<UStaticMeshComponent*> BobComponents(BobStriker);
+		for (UStaticMeshComponent* Visual : BobComponents)
+		{
+			if (!Visual || Visual->GetFName() != TEXT("WorkshopMesh") || !Visual->GetStaticMesh()) continue;
+			const FVector Extent = Visual->GetStaticMesh()->GetBounds().BoxExtent * Visual->GetComponentScale();
+			TestTrue(TEXT("BOB Standard art is scaled to its smaller physics radius"),
+				FMath::Max(Extent.X, Extent.Y) <= BobStriker->GetPieceRadius() + 0.2f);
+			TestTrue(TEXT("BOB Standard art is scaled to its smaller physics height"),
+				Extent.Z * 2.0f <= BobStriker->GetPieceThickness() * 1.2f);
+		}
+		BobStriker->Destroy();
+	}
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
 	return true;

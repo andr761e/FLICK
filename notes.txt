@@ -11,5 +11,9 @@ Currently we are testing what the final arenas should look like in the test aren
 Once that is perfected, we will add 
 
 Things to implement;
--
--
+- Make dividers customizeable in Training -> Free play and then 1v1, 2v2 and 3v3 maps. You should probably be able to decide which ones are active in edit game board mode.
+- Private match cannot start. Its stuck on class selection (But starts once the 10 seconds are up)
+- Make 2 distinct main pucks for bobs (the ones you shoot with) so its easier to tell them apart from the rest. Use the standard puck as the skeleton and then make it slightly different. Remember to make 1 for both teams
+- Add tutorials under training. 
+- Make a high detail map for BOB in Blender (keep same dimensions as now). And make sorroundings for the BOB arena
+- Make arena showcases lighter

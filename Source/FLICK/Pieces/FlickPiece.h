@@ -32,7 +32,7 @@ public:
 		int32 InOwningPlayerSlot = 0,
 		bool bInShowPlayerIdentity = false);
 	void ApplyPhysicsSettings();
-	/** Cosmetic mesh for the divider test arena; the existing root remains the physics body. */
+	/** Premium cosmetic mesh; the existing root remains the authoritative physics body. */
 	void EnableTestArenaVisuals();
 	bool HasTestArenaVisuals() const;
 	void Launch(const FVector& Direction, float NormalizedPower, float MaxLaunchSpeed);
@@ -109,6 +109,9 @@ private:
 	UFUNCTION()
 	void OnRep_KickoffLocked();
 
+	UFUNCTION()
+	void OnRep_HighDetailVisuals();
+
 	void ApplyEliminatedState();
 
 	UFUNCTION()
@@ -131,6 +134,9 @@ private:
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> WorkshopTeamMaterials;
 	bool bUsingHighDetailPuck = false;
 	bool bUsingHighDetailPlayerIdentity = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_HighDetailVisuals)
+	bool bHighDetailVisualsEnabled = false;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PieceMesh;

@@ -12,6 +12,7 @@ namespace
 		Rules.StartingPiecesPerTeam = 12;
 		Rules.RoundsToWin = 1;
 		Rules.Ruleset = EFlickRuleset::Bob;
+		Rules.bUseSwitchyardArena = false;
 		Rules.bUseSimultaneousKickoff = false;
 		Rules.bSupportsLoadouts = false;
 		Rules.ArenaRadius = 620.0f;

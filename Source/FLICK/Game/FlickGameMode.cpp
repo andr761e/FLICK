@@ -3133,7 +3133,10 @@ void AFlickGameMode::StartSelectedMatch()
 void AFlickGameMode::BeginSelectedMatch()
 {
 	bClassSelectionStartsTrainingBotMatch = false;
-	bTestArenaMode = false;
+	// Switchyard has graduated from the isolated Test playlist and is now the
+	// authoritative arena for every Classic match format. BOB keeps its own
+	// pocket board, but shares the premium puck presentation below.
+	bTestArenaMode = FlickModeRules::Get(NormalizeMatchVariant(SelectedMatchVariant)).bUseSwitchyardArena;
 	if (SelectedMatchVariant == EFlickMatchVariant::Classic)
 	{
 		EnsureActivePlayerClasses(MatchmakingPlayersPerTeam);
@@ -3169,13 +3172,11 @@ void AFlickGameMode::BeginSelectedMatch()
 
 void AFlickGameMode::StartTrainingMode()
 {
-	bTestArenaMode = false;
 	BeginTrainingActivity(false);
 }
 
 void AFlickGameMode::StartTrainingBotMatch()
 {
-	bTestArenaMode = false;
 	if (GetNetMode() != NM_Standalone
 		|| bNetworkMatchRequested
 		|| bPartyRequested
@@ -3198,24 +3199,6 @@ void AFlickGameMode::StartTrainingBotMatch()
 	PrepareClassSelection(false);
 }
 
-void AFlickGameMode::StartTestArenaBotMatch(const int32 PlayersPerTeam)
-{
-	if (GetNetMode() != NM_Standalone
-		|| bNetworkMatchRequested
-		|| bPartyRequested
-		|| bMatchmakingRequested)
-	{
-		UE_LOG(LogFlick, Warning, TEXT("Test arena bot match rejected because the current session is not offline"));
-		return;
-	}
-
-	bTestArenaMode = true;
-	MatchmakingPlayersPerTeam = FlickTeamRules::ClampPlayersPerTeam(PlayersPerTeam);
-	SelectedMatchVariant = EFlickMatchVariant::Classic;
-	bClassSelectionStartsTrainingBotMatch = true;
-	PrepareClassSelection(false);
-}
-
 void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 {
 	if (GetNetMode() != NM_Standalone
@@ -3226,6 +3209,7 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 		UE_LOG(LogFlick, Warning, TEXT("Training start rejected because the current session is not offline"));
 		return;
 	}
+	bTestArenaMode = FlickModeRules::Get(NormalizeMatchVariant(SelectedMatchVariant)).bUseSwitchyardArena;
 
 	UGameplayStatics::SetGamePaused(this, false);
 	bTrainingMode = true;
@@ -6175,29 +6159,16 @@ void AFlickGameMode::SpawnArenaIfNeeded()
 	{
 		return;
 	}
-	if (bTestArenaMode)
-	{
-		TestArenaActor = GetWorld()->SpawnActor<AFlickTestArena>(
-			AFlickTestArena::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
-		ArenaActor = TestArenaActor;
-	}
-	else
-	{
-		TestArenaActor = nullptr;
-		ArenaActor = GetWorld()->SpawnActor<AFlickArena>(
-			AFlickArena::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
-	}
+	// Every Knockout format now uses the promoted Switchyard arena. AFlickArena remains
+	// the shared collision/base class behind AFlickTestArena, but is no longer spawned
+	// as the old procedural presentation.
+	TestArenaActor = GetWorld()->SpawnActor<AFlickTestArena>(
+		AFlickTestArena::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+	ArenaActor = TestArenaActor;
 	if (ArenaActor)
 	{
-		if (TestArenaActor)
-		{
-			TestArenaActor->InitializeTestArena(
-				ArenaRadius, ArenaThickness, ArenaSurfaceZ, CurrentPlayersPerTeam);
-		}
-		else
-		{
-			ArenaActor->InitializeArena(ArenaRadius, ArenaThickness, ArenaSurfaceZ, CurrentPlayersPerTeam);
-		}
+		TestArenaActor->InitializeTestArena(
+			ArenaRadius, ArenaThickness, ArenaSurfaceZ, CurrentPlayersPerTeam);
 	}
 }
 
@@ -6772,6 +6743,9 @@ void AFlickGameMode::ApplyMatchConfiguration(
 {
 	ActiveMatchVariant = NormalizeMatchVariant(Variant);
 	const FFlickModeRules& Rules = FlickModeRules::Get(ActiveMatchVariant);
+	// Keep the menu showcase and every route into a match on the same arena family.
+	// Bob has its own arena; all Knockout team sizes use Switchyard.
+	bTestArenaMode = Rules.bUseSwitchyardArena;
 	CurrentPlayersPerTeam = ActiveMatchVariant == EFlickMatchVariant::Bob
 		? 1
 		: FlickTeamRules::ClampPlayersPerTeam(PlayersPerTeam);
@@ -8616,7 +8590,7 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 		bIsBobStriker,
 		OwningPlayerSlot,
 		bShowPlayerIdentity);
-	if (bTestArenaMode)
+	if (bTestArenaMode || IsBobMode())
 	{
 		Piece->EnableTestArenaVisuals();
 	}

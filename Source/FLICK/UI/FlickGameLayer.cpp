@@ -844,14 +844,6 @@ namespace
 				Draw({Center + FVector2D(0.0f, -27.0f), Center + FVector2D(0.0f, -17.0f)});
 				Draw({Center + FVector2D(27.0f, 0.0f), Center + FVector2D(17.0f, 0.0f)});
 				break;
-			case EFlickPlayPlaylist::Test:
-				Draw(Circle(Center + FVector2D(-18.0f, 14.0f), 7.0f), 1.7f);
-				Draw(Circle(Center + FVector2D(18.0f, -14.0f), 7.0f), 1.7f);
-				Draw({Center + FVector2D(-11.0f, 14.0f), Center + FVector2D(9.0f, 14.0f), Center + FVector2D(9.0f, 2.0f)}, 1.5f, 0.78f);
-				Draw({Center + FVector2D(11.0f, -14.0f), Center + FVector2D(-9.0f, -14.0f), Center + FVector2D(-9.0f, -2.0f)}, 1.5f, 0.78f);
-				Draw({Center + FVector2D(-28.0f, 0.0f), Center + FVector2D(-5.0f, 0.0f)}, 3.0f);
-				Draw({Center + FVector2D(5.0f, 0.0f), Center + FVector2D(28.0f, 0.0f)}, 3.0f);
-				break;
 			case EFlickPlayPlaylist::PrivateMatch:
 				Draw({Center + FVector2D(-17.0f, -3.0f), Center + FVector2D(-17.0f, 20.0f), Center + FVector2D(17.0f, 20.0f), Center + FVector2D(17.0f, -3.0f), Center + FVector2D(-17.0f, -3.0f)}, 1.7f);
 				Draw({Center + FVector2D(-11.0f, -3.0f), Center + FVector2D(-11.0f, -13.0f), Center + FVector2D(-6.0f, -20.0f), Center + FVector2D(6.0f, -20.0f), Center + FVector2D(11.0f, -13.0f), Center + FVector2D(11.0f, -3.0f)}, 1.7f);
@@ -3845,8 +3837,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 						? Orange.CopyWithNewOpacity(0.88f)
 						: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
 							? FLinearColor(0.2f, 0.78f, 0.5f, 0.88f)
-							: SelectedPlayPlaylist == EFlickPlayPlaylist::Test
-								? FLinearColor(0.62f, 0.36f, 0.95f, 0.88f)
 							: Brand.CopyWithNewOpacity(0.82f);
 				})
 				.UseAccentForOutline(true)
@@ -3879,7 +3869,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							{
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::None) return FText::FromString(TEXT("FIND YOUR NEXT RIVALRY."));
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training && SelectedTrainingActivity == EFlickTrainingActivity::None) return FText::FromString(TEXT("TRAINING"));
-								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Test) return FText::FromString(TEXT("TEST"));
 								return FText::FromString(TEXT("SELECT MATCH FORMAT"));
 							})
 							.Font(DisplayFont(30))
@@ -3892,7 +3881,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							{
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::None) return FText::FromString(TEXT("CHOOSE HOW YOU WANT TO PLAY"));
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training && SelectedTrainingActivity == EFlickTrainingActivity::None) return FText::FromString(TEXT("CHOOSE A TRAINING ACTIVITY"));
-								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Test) return FText::FromString(TEXT("SWITCHYARD  /  THE DIVIDER EXPERIMENT"));
 								return FText::FromString(TEXT("SET THE ARENA RULESET AND TEAM SIZE"));
 							})
 							.Font(UiFont(10, true))
@@ -3913,91 +3901,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							{
 								return FText::FromString(SelectedPlayPlaylist == EFlickPlayPlaylist::None
 									? TEXT("01  //  MODE")
-									: SelectedPlayPlaylist == EFlickPlayPlaylist::Test
-										? TEXT("02  //  EXPERIMENT")
-										: TEXT("02  //  FORMAT"));
+									: TEXT("02  //  FORMAT"));
 							})
 							.Font(UiFont(13, true)).ColorAndOpacity(Brand)
 						]
-					]
-				]
-			]
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(28.0f, 116.0f, 28.0f, 98.0f)
-		[
-			SNew(SBox)
-			.WidthOverride(UiMetrics::ModeContentWidth)
-			.Visibility_Lambda([this]()
-			{
-				return SelectedPlayPlaylist == EFlickPlayPlaylist::Test
-					? EVisibility::Visible
-					: EVisibility::Collapsed;
-			})
-			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight().Padding(UiMetrics::CardGap)
-				[
-					SNew(SFlickAngularBorder)
-					.BackgroundColor(PanelRaised)
-					.AccentColor(FLinearColor(0.62f, 0.36f, 0.95f, 0.72f))
-					.CutSize(8.0f)
-					.BorderWidth(0.9f)
-					.Padding(FMargin(18.0f, 2.0f))
-					[
-						MakeCycleRow(
-							TEXT("BOT DIFFICULTY"),
-							TAttribute<FText>::CreateLambda([this]()
-							{
-								return FText::FromString(GameMode.IsValid() ? GameMode->GetBotDifficultyLabel() : TEXT("NORMAL"));
-							}),
-							FOnClicked::CreateLambda([this]()
-							{
-								if (GameMode.IsValid()) GameMode->CycleBotDifficulty(-1);
-								return FReply::Handled();
-							}),
-							FOnClicked::CreateLambda([this]()
-							{
-								if (GameMode.IsValid()) GameMode->CycleBotDifficulty(1);
-								return FReply::Handled();
-							}))
-					]
-				]
-				+ SVerticalBox::Slot().AutoHeight()
-				[
-					SNew(SUniformGridPanel)
-					.SlotPadding(FMargin(UiMetrics::CardGap))
-					+ SUniformGridPanel::Slot(0, 0)
-					[
-						BuildTrainingActivityCard(
-							EFlickTrainingActivity::ArenaControlBotMatch,
-							TEXT("SWITCHYARD 1V1"),
-							TEXT("Shape the compact board with linked switches, then beat the bot."),
-							TEXT("8 ACTIVE  /  20 LOCATIONS"),
-							FLinearColor(0.62f, 0.36f, 0.95f, 1.0f),
-							&TestActivityDefaultButton,
-							1)
-					]
-					+ SUniformGridPanel::Slot(1, 0)
-					[
-						BuildTrainingActivityCard(
-							EFlickTrainingActivity::ArenaControlBotMatch,
-							TEXT("SWITCHYARD 2V2"),
-							TEXT("Coordinate two lineups across a larger, denser switchyard."),
-							TEXT("12 ACTIVE  /  28 LOCATIONS"),
-							FLinearColor(0.30f, 0.58f, 0.96f, 1.0f),
-							nullptr,
-							2)
-					]
-					+ SUniformGridPanel::Slot(2, 0)
-					[
-						BuildTrainingActivityCard(
-							EFlickTrainingActivity::ArenaControlBotMatch,
-							TEXT("SWITCHYARD 3V3"),
-							TEXT("Six lineups collide inside the most chaotic experimental layout."),
-							TEXT("14 ACTIVE  /  36 LOCATIONS"),
-							FLinearColor(0.82f, 0.32f, 0.86f, 1.0f),
-							nullptr,
-							3)
 					]
 				]
 			]
@@ -4013,7 +3920,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 				+ SGridPanel::Slot(1, 0).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Competitive, TEXT("COMPETITIVE"), TEXT("RANKED ONLINE MATCHES WITH MMR"), Orange, true)]
 				+ SGridPanel::Slot(0, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Training, TEXT("TRAINING"), TEXT("PRACTICE FREELY OR PLAY KNOCKOUT AND BOB AGAINST THE BOT"), FLinearColor(0.2f, 0.78f, 0.5f, 1.0f), true)]
 				+ SGridPanel::Slot(1, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::PrivateMatch, TEXT("PRIVATE MATCH"), TEXT("CUSTOM RULES, FLEXIBLE TEAMS, AND SPECTATORS"), FLinearColor(0.65f, 0.72f, 0.8f, 1.0f), true)]
-				+ SGridPanel::Slot(0, 2).ColumnSpan(2).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Test, TEXT("TEST"), TEXT("SWITCHYARD  /  LINKED SWITCHES. MOVING DIVIDERS. NEW ANGLES."), FLinearColor(0.62f, 0.36f, 0.95f, 1.0f), true)]
 			]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(28.0f, 116.0f, 28.0f, 98.0f)
@@ -4152,7 +4058,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 						{
 							return SelectedPlayPlaylist != EFlickPlayPlaylist::None
 								&& SelectedPlayPlaylist != EFlickPlayPlaylist::Training
-								&& SelectedPlayPlaylist != EFlickPlayPlaylist::Test
 								&& GameMode.IsValid()
 								&& GameMode->DoesSelectedModeSupportLoadouts()
 								? EVisibility::Visible
@@ -4550,36 +4455,26 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 	const FString& Summary,
 	const FString& Detail,
 	const FLinearColor& Accent,
-	TSharedPtr<SButton>* OutButton,
-	const int32 TestPlayersPerTeam)
+	TSharedPtr<SButton>* OutButton)
 {
-	const bool bTestActivity = Activity == EFlickTrainingActivity::ArenaControlBotMatch;
 	TSharedRef<SButton> CardButton = SNew(SButton)
 		.ButtonStyle(&TransparentButtonStyle)
 		.ContentPadding(0.0f)
 		.Cursor(EMouseCursor::Hand)
-		.OnClicked_Lambda([this, Activity, bTestActivity, TestPlayersPerTeam]()
+		.OnClicked_Lambda([this, Activity]()
 		{
 			if (GameMode.IsValid())
 			{
-				GameMode->SetMatchmakingPlayersPerTeam(bTestActivity ? TestPlayersPerTeam : 1);
+				GameMode->SetMatchmakingPlayersPerTeam(1);
 				const bool bBotMatch = Activity == EFlickTrainingActivity::BotMatch
-					|| Activity == EFlickTrainingActivity::BobBotMatch
-					|| bTestActivity;
+					|| Activity == EFlickTrainingActivity::BobBotMatch;
 				GameMode->SelectMatchVariant(
 					Activity == EFlickTrainingActivity::BobBotMatch
 						? EFlickMatchVariant::Bob
 						: EFlickMatchVariant::Classic);
 				if (bBotMatch)
 				{
-					if (bTestActivity)
-					{
-						GameMode->StartTestArenaBotMatch(TestPlayersPerTeam);
-					}
-					else
-					{
-						GameMode->StartTrainingBotMatch();
-					}
+					GameMode->StartTrainingBotMatch();
 					return FReply::Handled();
 				}
 			}
@@ -4609,7 +4504,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().FillWidth(1.0f)
-					[SNew(STextBlock).Text(FText::FromString(bTestActivity ? TEXT("THE LAB  /  EXPERIMENTAL") : TEXT("PRACTICE  /  OFFLINE"))).Font(UiFont(10, true)).ColorAndOpacity(Accent)]
+					[SNew(STextBlock).Text(FText::FromString(TEXT("PRACTICE  /  OFFLINE"))).Font(UiFont(10, true)).ColorAndOpacity(Accent)]
 					+ SHorizontalBox::Slot().AutoWidth()
 					[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(12, true)).ColorAndOpacity(Brand)]
 				]

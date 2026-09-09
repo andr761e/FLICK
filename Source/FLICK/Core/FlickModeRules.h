@@ -16,6 +16,7 @@ struct FLICK_API FFlickModeRules
 	int32 StartingPiecesPerTeam = 4;
 	int32 RoundsToWin = 3;
 	EFlickRuleset Ruleset = EFlickRuleset::Knockout;
+	bool bUseSwitchyardArena = true;
 	bool bUseSimultaneousKickoff = true;
 	bool bSupportsLoadouts = true;
 	float ArenaRadius = 650.0f;

@@ -23,7 +23,6 @@ enum class EFlickPlayPlaylist : uint8
 	Casual,
 	Competitive,
 	Training,
-	Test,
 	PrivateMatch
 };
 
@@ -32,8 +31,7 @@ enum class EFlickTrainingActivity : uint8
 	None,
 	FreePlay,
 	BotMatch,
-	BobBotMatch,
-	ArenaControlBotMatch
+	BobBotMatch
 };
 
 enum class EFlickProfileTab : uint8
@@ -118,8 +116,7 @@ private:
 		const FString& Summary,
 		const FString& Detail,
 		const FLinearColor& Accent,
-		TSharedPtr<SButton>* OutButton = nullptr,
-		int32 TestPlayersPerTeam = 1);
+		TSharedPtr<SButton>* OutButton = nullptr);
 	TSharedRef<SWidget> BuildPlayFormatCard(
 		int32 PlayersPerTeam,
 		bool bBob,
@@ -218,7 +215,6 @@ private:
 	TSharedPtr<SButton> ProfileDefaultButton;
 	TSharedPtr<SButton> ModeSelectDefaultButton;
 	TSharedPtr<SButton> TrainingActivityDefaultButton;
-	TSharedPtr<SButton> TestActivityDefaultButton;
 	TSharedPtr<SButton> ModeFormatDefaultButton;
 	TSharedPtr<SButton> PrivateMatchDefaultButton;
 	TSharedPtr<SButton> OnlineBrowserDefaultButton;

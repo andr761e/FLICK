@@ -270,7 +270,6 @@ public:
 	void OpenClassChange();
 	void StartTrainingMode();
 	void StartTrainingBotMatch();
-	void StartTestArenaBotMatch(int32 PlayersPerTeam = 1);
 	void ToggleTrainingEditMode();
 	void SetTrainingPlacementTeam(EFlickTeam Team);
 	void CycleTrainingPlacementArchetype(int32 Direction);
