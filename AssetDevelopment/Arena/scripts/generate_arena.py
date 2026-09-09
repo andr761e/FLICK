@@ -121,6 +121,26 @@ def curve_line(name,points,z,width,material,cyclic=False,height=.006):
     obj.location.z=z; obj.scale.z=height/max(width,1e-4)
     obj.data.materials.append(material); return obj
 
+def cross_inlay(name,half_length,width,bottom,top,material):
+    """One watertight plus-shaped prism with no coplanar self-overlap."""
+    half_width=width*.5
+    outline=[
+        (-half_length,-half_width),(-half_width,-half_width),
+        (-half_width,-half_length),(half_width,-half_length),
+        (half_width,-half_width),(half_length,-half_width),
+        (half_length,half_width),(half_width,half_width),
+        (half_width,half_length),(-half_width,half_length),
+        (-half_width,half_width),(-half_length,half_width),
+    ]
+    count=len(outline)
+    vertices=[(x,y,bottom) for x,y in outline]+[(x,y,top) for x,y in outline]
+    faces=[tuple(reversed(range(count))),tuple(range(count,count*2))]
+    faces += [(index,(index+1)%count,(index+1)%count+count,index+count)
+              for index in range(count)]
+    mesh=bpy.data.meshes.new(name); mesh.from_pydata(vertices,[],faces); mesh.update()
+    obj=bpy.data.objects.new(name,mesh); scene.collection.objects.link(obj)
+    return finish(obj,name,material,0.0)
+
 def join_asset(name,objects,origin=(0,0,0)):
     bpy.ops.object.select_all(action='DESELECT')
     for obj in objects: obj.select_set(True)
@@ -174,24 +194,30 @@ parts += [ring('Inner rim shadow',arena_radius*.960,arena_radius*.967,-.006,.012
 parts += [ring('Top rail chamfer',arena_radius*.969,arena_radius*.996,-.008,.016,accent_metal,192)]
 
 # Layered center target: a pale inset, dark separation groove and fine metal lip.
+# Marking tops are baked at 5 mm (dark) and 7 mm (bright) above the visual
+# surface. These meshes never collide; the separation only gives the depth
+# buffer an unambiguous order at every gameplay-camera angle.
+dark_marking_top=.005
+bright_marking_top=.007
 parts += [cylinder('Center field plate',arena_radius*.142,.006,-.002,center_inset,128,.001)]
 parts += [ring('Center plate shadow',arena_radius*.142,arena_radius*.151,-.0015,.005,recess,128)]
-parts += [ring('Center plate lip',arena_radius*.151,arena_radius*.154,-.001,.004,line_mat,128)]
+parts += [ring('Center plate lip',arena_radius*.151,arena_radius*.154,bright_marking_top-.002,.004,line_mat,128)]
 parts += [cylinder('Center spot recess',.052,.005,-.0015,dark_marking,64,.001)]
-parts += [cylinder('Center spot',.025,.004,-.001,line_mat,48,.001)]
+parts += [cylinder('Center spot',.025,.004,bright_marking_top-.002,line_mat,48,.001)]
 
-# Strong orthogonal axes plus 24 fine radial construction lines match the visual
-# grammar of the normal 1v1 arena without overwhelming the switch information.
-for name,points in (
-    ('Primary center line',[(0,-arena_radius*.945),(0,arena_radius*.945)]),
-    ('Primary cross line',[(-arena_radius*.945,0),(arena_radius*.945,0)])):
-    parts.append(curve_line(name,points,-.002,.014,line_mat))
+# One unified orthogonal axis replaces the former pair of overlapping curves.
+# At two centimetres it still reads as a fine line across a thirteen-metre
+# board, but remains wider than a pixel at every supported gameplay view.
+parts.append(cross_inlay('Primary center cross',arena_radius*.945,.020,
+                         bright_marking_top-.004,bright_marking_top,line_mat))
 for index in range(24):
     angle=2*math.pi*index/24
     start=Vector((math.cos(angle),math.sin(angle)))*arena_radius*.165
     end=Vector((math.cos(angle),math.sin(angle)))*arena_radius*.925
-    width=.010 if index%3==0 else .006
-    parts.append(curve_line('Radial field spoke',[(start.x,start.y),(end.x,end.y)],-.002,width,dark_marking))
+    # Nine millimetres is the minimum stable screen-space width at the most
+    # oblique supported camera angle. Major spokes remain slightly stronger.
+    width=.012 if index%3==0 else .009
+    parts.append(curve_line('Radial field spoke',[(start.x,start.y),(end.x,end.y)],dark_marking_top-.003,width,dark_marking))
 
 # Segmented circular records read like the dashed rings in the original Unreal
 # construction, but each dash has a tiny bevel and proper metallic response.
@@ -201,7 +227,7 @@ for ring_index,fraction in enumerate((.36,.52,.705,.855)):
     for index in range(segment_count):
         center=2*math.pi*index/segment_count
         half=math.pi/segment_count*(.50 if ring_index<2 else .62)
-        parts.append(arc('Segmented field ring',radius-.010,radius+.010,-.003,.008,
+        parts.append(arc('Segmented field ring',radius-.010,radius+.010,dark_marking_top-.004,.008,
                          center-half,center+half,dark_marking,5))
 
 # Four large cardinal arrows are the brightest non-emissive floor markings.
@@ -209,8 +235,8 @@ for angle in (0,math.pi/2,math.pi,3*math.pi/2):
     radial=Vector((math.cos(angle),math.sin(angle))); tangent=Vector((-radial.y,radial.x))
     tip=radial*arena_radius*.805
     base=radial*arena_radius*.755
-    parts.append(curve_line('Direction arrow left',[(base.x-tangent.x*.25,base.y-tangent.y*.25),(tip.x,tip.y)],-.004,.040,line_mat,height=.010))
-    parts.append(curve_line('Direction arrow right',[(tip.x,tip.y),(base.x+tangent.x*.25,base.y+tangent.y*.25)],-.004,.040,line_mat,height=.010))
+    parts.append(curve_line('Direction arrow left',[(base.x-tangent.x*.25,base.y-tangent.y*.25),(tip.x,tip.y)],bright_marking_top-.005,.040,line_mat,height=.010))
+    parts.append(curve_line('Direction arrow right',[(tip.x,tip.y),(base.x+tangent.x*.25,base.y+tangent.y*.25)],bright_marking_top-.005,.040,line_mat,height=.010))
 
 # Segmented machined rim modules and broad team light rails.
 rim_segments=40

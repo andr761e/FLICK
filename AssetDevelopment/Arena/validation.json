@@ -65,12 +65,12 @@
       "bounds_max_m": [
         6.5,
         6.5,
-        0.001
+        0.007
       ],
       "dimensions_m": [
         13.0,
         13.0,
-        0.501
+        0.507
       ]
     },
     "SM_TestArena_SwitchDot": {

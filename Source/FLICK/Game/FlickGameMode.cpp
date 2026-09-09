@@ -734,7 +734,9 @@ void AFlickGameMode::BeginPlay()
 	{
 		bTestArenaMode = true;
 		SelectedMatchVariant = EFlickMatchVariant::Classic;
-		MatchmakingPlayersPerTeam = 1;
+		int32 TestPlayersPerTeam = MatchmakingPlayersPerTeam;
+		FParse::Value(FCommandLine::Get(), TEXT("FlickPlayersPerTeam="), TestPlayersPerTeam);
+		MatchmakingPlayersPerTeam = FlickTeamRules::ClampPlayersPerTeam(TestPlayersPerTeam);
 		BeginTrainingActivity(true);
 		if (FParse::Param(FCommandLine::Get(), TEXT("FlickTestArenaSettingsPreview")))
 		{
@@ -2249,7 +2251,7 @@ void AFlickGameMode::NotifyArenaImpact(
 		if (TestArenaActor->FindDividerIndex(OtherComponent, DividerIndex))
 		{
 			ResolutionDividerContactPieceIds.Add(Piece->GetPieceId());
-			const uint8 DividerBit = static_cast<uint8>(1 << DividerIndex);
+			const uint16 DividerBit = static_cast<uint16>(1 << DividerIndex);
 			if ((ResolutionNewlyRaisedDividerMask & DividerBit) != 0)
 			{
 				ResolutionNewDividerContactPieceIds.Add(Piece->GetPieceId());
@@ -3196,7 +3198,7 @@ void AFlickGameMode::StartTrainingBotMatch()
 	PrepareClassSelection(false);
 }
 
-void AFlickGameMode::StartTestArenaBotMatch()
+void AFlickGameMode::StartTestArenaBotMatch(const int32 PlayersPerTeam)
 {
 	if (GetNetMode() != NM_Standalone
 		|| bNetworkMatchRequested
@@ -3208,7 +3210,7 @@ void AFlickGameMode::StartTestArenaBotMatch()
 	}
 
 	bTestArenaMode = true;
-	MatchmakingPlayersPerTeam = 1;
+	MatchmakingPlayersPerTeam = FlickTeamRules::ClampPlayersPerTeam(PlayersPerTeam);
 	SelectedMatchVariant = EFlickMatchVariant::Classic;
 	bClassSelectionStartsTrainingBotMatch = true;
 	PrepareClassSelection(false);
@@ -3240,11 +3242,14 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 	if (bAgainstBot)
 	{
 		SelectedMatchVariant = NormalizeMatchVariant(SelectedMatchVariant);
-		MatchmakingPlayersPerTeam = 1;
+		if (!bTestArenaMode)
+		{
+			MatchmakingPlayersPerTeam = 1;
+		}
 		if (SelectedMatchVariant == EFlickMatchVariant::Classic)
 		{
-			EnsureActivePlayerClasses(1);
-			RandomizeOtherLocalPlayerClasses(1);
+			EnsureActivePlayerClasses(MatchmakingPlayersPerTeam);
+			RandomizeOtherLocalPlayerClasses(MatchmakingPlayersPerTeam);
 			bPlayerClassesActiveForMatch = true;
 		}
 		else
@@ -6186,7 +6191,8 @@ void AFlickGameMode::SpawnArenaIfNeeded()
 	{
 		if (TestArenaActor)
 		{
-			TestArenaActor->InitializeTestArena(ArenaRadius, ArenaThickness, ArenaSurfaceZ);
+			TestArenaActor->InitializeTestArena(
+				ArenaRadius, ArenaThickness, ArenaSurfaceZ, CurrentPlayersPerTeam);
 		}
 		else
 		{
@@ -6596,6 +6602,23 @@ int32& AFlickGameMode::GetNextPlayerSlot(const EFlickTeam Team)
 int32 AFlickGameMode::GetNextPlayerSlot(const EFlickTeam Team) const
 {
 	return Team == EFlickTeam::Player2 ? Player2NextPlayerSlot : Player1NextPlayerSlot;
+}
+
+bool AFlickGameMode::GetNextScheduledTurn(EFlickTeam& OutTeam, int32& OutPlayerSlot) const
+{
+	const AFlickGameState* State = GetFlickGameState();
+	if (!State || CurrentPlayersPerTeam <= 1
+		|| State->CurrentTeam == EFlickTeam::None
+		|| State->MatchPhase == EFlickMatchPhase::RoundOver)
+	{
+		OutTeam = EFlickTeam::None;
+		OutPlayerSlot = INDEX_NONE;
+		return false;
+	}
+
+	OutTeam = GetOpposingTeam(State->CurrentTeam);
+	OutPlayerSlot = FindEligiblePlayerSlot(OutTeam, GetNextPlayerSlot(OutTeam));
+	return OutTeam != EFlickTeam::None && OutPlayerSlot != INDEX_NONE;
 }
 
 bool AFlickGameMode::HasActivePieceForPlayer(
@@ -7051,11 +7074,11 @@ void AFlickGameMode::TrackTestArenaControlZones(const float DeltaSeconds)
 {
 	if (bTestArenaMode && IsValid(TestArenaActor))
 	{
-		uint8 DeployedMechanisms = 0;
+		uint16 DeployedMechanisms = 0;
 		ResolutionActivatedSwitchMask |= TestArenaActor->TrackControlZoneCrossings(Pieces, DeltaSeconds, DeployedMechanisms);
 		for (int32 Index = 0; Index < TestArenaActor->GetMechanismCount(); ++Index)
 		{
-			const uint8 Bit = static_cast<uint8>(1 << Index);
+			const uint16 Bit = static_cast<uint16>(1 << Index);
 			if ((DeployedMechanisms & Bit) != 0 && TestArenaActor->IsDividerRaised(Index))
 			{
 				ResolutionNewlyRaisedDividerMask |= Bit;

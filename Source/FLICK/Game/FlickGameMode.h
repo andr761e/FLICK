@@ -58,7 +58,7 @@ struct FFlickReplayPieceState
 struct FFlickRoundReplayFrame
 {
 	float Time = 0.0f;
-	uint8 RaisedDividerMask = 0;
+	uint16 RaisedDividerMask = 0;
 	TArray<FFlickReplayPieceState> Pieces;
 };
 
@@ -174,6 +174,8 @@ public:
 	bool IsPrivateMatch() const { return bPrivateMatchActive; }
 	const FFlickPrivateMatchSettings& GetPrivateMatchSettings() const { return PrivateMatchSettings; }
 	int32 GetPlayersPerTeam() const { return CurrentPlayersPerTeam; }
+	/** Returns the next eligible team/player in the actual alternating turn order. */
+	bool GetNextScheduledTurn(EFlickTeam& OutTeam, int32& OutPlayerSlot) const;
 	int32 GetMatchmakingPlayersPerTeam() const { return MatchmakingPlayersPerTeam; }
 	int32 GetPartyMemberCount() const;
 	AFlickPlayerState* GetPartyMember(int32 PartySlot) const;
@@ -268,7 +270,7 @@ public:
 	void OpenClassChange();
 	void StartTrainingMode();
 	void StartTrainingBotMatch();
-	void StartTestArenaBotMatch();
+	void StartTestArenaBotMatch(int32 PlayersPerTeam = 1);
 	void ToggleTrainingEditMode();
 	void SetTrainingPlacementTeam(EFlickTeam Team);
 	void CycleTrainingPlacementArchetype(int32 Direction);
@@ -749,8 +751,8 @@ private:
 	int32 ResolutionShotPieceId = INDEX_NONE;
 	FVector2D ResolutionShotStart = FVector2D::ZeroVector;
 	bool bResolutionBuzzerRelease = false;
-	uint8 ResolutionActivatedSwitchMask = 0;
-	uint8 ResolutionNewlyRaisedDividerMask = 0;
+	uint16 ResolutionActivatedSwitchMask = 0;
+	uint16 ResolutionNewlyRaisedDividerMask = 0;
 	TMap<int32, FVector2D> ResolutionInitialPieceLocations;
 	TMap<int32, int32> ResolutionContactDepths;
 	TSet<int32> ResolutionDirectContactPieceIds;

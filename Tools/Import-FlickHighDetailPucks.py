@@ -1,4 +1,4 @@
-"""Import the eight high-detail puck meshes and generate blue/orange team variants."""
+"""Import the high-detail puck meshes, team materials, and P1/P2/P3 variants."""
 import json
 from pathlib import Path
 import unreal as u
@@ -58,6 +58,18 @@ orange_diffuser = team_material(
     "MI_Orange_Light_Diffuser", (.125, .022, .002), (1.0, .18, .003), .22)
 orange_emblem = team_material(
     "MI_Orange_Center_Emblem", (.10, .016, .002), (1.0, .18, .003), .23)
+
+identity_colors = {
+    "P1": (.92, .96, 1.0),
+    "P2": (1.0, .06, .72),
+    "P3": (.58, 1.0, .02),
+}
+identity_materials = {
+    identity: team_material(
+        "MI_Player_" + identity,
+        tuple(component * .10 for component in color), color, .20)
+    for identity, color in identity_colors.items()
+}
 
 manifest = json.loads((source_root / "manifests/archetype_exports.json").read_text())
 report = []
@@ -124,4 +136,76 @@ for row in manifest:
     })
 
 (project / "Saved/HighDetailPuckImportReport.json").write_text(json.dumps(report, indent=2))
+
+# Player identity geometry is shared by blue and orange. Import the Blue FBX
+# once per P1/P2/P3 and retain the existing runtime orange material swap for
+# the team-light diffuser; the P-number slot always uses its player material.
+identity_report = []
+for identity in ("P1", "P2", "P3"):
+    identity_destination = destination + "/PlayerIdentity/" + identity
+    u.EditorAssetLibrary.make_directory(identity_destination)
+    rows = json.loads((
+        source_root.parent / "PlayerIdentity" / identity / "Blue" / "manifest.json"
+    ).read_text())
+    for row in rows:
+        name = row["asset"]
+        asset_name = f"SM_Puck_{name}_{identity}_HighDetail"
+        mesh_path = identity_destination + "/" + asset_name
+        if u.EditorAssetLibrary.does_asset_exist(mesh_path):
+            u.EditorAssetLibrary.delete_asset(mesh_path)
+        task = u.AssetImportTask()
+        task.filename = str(
+            source_root.parent / "PlayerIdentity" / identity / "Blue" / "exports" / f"{name}.fbx")
+        task.destination_path = identity_destination
+        task.destination_name = asset_name
+        task.automated = True
+        task.replace_existing = True
+        task.save = True
+        options = u.FbxImportUI()
+        options.import_mesh = True
+        options.import_materials = False
+        options.import_textures = False
+        options.import_as_skeletal = False
+        options.automated_import_should_detect_type = False
+        options.mesh_type_to_import = u.FBXImportType.FBXIT_STATIC_MESH
+        data = options.static_mesh_import_data
+        data.combine_meshes = True
+        data.auto_generate_collision = False
+        data.generate_lightmap_u_vs = False
+        data.normal_import_method = u.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS
+        task.options = options
+        task.factory = u.FbxFactory()
+        assets.import_asset_tasks([task])
+        mesh = u.load_asset(mesh_path)
+        if not isinstance(mesh, u.StaticMesh):
+            raise RuntimeError(asset_name + ": identity mesh import failed")
+        slots = mesh.get_editor_property("static_materials")
+        if len(slots) != 7:
+            raise RuntimeError(asset_name + ": expected seven material sections")
+        mapped = []
+        for slot_index, slot in enumerate(slots):
+            slot_name = str(slot.get_editor_property("material_slot_name"))
+            normalized = slot_name.replace("_", " ").lower()
+            if "player identity" in normalized:
+                mesh.set_material(slot_index, identity_materials[identity])
+                mapped.append("Player identity " + identity)
+                continue
+            matches = [key for key in materials
+                       if "center emblem" not in key.lower() and key.lower() in normalized]
+            if len(matches) != 1:
+                raise RuntimeError(asset_name + ": unknown material slot " + slot_name)
+            mesh.set_material(slot_index, materials[matches[0]])
+            mapped.append(matches[0])
+        bounds = mesh.get_bounds()
+        measured = [bounds.box_extent.x * 2.0, bounds.box_extent.y * 2.0, bounds.box_extent.z * 2.0]
+        expected = row["dimensions_cm"]
+        if max(abs(actual - wanted) for actual, wanted in zip(measured, expected)) > .3:
+            raise RuntimeError(asset_name + ": dimensions mismatch " + str(measured))
+        if bounds.origin.length() > 1.0:
+            raise RuntimeError(asset_name + ": pivot is not centered " + str(bounds.origin))
+        u.EditorAssetLibrary.save_loaded_asset(mesh)
+        identity_report.append({"asset": asset_name, "dimensions_cm": measured, "materials": mapped})
+
+(project / "Saved/PlayerIdentityPuckImportReport.json").write_text(
+    json.dumps(identity_report, indent=2))
 u.log("FLICK_HIGH_DETAIL_PUCK_IMPORT_COMPLETE")

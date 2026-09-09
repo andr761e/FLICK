@@ -282,7 +282,9 @@ void AFlickCameraPawn::ResetGameplayView(const int32 InViewIndex, const bool bRe
 	if (bResetElevation && !bGameplayElevationLocked)
 	{
 		GameplayElevationPresetIndex = 1;
-		SetGameplayElevation(TacticalGameplayElevation, false);
+		SetGameplayElevation(
+			bTestArenaPresentation ? TestArenaTacticalGameplayElevation : TacticalGameplayElevation,
+			false);
 	}
 	ShakeTrauma = 0.0f;
 	bGameplayViewTransitioning = !bMenuPresentation;
@@ -300,9 +302,9 @@ void AFlickCameraPawn::AdjustGameplayElevation(const int32 StepDirection)
 		2);
 	const float PresetElevations[] =
 	{
-		LowGameplayElevation,
-		TacticalGameplayElevation,
-		OverviewGameplayElevation
+		bTestArenaPresentation ? TestArenaLowGameplayElevation : LowGameplayElevation,
+		bTestArenaPresentation ? TestArenaTacticalGameplayElevation : TacticalGameplayElevation,
+		bTestArenaPresentation ? TestArenaOverviewGameplayElevation : OverviewGameplayElevation
 	};
 	SetGameplayElevation(PresetElevations[GameplayElevationPresetIndex]);
 }
@@ -325,9 +327,9 @@ void AFlickCameraPawn::SetGameplayElevation(const float InElevation, const bool 
 	GameplayElevationAngle = NewElevation;
 	const float PresetElevations[] =
 	{
-		LowGameplayElevation,
-		TacticalGameplayElevation,
-		OverviewGameplayElevation
+		bTestArenaPresentation ? TestArenaLowGameplayElevation : LowGameplayElevation,
+		bTestArenaPresentation ? TestArenaTacticalGameplayElevation : TacticalGameplayElevation,
+		bTestArenaPresentation ? TestArenaOverviewGameplayElevation : OverviewGameplayElevation
 	};
 	float ClosestDistance = TNumericLimits<float>::Max();
 	for (int32 PresetIndex = 0; PresetIndex < UE_ARRAY_COUNT(PresetElevations); ++PresetIndex)

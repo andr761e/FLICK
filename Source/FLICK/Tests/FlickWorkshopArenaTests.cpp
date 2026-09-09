@@ -28,6 +28,8 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	Arena->InitializeTestArena(650.0f, 50.0f, 250.0f);
+	TestEqual(TEXT("1v1 active divider count"), Arena->GetMechanismCount(), 8);
+	TestEqual(TEXT("1v1 designed location count"), Arena->GetPossibleLocationCount(), 20);
 	for (int32 Index = 0; Index < Arena->GetMechanismCount(); ++Index)
 	{
 		const FVector RelativeCenter = Arena->GetDividerWorldCenter(Index) - Arena->GetActorLocation();
@@ -38,6 +40,8 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	}
 
 	UStaticMeshComponent* StaticArt = nullptr;
+	UStaticMeshComponent* StadiumStructure = nullptr;
+	UStaticMeshComponent* StadiumLights = nullptr;
 	UStaticMeshComponent* FloorCollider = nullptr;
 	UStaticMeshComponent* DividerCollider = nullptr;
 	UStaticMeshComponent* DividerArt = nullptr;
@@ -50,6 +54,8 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	for (UStaticMeshComponent* Component : Components)
 	{
 		if (Component->GetFName() == TEXT("WorkshopArenaMesh")) StaticArt = Component;
+		if (Component->GetFName() == TEXT("StadiumStructureMesh")) StadiumStructure = Component;
+		if (Component->GetFName() == TEXT("StadiumLightsMesh")) StadiumLights = Component;
 		if (Component->GetFName() == TEXT("ArenaMesh")) FloorCollider = Component;
 		if (Component->GetFName() == TEXT("EdgeDivider_00")) DividerCollider = Component;
 		if (Component->GetFName() == TEXT("WorkshopDivider_00")) DividerArt = Component;
@@ -61,6 +67,8 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	}
 
 	TestNotNull(TEXT("Imported arena presentation component"), StaticArt);
+	TestNotNull(TEXT("Imported stadium structure component"), StadiumStructure);
+	TestNotNull(TEXT("Imported stadium lighting component"), StadiumLights);
 	TestNotNull(TEXT("Original floor collider"), FloorCollider);
 	TestNotNull(TEXT("Simple divider collider"), DividerCollider);
 	TestNotNull(TEXT("Imported divider presentation component"), DividerArt);
@@ -68,7 +76,20 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Imported switch-dot presentation component"), SwitchDotArt);
 	TestNotNull(TEXT("Imported signal-trace presentation component"), SignalTraceArt);
 	TestNotNull(TEXT("Imported dormant-divider socket component"), DormantSocketArt);
-	TestEqual(TEXT("All designed sockets remain present"), SocketCount, AFlickTestArena::PossibleLocationCount);
+	TestEqual(TEXT("All maximum-format socket components remain present"),
+		SocketCount, AFlickTestArena::MaxPossibleLocationCount);
+
+	Arena->InitializeTestArena(815.0f, 50.0f, 250.0f, 2);
+	TestEqual(TEXT("2v2 active divider count"), Arena->GetMechanismCount(), 12);
+	TestEqual(TEXT("2v2 designed location count"), Arena->GetPossibleLocationCount(), 28);
+	Arena->InitializeTestArena(815.0f, 50.0f, 250.0f, 3);
+	TestEqual(TEXT("3v3 active divider count"), Arena->GetMechanismCount(), 14);
+	TestEqual(TEXT("3v3 designed location count"), Arena->GetPossibleLocationCount(), 36);
+	Arena->BeginReplayPresentation();
+	Arena->ApplyReplayDividerState(static_cast<uint16>(1 << 13));
+	TestTrue(TEXT("Replay state preserves divider fourteen"), Arena->IsDividerRaised(13));
+	Arena->EndReplayPresentation();
+	Arena->InitializeTestArena(650.0f, 50.0f, 250.0f, 1);
 	if (StaticArt && StaticArt->GetStaticMesh())
 	{
 		const FVector Size = StaticArt->GetStaticMesh()->GetBounds().BoxExtent * 2.0f;
@@ -85,6 +106,37 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	else
 	{
 		AddError(TEXT("Workshop arena mesh asset was not loaded"));
+	}
+	for (UStaticMeshComponent* StadiumComponent : { StadiumStructure, StadiumLights })
+	{
+		if (!StadiumComponent || !StadiumComponent->GetStaticMesh())
+		{
+			AddError(TEXT("Stadium presentation asset was not loaded"));
+			continue;
+		}
+		TestEqual(TEXT("Stadium presentation cannot affect puck physics"),
+			StadiumComponent->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestTrue(TEXT("Stadium presentation is visible in the Test arena"),
+			StadiumComponent->IsVisible());
+		TestFalse(TEXT("Stadium shell cannot shadow the gameplay lighting rig"),
+			StadiumComponent->CastShadow);
+		TestTrue(TEXT("Stadium shares the play-surface origin"),
+			FMath::IsNearlyEqual(StadiumComponent->GetRelativeLocation().Z, Arena->GetSurfaceZ(), 0.01f));
+		TestTrue(TEXT("Stadium uses the authored 650 cm opening scale"),
+			StadiumComponent->GetRelativeScale3D().Equals(FVector(1.0f), 0.001f));
+	}
+	if (StadiumStructure && StadiumStructure->GetStaticMesh())
+	{
+		const FVector StadiumSize = StadiumStructure->GetStaticMesh()->GetBounds().BoxExtent * 2.0f;
+		TestTrue(TEXT("Stadium surrounds rather than overlaps the arena"),
+			StadiumSize.X >= 3100.0f && StadiumSize.Y >= 3100.0f);
+		TestTrue(TEXT("Stadium structure preserves layered material separation"),
+			StadiumStructure->GetStaticMesh()->GetStaticMaterials().Num() >= 5);
+	}
+	if (StadiumLights && StadiumLights->GetStaticMesh())
+	{
+		TestTrue(TEXT("Stadium keeps warm, cyan, and orange lighting separate"),
+			StadiumLights->GetStaticMesh()->GetStaticMaterials().Num() >= 3);
 	}
 	if (FloorCollider)
 	{

@@ -21,6 +21,8 @@ param(
     [string]$Map = '/Engine/Maps/Entry',
     [ValidateRange(0, 3)]
     [int]$CameraView = 0,
+    [ValidateRange(1, 3)]
+    [int]$PlayersPerTeam = 1,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
     [string]$EngineRoot = $(if ($env:FLICK_UNREAL_ENGINE_ROOT) { $env:FLICK_UNREAL_ENGINE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.6' })
@@ -75,7 +77,7 @@ foreach ($screenName in $Screen) {
         '-ddc=InstalledNoZenLocalFallback',
         '-nosound', '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame',
-        "-FlickCameraView=$CameraView", '-FlickTestArenaSeed=1337',
+        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", '-FlickTestArenaSeed=1337',
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),
         ('-abslog="{0}"' -f $logPath)

@@ -14,6 +14,9 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickWorkshopPuckTest, "FLICK.Visuals.WorkshopPucks",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPlayerIdentityPuckTest, "FLICK.Visuals.PlayerIdentityPucks",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickTestArenaExposureTest, "FLICK.Visuals.TestArenaExposure",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -37,6 +40,20 @@ bool FFlickTestArenaExposureTest::RunTest(const FString& Parameters)
 		&& Camera->PostProcessSettings.BloomThreshold > CameraPawn->ClassicBloomThreshold
 		&& Camera->PostProcessSettings.bOverride_Bloom6Size
 		&& Camera->PostProcessSettings.Bloom6Size < 64.0f);
+	CameraPawn->ResetGameplayView(0, true);
+	TestEqual(TEXT("Test arena starts on its lower tactical elevation"),
+		CameraPawn->GetGameplayElevationAngle(), CameraPawn->TestArenaTacticalGameplayElevation);
+	CameraPawn->AdjustGameplayElevation(-1);
+	TestEqual(TEXT("Test arena can scroll lower than the classic low view"),
+		CameraPawn->GetGameplayElevationAngle(), CameraPawn->TestArenaLowGameplayElevation);
+	CameraPawn->AdjustGameplayElevation(1);
+	CameraPawn->AdjustGameplayElevation(1);
+	TestEqual(TEXT("Test arena overview is deliberately restrained"),
+		CameraPawn->GetGameplayElevationAngle(), CameraPawn->TestArenaOverviewGameplayElevation);
+	TestTrue(TEXT("Test arena low view is below classic low view"),
+		CameraPawn->TestArenaLowGameplayElevation < CameraPawn->LowGameplayElevation);
+	TestTrue(TEXT("Test arena high view is below classic overview"),
+		CameraPawn->TestArenaOverviewGameplayElevation < CameraPawn->OverviewGameplayElevation);
 
 	CameraPawn->SetTestArenaPresentation(false);
 	TestFalse(TEXT("Other arenas restore adaptive minimum exposure"),
@@ -141,6 +158,118 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 			Piece->Destroy();
 		}
 	}
+	World->DestroyWorld(false);
+	GEngine->DestroyWorldContext(World);
+	return true;
+}
+
+bool FFlickPlayerIdentityPuckTest::RunTest(const FString& Parameters)
+{
+	static const TCHAR* ArchetypeNames[] = {
+		TEXT("Standard"), TEXT("Heavy"), TEXT("Striker"), TEXT("Grippy"), TEXT("Slider"),
+		TEXT("Blocker"), TEXT("Compact"), TEXT("Bouncer"), TEXT("Toppler")};
+	static const TCHAR* IdentityNames[] = {TEXT("P1"), TEXT("P2"), TEXT("P3")};
+
+	for (const TCHAR* Identity : IdentityNames)
+	{
+		for (const TCHAR* Archetype : ArchetypeNames)
+		{
+			const FString MeshPath = FString::Printf(
+				TEXT("/Game/TestArena/Pucks/HighDetail/PlayerIdentity/%s/SM_Puck_%s_%s_HighDetail.SM_Puck_%s_%s_HighDetail"),
+				Identity, Archetype, Identity, Archetype, Identity);
+			UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *MeshPath);
+			if (!TestNotNull(*FString::Printf(TEXT("%s %s mesh"), Identity, Archetype), Mesh))
+			{
+				continue;
+			}
+			TestEqual(TEXT("Identity puck preserves seven authored material sections"),
+				Mesh->GetStaticMaterials().Num(), 7);
+
+			int32 PlayerIdentitySlotCount = 0;
+			int32 TeamLightSlotCount = 0;
+			for (const FStaticMaterial& Slot : Mesh->GetStaticMaterials())
+			{
+				const FString SlotName = Slot.MaterialSlotName.ToString();
+				if (SlotName.Contains(TEXT("Player_identity"), ESearchCase::IgnoreCase)
+					|| SlotName.Contains(TEXT("Player identity"), ESearchCase::IgnoreCase))
+				{
+					++PlayerIdentitySlotCount;
+					TestTrue(TEXT("Player-number material is independent from team colour"),
+						Slot.MaterialInterface
+						&& Slot.MaterialInterface->GetPathName().Contains(FString::Printf(TEXT("MI_Player_%s"), Identity)));
+				}
+				if (SlotName.Contains(TEXT("Cyan_light_diffuser"), ESearchCase::IgnoreCase)
+					|| SlotName.Contains(TEXT("Cyan light diffuser"), ESearchCase::IgnoreCase))
+				{
+					++TeamLightSlotCount;
+				}
+			}
+			TestEqual(TEXT("Puck has exactly one player-number section"), PlayerIdentitySlotCount, 1);
+			TestEqual(TEXT("Puck has exactly one team-light section"), TeamLightSlotCount, 1);
+		}
+	}
+
+	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(true);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Settings);
+	if (!TestNotNull(TEXT("Player identity runtime world"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+
+	for (int32 PlayerSlot = 0; PlayerSlot < 3; ++PlayerSlot)
+	{
+		UStaticMesh* SharedIdentityMesh = nullptr;
+		for (const EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+		{
+			AFlickPiece* Piece = World->SpawnActor<AFlickPiece>();
+			if (!TestNotNull(TEXT("Spawned identity puck"), Piece)) continue;
+			Piece->InitializePiece(
+				Team, PlayerSlot + 1, 45.0f, 20.0f, EFlickPieceArchetype::Standard,
+				false, PlayerSlot, true);
+			Piece->EnableTestArenaVisuals();
+
+			UStaticMeshComponent* IdentityVisual = nullptr;
+			TInlineComponentArray<UStaticMeshComponent*> Components(Piece);
+			for (UStaticMeshComponent* Component : Components)
+			{
+				if (Component && Component->GetFName() == TEXT("WorkshopMesh"))
+				{
+					IdentityVisual = Component;
+					break;
+				}
+			}
+			if (!TestNotNull(TEXT("Runtime identity visual"), IdentityVisual))
+			{
+				Piece->Destroy();
+				continue;
+			}
+			TestTrue(TEXT("Runtime selected the requested P-number mesh"),
+				IdentityVisual->GetStaticMesh()
+				&& IdentityVisual->GetStaticMesh()->GetPathName().Contains(
+					FString::Printf(TEXT("P%d_HighDetail"), PlayerSlot + 1)));
+			if (SharedIdentityMesh)
+			{
+				TestTrue(TEXT("Blue and orange share the same player-identity geometry"),
+					IdentityVisual->GetStaticMesh() == SharedIdentityMesh);
+			}
+			SharedIdentityMesh = IdentityVisual->GetStaticMesh();
+
+			int32 DynamicTeamMaterialCount = 0;
+			for (int32 MaterialIndex = 0; MaterialIndex < IdentityVisual->GetNumMaterials(); ++MaterialIndex)
+			{
+				if (UMaterialInstanceDynamic* Dynamic =
+					Cast<UMaterialInstanceDynamic>(IdentityVisual->GetMaterial(MaterialIndex)))
+				{
+					const FLinearColor TeamColor = Dynamic->K2_GetVectorParameterValue(TEXT("TeamColor"));
+					TestTrue(TEXT("Runtime team light matches the puck team"),
+						Team == EFlickTeam::Player2 ? TeamColor.R > TeamColor.B : TeamColor.B > TeamColor.R);
+					++DynamicTeamMaterialCount;
+				}
+			}
+			TestEqual(TEXT("Only the team-light section is dynamically recoloured"), DynamicTeamMaterialCount, 1);
+			Piece->Destroy();
+		}
+	}
+
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
 	return true;

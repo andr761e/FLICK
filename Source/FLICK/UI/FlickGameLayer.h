@@ -118,7 +118,8 @@ private:
 		const FString& Summary,
 		const FString& Detail,
 		const FLinearColor& Accent,
-		TSharedPtr<SButton>* OutButton = nullptr);
+		TSharedPtr<SButton>* OutButton = nullptr,
+		int32 TestPlayersPerTeam = 1);
 	TSharedRef<SWidget> BuildPlayFormatCard(
 		int32 PlayersPerTeam,
 		bool bBob,
@@ -166,6 +167,9 @@ private:
 	FText GetEventPointsText(int32 IndexFromNewest) const;
 	FText GetMatchStatusText() const;
 	FSlateColor GetMatchStatusColor() const;
+	FText GetNextTurnText() const;
+	FSlateColor GetNextTurnColor() const;
+	EVisibility GetNextTurnVisibility() const;
 	FText GetScoreboardPlayerName(EFlickTeam Team, int32 PlayerSlot) const;
 	FText GetScoreboardStatText(EFlickTeam Team, int32 PlayerSlot, int32 StatIndex) const;
 	FText GetScoreboardTeamSummary(EFlickTeam Team) const;

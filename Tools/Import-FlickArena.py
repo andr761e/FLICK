@@ -104,12 +104,14 @@ specs = {
     # still below the puck LEDs and restrained enough to preserve a sharp edge.
     "06_Team_Cyan": ((0.0, .32, .76), .06, .25, 2.75, 0.0, .55, 0.0, 0.0),
     "07_Team_Orange": ((.95, .16, .008), .06, .25, 2.75, 0.0, .55, 0.0, 0.0),
+    # Marking separation is baked into the non-colliding visual mesh. Avoid
+    # relying on WPO here: actual vertex separation is stable under every view.
     "08_Floor_Lines": ((.79, .85, .92), .48, .27, 0.0, .10, .66, .24, 0.0),
     "09_Switch_Accent": ((.025, .48, .72), .12, .32, .72, 0.0, .55, 0.0, 0.0),
     "10_Inner_Field": ((.53, .61, .70), .16, .42, 0.0, .20, .58, .08, -.20),
     "11_Center_Inset": ((.70, .77, .84), .28, .30, 0.0, .18, .64, .16, -.15),
     "12_Accent_Metal": ((.43, .51, .61), .90, .23, 0.0, .18, .70, .56, -.15),
-    "13_Dark_Marking": ((.075, .105, .15), .40, .32, 0.0, .025, .56, .18, -.05),
+    "13_Dark_Marking": ((.075, .105, .15), .40, .32, 0.0, .025, .56, .18, 0.0),
 }
 materials = {}
 for key, (rgb, metallic, roughness, emission, lift, specular, anisotropy, layer_offset) in specs.items():

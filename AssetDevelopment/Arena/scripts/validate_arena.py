@@ -57,6 +57,26 @@ require(rim_vertex_z and max(rim_vertex_z) <= TOLERANCE_M,
 require(static_max.z <= 0.035,
         "Static arena contains raised non-colliding trim above the play surface")
 
+
+def material_top_z(mesh, material_name):
+    indices = {index for index, material in enumerate(mesh.materials)
+               if material and material.name == material_name}
+    return max((mesh.vertices[vertex_index].co.z
+                for polygon in mesh.polygons if polygon.material_index in indices
+                for vertex_index in polygon.vertices), default=-1000.0)
+
+
+# Marking depth order must be present in the actual exported vertices. A
+# material-only WPO workaround previously allowed the lines to shimmer again.
+surface_top = max(material_top_z(static_mesh, name) for name in (
+    "02_Arena_Surface", "10_Inner_Field", "11_Center_Inset"))
+dark_line_top = material_top_z(static_mesh, "13_Dark_Marking")
+bright_line_top = material_top_z(static_mesh, "08_Floor_Lines")
+require(dark_line_top >= surface_top + 0.003,
+        "Dark floor markings lack baked anti-flicker separation")
+require(bright_line_top >= dark_line_top + 0.0015,
+        "Bright floor markings lack a stable order above dark markings")
+
 divider_min, divider_max, divider_size = local_bounds(bpy.data.objects["SM_TestArena_Divider"])
 nominal = [value / 100.0 for value in MANIFEST["divider_nominal_cm"]]
 for axis, (actual, expected) in enumerate(zip(divider_size, nominal)):

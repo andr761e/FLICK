@@ -19,21 +19,21 @@ class FLICK_API AFlickTestArena : public AFlickArena
 	GENERATED_BODY()
 
 public:
-	// Twenty authored sockets remain fixed and readable. Eight of them receive
-	// a live switch/divider mechanism for each match.
-	static constexpr int32 PossibleLocationCount = 20;
-	static constexpr int32 MechanismCount = 8;
+	// Allocate once for the largest experimental format. Runtime layout counts
+	// remain 20/8 in 1v1, 28/12 in 2v2, and 36/14 in 3v3.
+	static constexpr int32 MaxPossibleLocationCount = 36;
+	static constexpr int32 MaxMechanismCount = 14;
 
 	AFlickTestArena();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void InitializeTestArena(float InRadius, float InThickness, float InSurfaceZ);
+	void InitializeTestArena(float InRadius, float InThickness, float InSurfaceZ, int32 InPlayersPerTeam = 1);
 	void BeginControlZoneTracking(const TArray<TObjectPtr<AFlickPiece>>& Pieces);
-	uint8 TrackControlZoneCrossings(
+	uint16 TrackControlZoneCrossings(
 		const TArray<TObjectPtr<AFlickPiece>>& Pieces,
 		float DeltaSeconds,
-		uint8& OutDeployedMechanisms);
-	uint8 CommitPendingControlZoneToggles(const TArray<TObjectPtr<AFlickPiece>>& Pieces);
+		uint16& OutDeployedMechanisms);
+	uint16 CommitPendingControlZoneToggles(const TArray<TObjectPtr<AFlickPiece>>& Pieces);
 	void ResetMechanisms();
 	bool IsDividerRaised(int32 DividerIndex) const;
 	bool IsDividerPending(int32 DividerIndex) const;
@@ -45,12 +45,13 @@ public:
 	FVector2D GetDividerWorldTangent(int32 Index) const;
 	float GetDividerLength(int32 Index) const;
 	float GetDividerCollisionThickness() const { return DividerThickness; }
-	int32 GetMechanismCount() const { return FMath::Clamp(ActiveMechanismCount, 1, MechanismCount); }
+	int32 GetMechanismCount() const { return FMath::Clamp(ActiveMechanismCount, 1, MaxMechanismCount); }
+	int32 GetPossibleLocationCount() const { return FMath::Clamp(DesignedLocationCount, 1, MaxPossibleLocationCount); }
 	FString GetDividerLabel(int32 DividerIndex) const;
 	FLinearColor GetMechanismColor(int32 MechanismIndex) const;
-	uint8 GetRaisedDividerMask() const { return RaisedDividerMask; }
+	uint16 GetRaisedDividerMask() const { return RaisedDividerMask; }
 	void BeginReplayPresentation();
-	void ApplyReplayDividerState(uint8 DividerMask);
+	void ApplyReplayDividerState(uint16 DividerMask);
 	void EndReplayPresentation();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "24.0", ClampMax = "70.0"))
@@ -62,8 +63,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "0.0", ClampMax = "10.0"))
 	float SwitchDetectionPadding = 2.0f;
 
-	UPROPERTY(ReplicatedUsing = OnRep_TestLayout, EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "4", ClampMax = "8"))
+	UPROPERTY(ReplicatedUsing = OnRep_TestLayout, EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "4", ClampMax = "14"))
 	int32 ActiveMechanismCount = 8;
+
+	UPROPERTY(ReplicatedUsing = OnRep_TestLayout, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena")
+	int32 DesignedLocationCount = 20;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "1", ClampMax = "8"))
 	int32 GuaranteedOuterEdgeMechanisms = 4;
@@ -108,6 +112,15 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TObjectPtr<UStaticMeshComponent> WorkshopArenaMesh;
 
+	// The surrounding stadium is presentation-only. Keeping its shell and
+	// emissive details separate lets us tune visibility and lighting without
+	// ever adding another collision surface around the gameplay arena.
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
+	TObjectPtr<UStaticMeshComponent> StadiumStructureMesh;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
+	TObjectPtr<UStaticMeshComponent> StadiumLightsMesh;
+
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> DividerCapMeshes;
 
@@ -133,7 +146,7 @@ private:
 	bool IsZoneCurrentlyOverlapped(int32 ZoneIndex, const TArray<TObjectPtr<AFlickPiece>>& Pieces) const;
 	bool IsDividerCurrentlyOverlapped(int32 DividerIndex, const TArray<TObjectPtr<AFlickPiece>>& Pieces) const;
 	FVector2D GetZoneLocalCenter(int32 ZoneIndex) const;
-	uint8 DeployReadyDividers(const TArray<TObjectPtr<AFlickPiece>>& Pieces, float DeltaSeconds);
+	uint16 DeployReadyDividers(const TArray<TObjectPtr<AFlickPiece>>& Pieces, float DeltaSeconds);
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> ZoneOuterMeshes;
@@ -159,20 +172,20 @@ private:
 	TArray<TObjectPtr<UStaticMeshComponent>> DividerVisualMeshes;
 
 	UPROPERTY(ReplicatedUsing = OnRep_DividerState)
-	uint8 RaisedDividerMask = 0;
+	uint16 RaisedDividerMask = 0;
 
 	UPROPERTY(ReplicatedUsing = OnRep_DividerState)
-	uint8 PendingToggleMask = 0;
+	uint16 PendingToggleMask = 0;
 
 	UPROPERTY(ReplicatedUsing = OnRep_TestLayout)
 	int32 ArenaLayoutSeed = 1337;
 
-	uint8 ArmedZoneMask = 0;
-	uint8 TriggeredThisShotMask = 0;
+	uint16 ArmedZoneMask = 0;
+	uint16 TriggeredThisShotMask = 0;
 	bool bTrackingShot = false;
 	TMap<int32, FVector2D> PreviousPieceLocations;
 	TArray<float> DeploymentTimers;
-	uint8 PreReplayRaisedDividerMask = 0;
+	uint16 PreReplayRaisedDividerMask = 0;
 	bool bReplayPresentationActive = false;
 	TArray<int32> ActiveLocationIndices;
 	TArray<FVector2D> ZoneCenters;
@@ -199,4 +212,5 @@ private:
 	TObjectPtr<UPhysicalMaterial> RuntimeDividerPhysicalMaterial;
 
 	bool bUsingWorkshopAssets = false;
+	bool bUsingStadiumAssets = false;
 };

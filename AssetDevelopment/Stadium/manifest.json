@@ -1,0 +1,12 @@
+{
+  "arena_radius_cm": 650.0,
+  "arena_surface_z_cm": 0.0,
+  "stadium_floor_z_cm": -50.0,
+  "outer_floor_radius_cm": 1590.0,
+  "wall_inner_radius_cm": 1555.0,
+  "wall_top_z_cm": 465.00000000000006,
+  "exports": [
+    "SM_TestStadium_Structure",
+    "SM_TestStadium_Lights"
+  ]
+}

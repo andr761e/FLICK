@@ -1135,13 +1135,36 @@ void AFlickPiece::EnableTestArenaVisuals()
 		TEXT("Grippy"), TEXT("Slider"), TEXT("Blocker"), TEXT("Compact"), TEXT("Bouncer"), TEXT("Toppler")};
 	const int32 Index = static_cast<int32>(Archetype);
 	if (Index < 0 || Index >= UE_ARRAY_COUNT(Names)) return;
-	const FString HighDetailPath = Archetype == EFlickPieceArchetype::Standard
+	bUsingHighDetailPlayerIdentity = false;
+	FString HighDetailPath;
+	if (bShowPlayerIdentity && OwningPlayerSlot >= 0 && OwningPlayerSlot < 3)
+	{
+		const FString Identity = FString::Printf(TEXT("P%d"), OwningPlayerSlot + 1);
+		HighDetailPath = FString::Printf(
+			TEXT("/Game/TestArena/Pucks/HighDetail/PlayerIdentity/%s/SM_Puck_%s_%s_HighDetail.SM_Puck_%s_%s_HighDetail"),
+			*Identity, Names[Index], *Identity, Names[Index], *Identity);
+	}
+	else
+	{
+		HighDetailPath = Archetype == EFlickPieceArchetype::Standard
 		? TEXT("/Game/TestArena/Pucks/PrototypeStandard/SM_Puck_Standard_Blue_Prototype.SM_Puck_Standard_Blue_Prototype")
 		: FString::Printf(
 			TEXT("/Game/TestArena/Pucks/HighDetail/SM_Puck_%s_HighDetail.SM_Puck_%s_HighDetail"),
 			Names[Index], Names[Index]);
+	}
 	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *HighDetailPath);
+	bUsingHighDetailPlayerIdentity = Mesh != nullptr && bShowPlayerIdentity;
 	bUsingHighDetailPuck = Mesh != nullptr;
+	if (!Mesh && bShowPlayerIdentity)
+	{
+		HighDetailPath = Archetype == EFlickPieceArchetype::Standard
+			? TEXT("/Game/TestArena/Pucks/PrototypeStandard/SM_Puck_Standard_Blue_Prototype.SM_Puck_Standard_Blue_Prototype")
+			: FString::Printf(
+				TEXT("/Game/TestArena/Pucks/HighDetail/SM_Puck_%s_HighDetail.SM_Puck_%s_HighDetail"),
+				Names[Index], Names[Index]);
+		Mesh = LoadObject<UStaticMesh>(nullptr, *HighDetailPath);
+		bUsingHighDetailPuck = Mesh != nullptr;
+	}
 	if (!Mesh)
 	{
 		const FString FallbackPath = FString::Printf(
@@ -1428,6 +1451,7 @@ void AFlickPiece::ApplyVisuals()
 		? FLinearColor::White
 		: FLinearColor(0.005f, 0.01f, 0.018f, 1.0f)).ToFColor(true));
 	PlayerLabel->SetWorldSize(bSelected ? 29.0f : 26.0f);
-	PlayerLabel->SetVisibility(bShowPlayerIdentity && !bEliminated);
+	PlayerLabel->SetVisibility(
+		bShowPlayerIdentity && !bUsingHighDetailPlayerIdentity && !bEliminated);
 	UpdateTestArenaVisuals();
 }

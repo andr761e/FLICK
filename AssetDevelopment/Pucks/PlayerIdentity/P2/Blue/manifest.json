@@ -1,0 +1,173 @@
+[
+  {
+    "asset": "Standard",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      90.0,
+      90.0,
+      20.0
+    ],
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Player identity P2"
+    ]
+  },
+  {
+    "asset": "Toppler",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      90.3,
+      90.3,
+      30.7
+    ],
+    "materials": [
+      "Graphite anodized housing.001",
+      "Machined edge highlights.001",
+      "Black gasket and sockets.001",
+      "Cyan light diffuser.001",
+      "Circular brushed silver.001",
+      "Recessed dark titanium.001",
+      "Player identity P2"
+    ]
+  },
+  {
+    "asset": "Bouncer",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      86.5,
+      86.5,
+      16.1
+    ],
+    "materials": [
+      "Graphite anodized housing.002",
+      "Machined edge highlights.002",
+      "Black gasket and sockets.002",
+      "Cyan light diffuser.002",
+      "Circular brushed silver.002",
+      "Recessed dark titanium.002",
+      "Player identity P2"
+    ]
+  },
+  {
+    "asset": "Compact",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      71.9,
+      71.9,
+      14.7
+    ],
+    "materials": [
+      "Graphite anodized housing.003",
+      "Machined edge highlights.003",
+      "Black gasket and sockets.003",
+      "Cyan light diffuser.003",
+      "Circular brushed silver.003",
+      "Recessed dark titanium.003",
+      "Player identity P2"
+    ]
+  },
+  {
+    "asset": "Blocker",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      106.1,
+      106.1,
+      16.5
+    ],
+    "materials": [
+      "Graphite anodized housing.004",
+      "Machined edge highlights.004",
+      "Black gasket and sockets.004",
+      "Cyan light diffuser.004",
+      "Circular brushed silver.004",
+      "Recessed dark titanium.004",
+      "Player identity P2"
+    ]
+  },
+  {
+    "asset": "Slider",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      89.9,
+      89.9,
+      18.3
+    ],
+    "materials": [
+      "Graphite anodized housing.005",
+      "Machined edge highlights.005",
+      "Black gasket and sockets.005",
+      "Cyan light diffuser.005",
+      "Circular brushed silver.005",
+      "Recessed dark titanium.005",
+      "Player identity P2"
+    ]
+  },
+  {
+    "asset": "Grippy",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      90.3,
+      90.3,
+      20.9
+    ],
+    "materials": [
+      "Graphite anodized housing.006",
+      "Machined edge highlights.006",
+      "Black gasket and sockets.006",
+      "Cyan light diffuser.006",
+      "Circular brushed silver.006",
+      "Recessed dark titanium.006",
+      "Player identity P2"
+    ]
+  },
+  {
+    "asset": "Striker",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      82.7,
+      82.7,
+      13.4
+    ],
+    "materials": [
+      "Graphite anodized housing.007",
+      "Machined edge highlights.007",
+      "Black gasket and sockets.007",
+      "Cyan light diffuser.007",
+      "Circular brushed silver.007",
+      "Recessed dark titanium.007",
+      "Player identity P2"
+    ]
+  },
+  {
+    "asset": "Heavy",
+    "identity": "P2",
+    "team_preview": "Blue",
+    "dimensions_cm": [
+      97.5,
+      97.5,
+      27.3
+    ],
+    "materials": [
+      "Graphite anodized housing.008",
+      "Machined edge highlights.008",
+      "Black gasket and sockets.008",
+      "Cyan light diffuser.008",
+      "Circular brushed silver.008",
+      "Recessed dark titanium.008",
+      "Player identity P2"
+    ]
+  }
+]

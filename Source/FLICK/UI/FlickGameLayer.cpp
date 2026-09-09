@@ -3926,7 +3926,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(28.0f, 116.0f, 28.0f, 98.0f)
 		[
 			SNew(SBox)
-			.WidthOverride(720.0f)
+			.WidthOverride(UiMetrics::ModeContentWidth)
 			.Visibility_Lambda([this]()
 			{
 				return SelectedPlayPlaylist == EFlickPlayPlaylist::Test
@@ -3962,15 +3962,43 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							}))
 					]
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(UiMetrics::CardGap)
+				+ SVerticalBox::Slot().AutoHeight()
 				[
-					BuildTrainingActivityCard(
-						EFlickTrainingActivity::ArenaControlBotMatch,
-						TEXT("SWITCHYARD"),
-						TEXT("Hit a numbered dot to toggle its matching divider. Shape the board, then beat the bot."),
-						TEXT("8 LINKED SWITCHES  /  20 SOCKETS  /  1V1 VS BOT"),
-						FLinearColor(0.62f, 0.36f, 0.95f, 1.0f),
-						&TestActivityDefaultButton)
+					SNew(SUniformGridPanel)
+					.SlotPadding(FMargin(UiMetrics::CardGap))
+					+ SUniformGridPanel::Slot(0, 0)
+					[
+						BuildTrainingActivityCard(
+							EFlickTrainingActivity::ArenaControlBotMatch,
+							TEXT("SWITCHYARD 1V1"),
+							TEXT("Shape the compact board with linked switches, then beat the bot."),
+							TEXT("8 ACTIVE  /  20 LOCATIONS"),
+							FLinearColor(0.62f, 0.36f, 0.95f, 1.0f),
+							&TestActivityDefaultButton,
+							1)
+					]
+					+ SUniformGridPanel::Slot(1, 0)
+					[
+						BuildTrainingActivityCard(
+							EFlickTrainingActivity::ArenaControlBotMatch,
+							TEXT("SWITCHYARD 2V2"),
+							TEXT("Coordinate two lineups across a larger, denser switchyard."),
+							TEXT("12 ACTIVE  /  28 LOCATIONS"),
+							FLinearColor(0.30f, 0.58f, 0.96f, 1.0f),
+							nullptr,
+							2)
+					]
+					+ SUniformGridPanel::Slot(2, 0)
+					[
+						BuildTrainingActivityCard(
+							EFlickTrainingActivity::ArenaControlBotMatch,
+							TEXT("SWITCHYARD 3V3"),
+							TEXT("Six lineups collide inside the most chaotic experimental layout."),
+							TEXT("14 ACTIVE  /  36 LOCATIONS"),
+							FLinearColor(0.82f, 0.32f, 0.86f, 1.0f),
+							nullptr,
+							3)
+					]
 				]
 			]
 		]
@@ -4522,18 +4550,19 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 	const FString& Summary,
 	const FString& Detail,
 	const FLinearColor& Accent,
-	TSharedPtr<SButton>* OutButton)
+	TSharedPtr<SButton>* OutButton,
+	const int32 TestPlayersPerTeam)
 {
 	const bool bTestActivity = Activity == EFlickTrainingActivity::ArenaControlBotMatch;
 	TSharedRef<SButton> CardButton = SNew(SButton)
 		.ButtonStyle(&TransparentButtonStyle)
 		.ContentPadding(0.0f)
 		.Cursor(EMouseCursor::Hand)
-		.OnClicked_Lambda([this, Activity, bTestActivity]()
+		.OnClicked_Lambda([this, Activity, bTestActivity, TestPlayersPerTeam]()
 		{
 			if (GameMode.IsValid())
 			{
-				GameMode->SetMatchmakingPlayersPerTeam(1);
+				GameMode->SetMatchmakingPlayersPerTeam(bTestActivity ? TestPlayersPerTeam : 1);
 				const bool bBotMatch = Activity == EFlickTrainingActivity::BotMatch
 					|| Activity == EFlickTrainingActivity::BobBotMatch
 					|| bTestActivity;
@@ -4545,7 +4574,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 				{
 					if (bTestActivity)
 					{
-						GameMode->StartTestArenaBotMatch();
+						GameMode->StartTestArenaBotMatch(TestPlayersPerTeam);
 					}
 					else
 					{
@@ -6748,7 +6777,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 		[
 			SNew(SBox)
 			.WidthOverride(560.0f)
-			.HeightOverride(84.0f)
+			.HeightOverride(102.0f)
 			[
 				SNew(SFlickAngularBorder)
 				.BackgroundColor(Panel)
@@ -6801,6 +6830,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 								.ColorAndOpacity_Lambda([this]() { return GetMatchStatusColor(); })
 							]
 						]
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 2.0f)
+						[
+							SNew(STextBlock)
+							.Visibility_Lambda([this]() { return GetNextTurnVisibility(); })
+							.Text_Lambda([this]() { return GetNextTurnText(); })
+							.Font(UiFont(10, true))
+							.ColorAndOpacity_Lambda([this]() { return GetNextTurnColor(); })
+						]
 						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 3.0f, 0.0f, 0.0f)
 						[
 							SNew(STextBlock)
@@ -6822,9 +6859,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 													State->TurnNumber,
 													FMath::CeilToInt(State->GetShotClockTimeRemaining())));
 											}
-											return FText::FromString(FString::Printf(
-												TEXT("1V1 TRAINING   /   ROUND %d   /   SHOT %d   /   SHOOT IN %02d"),
-												State->RoundNumber,
+										return FText::FromString(FString::Printf(
+											TEXT("%dV%d TRAINING   /   ROUND %d   /   SHOT %d   /   SHOOT IN %02d"),
+											State->PlayersPerTeam,
+											State->PlayersPerTeam,
+											State->RoundNumber,
 												State->TurnNumber,
 												FMath::CeilToInt(State->GetShotClockTimeRemaining())));
 										}
@@ -6834,9 +6873,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 												TEXT("BOB TRAINING   /   TURN %d"),
 												State->TurnNumber));
 										}
-										return FText::FromString(FString::Printf(
-											TEXT("1V1 TRAINING   /   ROUND %d   /   SHOT %d"),
-											State->RoundNumber,
+									return FText::FromString(FString::Printf(
+										TEXT("%dV%d TRAINING   /   ROUND %d   /   SHOT %d"),
+										State->PlayersPerTeam,
+										State->PlayersPerTeam,
+										State->RoundNumber,
 											State->TurnNumber));
 									}
 									if (GameMode->IsTrainingEditMode())
@@ -8720,6 +8761,21 @@ FText SFlickGameLayer::GetMatchStatusText() const
 				? TEXT("KICKOFF IN MOTION")
 				: TEXT("PUCKS IN MOTION"));
 		}
+		if (State->PlayersPerTeam > 1)
+		{
+			const TCHAR* TeamName = State->CurrentTeam == EFlickTeam::Player2
+				? TEXT("ORANGE") : TEXT("BLUE");
+			const int32 PlayerNumber = State->CurrentTeamPlayerSlot + 1;
+			if (State->CurrentTeam == EFlickTeam::Player2)
+			{
+				return FText::FromString(State->MatchPhase == EFlickMatchPhase::KickoffPlanning
+					? FString::Printf(TEXT("%s P%d  /  BOT SETTING KICKOFF"), TeamName, PlayerNumber)
+					: FString::Printf(TEXT("%s P%d  /  BOT THINKING"), TeamName, PlayerNumber));
+			}
+			return FText::FromString(State->MatchPhase == EFlickMatchPhase::KickoffPlanning
+				? FString::Printf(TEXT("%s P%d  /  SET YOUR KICKOFF"), TeamName, PlayerNumber)
+				: FString::Printf(TEXT("%s P%d  /  YOUR TURN"), TeamName, PlayerNumber));
+		}
 		if (State->CurrentTeam == EFlickTeam::Player2)
 		{
 			return FText::FromString(TEXT("BOT THINKING"));
@@ -8744,8 +8800,8 @@ FText SFlickGameLayer::GetMatchStatusText() const
 	{
 		return FText::FromString(State->PlayersPerTeam > 1
 			? FString::Printf(
-				TEXT("TEAM %d PLAYER %d SET KICKOFF  /  %d OF %d LOCKED"),
-				GetTeamNumber(State->CurrentTeam),
+				TEXT("%s P%d SET KICKOFF  /  %d OF %d LOCKED"),
+				State->CurrentTeam == EFlickTeam::Player2 ? TEXT("ORANGE") : TEXT("BLUE"),
 				State->CurrentTeamPlayerSlot + 1,
 				State->KickoffShotsLocked,
 				State->KickoffShotsRequired)
@@ -8766,12 +8822,12 @@ FText SFlickGameLayer::GetMatchStatusText() const
 	{
 		return FText::FromString(State->ActiveMatchVariant == EFlickMatchVariant::Bob
 			? FString::Printf(
-				TEXT("TEAM %d PLAYER %d STRIKER"),
-				GetTeamNumber(State->CurrentTeam),
+				TEXT("%s P%d STRIKER"),
+				State->CurrentTeam == EFlickTeam::Player2 ? TEXT("ORANGE") : TEXT("BLUE"),
 				State->CurrentTeamPlayerSlot + 1)
 			: FString::Printf(
-				TEXT("TEAM %d PLAYER %d TURN"),
-				GetTeamNumber(State->CurrentTeam),
+				TEXT("%s P%d  /  TURN"),
+				State->CurrentTeam == EFlickTeam::Player2 ? TEXT("ORANGE") : TEXT("BLUE"),
 				State->CurrentTeamPlayerSlot + 1));
 	}
 	return FText::FromString(State->ActiveMatchVariant == EFlickMatchVariant::Bob
@@ -8811,6 +8867,44 @@ FSlateColor SFlickGameLayer::GetMatchStatusColor() const
 	if (State->MatchPhase == EFlickMatchPhase::KickoffPlanning) return FSlateColor(GetTeamAccent(State->CurrentTeam));
 	if (State->MatchPhase == EFlickMatchPhase::ResolvingPhysics) return FSlateColor(FLinearColor(1.0f, 0.72f, 0.12f, 1.0f));
 	return FSlateColor(GetTeamAccent(State->MatchPhase == EFlickMatchPhase::RoundOver ? State->WinnerTeam : State->CurrentTeam));
+}
+
+FText SFlickGameLayer::GetNextTurnText() const
+{
+	EFlickTeam NextTeam = EFlickTeam::None;
+	int32 NextPlayerSlot = INDEX_NONE;
+	if (!GameMode.IsValid() || !GameMode->GetNextScheduledTurn(NextTeam, NextPlayerSlot))
+	{
+		return FText::GetEmpty();
+	}
+	return FText::FromString(FString::Printf(
+		TEXT("NEXT TURN  P%d  /  %s"),
+		NextPlayerSlot + 1,
+		NextTeam == EFlickTeam::Player2 ? TEXT("ORANGE") : TEXT("BLUE")));
+}
+
+FSlateColor SFlickGameLayer::GetNextTurnColor() const
+{
+	EFlickTeam NextTeam = EFlickTeam::None;
+	int32 NextPlayerSlot = INDEX_NONE;
+	return FSlateColor(GameMode.IsValid()
+		&& GameMode->GetNextScheduledTurn(NextTeam, NextPlayerSlot)
+		? GetTeamAccent(NextTeam)
+		: FLinearColor::Transparent);
+}
+
+EVisibility SFlickGameLayer::GetNextTurnVisibility() const
+{
+	const AFlickGameState* State = GetScoreboardGameState();
+	EFlickTeam NextTeam = EFlickTeam::None;
+	int32 NextPlayerSlot = INDEX_NONE;
+	return State
+		&& State->PlayersPerTeam > 1
+		&& (!GameMode.IsValid() || !GameMode->IsCinematicReplayActive())
+		&& GameMode.IsValid()
+		&& GameMode->GetNextScheduledTurn(NextTeam, NextPlayerSlot)
+		? EVisibility::Visible
+		: EVisibility::Collapsed;
 }
 
 FText SFlickGameLayer::GetRoundResultText() const

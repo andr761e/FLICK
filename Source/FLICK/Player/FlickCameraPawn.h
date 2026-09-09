@@ -131,6 +131,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Elevation", meta = (ClampMin = "0.0", ClampMax = "30.0"))
 	float OverviewGameplayElevation = 10.0f;
 
+	// The Switchyard test arenas benefit from a lower inspection angle and do
+	// not need the very tall overview used by the simpler classic arenas.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Elevation", meta = (ClampMin = "-30.0", ClampMax = "0.0"))
+	float TestArenaLowGameplayElevation = -14.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Elevation", meta = (ClampMin = "-15.0", ClampMax = "15.0"))
+	float TestArenaTacticalGameplayElevation = -2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Elevation", meta = (ClampMin = "0.0", ClampMax = "30.0"))
+	float TestArenaOverviewGameplayElevation = 4.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Elevation", meta = (ClampMin = "-30.0", ClampMax = "0.0"))
 	float MinimumGameplayElevation = -18.0f;
 

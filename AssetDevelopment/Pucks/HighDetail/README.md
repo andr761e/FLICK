@@ -14,6 +14,9 @@ material families for the orange team.
 - `manifests/` — dimensions, material slots and validation results.
 - `previews/` — current high-detail review images only.
 
+Generated multiplayer variants live in `../PlayerIdentity/`, organized by
+P1/P2/P3 first and then Blue/Orange team presentation.
+
 The editable art is separate from Unreal's imported `.uasset` files under
 `Content/TestArena/Pucks`. None of these meshes owns gameplay collision.
 
@@ -24,6 +27,7 @@ From the project root with Blender 5.2:
 ```powershell
 & 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe' --background --python AssetDevelopment/Pucks/HighDetail/scripts/export_standard_unreal.py
 & 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe' --background --python AssetDevelopment/Pucks/HighDetail/scripts/export_archetypes_unreal.py
+& 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe' --background --python AssetDevelopment/Pucks/HighDetail/scripts/generate_player_identity_variants.py
 ```
 
 Then run the Unreal Python importers:

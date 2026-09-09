@@ -130,6 +130,7 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> WorkshopTeamMaterials;
 	bool bUsingHighDetailPuck = false;
+	bool bUsingHighDetailPlayerIdentity = false;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PieceMesh;

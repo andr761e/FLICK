@@ -105,10 +105,15 @@ AFlickTestArena::AFlickTestArena()
 		TEXT("/Game/TestArena/Arena/SM_TestArena_SwitchDot.SM_TestArena_SwitchDot"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopTraceAsset(
 		TEXT("/Game/TestArena/Arena/SM_TestArena_SignalTrace.SM_TestArena_SignalTrace"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> StadiumStructureAsset(
+		TEXT("/Game/TestArena/Stadium/SM_TestStadium_Structure.SM_TestStadium_Structure"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> StadiumLightsAsset(
+		TEXT("/Game/TestArena/Stadium/SM_TestStadium_Lights.SM_TestStadium_Lights"));
 	bUsingWorkshopAssets = WorkshopArenaAsset.Succeeded()
 		&& WorkshopDividerAsset.Succeeded() && WorkshopSocketAsset.Succeeded()
 		&& WorkshopSwitchAsset.Succeeded() && WorkshopDotAsset.Succeeded()
 		&& WorkshopTraceAsset.Succeeded();
+	bUsingStadiumAssets = StadiumStructureAsset.Succeeded() && StadiumLightsAsset.Succeeded();
 
 	auto CreateBar = [this](const FString& Name, const bool bCollision)
 	{
@@ -146,7 +151,7 @@ AFlickTestArena::AFlickTestArena()
 		return Component;
 	};
 
-	ZoneOuterMeshes.Reserve(MechanismCount);
+	ZoneOuterMeshes.Reserve(MaxMechanismCount);
 	InstrumentDeckMesh = CreateDisc(TEXT("SwitchyardInstrumentDeck"));
 	WorkshopArenaMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorkshopArenaMesh"));
 	WorkshopArenaMesh->SetupAttachment(GetRootComponent());
@@ -156,13 +161,36 @@ AFlickTestArena::AFlickTestArena()
 	{
 		WorkshopArenaMesh->SetStaticMesh(WorkshopArenaAsset.Object);
 	}
-	DividerCapMeshes.Reserve(MechanismCount);
-	ZoneInnerMeshes.Reserve(MechanismCount);
-	ZoneDotMeshes.Reserve(MechanismCount);
-	SignalTraceMeshes.Reserve(MechanismCount);
-	DividerMeshes.Reserve(MechanismCount);
-	DividerVisualMeshes.Reserve(MechanismCount);
-	for (int32 Index = 0; Index < MechanismCount; ++Index)
+	StadiumStructureMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StadiumStructureMesh"));
+	StadiumStructureMesh->SetupAttachment(GetRootComponent());
+	ConfigureVisualComponent(StadiumStructureMesh);
+	// The enclosing wall is presentation geometry, not an actual roof. Let the
+	// established arena key light reach gameplay instead of casting the entire
+	// board and every puck into one large interior shadow.
+	StadiumStructureMesh->SetCastShadow(false);
+	StadiumLightsMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StadiumLightsMesh"));
+	StadiumLightsMesh->SetupAttachment(GetRootComponent());
+	ConfigureVisualComponent(StadiumLightsMesh);
+	StadiumLightsMesh->SetCastShadow(false);
+	if (bUsingStadiumAssets)
+	{
+		StadiumStructureMesh->SetStaticMesh(StadiumStructureAsset.Object);
+		StadiumLightsMesh->SetStaticMesh(StadiumLightsAsset.Object);
+	}
+	else
+	{
+		StadiumStructureMesh->SetVisibility(false, true);
+		StadiumStructureMesh->SetHiddenInGame(true, true);
+		StadiumLightsMesh->SetVisibility(false, true);
+		StadiumLightsMesh->SetHiddenInGame(true, true);
+	}
+	DividerCapMeshes.Reserve(MaxMechanismCount);
+	ZoneInnerMeshes.Reserve(MaxMechanismCount);
+	ZoneDotMeshes.Reserve(MaxMechanismCount);
+	SignalTraceMeshes.Reserve(MaxMechanismCount);
+	DividerMeshes.Reserve(MaxMechanismCount);
+	DividerVisualMeshes.Reserve(MaxMechanismCount);
+	for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 	{
 		ZoneOuterMeshes.Add(CreateDisc(FString::Printf(TEXT("ControlSwitchOuter_%02d"), Index)));
 		ZoneInnerMeshes.Add(CreateDisc(FString::Printf(TEXT("ControlSwitchInner_%02d"), Index)));
@@ -181,8 +209,8 @@ AFlickTestArena::AFlickTestArena()
 		}
 		DividerVisualMeshes.Add(DividerVisual);
 	}
-	DividerBaseMeshes.Reserve(PossibleLocationCount);
-	for (int32 LocationIndex = 0; LocationIndex < PossibleLocationCount; ++LocationIndex)
+	DividerBaseMeshes.Reserve(MaxPossibleLocationCount);
+	for (int32 LocationIndex = 0; LocationIndex < MaxPossibleLocationCount; ++LocationIndex)
 	{
 		DividerBaseMeshes.Add(CreateBar(FString::Printf(TEXT("DividerSocket_%02d"), LocationIndex), false));
 	}
@@ -191,7 +219,7 @@ AFlickTestArena::AFlickTestArena()
 	{
 		InstrumentDeckMesh->SetVisibility(false, true);
 		InstrumentDeckMesh->SetHiddenInGame(true, true);
-		for (int32 Index = 0; Index < MechanismCount; ++Index)
+		for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 		{
 			ZoneOuterMeshes[Index]->SetStaticMesh(WorkshopSwitchAsset.Object);
 			ZoneInnerMeshes[Index]->SetVisibility(false, true);
@@ -232,14 +260,19 @@ void AFlickTestArena::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AFlickTestArena, PendingToggleMask);
 	DOREPLIFETIME(AFlickTestArena, ArenaLayoutSeed);
 	DOREPLIFETIME(AFlickTestArena, ActiveMechanismCount);
+	DOREPLIFETIME(AFlickTestArena, DesignedLocationCount);
 }
 
 void AFlickTestArena::InitializeTestArena(
 	const float InRadius,
 	const float InThickness,
-	const float InSurfaceZ)
+	const float InSurfaceZ,
+	const int32 InPlayersPerTeam)
 {
-	InitializeArena(InRadius, InThickness, InSurfaceZ, 1);
+	const int32 TeamSize = FMath::Clamp(InPlayersPerTeam, 1, 3);
+	InitializeArena(InRadius, InThickness, InSurfaceZ, TeamSize);
+	DesignedLocationCount = TeamSize == 1 ? 20 : TeamSize == 2 ? 28 : 36;
+	ActiveMechanismCount = TeamSize == 1 ? 8 : TeamSize == 2 ? 12 : 14;
 	if (HasAuthority())
 	{
 		ArenaLayoutSeed = FMath::Rand();
@@ -255,7 +288,7 @@ void AFlickTestArena::InitializeTestArena(
 	// Explicit visual fixture for reviewing raised/queued/open states together.
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickTestArenaStatePreview")))
 	{
-		RaisedDividerMask = 0x55 & static_cast<uint8>((1 << GetMechanismCount()) - 1);
+		RaisedDividerMask = 0x1555 & static_cast<uint16>((1 << GetMechanismCount()) - 1);
 		PendingToggleMask = 0x02;
 		ApplyMechanismState();
 	}
@@ -287,16 +320,16 @@ void AFlickTestArena::BeginControlZoneTracking(const TArray<TObjectPtr<AFlickPie
 	{
 		if (!IsZoneCurrentlyOverlapped(ZoneIndex, Pieces))
 		{
-			ArmedZoneMask |= static_cast<uint8>(1 << ZoneIndex);
+			ArmedZoneMask |= static_cast<uint16>(1 << ZoneIndex);
 		}
 	}
 	ApplyMechanismState();
 }
 
-uint8 AFlickTestArena::TrackControlZoneCrossings(
+uint16 AFlickTestArena::TrackControlZoneCrossings(
 	const TArray<TObjectPtr<AFlickPiece>>& Pieces,
 	const float DeltaSeconds,
-	uint8& OutDeployedMechanisms)
+	uint16& OutDeployedMechanisms)
 {
 	OutDeployedMechanisms = 0;
 	if (!HasAuthority() || !bTrackingShot)
@@ -333,10 +366,10 @@ uint8 AFlickTestArena::TrackControlZoneCrossings(
 		}
 	}
 
-	const uint8 PendingMaskBeforeTracking = PendingToggleMask;
+	const uint16 PendingMaskBeforeTracking = PendingToggleMask;
 	for (int32 ZoneIndex = 0; ZoneIndex < GetMechanismCount(); ++ZoneIndex)
 	{
-		const uint8 ZoneBit = static_cast<uint8>(1 << ZoneIndex);
+		const uint16 ZoneBit = static_cast<uint16>(1 << ZoneIndex);
 		if ((TriggeredThisShotMask & ZoneBit) != 0)
 		{
 			continue;
@@ -379,7 +412,7 @@ uint8 AFlickTestArena::TrackControlZoneCrossings(
 	{
 		PreviousPieceLocations.Add(Piece.PieceId, Piece.Current);
 	}
-	const uint8 NewlyTriggeredMask = PendingToggleMask & ~PendingMaskBeforeTracking;
+	const uint16 NewlyTriggeredMask = PendingToggleMask & ~PendingMaskBeforeTracking;
 	if (NewlyTriggeredMask != 0)
 	{
 		ApplyMechanismState();
@@ -389,22 +422,22 @@ uint8 AFlickTestArena::TrackControlZoneCrossings(
 	return NewlyTriggeredMask;
 }
 
-uint8 AFlickTestArena::CommitPendingControlZoneToggles(const TArray<TObjectPtr<AFlickPiece>>& Pieces)
+uint16 AFlickTestArena::CommitPendingControlZoneToggles(const TArray<TObjectPtr<AFlickPiece>>& Pieces)
 {
 	if (!HasAuthority())
 	{
 		return 0;
 	}
 
-	uint8 ToggledMechanisms = 0;
+	uint16 ToggledMechanisms = 0;
 	TrackControlZoneCrossings(Pieces, 0.0f, ToggledMechanisms);
-	const uint8 PendingBeforeCommit = PendingToggleMask;
+	const uint16 PendingBeforeCommit = PendingToggleMask;
 	// A shot normally lasts far longer than the deployment delay. At resolution,
 	// safely deploy any remaining unobstructed mechanisms and cancel only a wall
 	// whose footprint is still occupied by a settled puck.
 	for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
 	{
-		const uint8 MechanismBit = static_cast<uint8>(1 << Index);
+		const uint16 MechanismBit = static_cast<uint16>(1 << Index);
 		if ((PendingToggleMask & MechanismBit) == 0)
 		{
 			continue;
@@ -453,7 +486,7 @@ void AFlickTestArena::BeginReplayPresentation()
 	bReplayPresentationActive = true;
 }
 
-void AFlickTestArena::ApplyReplayDividerState(const uint8 DividerMask)
+void AFlickTestArena::ApplyReplayDividerState(const uint16 DividerMask)
 {
 	if (!bReplayPresentationActive)
 	{
@@ -479,7 +512,7 @@ void AFlickTestArena::EndReplayPresentation()
 bool AFlickTestArena::IsDividerRaised(const int32 DividerIndex) const
 {
 	return DividerIndex >= 0
-		&& DividerIndex < MechanismCount
+		&& DividerIndex < GetMechanismCount()
 		&& (RaisedDividerMask & (1 << DividerIndex)) != 0;
 }
 
@@ -573,7 +606,7 @@ FString AFlickTestArena::GetDividerLabel(const int32 DividerIndex) const
 
 FLinearColor AFlickTestArena::GetMechanismColor(const int32 MechanismIndex) const
 {
-	static const FLinearColor Colors[MechanismCount] =
+	static const FLinearColor Colors[MaxMechanismCount] =
 	{
 		FLinearColor(0.0f, 0.72f, 0.92f, 1.0f),
 		FLinearColor(0.52f, 0.34f, 0.96f, 1.0f),
@@ -582,9 +615,15 @@ FLinearColor AFlickTestArena::GetMechanismColor(const int32 MechanismIndex) cons
 		FLinearColor(0.84f, 0.2f, 0.62f, 1.0f),
 		FLinearColor(0.08f, 0.72f, 0.5f, 1.0f),
 		FLinearColor(0.34f, 0.78f, 0.18f, 1.0f),
-		FLinearColor(0.94f, 0.82f, 0.12f, 1.0f)
+		FLinearColor(0.94f, 0.82f, 0.12f, 1.0f),
+		FLinearColor(0.10f, 0.64f, 0.96f, 1.0f),
+		FLinearColor(0.72f, 0.30f, 0.92f, 1.0f),
+		FLinearColor(0.98f, 0.46f, 0.10f, 1.0f),
+		FLinearColor(0.96f, 0.18f, 0.32f, 1.0f),
+		FLinearColor(0.20f, 0.82f, 0.64f, 1.0f),
+		FLinearColor(0.68f, 0.88f, 0.16f, 1.0f)
 	};
-	return Colors[FMath::Clamp(MechanismIndex, 0, MechanismCount - 1)];
+	return Colors[FMath::Clamp(MechanismIndex, 0, MaxMechanismCount - 1)];
 }
 
 void AFlickTestArena::OnRep_DividerState()
@@ -662,14 +701,14 @@ bool AFlickTestArena::IsDividerCurrentlyOverlapped(
 	return false;
 }
 
-uint8 AFlickTestArena::DeployReadyDividers(
+uint16 AFlickTestArena::DeployReadyDividers(
 	const TArray<TObjectPtr<AFlickPiece>>& Pieces,
 	const float DeltaSeconds)
 {
-	uint8 DeployedMask = 0;
+	uint16 DeployedMask = 0;
 	for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
 	{
-		const uint8 MechanismBit = static_cast<uint8>(1 << Index);
+		const uint16 MechanismBit = static_cast<uint16>(1 << Index);
 		if ((PendingToggleMask & MechanismBit) == 0)
 		{
 			continue;
@@ -705,20 +744,21 @@ uint8 AFlickTestArena::DeployReadyDividers(
 void AFlickTestArena::BuildLayoutFromSeed()
 {
 	const int32 ActiveCount = GetMechanismCount();
+	const int32 LocationCount = GetPossibleLocationCount();
 	FRandomStream LayoutRandom(ArenaLayoutSeed);
 
-	// The authored pool is rotationally symmetric: ten tangent rim sockets and
-	// ten staggered inset sockets, alternating every 18 degrees. Randomness only
-	// chooses which designed locations are wired to switches for this match.
-	PossibleDividerCenters.SetNum(PossibleLocationCount);
-	PossibleDividerAngles.SetNum(PossibleLocationCount);
-	PossibleDividerLengths.SetNum(PossibleLocationCount);
-	TArray<int32, TInlineAllocator<10>> OuterLocations;
-	TArray<int32, TInlineAllocator<10>> InsetLocations;
-	for (int32 LocationIndex = 0; LocationIndex < PossibleLocationCount; ++LocationIndex)
+	// Each format uses a rotationally symmetric authored pool split evenly
+	// between tangent rim sockets and staggered inset sockets. Randomness only
+	// chooses which locations are wired to live switches for this match.
+	PossibleDividerCenters.SetNum(LocationCount);
+	PossibleDividerAngles.SetNum(LocationCount);
+	PossibleDividerLengths.SetNum(LocationCount);
+	TArray<int32, TInlineAllocator<18>> OuterLocations;
+	TArray<int32, TInlineAllocator<18>> InsetLocations;
+	for (int32 LocationIndex = 0; LocationIndex < LocationCount; ++LocationIndex)
 	{
 		const bool bOuter = (LocationIndex % 2) == 0;
-		const float RadialAngle = FMath::DegreesToRadians(LocationIndex * (360.0f / PossibleLocationCount));
+		const float RadialAngle = FMath::DegreesToRadians(LocationIndex * (360.0f / LocationCount));
 		const FVector2D Radial(FMath::Cos(RadialAngle), FMath::Sin(RadialAngle));
 		PossibleDividerCenters[LocationIndex] = Radial * ArenaRadius * (bOuter ? OuterDividerRadiusFraction : 0.82f);
 		PossibleDividerAngles[LocationIndex] = RadialAngle + PI * 0.5f
@@ -738,7 +778,8 @@ void AFlickTestArena::BuildLayoutFromSeed()
 	ShuffleLocations(InsetLocations);
 
 	ActiveLocationIndices.Reset(ActiveCount);
-	const int32 OuterCount = FMath::Clamp(GuaranteedOuterEdgeMechanisms, 1, ActiveCount);
+	const int32 OuterCount = FMath::Clamp(
+		FMath::Max(GuaranteedOuterEdgeMechanisms, (ActiveCount + 1) / 2), 1, ActiveCount);
 	const int32 InsetCount = ActiveCount - OuterCount;
 	for (int32 Index = 0; Index < OuterCount && Index < OuterLocations.Num(); ++Index)
 	{
@@ -761,7 +802,7 @@ void AFlickTestArena::BuildLayoutFromSeed()
 		DividerAngles[Index] = PossibleDividerAngles[LocationIndex];
 		RandomizedDividerLengths[Index] = PossibleDividerLengths[LocationIndex];
 
-		const float DividerAngle = FMath::DegreesToRadians(LocationIndex * (360.0f / PossibleLocationCount));
+		const float DividerAngle = FMath::DegreesToRadians(LocationIndex * (360.0f / LocationCount));
 		const float Direction = (LocationIndex % 4) < 2 ? 1.0f : -1.0f;
 		const float SwitchAngle = DividerAngle + FMath::DegreesToRadians(Direction * 3.0f);
 		const float SwitchRadius = FMath::Max(
@@ -788,6 +829,18 @@ void AFlickTestArena::ApplyTestLayout()
 		ArenaRadius / 650.0f,
 		ArenaRadius / 650.0f,
 		ArenaThickness / 50.0f));
+	// Both stadium exports use the same origin and 650 cm arena opening as the
+	// workshop arena. Uniform scaling keeps every surrounding detail aligned if
+	// the Test arena radius is tuned later, while its components remain visual-only.
+	const float StadiumScale = ArenaRadius / 650.0f;
+	for (UStaticMeshComponent* StadiumComponent : {
+		StadiumStructureMesh.Get(), StadiumLightsMesh.Get()})
+	{
+		StadiumComponent->SetVisibility(bUsingStadiumAssets, true);
+		StadiumComponent->SetHiddenInGame(!bUsingStadiumAssets, true);
+		StadiumComponent->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ));
+		StadiumComponent->SetRelativeScale3D(FVector(StadiumScale));
+	}
 	InstrumentDeckMesh->SetVisibility(!bUsingWorkshopAssets, true);
 	InstrumentDeckMesh->SetHiddenInGame(bUsingWorkshopAssets, true);
 	InstrumentDeckMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 2.1f));
@@ -796,11 +849,16 @@ void AFlickTestArena::ApplyTestLayout()
 	// from a shared Z=0 top face. Place that face exactly on the authoritative
 	// arena surface so pucks cannot visually enter non-colliding presentation.
 	const float SwitchSurfaceZ = SurfaceZ;
-	for (int32 LocationIndex = 0; LocationIndex < PossibleLocationCount; ++LocationIndex)
+	for (int32 LocationIndex = 0; LocationIndex < MaxPossibleLocationCount; ++LocationIndex)
 	{
 		UStaticMeshComponent* Socket = DividerBaseMeshes[LocationIndex];
-		Socket->SetVisibility(true, true);
-		Socket->SetHiddenInGame(false, true);
+		const bool bDesignedForFormat = LocationIndex < GetPossibleLocationCount();
+		Socket->SetVisibility(bDesignedForFormat, true);
+		Socket->SetHiddenInGame(!bDesignedForFormat, true);
+		if (!bDesignedForFormat)
+		{
+			continue;
+		}
 		Socket->SetRelativeLocation(FVector(PossibleDividerCenters[LocationIndex], SwitchSurfaceZ));
 		Socket->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(PossibleDividerAngles[LocationIndex]), 0.0f));
 		Socket->SetRelativeScale3D(bUsingWorkshopAssets
@@ -815,7 +873,7 @@ void AFlickTestArena::ApplyTestLayout()
 		}
 	}
 
-	for (int32 Index = 0; Index < MechanismCount; ++Index)
+	for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 	{
 		const bool bActive = Index < GetMechanismCount();
 		for (UStaticMeshComponent* Component : {
@@ -905,9 +963,9 @@ void AFlickTestArena::CreateRuntimeMaterials()
 	SetMaterialColor(InstrumentDeckMaterial, FLinearColor(0.026f, 0.034f, 0.032f, 1.0f), 0.94f);
 	if (AccentMaterials.IsEmpty())
 	{
-		AccentMaterials.Reserve(MechanismCount);
-		DividerMaterials.Reserve(MechanismCount);
-		for (int32 Index = 0; Index < MechanismCount; ++Index)
+		AccentMaterials.Reserve(MaxMechanismCount);
+		DividerMaterials.Reserve(MaxMechanismCount);
+		for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 		{
 			UMaterialInstanceDynamic* Accent = bUsingWorkshopAssets
 				? CreateAccentMaterial(ZoneOuterMeshes[Index])
@@ -931,7 +989,7 @@ void AFlickTestArena::CreateRuntimeMaterials()
 	if (!ZoneInsetMaterial)
 	{
 		ZoneInsetMaterial = ZoneInnerMeshes[0]->CreateAndSetMaterialInstanceDynamic(0);
-		for (int32 Index = 1; Index < MechanismCount; ++Index)
+		for (int32 Index = 1; Index < MaxMechanismCount; ++Index)
 		{
 			ZoneInnerMeshes[Index]->SetMaterial(0, ZoneInsetMaterial);
 		}
@@ -949,7 +1007,7 @@ void AFlickTestArena::CreateRuntimeMaterials()
 	// Matte, non-emissive surfaces preserve puck readability and avoid adding bloom.
 	SetMaterialColor(ZoneInsetMaterial, FLinearColor(0.012f, 0.019f, 0.017f, 1.0f), 0.88f);
 	SetMaterialColor(DormantSocketMaterial, FLinearColor(0.11f, 0.14f, 0.18f, 1.0f), 0.72f);
-	for (int32 Index = 0; Index < MechanismCount; ++Index)
+	for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 	{
 		const FLinearColor Accent = GetMechanismColor(Index);
 		SetMaterialColor(
@@ -983,9 +1041,9 @@ void AFlickTestArena::CreateRuntimeMaterials()
 
 void AFlickTestArena::ApplyMechanismState()
 {
-	for (int32 Index = 0; Index < MechanismCount; ++Index)
+	for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 	{
-		const uint8 MechanismBit = static_cast<uint8>(1 << Index);
+		const uint16 MechanismBit = static_cast<uint16>(1 << Index);
 		const bool bActive = Index < GetMechanismCount();
 		const bool bRaised = bActive && (RaisedDividerMask & MechanismBit) != 0;
 		const bool bPending = bActive && (PendingToggleMask & MechanismBit) != 0;
