@@ -13,6 +13,7 @@ importers = (
     "Import-FlickHighDetailPucks.py",
     "Import-FlickArena.py",
     "Import-FlickStadium.py",
+    "Import-FlickBobArena.py",
 )
 
 for importer in importers:
@@ -24,4 +25,5 @@ for importer in importers:
     u.log("FLICK_ASSET_UPDATE_FINISH: " + importer)
 
 u.EditorAssetLibrary.save_directory("/Game/TestArena", only_if_is_dirty=True, recursive=True)
+u.EditorAssetLibrary.save_directory("/Game/BOB", only_if_is_dirty=True, recursive=True)
 u.log("FLICK_ASSET_UPDATE_COMPLETE")

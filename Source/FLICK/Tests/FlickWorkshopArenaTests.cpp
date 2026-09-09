@@ -4,6 +4,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Components/StaticMeshComponent.h"
+#include "Arena/FlickBobArena.h"
 #include "Arena/FlickTestArena.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickWorkshopArenaTest, "FLICK.Visuals.WorkshopArena",
@@ -185,6 +186,73 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Visual and collider share XY placement"),
 			FVector2D(ColliderLocation.X, ColliderLocation.Y).Equals(
 				FVector2D(ArtLocation.X, ArtLocation.Y), 0.1f));
+	}
+
+	Arena->Destroy();
+	World->DestroyWorld(false);
+	GEngine->DestroyWorldContext(World);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickHighDetailBobArenaTest, "FLICK.Visuals.HighDetailBobArena",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
+{
+	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(true);
+	UWorld* World = UWorld::CreateWorld(
+		EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Settings);
+	if (!TestNotNull(TEXT("BOB test world"), World))
+	{
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	AFlickBobArena* Arena = World->SpawnActor<AFlickBobArena>();
+	if (!TestNotNull(TEXT("BOB arena"), Arena))
+	{
+		World->DestroyWorld(false);
+		GEngine->DestroyWorldContext(World);
+		return false;
+	}
+	Arena->InitializeArena(620.0f, 50.0f, 250.0f);
+
+	UStaticMeshComponent* HighDetailArt = nullptr;
+	UStaticMeshComponent* BoardCollider = nullptr;
+	UStaticMeshComponent* RailCollider = nullptr;
+	TInlineComponentArray<UStaticMeshComponent*> Components(Arena);
+	for (UStaticMeshComponent* Component : Components)
+	{
+		if (Component->GetFName() == TEXT("HighDetailArenaMesh")) HighDetailArt = Component;
+		if (Component->GetFName() == TEXT("BoardBase")) BoardCollider = Component;
+		if (Component->GetFName() == TEXT("Rail_0")) RailCollider = Component;
+	}
+
+	TestNotNull(TEXT("Imported high-detail BOB presentation"), HighDetailArt);
+	TestNotNull(TEXT("Original BOB board collider"), BoardCollider);
+	TestNotNull(TEXT("Original BOB rail collider"), RailCollider);
+	if (HighDetailArt && HighDetailArt->GetStaticMesh())
+	{
+		const FVector Size = HighDetailArt->GetStaticMesh()->GetBounds().BoxExtent * 2.0f;
+		TestTrue(TEXT("BOB art keeps the authoritative 1308 cm outer span"),
+			FMath::IsNearlyEqual(Size.X, 1308.0f, 1.0f)
+			&& FMath::IsNearlyEqual(Size.Y, 1308.0f, 1.0f));
+		TestEqual(TEXT("BOB art cannot affect puck physics"),
+			HighDetailArt->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestTrue(TEXT("High-detail BOB presentation is visible"), HighDetailArt->IsVisible());
+		TestTrue(TEXT("BOB materials preserve surface, wood, metal, markings, and pockets"),
+			HighDetailArt->GetStaticMesh()->GetStaticMaterials().Num() >= 9);
+	}
+	else
+	{
+		AddError(TEXT("High-detail BOB mesh asset was not loaded"));
+	}
+	for (UStaticMeshComponent* Collider : { BoardCollider, RailCollider })
+	{
+		if (!Collider) continue;
+		TestEqual(TEXT("Legacy BOB collision remains authoritative"),
+			Collider->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+		TestFalse(TEXT("Legacy BOB collision presentation is hidden"), Collider->IsVisible());
 	}
 
 	Arena->Destroy();

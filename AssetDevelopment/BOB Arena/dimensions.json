@@ -1,0 +1,37 @@
+{
+  "units": "centimeters",
+  "play_size": [
+    1240.0,
+    1240.0
+  ],
+  "outer_size": [
+    1308.0,
+    1308.0
+  ],
+  "board_thickness": 50.0,
+  "surface_z": 250.0,
+  "rail_height": 42.0,
+  "rail_thickness": 34.0,
+  "pocket_radius": 66.0,
+  "pocket_centers": [
+    [
+      -470.0,
+      -470.0
+    ],
+    [
+      -470.0,
+      470.0
+    ],
+    [
+      470.0,
+      -470.0
+    ],
+    [
+      470.0,
+      470.0
+    ]
+  ],
+  "exports": [
+    "SM_BobArena_HighDetail"
+  ]
+}

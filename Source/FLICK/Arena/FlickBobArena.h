@@ -71,12 +71,19 @@ private:
 
 	void ApplyArenaShape();
 	void ApplyPhysicsMaterials();
+	void SetLegacyArenaPresentationVisible(bool bVisible);
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> BoardBase;
+
+	/** Blender-authored presentation; gameplay continues to use BoardBase and Rails. */
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> HighDetailArenaMesh;
+
+	bool bUsingHighDetailArena = false;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PlayingSurface;

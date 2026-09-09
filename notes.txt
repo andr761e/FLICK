@@ -16,3 +16,8 @@ Once that is perfected, we will add
 Things to implement;
 - Make a high detail map for BOB in Blender (keep same dimensions as now). And make sorroundings for the BOB arena
 - Move the guide in tutorial so it doesn't cover the arena
+A few more fixes to the BOB arena
+- You forgot to add the red circle in the middle that encloses all the pucks
+- Please add a small line that the shooting pucks spawn on
+- Fix the holes. The holes are just a red cylinder with the top cut off so the pucks can fall in. Make sure that we can see that the holes are small indentations into the board
+- Also, change the physics a bit so the pucks can "fall" in

@@ -34,6 +34,8 @@ AFlickBobArena::AFlickBobArena()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HighDetailArenaAsset(
+		TEXT("/Game/BOB/Arena/SM_BobArena_HighDetail.SM_BobArena_HighDetail"));
 
 	const auto CreateMesh = [this](const FName Name, UStaticMesh* Mesh)
 	{
@@ -49,6 +51,17 @@ AFlickBobArena::AFlickBobArena()
 	};
 
 	BoardBase = CreateMesh(TEXT("BoardBase"), CubeMesh.Object);
+	HighDetailArenaMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HighDetailArenaMesh"));
+	HighDetailArenaMesh->SetupAttachment(SceneRoot);
+	HighDetailArenaMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HighDetailArenaMesh->SetGenerateOverlapEvents(false);
+	HighDetailArenaMesh->SetCanEverAffectNavigation(false);
+	HighDetailArenaMesh->SetCastShadow(true);
+	if (HighDetailArenaAsset.Succeeded())
+	{
+		HighDetailArenaMesh->SetStaticMesh(HighDetailArenaAsset.Object);
+		bUsingHighDetailArena = true;
+	}
 	PlayingSurface = CreateMesh(TEXT("PlayingSurface"), CubeMesh.Object);
 	CenterRingOuter = CreateMesh(TEXT("CenterRingOuter"), CylinderMesh.Object);
 	CenterRingInner = CreateMesh(TEXT("CenterRingInner"), CylinderMesh.Object);
@@ -297,6 +310,17 @@ void AFlickBobArena::ApplyArenaShape()
 	const float PedestalHeight = FMath::Max(80.0f, BottomZ);
 	BoardBase->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - BoardThickness * 0.5f));
 	BoardBase->SetRelativeScale3D(FVector(BoardHalfExtent / 50.0f, BoardHalfExtent / 50.0f, BoardThickness / 100.0f));
+	if (HighDetailArenaMesh)
+	{
+		HighDetailArenaMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 250.0f));
+		HighDetailArenaMesh->SetRelativeScale3D(FVector(
+			BoardHalfExtent / 620.0f,
+			BoardHalfExtent / 620.0f,
+			1.0f));
+		HighDetailArenaMesh->SetVisibility(bUsingHighDetailArena, true);
+		HighDetailArenaMesh->SetHiddenInGame(!bUsingHighDetailArena, true);
+	}
+	SetLegacyArenaPresentationVisible(!bUsingHighDetailArena);
 	PlayingSurface->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 0.8f));
 	PlayingSurface->SetRelativeScale3D(FVector((BoardHalfExtent - 18.0f) / 50.0f, (BoardHalfExtent - 18.0f) / 50.0f, 0.018f));
 	const float VisibleSurfaceTop = SurfaceZ + 1.7f;
@@ -527,6 +551,32 @@ void AFlickBobArena::ApplyArenaShape()
 				: FLinearColor(1.0f, 0.2f, 0.025f, 1.0f));
 	}
 	for (UStaticMeshComponent* GridLine : FloorGridSegments) ColorComponent(GridLine, FLinearColor(0.004f, 0.026f, 0.042f, 1.0f));
+}
+
+void AFlickBobArena::SetLegacyArenaPresentationVisible(const bool bVisible)
+{
+	TArray<UStaticMeshComponent*> BoardPresentation = {
+		BoardBase.Get(), PlayingSurface.Get(), CenterRingOuter.Get(), CenterRingInner.Get()
+	};
+	for (UStaticMeshComponent* Component : Rails) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : PocketTrims) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : Pockets) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : PocketDepths) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : PocketBottoms) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : PocketRimSegments) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : RailAccentStrips) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : CornerCaps) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : GuideLines) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : StartLines) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : SurfacePanelLines) BoardPresentation.Add(Component);
+	for (UStaticMeshComponent* Component : BoardPresentation)
+	{
+		if (Component)
+		{
+			Component->SetVisibility(bVisible, true);
+			Component->SetHiddenInGame(!bVisible, true);
+		}
+	}
 }
 
 void AFlickBobArena::ApplyPhysicsMaterials()

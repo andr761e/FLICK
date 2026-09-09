@@ -43,7 +43,8 @@ $requiredFiles = @(
     'AssetDevelopment\Arena\exports\SM_TestArena_SwitchDot.fbx',
     'AssetDevelopment\Arena\exports\SM_TestArena_SignalTrace.fbx',
     'AssetDevelopment\Stadium\exports\SM_TestStadium_Structure.fbx',
-    'AssetDevelopment\Stadium\exports\SM_TestStadium_Lights.fbx'
+	'AssetDevelopment\Stadium\exports\SM_TestStadium_Lights.fbx',
+	'AssetDevelopment\BOB Arena\exports\SM_BobArena_HighDetail.fbx'
 )
 
 $missingFiles = @($requiredFiles | Where-Object {
@@ -53,7 +54,7 @@ if ($missingFiles.Count -gt 0) {
     throw "Asset update stopped because required FBX files are missing:`n  $($missingFiles -join "`n  ")"
 }
 
-Write-Host 'Updating FLICK puck, arena, and stadium assets...'
+Write-Host 'Updating FLICK puck, arena, stadium, and BOB arena assets...'
 & $UnrealEditor $projectFile `
     -run=pythonscript `
     "-script=$importScript" `
@@ -72,4 +73,4 @@ if (-not (Test-Path -LiteralPath $logFile) -or
     throw 'Unreal exited without confirming completion. See Saved\Logs\FLICK.log.'
 }
 
-Write-Host 'Asset update complete. Review the meshes in Unreal, then commit the updated Content/TestArena .uasset files.'
+Write-Host 'Asset update complete. Review the meshes in Unreal, then commit the updated Content/TestArena and Content/BOB .uasset files.'
