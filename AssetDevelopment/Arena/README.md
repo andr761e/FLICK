@@ -41,10 +41,11 @@ components rather than replacing them.
 ## Unreal integration
 
 The imported assets live under `/Game/TestArena/Arena`. Reimport them after an
-authoring rebuild with:
+authoring rebuild together with the pucks and stadium by closing Unreal Editor
+and running from the project root:
 
 ```powershell
-& 'C:/Program Files/Epic Games/UE_5.6/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' FLICK.uproject -run=pythonscript -script=Tools/Import-FlickArena.py -unattended -nop4
+.\update-flick-assets.cmd
 ```
 
 `AFlickTestArena` uses the static arena and mechanism meshes only as presentation.

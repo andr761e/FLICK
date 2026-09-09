@@ -76,33 +76,34 @@ report = []
 for row in manifest:
     name = row["asset"]
     mesh_path = destination + "/SM_Puck_" + name + "_HighDetail"
+    source_file = source_root / "exports" / (name + ".fbx")
+    if not source_file.is_file():
+        raise RuntimeError(name + ": source FBX is missing: " + str(source_file))
+    task = u.AssetImportTask()
+    task.filename = str(source_file)
+    task.destination_path = destination
+    task.destination_name = "SM_Puck_" + name + "_HighDetail"
+    task.automated = True
+    # Replace the object in place. Its /Game path remains stable, so every C++
+    # soft reference and loaded map continues to resolve to the updated mesh.
+    task.replace_existing = True
+    task.save = True
+    options = u.FbxImportUI()
+    options.import_mesh = True
+    options.import_materials = False
+    options.import_textures = False
+    options.import_as_skeletal = False
+    options.automated_import_should_detect_type = False
+    options.mesh_type_to_import = u.FBXImportType.FBXIT_STATIC_MESH
+    data = options.static_mesh_import_data
+    data.combine_meshes = True
+    data.auto_generate_collision = False
+    data.generate_lightmap_u_vs = False
+    data.normal_import_method = u.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS
+    task.options = options
+    task.factory = u.FbxFactory()
+    assets.import_asset_tasks([task])
     mesh = u.load_asset(mesh_path)
-    if not isinstance(mesh, u.StaticMesh) or len(mesh.get_editor_property("static_materials")) != 7:
-        if mesh:
-            u.EditorAssetLibrary.delete_asset(mesh_path)
-        task = u.AssetImportTask()
-        task.filename = str(source_root / "exports" / (name + ".fbx"))
-        task.destination_path = destination
-        task.destination_name = "SM_Puck_" + name + "_HighDetail"
-        task.automated = True
-        task.replace_existing = False
-        task.save = True
-        options = u.FbxImportUI()
-        options.import_mesh = True
-        options.import_materials = False
-        options.import_textures = False
-        options.import_as_skeletal = False
-        options.automated_import_should_detect_type = False
-        options.mesh_type_to_import = u.FBXImportType.FBXIT_STATIC_MESH
-        data = options.static_mesh_import_data
-        data.combine_meshes = True
-        data.auto_generate_collision = False
-        data.generate_lightmap_u_vs = False
-        data.normal_import_method = u.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS
-        task.options = options
-        task.factory = u.FbxFactory()
-        assets.import_asset_tasks([task])
-        mesh = u.load_asset(mesh_path)
 
     if not isinstance(mesh, u.StaticMesh):
         raise RuntimeError(name + ": mesh import failed")
@@ -151,11 +152,13 @@ for identity in ("P1", "P2", "P3"):
         name = row["asset"]
         asset_name = f"SM_Puck_{name}_{identity}_HighDetail"
         mesh_path = identity_destination + "/" + asset_name
-        if u.EditorAssetLibrary.does_asset_exist(mesh_path):
-            u.EditorAssetLibrary.delete_asset(mesh_path)
+        source_file = (
+            source_root.parent / "PlayerIdentity" / identity / "Blue" /
+            "exports" / f"{name}.fbx")
+        if not source_file.is_file():
+            raise RuntimeError(asset_name + ": source FBX is missing: " + str(source_file))
         task = u.AssetImportTask()
-        task.filename = str(
-            source_root.parent / "PlayerIdentity" / identity / "Blue" / "exports" / f"{name}.fbx")
+        task.filename = str(source_file)
         task.destination_path = identity_destination
         task.destination_name = asset_name
         task.automated = True

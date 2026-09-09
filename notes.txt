@@ -7,6 +7,9 @@ Byg development build:
 Åben dobbelt spil
 .\play-flick-network.cmd
 
+Opdater assets
+.\update-flick-assets.cmd
+
 Currently we are testing what the final arenas should look like in the test arena.
 Once that is perfected, we will add 
 
@@ -17,3 +20,4 @@ Things to implement;
 - Add tutorials under training. 
 - Make a high detail map for BOB in Blender (keep same dimensions as now). And make sorroundings for the BOB arena
 - Make arena showcases lighter
+- Add free camera mode to free play

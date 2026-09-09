@@ -17,6 +17,7 @@ Generated files:
 - `renders/test_stadium_preview.png` - reference render with the current arena.
 - `manifest.json` - dimensions and integration contract.
 
-Regenerate with Blender 5.2, then run `Tools/Import-FlickStadium.py` through the
-Unreal Python commandlet. Stadium meshes are presentation-only and must never
-participate in puck collision.
+Regenerate with Blender 5.2, close Unreal Editor, then run
+`.\update-flick-assets.cmd` from the project root. The command updates the
+stadium together with the puck and arena assets. Stadium meshes are
+presentation-only and must never participate in puck collision.

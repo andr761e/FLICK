@@ -30,10 +30,17 @@ From the project root with Blender 5.2:
 & 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe' --background --python AssetDevelopment/Pucks/HighDetail/scripts/generate_player_identity_variants.py
 ```
 
-Then run the Unreal Python importers:
+To update the in-game puck, arena, and stadium assets together after replacing
+their FBX exports, close Unreal Editor and run from the project root:
 
-- `Tools/Import-FlickBlueStandardPrototype.py`
-- `Tools/Import-FlickHighDetailPucks.py`
+```powershell
+.\update-flick-assets.cmd
+```
+
+The command reimports the existing `.uasset` meshes in place, reapplies their
+approved materials, validates dimensions/material slots, and writes reports to
+`Saved/`. Commit the changed FBX source files and `Content/TestArena` `.uasset`
+files so other machines receive both the editable exports and playable assets.
 
 The exporters validate dimensions and preserve seven material sections:
 graphite housing, machined highlights, gasket/sockets, team diffuser, brushed
