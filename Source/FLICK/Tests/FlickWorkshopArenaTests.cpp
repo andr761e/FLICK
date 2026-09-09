@@ -219,17 +219,20 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 
 	UStaticMeshComponent* HighDetailArt = nullptr;
 	UStaticMeshComponent* BoardCollider = nullptr;
+	UStaticMeshComponent* PocketedBoardCollider = nullptr;
 	UStaticMeshComponent* RailCollider = nullptr;
 	TInlineComponentArray<UStaticMeshComponent*> Components(Arena);
 	for (UStaticMeshComponent* Component : Components)
 	{
 		if (Component->GetFName() == TEXT("HighDetailArenaMesh")) HighDetailArt = Component;
 		if (Component->GetFName() == TEXT("BoardBase")) BoardCollider = Component;
+		if (Component->GetFName() == TEXT("BoardCollision_0")) PocketedBoardCollider = Component;
 		if (Component->GetFName() == TEXT("Rail_0")) RailCollider = Component;
 	}
 
 	TestNotNull(TEXT("Imported high-detail BOB presentation"), HighDetailArt);
-	TestNotNull(TEXT("Original BOB board collider"), BoardCollider);
+	TestNotNull(TEXT("Original BOB board presentation"), BoardCollider);
+	TestNotNull(TEXT("Pocketed BOB board collider"), PocketedBoardCollider);
 	TestNotNull(TEXT("Original BOB rail collider"), RailCollider);
 	if (HighDetailArt && HighDetailArt->GetStaticMesh())
 	{
@@ -247,13 +250,23 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	{
 		AddError(TEXT("High-detail BOB mesh asset was not loaded"));
 	}
-	for (UStaticMeshComponent* Collider : { BoardCollider, RailCollider })
+	if (BoardCollider)
+	{
+		TestEqual(TEXT("Solid legacy slab no longer blocks the pocket openings"),
+			BoardCollider->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+	}
+	for (UStaticMeshComponent* Collider : { PocketedBoardCollider, RailCollider })
 	{
 		if (!Collider) continue;
 		TestEqual(TEXT("Legacy BOB collision remains authoritative"),
 			Collider->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
 		TestFalse(TEXT("Legacy BOB collision presentation is hidden"), Collider->IsVisible());
 	}
+	const FVector Pocket = Arena->GetPocketWorldLocation(0);
+	TestFalse(TEXT("Puck is not captured before it descends into the cup"),
+		Arena->IsCapturedByPocket(FVector(Pocket.X, Pocket.Y, 250.0f), 24.0f));
+	TestTrue(TEXT("Puck is captured after it visibly falls below the tabletop"),
+		Arena->IsCapturedByPocket(FVector(Pocket.X, Pocket.Y, 240.0f), 24.0f));
 
 	Arena->Destroy();
 	World->DestroyWorld(false);

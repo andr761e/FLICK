@@ -51,6 +51,11 @@ AFlickBobArena::AFlickBobArena()
 	};
 
 	BoardBase = CreateMesh(TEXT("BoardBase"), CubeMesh.Object);
+	for (int32 Index = 0; Index < 9; ++Index)
+	{
+		BoardCollisionTiles.Add(CreateMesh(
+			*FString::Printf(TEXT("BoardCollision_%d"), Index), CubeMesh.Object));
+	}
 	HighDetailArenaMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HighDetailArenaMesh"));
 	HighDetailArenaMesh->SetupAttachment(SceneRoot);
 	HighDetailArenaMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -112,10 +117,17 @@ AFlickBobArena::AFlickBobArena()
 	// A single simple box is the authoritative tabletop. Decorative markings and
 	// pocket geometry never participate in collision, so there are no hidden triangle
 	// seams or raised visual strips capable of steering a moving puck.
-	BoardBase->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	BoardBase->SetCollisionObjectType(ECC_WorldStatic);
-	BoardBase->SetCollisionResponseToAllChannels(ECR_Block);
+	BoardBase->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	BoardBase->SetGenerateOverlapEvents(false);
+	for (UStaticMeshComponent* Tile : BoardCollisionTiles)
+	{
+		Tile->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Tile->SetCollisionObjectType(ECC_WorldStatic);
+		Tile->SetCollisionResponseToAllChannels(ECR_Block);
+		Tile->SetGenerateOverlapEvents(false);
+		Tile->SetVisibility(false, true);
+		Tile->SetHiddenInGame(true, true);
+	}
 	for (UStaticMeshComponent* Rail : Rails)
 	{
 		Rail->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -226,8 +238,10 @@ bool AFlickBobArena::IsCapturedByPocket(const FVector& WorldLocation, const floa
 {
 	const FVector LocalLocation = GetActorTransform().InverseTransformPosition(WorldLocation);
 	const float SafePieceRadius = FMath::Max(0.0f, PieceRadius);
-	const float VerticalTolerance = FMath::Max(PocketCaptureDepth, SafePieceRadius * 0.4f);
-	if (LocalLocation.Z > SurfaceZ + VerticalTolerance
+	// Wait until the puck has visibly descended into the cup. Previously the
+	// planar radius check removed it while it was still sitting on the tabletop.
+	const float CapturePlane = SurfaceZ - FMath::Max(PocketCaptureDepth, SafePieceRadius * 0.25f);
+	if (LocalLocation.Z > CapturePlane
 		|| LocalLocation.Z < SurfaceZ - BoardThickness)
 	{
 		return false;
@@ -310,6 +324,42 @@ void AFlickBobArena::ApplyArenaShape()
 	const float PedestalHeight = FMath::Max(80.0f, BottomZ);
 	BoardBase->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - BoardThickness * 0.5f));
 	BoardBase->SetRelativeScale3D(FVector(BoardHalfExtent / 50.0f, BoardHalfExtent / 50.0f, BoardThickness / 100.0f));
+	// Nine slightly overlapping slabs support the board while leaving four
+	// square apertures hidden precisely beneath the round pocket artwork.
+	// The visual red sleeve masks the corners; the generous opening lets the
+	// small BOB pucks drop under gravity instead of resting on a solid slab.
+	if (BoardCollisionTiles.Num() == 9)
+	{
+		const float HoleCenter = BoardHalfExtent - PocketInset;
+		const float HoleMin = HoleCenter - PocketRadius;
+		const float HoleMax = HoleCenter + PocketRadius;
+		const float CollisionZ = SurfaceZ - BoardThickness * 0.5f;
+		const float SeamOverlap = 0.5f;
+		const auto ConfigureTile = [this, CollisionZ, SeamOverlap](
+			UStaticMeshComponent* Tile, const float MinX, const float MaxX,
+			const float MinY, const float MaxY)
+		{
+			const float Width = MaxX - MinX;
+			const float Height = MaxY - MinY;
+			Tile->SetRelativeLocation(FVector((MinX + MaxX) * 0.5f, (MinY + MaxY) * 0.5f, CollisionZ));
+			Tile->SetRelativeScale3D(FVector(
+				(Width + SeamOverlap) / 100.0f,
+				(Height + SeamOverlap) / 100.0f,
+				BoardThickness / 100.0f));
+		};
+
+		int32 TileIndex = 0;
+		ConfigureTile(BoardCollisionTiles[TileIndex++], -BoardHalfExtent, -HoleMax, -BoardHalfExtent, BoardHalfExtent);
+		ConfigureTile(BoardCollisionTiles[TileIndex++], -HoleMin, HoleMin, -BoardHalfExtent, BoardHalfExtent);
+		ConfigureTile(BoardCollisionTiles[TileIndex++], HoleMax, BoardHalfExtent, -BoardHalfExtent, BoardHalfExtent);
+		for (const float MinX : { -HoleMax, HoleMin })
+		{
+			const float MaxX = MinX + PocketRadius * 2.0f;
+			ConfigureTile(BoardCollisionTiles[TileIndex++], MinX, MaxX, -BoardHalfExtent, -HoleMax);
+			ConfigureTile(BoardCollisionTiles[TileIndex++], MinX, MaxX, -HoleMin, HoleMin);
+			ConfigureTile(BoardCollisionTiles[TileIndex++], MinX, MaxX, HoleMax, BoardHalfExtent);
+		}
+	}
 	if (HighDetailArenaMesh)
 	{
 		HighDetailArenaMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 250.0f));
@@ -606,6 +656,10 @@ void AFlickBobArena::ApplyPhysicsMaterials()
 	RailPhysicalMaterial->bOverrideRestitutionCombineMode = true;
 	RailPhysicalMaterial->RestitutionCombineMode = EFrictionCombineMode::Average;
 	BoardBase->SetPhysMaterialOverride(BoardPhysicalMaterial);
+	for (UStaticMeshComponent* Tile : BoardCollisionTiles)
+	{
+		Tile->SetPhysMaterialOverride(BoardPhysicalMaterial);
+	}
 	for (UStaticMeshComponent* Rail : Rails)
 	{
 		Rail->SetPhysMaterialOverride(RailPhysicalMaterial);

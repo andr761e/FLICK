@@ -31,6 +31,8 @@ LINE_Z = SURFACE_Z + 0.004  # 4 mm separation prevents gameplay-camera flicker.
 SQUARE_HALF = 4.10
 CORNER_GUIDE_RADIUS = 0.20
 CENTER_RING_RADIUS = 1.22
+RACK_RING_RADIUS = 3.25
+STRIKER_LINE_WIDTH = 1.25
 COLLECTION_NAME = "BOB_ARENA_HIGH_DETAIL"
 
 
@@ -278,6 +280,12 @@ objects.extend((
     flat_rect("Line_Left", LINE_WIDTH, straight_length, LINE_Z, MATS["04_BOB_Red"], (-SQUARE_HALF, 0.0)),
     flat_rect("Line_Right", LINE_WIDTH, straight_length, LINE_Z, MATS["04_BOB_Red"], (SQUARE_HALF, 0.0)),
     flat_ring("CenterRing", CENTER_RING_RADIUS, LINE_WIDTH, LINE_Z, MATS["04_BOB_Red"]),
+    solid_ring("RackRing", RACK_RING_RADIUS, LINE_WIDTH, 0.010,
+               LINE_Z + 0.006, MATS["04_BOB_Red"], segments=192),
+    flat_rect("StrikerLine_Blue", STRIKER_LINE_WIDTH, LINE_WIDTH, LINE_Z,
+              MATS["04_BOB_Red"], (0.0, -(HALF_PLAY - 1.58))),
+    flat_rect("StrikerLine_Orange", STRIKER_LINE_WIDTH, LINE_WIDTH, LINE_Z,
+              MATS["04_BOB_Red"], (0.0, HALF_PLAY - 1.58)),
     cylinder("CenterMedallion", 0.045, 0.012, (0.0, 0.0, LINE_Z + 0.006), MATS["05_BOB_PocketRed"], 64),
 ))
 for sx in (-1.0, 1.0):

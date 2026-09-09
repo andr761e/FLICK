@@ -79,6 +79,10 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> BoardBase;
 
+	/** Invisible tabletop tiles leave genuine openings beneath the four visual cups. */
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> BoardCollisionTiles;
+
 	/** Blender-authored presentation; gameplay continues to use BoardBase and Rails. */
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> HighDetailArenaMesh;
