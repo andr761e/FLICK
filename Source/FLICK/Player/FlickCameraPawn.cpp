@@ -54,6 +54,14 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	{
 		return;
 	}
+	if (bFreeCameraEnabled)
+	{
+		Camera->SetRelativeLocation(FVector::ZeroVector);
+		Camera->SetRelativeRotation(FRotator::ZeroRotator);
+		Camera->SetFieldOfView(CurrentFieldOfView);
+		bGameplayViewTransitioning = false;
+		return;
+	}
 
 	ShakeTime += DeltaSeconds;
 	const float MenuDrift = bMenuPresentation ? FMath::Sin(ShakeTime * 0.2f) * 30.0f : 0.0f;
@@ -382,6 +390,67 @@ void AFlickCameraPawn::EndCinematicReplay()
 	ReplayProgress = 0.0f;
 	ReplayPullbackAlpha = 0.0f;
 	bGameplayViewTransitioning = true;
+}
+
+void AFlickCameraPawn::SetFreeCameraEnabled(const bool bEnabled)
+{
+	if (bFreeCameraEnabled == bEnabled || (bEnabled && (bMenuPresentation || bCinematicReplay)))
+	{
+		return;
+	}
+	bFreeCameraEnabled = bEnabled;
+	bAimPresentation = false;
+	ShakeTrauma = 0.0f;
+	if (!bFreeCameraEnabled)
+	{
+		bGameplayViewTransitioning = true;
+	}
+}
+
+void AFlickCameraPawn::AddFreeCameraInput(
+	const float Forward,
+	const float Right,
+	const float Up,
+	const FVector2D& LookDelta,
+	const bool bBoost,
+	const float DeltaSeconds)
+{
+	if (!bFreeCameraEnabled || DeltaSeconds <= 0.0f)
+	{
+		return;
+	}
+
+	FRotator Rotation = GetActorRotation();
+	Rotation.Yaw = FRotator::NormalizeAxis(Rotation.Yaw + LookDelta.X * FreeCameraMouseSensitivity);
+	Rotation.Pitch = FMath::Clamp(
+		Rotation.Pitch - LookDelta.Y * FreeCameraMouseSensitivity,
+		-85.0f,
+		10.0f);
+	Rotation.Roll = 0.0f;
+	SetActorRotation(Rotation);
+
+	FVector Movement = GetActorForwardVector() * FMath::Clamp(Forward, -1.0f, 1.0f)
+		+ GetActorRightVector() * FMath::Clamp(Right, -1.0f, 1.0f)
+		+ FVector::UpVector * FMath::Clamp(Up, -1.0f, 1.0f);
+	if (!Movement.IsNearlyZero())
+	{
+		Movement.Normalize();
+	}
+	const float Speed = FreeCameraMoveSpeed * (bBoost ? FreeCameraBoostMultiplier : 1.0f);
+	FVector NewLocation = GetActorLocation() + Movement * Speed * DeltaSeconds;
+	const float MaximumRadius = FreeCameraMaximumRadius * ArenaFramingScale;
+	FVector2D Planar(NewLocation.X, NewLocation.Y);
+	if (Planar.SizeSquared() > FMath::Square(MaximumRadius))
+	{
+		Planar = Planar.GetSafeNormal() * MaximumRadius;
+		NewLocation.X = Planar.X;
+		NewLocation.Y = Planar.Y;
+	}
+	NewLocation.Z = FMath::Clamp(
+		NewLocation.Z,
+		FreeCameraMinimumHeight,
+		FreeCameraMaximumHeight * ArenaFramingScale);
+	SetActorLocation(NewLocation);
 }
 
 FVector AFlickCameraPawn::GetGameplayTargetLocation() const

@@ -29,6 +29,7 @@ enum class EFlickPlayPlaylist : uint8
 enum class EFlickTrainingActivity : uint8
 {
 	None,
+	Tutorial,
 	FreePlay,
 	BotMatch,
 	BobBotMatch
@@ -96,6 +97,7 @@ private:
 	TSharedRef<SWidget> BuildScoreboardPlayerRow(EFlickTeam Team, int32 PlayerSlot);
 	TSharedRef<SWidget> BuildTeamPlate(EFlickTeam Team);
 	TSharedRef<SWidget> BuildTrainingToolsPanel();
+	TSharedRef<SWidget> BuildTutorialOverlay();
 	TSharedRef<SWidget> BuildControlHintPanel(bool bRightSide);
 	TSharedRef<SWidget> BuildPowerMeter();
 	TSharedRef<SWidget> BuildCameraOrbitHint();

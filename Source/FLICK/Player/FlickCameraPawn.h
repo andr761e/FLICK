@@ -35,6 +35,9 @@ public:
 	void BeginCinematicReplay(const FVector& InitialFocus, EFlickTeam ShootingTeam);
 	void UpdateCinematicReplay(const FVector& Focus, float NormalizedProgress, float PullbackAlpha);
 	void EndCinematicReplay();
+	void SetFreeCameraEnabled(bool bEnabled);
+	void AddFreeCameraInput(float Forward, float Right, float Up, const FVector2D& LookDelta, bool bBoost, float DeltaSeconds);
+	bool IsFreeCameraEnabled() const { return bFreeCameraEnabled; }
 	float GetGameplayOrbitAngle() const { return GameplayOrbitAngle; }
 	float GetGameplayElevationAngle() const { return GameplayElevationAngle; }
 	bool IsGameplayViewTransitioning() const { return bGameplayViewTransitioning; }
@@ -160,6 +163,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera Feedback")
 	float ShakeDecayPerSecond = 2.8f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera", meta = (ClampMin = "100.0", ClampMax = "3000.0"))
+	float FreeCameraMoveSpeed = 720.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera", meta = (ClampMin = "1.0", ClampMax = "6.0"))
+	float FreeCameraBoostMultiplier = 2.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera", meta = (ClampMin = "0.02", ClampMax = "0.5"))
+	float FreeCameraMouseSensitivity = 0.11f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera", meta = (ClampMin = "500.0", ClampMax = "4000.0"))
+	float FreeCameraMaximumRadius = 1850.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera")
+	float FreeCameraMinimumHeight = 75.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera")
+	float FreeCameraMaximumHeight = 1650.0f;
+
 private:
 	void ApplyArenaPostProcess();
 	FVector GetGameplayTargetLocation() const;
@@ -192,4 +213,5 @@ private:
 	bool bAimPresentation = false;
 	bool bCompactGameplayFraming = false;
 	bool bCinematicReplay = false;
+	bool bFreeCameraEnabled = false;
 };

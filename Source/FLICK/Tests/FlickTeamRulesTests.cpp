@@ -34,6 +34,14 @@ bool FFlickTeamRulesRotationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Trios wraps"), FlickTeamRules::AdvancePlayerSlot(2, 3), 0);
 	TestTrue(TEXT("Matching slot is active"), FlickTeamRules::IsActivePlayerSlot(1, 1, 3));
 	TestFalse(TEXT("Different slot is inactive"), FlickTeamRules::IsActivePlayerSlot(0, 1, 3));
+	TestTrue(TEXT("Private match accepts one human controlling several slots"),
+		FlickTeamRules::HasRequiredClassConfirmationCount(true, 1, 3));
+	TestFalse(TEXT("Private match still requires at least one participant"),
+		FlickTeamRules::HasRequiredClassConfirmationCount(true, 0, 3));
+	TestFalse(TEXT("Public doubles waits for all four players"),
+		FlickTeamRules::HasRequiredClassConfirmationCount(false, 3, 2));
+	TestTrue(TEXT("Public doubles accepts its complete roster"),
+		FlickTeamRules::HasRequiredClassConfirmationCount(false, 4, 2));
 	return true;
 }
 

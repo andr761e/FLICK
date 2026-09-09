@@ -151,8 +151,16 @@ public:
 	bool IsRankedMatch() const { return bRankedRequested; }
 	bool IsTrainingMode() const { return bTrainingMode; }
 	bool IsTrainingBotMatch() const { return bTrainingMode && bTrainingBotMatch; }
-	bool IsFreePlayTraining() const { return bTrainingMode && !bTrainingBotMatch; }
+	bool IsTutorialMode() const { return bTrainingMode && bTutorialMode; }
+	bool IsFreePlayTraining() const { return bTrainingMode && !bTrainingBotMatch && !bTutorialMode; }
 	bool IsTrainingEditMode() const { return bTrainingMode && bTrainingEditMode; }
+	int32 GetTutorialStageNumber() const { return TutorialStageIndex + 1; }
+	int32 GetTutorialStageCount() const { return TutorialStageTotal; }
+	FString GetTutorialTitle() const;
+	FString GetTutorialObjective() const;
+	FString GetTutorialHint() const;
+	bool IsTutorialComplete() const { return bTutorialCompleted; }
+	bool IsTutorialTransitioning() const { return TutorialTransitionRemaining > 0.0f; }
 	bool IsTestArenaMode() const { return bTestArenaMode; }
 	bool IsCinematicReplayActive() const { return bCinematicReplayActive; }
 	bool IsCinematicReplayPullbackActive() const;
@@ -270,10 +278,12 @@ public:
 	void OpenClassChange();
 	void StartTrainingMode();
 	void StartTrainingBotMatch();
+	void StartTutorialMode();
 	void ToggleTrainingEditMode();
 	void SetTrainingPlacementTeam(EFlickTeam Team);
 	void CycleTrainingPlacementArchetype(int32 Direction);
 	bool PlaceTrainingPuck(const FVector& WorldLocation);
+	bool ToggleTrainingDivider(const FVector& WorldLocation);
 	bool BeginTrainingPuckMove(AFlickPiece* Piece);
 	bool MoveTrainingPuck(AFlickPiece* Piece, const FVector& WorldLocation);
 	void FinishTrainingPuckMove(AFlickPiece* Piece);
@@ -546,6 +556,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Test Arena", meta = (ClampMin = "0.0", ClampMax = "1000.0"))
 	float TestPuckRimLightIntensity = 180.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "1.0", ClampMax = "2.0"))
+	float FrontendArenaDirectionalLightMultiplier = 1.22f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "1.0", ClampMax = "2.0"))
+	float FrontendArenaSkyLightMultiplier = 1.28f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "1.0", ClampMax = "2.0"))
+	float FrontendArenaFillLightMultiplier = 1.18f;
+
 private:
 	void SpawnCameraIfNeeded();
 	void SpawnAudioIfNeeded();
@@ -555,6 +574,9 @@ private:
 	void SpawnBobPieces();
 	void BeginSelectedMatch();
 	void BeginTrainingActivity(bool bAgainstBot);
+	void SetupTutorialStage(int32 StageIndex);
+	void ResolveTutorialShot();
+	void UpdateTutorial(float DeltaSeconds);
 	void UpdateTrainingBot(float DeltaSeconds);
 	void UpdateShotClock();
 	void UpdateInitialClassSelectionTimer(float DeltaSeconds);
@@ -802,6 +824,14 @@ private:
 	bool bTrainingMode = false;
 	bool bTrainingEditMode = false;
 	bool bTrainingBotMatch = false;
+	bool bTutorialMode = false;
+	bool bTutorialCompleted = false;
+	bool bTutorialAdvancePending = false;
+	static constexpr int32 TutorialStageTotal = 4;
+	int32 TutorialStageIndex = 0;
+	int32 TutorialShotPieceId = INDEX_NONE;
+	int32 TutorialTargetPieceId = INDEX_NONE;
+	float TutorialTransitionRemaining = 0.0f;
 	bool bClassSelectionStartsTrainingBotMatch = false;
 	bool bTestArenaMode = false;
 	bool bPrivateMatchSetupActive = false;

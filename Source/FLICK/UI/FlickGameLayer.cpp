@@ -3918,7 +3918,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 				SNew(SGridPanel).FillColumn(0, 1.0f).FillColumn(1, 1.0f)
 				+ SGridPanel::Slot(0, 0).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Casual, TEXT("CASUAL"), TEXT("LOCAL PLAY OR RELAXED ONLINE MATCHMAKING"), Cyan, true, &ModeSelectDefaultButton)]
 				+ SGridPanel::Slot(1, 0).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Competitive, TEXT("COMPETITIVE"), TEXT("RANKED ONLINE MATCHES WITH MMR"), Orange, true)]
-				+ SGridPanel::Slot(0, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Training, TEXT("TRAINING"), TEXT("PRACTICE FREELY OR PLAY KNOCKOUT AND BOB AGAINST THE BOT"), FLinearColor(0.2f, 0.78f, 0.5f, 1.0f), true)]
+				+ SGridPanel::Slot(0, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Training, TEXT("TRAINING"), TEXT("LEARN THE BASICS, PRACTICE FREELY, OR PLAY AGAINST THE BOT"), FLinearColor(0.2f, 0.78f, 0.5f, 1.0f), true)]
 				+ SGridPanel::Slot(1, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::PrivateMatch, TEXT("PRIVATE MATCH"), TEXT("CUSTOM RULES, FLEXIBLE TEAMS, AND SPECTATORS"), FLinearColor(0.65f, 0.72f, 0.8f, 1.0f), true)]
 			]
 		]
@@ -3969,14 +3969,23 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 					+ SUniformGridPanel::Slot(0, 0)
 				[
 					BuildTrainingActivityCard(
+						EFlickTrainingActivity::Tutorial,
+						TEXT("TUTORIAL"),
+						TEXT("LEARN AIMING, POWER, KNOCKOUTS, AND SWITCHES"),
+						TEXT("4 GUIDED LESSONS  |  FIXED SETUPS  |  INSTANT RETRY"),
+						Cyan,
+						&TrainingActivityDefaultButton)
+				]
+				+ SUniformGridPanel::Slot(1, 0)
+				[
+					BuildTrainingActivityCard(
 						EFlickTrainingActivity::FreePlay,
 						TEXT("FREE PLAY"),
 						TEXT("BUILD A CUSTOM BOARD AND REPEAT ANY SHOT"),
 						TEXT("BOARD EDITOR  |  INSTANT RESET  |  ANY ARENA"),
-						FLinearColor(0.2f, 0.78f, 0.5f, 1.0f),
-						&TrainingActivityDefaultButton)
+						FLinearColor(0.2f, 0.78f, 0.5f, 1.0f))
 				]
-				+ SUniformGridPanel::Slot(1, 0)
+				+ SUniformGridPanel::Slot(0, 1)
 				[
 					BuildTrainingActivityCard(
 						EFlickTrainingActivity::BotMatch,
@@ -3985,7 +3994,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 						TEXT("4 PUCKS EACH  |  BEST OF 5  |  OFFLINE"),
 						Orange)
 				]
-				+ SUniformGridPanel::Slot(2, 0)
+				+ SUniformGridPanel::Slot(1, 1)
 				[
 					BuildTrainingActivityCard(
 						EFlickTrainingActivity::BobBotMatch,
@@ -4463,9 +4472,16 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 		.Cursor(EMouseCursor::Hand)
 		.OnClicked_Lambda([this, Activity]()
 		{
+			SelectedTrainingActivity = Activity;
 			if (GameMode.IsValid())
 			{
 				GameMode->SetMatchmakingPlayersPerTeam(1);
+				if (Activity == EFlickTrainingActivity::Tutorial)
+				{
+					GameMode->SelectMatchVariant(EFlickMatchVariant::Classic);
+					GameMode->StartTutorialMode();
+					return FReply::Handled();
+				}
 				const bool bBotMatch = Activity == EFlickTrainingActivity::BotMatch
 					|| Activity == EFlickTrainingActivity::BobBotMatch;
 				GameMode->SelectMatchVariant(
@@ -4479,7 +4495,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 				}
 			}
 
-			SelectedTrainingActivity = Activity;
 			return FReply::Handled();
 		});
 	const TWeakPtr<SButton> WeakCardButton = CardButton;
@@ -6658,16 +6673,17 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
-			.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->IsFreePlayTraining() ? EVisibility::Collapsed : EVisibility::Visible; })
+			.Visibility_Lambda([this]() { return GameMode.IsValid() && (GameMode->IsFreePlayTraining() || GameMode->IsTutorialMode()) ? EVisibility::Collapsed : EVisibility::Visible; })
 			[BuildTeamPlate(EFlickTeam::Player1)]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 16.0f, 24.0f, 0.0f)
 		[
 			SNew(SBox)
-			.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->IsFreePlayTraining() ? EVisibility::Collapsed : EVisibility::Visible; })
+			.Visibility_Lambda([this]() { return GameMode.IsValid() && (GameMode->IsFreePlayTraining() || GameMode->IsTutorialMode()) ? EVisibility::Collapsed : EVisibility::Visible; })
 			[BuildTeamPlate(EFlickTeam::Player2)]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)[BuildTrainingToolsPanel()]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 132.0f, 0.0f, 0.0f)[BuildTutorialOverlay()]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 16.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
@@ -6701,7 +6717,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 							.Text_Lambda([this]()
 							{
 								const AFlickGameState* State = GetScoreboardGameState();
-								return FText::FromString(GameMode.IsValid() && GameMode->IsTrainingBotMatch()
+								return FText::FromString(GameMode.IsValid() && GameMode->IsTutorialMode()
+									? TEXT("TUTORIAL")
+									: GameMode.IsValid() && GameMode->IsTrainingBotMatch()
 									? State && State->ActiveMatchVariant == EFlickMatchVariant::Bob
 										? TEXT("BOB BOT")
 										: TEXT("BOT MATCH")
@@ -6742,6 +6760,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 								if (!State) return FText::GetEmpty();
 								if (GameMode.IsValid() && GameMode->IsTrainingMode())
 								{
+									if (GameMode->IsTutorialMode())
+									{
+										return FText::FromString(GameMode->IsTutorialComplete()
+											? TEXT("ALL LESSONS COMPLETE")
+											: FString::Printf(TEXT("LESSON %d / %d"), GameMode->GetTutorialStageNumber(), GameMode->GetTutorialStageCount()));
+									}
 									if (GameMode->IsTrainingBotMatch())
 									{
 										const bool bBobBot = State->ActiveMatchVariant == EFlickMatchVariant::Bob;
@@ -7387,7 +7411,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 						{
 							return FText::FromString(GameMode->IsBobMode()
 								? TEXT("1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  DEL REMOVE NON-STRIKERS")
-								: TEXT("WHEEL TYPE  |  1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  DEL REMOVE"));
+								: TEXT("WHEEL TYPE  |  LMB PLACE/DRAG PUCK OR TOGGLE DIVIDER  |  DEL REMOVE"));
 						}
 						return FText::FromString(TEXT("Aim and shoot normally   |   R restores your saved setup"));
 					})
@@ -7395,6 +7419,78 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 					.AutoWrapText(true)
 					.WrapTextAt(272.0f)
 					.ColorAndOpacity(FLinearColor(0.68f, 0.76f, 0.82f, 1.0f))
+				]
+			]
+		];
+}
+
+TSharedRef<SWidget> SFlickGameLayer::BuildTutorialOverlay()
+{
+	return SNew(SBox)
+		.Visibility_Lambda([this]()
+		{
+			return GameMode.IsValid() && GameMode->IsTutorialMode()
+				? EVisibility::HitTestInvisible
+				: EVisibility::Collapsed;
+		})
+		.WidthOverride(620.0f)
+		[
+			SNew(SFlickAngularBorder)
+			.BackgroundColor(FLinearColor(0.003f, 0.014f, 0.024f, 0.94f))
+			.AccentColor(Cyan.CopyWithNewOpacity(0.82f))
+			.CutSize(12.0f)
+			.BorderWidth(1.0f)
+			.UseAccentForOutline(true)
+			.Padding(FMargin(22.0f, 13.0f, 22.0f, 15.0f))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.0f)
+					[
+						SNew(STextBlock)
+						.Text_Lambda([this]()
+						{
+							if (!GameMode.IsValid()) return FText::GetEmpty();
+							return FText::FromString(GameMode->IsTutorialComplete()
+								? TEXT("GUIDED TRAINING  /  COMPLETE")
+								: FString::Printf(TEXT("GUIDED TRAINING  /  LESSON %d OF %d"),
+									GameMode->GetTutorialStageNumber(), GameMode->GetTutorialStageCount()));
+						})
+						.Font(UiFont(10, true))
+						.ColorAndOpacity(Cyan)
+					]
+					+ SHorizontalBox::Slot().AutoWidth()
+					[
+						SNew(STextBlock)
+						.Text(FText::FromString(TEXT("R  RETRY")))
+						.Font(UiFont(9, true))
+						.ColorAndOpacity(Muted)
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetTutorialTitle() : TEXT("TUTORIAL")); })
+					.Font(DisplayFont(21))
+					.ColorAndOpacity(Paper)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetTutorialObjective() : FString()); })
+					.Font(UiFont(11, true))
+					.ColorAndOpacity(FLinearColor::White)
+					.AutoWrapText(true)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 6.0f, 0.0f, 0.0f)
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetTutorialHint() : FString()); })
+					.Font(UiFont(9))
+					.ColorAndOpacity(Muted)
+					.AutoWrapText(true)
 				]
 			]
 		];
@@ -7439,8 +7535,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 			else if (bTraining)
 			{
 				AddHint(TEXT("T"), TEXT("EDIT BOARD"), false);
-				AddHint(TEXT("R"), TEXT("RESET"), false);
-				AddHint(TEXT("ESC"), TEXT("PAUSE"), true);
+				AddHint(TEXT("V"), TEXT("FREE CAMERA"), false);
+				AddHint(TEXT("R"), TEXT("RESET"), true);
 			}
 			else
 			{
@@ -7451,7 +7547,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 		}
 		else if (bTraining && bEditing)
 		{
-			AddHint(TEXT("LMB"), TEXT("PLACE / DRAG"), false);
+			AddHint(TEXT("LMB"), TEXT("PUCK / DIVIDER"), false);
 			AddHint(TEXT("DEL"), TEXT("REMOVE"), false);
 			AddHint(TEXT("1 / 2"), TEXT("OWN / TARGET"), true);
 		}
@@ -7641,7 +7737,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 					SNew(STextBlock)
 					.Text_Lambda([this]()
 					{
-						return FText::FromString(GameMode.IsValid() && GameMode->IsTrainingEditMode()
+					return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive()
+						? TEXT("FREE CAMERA  /  V OR ESC TO EXIT")
+						: GameMode.IsValid() && GameMode->IsTrainingEditMode()
 							? TEXT("EDIT VIEW  /  VERTICAL ANGLE LOCKED")
 							: TEXT("CAMERA"));
 					})
@@ -7659,13 +7757,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
 						[
 							SNew(STextBlock)
-							.Text(FText::FromString(TEXT("Q / E")))
+							.Text_Lambda([this]() { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("WASD") : TEXT("Q / E")); })
 							.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 						]
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(7.0f, 0.0f, 14.0f, 0.0f)
 					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("ORBIT"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
+					SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("MOVE") : TEXT("ORBIT")); }).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
@@ -7683,7 +7781,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 							.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
 							[
 								SNew(STextBlock)
-								.Text(FText::FromString(TEXT("WHEEL")))
+								.Text_Lambda([this]() { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("MOUSE") : TEXT("WHEEL")); })
 								.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 							]
 						]
@@ -7703,7 +7801,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 									TEXT("PUCK TYPE  /  %s"),
 									*GetPieceArchetypeName(GameMode->GetTrainingPlacementArchetype())));
 							}
-							return FText::FromString(TEXT("VERTICAL ANGLE"));
+							return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive()
+								? TEXT("LOOK")
+								: TEXT("VERTICAL ANGLE"));
 						})
 						.Font(UiFont(9, true))
 						.ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
@@ -7716,13 +7816,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
 						[
 							SNew(STextBlock)
-							.Text(FText::FromString(TEXT("F")))
+							.Text_Lambda([this]() { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("SPACE / CTRL") : TEXT("F")); })
 							.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 						]
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(7.0f, 0.0f, 0.0f, 0.0f)
 					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("RESET"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
+					SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("HEIGHT") : TEXT("RESET")); }).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
 					]
 				]
 			]

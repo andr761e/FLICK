@@ -1197,7 +1197,9 @@ void AFlickPiece::EnableTestArenaVisuals()
 	for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
 	{
 		const FString SlotName = Mesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString();
-		if (SlotName.Contains(TEXT("05_Team")) || SlotName.Contains(TEXT("Cyan")))
+		const bool bTeamLightSlot = SlotName.Contains(TEXT("05_Team"))
+			|| SlotName.Contains(TEXT("Cyan"));
+		if (bTeamLightSlot)
 		{
 			if (bUsingHighDetailPuck && Team == EFlickTeam::Player2)
 			{
@@ -1212,6 +1214,32 @@ void AFlickPiece::EnableTestArenaVisuals()
 			if (UMaterialInstanceDynamic* TeamMaterial = WorkshopMesh->CreateDynamicMaterialInstance(Slot))
 			{
 				WorkshopTeamMaterials.Add(TeamMaterial);
+			}
+		}
+		else if (bBobStriker)
+		{
+			// BOB's controllable strikers retain the Standard silhouette and
+			// physics, but receive a brighter team-tinted metal crown. The rack
+			// pucks keep the regular Standard treatment, so the shot pieces are
+			// recognizable without adding another broad light source to the board.
+			const bool bSilverCrown = SlotName.Contains(TEXT("brushed_silver"), ESearchCase::IgnoreCase)
+				|| SlotName.Contains(TEXT("brushed silver"), ESearchCase::IgnoreCase)
+				|| SlotName.Contains(TEXT("Machined_edge"), ESearchCase::IgnoreCase)
+				|| SlotName.Contains(TEXT("Machined edge"), ESearchCase::IgnoreCase);
+			const bool bGraphiteHousing = SlotName.Contains(TEXT("Graphite"), ESearchCase::IgnoreCase);
+			if (bSilverCrown || bGraphiteHousing)
+			{
+				if (UMaterialInstanceDynamic* StrikerMaterial = WorkshopMesh->CreateDynamicMaterialInstance(Slot))
+				{
+					const FLinearColor CrownColor = FMath::Lerp(
+						FLinearColor(0.78f, 0.84f, 0.91f, 1.0f), GetTeamColor(Team), 0.20f);
+					StrikerMaterial->SetVectorParameterValue(
+						TEXT("BaseColor"),
+						bSilverCrown ? CrownColor : FLinearColor(0.065f, 0.085f, 0.115f, 1.0f));
+					StrikerMaterial->SetScalarParameterValue(TEXT("Metallic"), bSilverCrown ? 0.98f : 0.72f);
+					StrikerMaterial->SetScalarParameterValue(TEXT("Roughness"), bSilverCrown ? 0.16f : 0.24f);
+					StrikerMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), bSilverCrown ? 0.40f : 0.10f);
+				}
 			}
 		}
 	}
@@ -1269,8 +1297,8 @@ void AFlickPiece::UpdateTestArenaVisuals()
 			{
 				TeamMaterial->SetVectorParameterValue(TEXT("BaseColor"), DiffuserBaseColor);
 			}
-			const float IdleEmission = bUsingHighDetailPuck ? 6.0f : 10.0f;
-			const float HighlightEmission = bUsingHighDetailPuck ? 8.0f : 14.0f;
+			const float IdleEmission = bUsingHighDetailPuck ? (bBobStriker ? 7.5f : 6.0f) : 10.0f;
+			const float HighlightEmission = bUsingHighDetailPuck ? (bBobStriker ? 9.5f : 8.0f) : 14.0f;
 			TeamMaterial->SetScalarParameterValue(
 				TEXT("Emission"), (bSelected || bHovered ? HighlightEmission : IdleEmission) + Flash);
 		}
@@ -1467,10 +1495,14 @@ void AFlickPiece::ApplyVisuals()
 	Label->SetWorldSize(bSelected ? 21.0f : 18.0f);
 	Label->SetVisibility(bBobStriker && !bShowPlayerIdentity && !bEliminated);
 	PlayerLabel->SetText(FText::FromString(FString::Printf(TEXT("P%d"), OwningPlayerSlot + 1)));
-	PlayerLabel->SetTextRenderColor((OwningPlayerSlot == 1
-		? FLinearColor::White
-		: FLinearColor(0.005f, 0.01f, 0.018f, 1.0f)).ToFColor(true));
-	PlayerLabel->SetWorldSize(bSelected ? 29.0f : 26.0f);
+	PlayerLabel->SetTextRenderColor((bBobStriker
+		? FMath::Lerp(TeamColor, FLinearColor::White, 0.78f)
+		: OwningPlayerSlot == 1
+			? FLinearColor::White
+			: FLinearColor(0.005f, 0.01f, 0.018f, 1.0f)).ToFColor(true));
+	PlayerLabel->SetWorldSize(bBobStriker
+		? (bSelected ? 31.0f : 29.0f)
+		: (bSelected ? 29.0f : 26.0f));
 	PlayerLabel->SetVisibility(
 		(bBobStriker || (bShowPlayerIdentity && !bUsingHighDetailPlayerIdentity)) && !bEliminated);
 	UpdateTestArenaVisuals();

@@ -476,6 +476,105 @@ void AFlickTestArena::ResetMechanisms()
 	ForceNetUpdate();
 }
 
+void AFlickTestArena::SetTrainingBoardEditMode(const bool bEnabled)
+{
+	bTrainingBoardEditMode = bEnabled;
+	ApplyTestLayout();
+	ApplyMechanismState();
+}
+
+bool AFlickTestArena::ToggleTrainingMechanismAtWorldLocation(
+	const FVector& WorldLocation,
+	bool& bOutEnabled,
+	bool& bOutChanged)
+{
+	bOutEnabled = false;
+	bOutChanged = false;
+	if (!bTrainingBoardEditMode || !HasAuthority())
+	{
+		return false;
+	}
+
+	const FVector LocalLocation3D = GetActorTransform().InverseTransformPosition(WorldLocation);
+	const FVector2D LocalLocation(LocalLocation3D.X, LocalLocation3D.Y);
+	int32 ClosestLocationIndex = INDEX_NONE;
+	float ClosestScore = TNumericLimits<float>::Max();
+	for (int32 LocationIndex = 0; LocationIndex < GetPossibleLocationCount(); ++LocationIndex)
+	{
+		const FVector2D Offset = LocalLocation - PossibleDividerCenters[LocationIndex];
+		const FVector2D Tangent(
+			FMath::Cos(PossibleDividerAngles[LocationIndex]),
+			FMath::Sin(PossibleDividerAngles[LocationIndex]));
+		const FVector2D Normal(-Tangent.Y, Tangent.X);
+		const float Along = FMath::Abs(FVector2D::DotProduct(Offset, Tangent));
+		const float Across = FMath::Abs(FVector2D::DotProduct(Offset, Normal));
+		const float HalfLength = PossibleDividerLengths[LocationIndex] * 0.5f + 14.0f;
+		const float HalfWidth = DividerThickness * 0.5f + 22.0f;
+		if (Along <= HalfLength && Across <= HalfWidth)
+		{
+			const float Score = FMath::Square(Along / HalfLength) + FMath::Square(Across / HalfWidth);
+			if (Score < ClosestScore)
+			{
+				ClosestScore = Score;
+				ClosestLocationIndex = LocationIndex;
+			}
+		}
+	}
+
+	// A live mechanism can also be selected by its switch, which is normally
+	// much easier to click than the narrow flush divider socket.
+	for (int32 MechanismIndex = 0; MechanismIndex < ActiveLocationIndices.Num(); ++MechanismIndex)
+	{
+		if (!ZoneCenters.IsValidIndex(MechanismIndex))
+		{
+			continue;
+		}
+		const float DistanceSquared = FVector2D::DistSquared(LocalLocation, ZoneCenters[MechanismIndex]);
+		if (DistanceSquared <= FMath::Square(ControlZoneRadius + 18.0f))
+		{
+			ClosestLocationIndex = ActiveLocationIndices[MechanismIndex];
+			break;
+		}
+	}
+
+	if (ClosestLocationIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	const int32 ExistingIndex = ActiveLocationIndices.Find(ClosestLocationIndex);
+	if (ExistingIndex != INDEX_NONE)
+	{
+		// Keep one usable switch/divider pair so the mechanic cannot be left in
+		// an invalid zero-component state.
+		if (ActiveLocationIndices.Num() <= 1)
+		{
+			return true;
+		}
+		ActiveLocationIndices.RemoveAt(ExistingIndex);
+		bOutEnabled = false;
+		bOutChanged = true;
+	}
+	else
+	{
+		if (ActiveLocationIndices.Num() >= MaxMechanismCount)
+		{
+			return true;
+		}
+		ActiveLocationIndices.Add(ClosestLocationIndex);
+		bOutEnabled = true;
+		bOutChanged = true;
+	}
+
+	ActiveMechanismCount = ActiveLocationIndices.Num();
+	PopulateActiveLayoutFromLocations();
+	ResetMechanisms();
+	ApplyTestLayout();
+	ApplyMechanismState();
+	ForceNetUpdate();
+	return true;
+}
+
 void AFlickTestArena::BeginReplayPresentation()
 {
 	if (bReplayPresentationActive)
@@ -791,13 +890,21 @@ void AFlickTestArena::BuildLayoutFromSeed()
 	}
 	ShuffleLocations(ActiveLocationIndices);
 
+	PopulateActiveLayoutFromLocations();
+}
+
+void AFlickTestArena::PopulateActiveLayoutFromLocations()
+{
+	const int32 ActiveCount = FMath::Min(ActiveLocationIndices.Num(), MaxMechanismCount);
+	const int32 LocationCount = GetPossibleLocationCount();
 	ZoneCenters.SetNum(ActiveCount);
 	DividerCenters.SetNum(ActiveCount);
 	DividerAngles.SetNum(ActiveCount);
 	RandomizedDividerLengths.SetNum(ActiveCount);
 	for (int32 Index = 0; Index < ActiveCount; ++Index)
 	{
-		const int32 LocationIndex = ActiveLocationIndices[Index];
+		const int32 LocationIndex = FMath::Clamp(
+			ActiveLocationIndices[Index], 0, LocationCount - 1);
 		DividerCenters[Index] = PossibleDividerCenters[LocationIndex];
 		DividerAngles[Index] = PossibleDividerAngles[LocationIndex];
 		RandomizedDividerLengths[Index] = PossibleDividerLengths[LocationIndex];
@@ -848,7 +955,10 @@ void AFlickTestArena::ApplyTestLayout()
 	// Workshop switch, trace and dormant-socket meshes are authored downward
 	// from a shared Z=0 top face. Place that face exactly on the authoritative
 	// arena surface so pucks cannot visually enter non-colliding presentation.
-	const float SwitchSurfaceZ = SurfaceZ;
+	// Keep the authored switch graphics visually flush while giving their top
+	// faces a sub-centimetre depth separation from the arena's curved linework.
+	// These components never collide, so gameplay geometry remains exactly flat.
+	const float SwitchSurfaceZ = SurfaceZ + 0.35f;
 	for (int32 LocationIndex = 0; LocationIndex < MaxPossibleLocationCount; ++LocationIndex)
 	{
 		UStaticMeshComponent* Socket = DividerBaseMeshes[LocationIndex];
@@ -859,7 +969,9 @@ void AFlickTestArena::ApplyTestLayout()
 		{
 			continue;
 		}
-		Socket->SetRelativeLocation(FVector(PossibleDividerCenters[LocationIndex], SwitchSurfaceZ));
+		// Socket collision/presentation stays flush with the authoritative deck;
+		// only the non-colliding switch graphics need the anti-z-fighting lift.
+		Socket->SetRelativeLocation(FVector(PossibleDividerCenters[LocationIndex], SurfaceZ));
 		Socket->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(PossibleDividerAngles[LocationIndex]), 0.0f));
 		Socket->SetRelativeScale3D(bUsingWorkshopAssets
 			? FVector(PossibleDividerLengths[LocationIndex] / DividerLength, 1.0f, 1.0f)

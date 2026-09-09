@@ -35,6 +35,8 @@ public:
 		uint16& OutDeployedMechanisms);
 	uint16 CommitPendingControlZoneToggles(const TArray<TObjectPtr<AFlickPiece>>& Pieces);
 	void ResetMechanisms();
+	void SetTrainingBoardEditMode(bool bEnabled);
+	bool ToggleTrainingMechanismAtWorldLocation(const FVector& WorldLocation, bool& bOutEnabled, bool& bOutChanged);
 	bool IsDividerRaised(int32 DividerIndex) const;
 	bool IsDividerPending(int32 DividerIndex) const;
 	bool FindDividerIndex(const UPrimitiveComponent* Component, int32& OutDividerIndex) const;
@@ -140,6 +142,7 @@ private:
 	void OnRep_TestLayout();
 
 	void BuildLayoutFromSeed();
+	void PopulateActiveLayoutFromLocations();
 	void ApplyTestLayout();
 	void ApplyMechanismState();
 	void CreateRuntimeMaterials();
@@ -187,6 +190,7 @@ private:
 	TArray<float> DeploymentTimers;
 	uint16 PreReplayRaisedDividerMask = 0;
 	bool bReplayPresentationActive = false;
+	bool bTrainingBoardEditMode = false;
 	TArray<int32> ActiveLocationIndices;
 	TArray<FVector2D> ZoneCenters;
 	TArray<FVector2D> DividerCenters;

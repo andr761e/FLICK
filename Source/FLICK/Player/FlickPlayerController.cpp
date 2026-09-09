@@ -64,6 +64,7 @@ void AFlickPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &AFlickPlayerController::HandleTrainingTargetPuckPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::C, IE_Pressed, this, &AFlickPlayerController::HandleTrainingClearPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::Delete, IE_Pressed, this, &AFlickPlayerController::HandleTrainingRemovePressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AFlickPlayerController::HandleFreeCameraTogglePressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationUpPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationDownPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
@@ -106,6 +107,12 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 	}
 	if (!IsGameplayActive())
 	{
+		if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
+			CameraPawn && CameraPawn->IsFreeCameraEnabled())
+		{
+			CameraPawn->SetFreeCameraEnabled(false);
+			SetFreeCameraInputMode(false);
+		}
 		if (TrainingDraggedPiece)
 		{
 			if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
@@ -122,6 +129,10 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 		return;
 	}
 	NetworkGameplayElapsed += DeltaTime;
+	if (UpdateFreeCamera(DeltaTime))
+	{
+		return;
+	}
 	UpdateLocalCameraOrbit(DeltaTime);
 
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
@@ -321,6 +332,10 @@ void AFlickPlayerController::HandlePrimaryPressed()
 		FVector CursorPoint;
 		if (GetCursorPointOnArenaPlane(CursorPoint))
 		{
+			if (FlickGameMode->ToggleTrainingDivider(CursorPoint))
+			{
+				return;
+			}
 			FlickGameMode->PlaceTrainingPuck(CursorPoint);
 		}
 		return;
@@ -460,6 +475,13 @@ void AFlickPlayerController::HandleSecondaryPressed()
 void AFlickPlayerController::HandleCancelPressed()
 {
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
+		CameraPawn && CameraPawn->IsFreeCameraEnabled())
+	{
+		CameraPawn->SetFreeCameraEnabled(false);
+		SetFreeCameraInputMode(false);
+		return;
+	}
 	if (TrainingDraggedPiece)
 	{
 		if (FlickGameMode)
@@ -524,6 +546,12 @@ void AFlickPlayerController::HandleCancelPressed()
 
 void AFlickPlayerController::HandleRestartPressed()
 {
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
+		CameraPawn && CameraPawn->IsFreeCameraEnabled())
+	{
+		CameraPawn->SetFreeCameraEnabled(false);
+		SetFreeCameraInputMode(false);
+	}
 	if (TrainingDraggedPiece)
 	{
 		if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
@@ -535,6 +563,12 @@ void AFlickPlayerController::HandleRestartPressed()
 	RequestRestartMatch();
 }
 
+bool AFlickPlayerController::IsFreeCameraActive() const
+{
+	const AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
+	return CameraPawn && CameraPawn->IsFreeCameraEnabled();
+}
+
 void AFlickPlayerController::HandleTrainingEditorTogglePressed()
 {
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
@@ -542,6 +576,12 @@ void AFlickPlayerController::HandleTrainingEditorTogglePressed()
 		|| FlickGameMode->GetFrontendScreen() != EFlickFrontendScreen::Playing)
 	{
 		return;
+	}
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
+		CameraPawn && CameraPawn->IsFreeCameraEnabled())
+	{
+		CameraPawn->SetFreeCameraEnabled(false);
+		SetFreeCameraInputMode(false);
 	}
 	if (TrainingDraggedPiece)
 	{
@@ -598,6 +638,66 @@ void AFlickPlayerController::HandleTrainingRemovePressed()
 		ClearHoveredPiece();
 		FlickGameMode->RemoveTrainingPuck(PieceToRemove);
 	}
+}
+
+void AFlickPlayerController::HandleFreeCameraTogglePressed()
+{
+	AFlickGameMode* FlickGameMode = GetFlickGameMode();
+	AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
+	if (!FlickGameMode || !CameraPawn || !IsGameplayActive()
+		|| !FlickGameMode->IsFreePlayTraining()
+		|| FlickGameMode->GetFrontendScreen() != EFlickFrontendScreen::Playing)
+	{
+		return;
+	}
+
+	ClearAiming();
+	ClearHoveredPiece();
+	const bool bEnable = !CameraPawn->IsFreeCameraEnabled();
+	CameraPawn->SetFreeCameraEnabled(bEnable);
+	SetFreeCameraInputMode(bEnable);
+}
+
+void AFlickPlayerController::SetFreeCameraInputMode(const bool bEnabled)
+{
+	bShowMouseCursor = !bEnabled;
+	bEnableClickEvents = !bEnabled;
+	bEnableMouseOverEvents = !bEnabled;
+	if (bEnabled)
+	{
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+	}
+	else
+	{
+		FInputModeGameAndUI InputMode;
+		InputMode.SetHideCursorDuringCapture(false);
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(InputMode);
+	}
+}
+
+bool AFlickPlayerController::UpdateFreeCamera(const float DeltaSeconds)
+{
+	AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
+	if (!CameraPawn || !CameraPawn->IsFreeCameraEnabled())
+	{
+		return false;
+	}
+
+	float MouseX = 0.0f;
+	float MouseY = 0.0f;
+	GetInputMouseDelta(MouseX, MouseY);
+	const float Forward = (IsInputKeyDown(EKeys::W) ? 1.0f : 0.0f)
+		- (IsInputKeyDown(EKeys::S) ? 1.0f : 0.0f);
+	const float Right = (IsInputKeyDown(EKeys::D) ? 1.0f : 0.0f)
+		- (IsInputKeyDown(EKeys::A) ? 1.0f : 0.0f);
+	const float Up = (IsInputKeyDown(EKeys::SpaceBar) ? 1.0f : 0.0f)
+		- (IsInputKeyDown(EKeys::LeftControl) || IsInputKeyDown(EKeys::RightControl) ? 1.0f : 0.0f);
+	const bool bBoost = IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift);
+	CameraPawn->AddFreeCameraInput(Forward, Right, Up, FVector2D(MouseX, MouseY), bBoost, DeltaSeconds);
+	CurrentMouseCursor = EMouseCursor::None;
+	return true;
 }
 
 void AFlickPlayerController::UpdateAimFromCursor()

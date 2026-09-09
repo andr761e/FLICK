@@ -6,6 +6,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Pieces/FlickPiece.h"
 #include "Player/FlickCameraPawn.h"
@@ -163,11 +164,13 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 	if (TestNotNull(TEXT("Spawned BOB striker"), BobStriker))
 	{
 		BobStriker->InitializePiece(
-			EFlickTeam::Player1, 99, 24.0f, 14.0f,
-			EFlickPieceArchetype::Standard, true);
+			EFlickTeam::Player2, 99, 24.0f, 14.0f,
+			EFlickPieceArchetype::Standard, true, 1);
 		BobStriker->EnableTestArenaVisuals();
 		TestTrue(TEXT("BOB striker uses the premium Standard puck mesh"),
 			BobStriker->HasTestArenaVisuals());
+		TestEqual(TEXT("BOB striker retains its distinct player identity"),
+			BobStriker->GetOwningPlayerSlot(), 1);
 		TInlineComponentArray<UStaticMeshComponent*> BobComponents(BobStriker);
 		for (UStaticMeshComponent* Visual : BobComponents)
 		{
@@ -177,6 +180,29 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 				FMath::Max(Extent.X, Extent.Y) <= BobStriker->GetPieceRadius() + 0.2f);
 			TestTrue(TEXT("BOB Standard art is scaled to its smaller physics height"),
 				Extent.Z * 2.0f <= BobStriker->GetPieceThickness() * 1.2f);
+			int32 DynamicMaterialCount = 0;
+			for (int32 Slot = 0; Slot < Visual->GetNumMaterials(); ++Slot)
+			{
+				DynamicMaterialCount += Cast<UMaterialInstanceDynamic>(Visual->GetMaterial(Slot)) ? 1 : 0;
+			}
+			TestTrue(TEXT("BOB striker has distinct dynamic crown and light materials"),
+				DynamicMaterialCount >= 4);
+		}
+		UTextRenderComponent* PlayerMarker = nullptr;
+		TInlineComponentArray<UTextRenderComponent*> TextComponents(BobStriker);
+		for (UTextRenderComponent* Text : TextComponents)
+		{
+			if (Text && Text->GetFName() == TEXT("PlayerLabel"))
+			{
+				PlayerMarker = Text;
+				break;
+			}
+		}
+		TestNotNull(TEXT("BOB striker has a player marker"), PlayerMarker);
+		if (PlayerMarker)
+		{
+			TestEqual(TEXT("Orange BOB striker is marked P2"), PlayerMarker->Text.ToString(), FString(TEXT("P2")));
+			TestTrue(TEXT("BOB player marker remains visible over premium art"), PlayerMarker->IsVisible());
 		}
 		BobStriker->Destroy();
 	}

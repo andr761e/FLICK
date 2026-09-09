@@ -25,6 +25,7 @@ public:
 
 	void ClearAiming();
 	bool IsAimingShot() const { return bAimingShot; }
+	bool IsFreeCameraActive() const;
 	float GetAimPowerPercent() const { return CurrentLaunchResult.NormalizedPower * 100.0f; }
 	const AFlickPiece* GetSelectedPiece() const { return SelectedPiece; }
 	const FFlickLaunchResult& GetAimResult() const { return CurrentLaunchResult; }
@@ -99,6 +100,9 @@ private:
 	void HandleTrainingTargetPuckPressed();
 	void HandleTrainingClearPressed();
 	void HandleTrainingRemovePressed();
+	void HandleFreeCameraTogglePressed();
+	void SetFreeCameraInputMode(bool bEnabled);
+	bool UpdateFreeCamera(float DeltaSeconds);
 	void UpdateAimFromCursor();
 	void UpdatePredictedContact();
 	void UpdateHoveredPiece();

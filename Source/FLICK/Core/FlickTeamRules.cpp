@@ -32,3 +32,16 @@ bool FlickTeamRules::IsActivePlayerSlot(
 		&& PlayerSlot < ClampedTeamSize
 		&& PlayerSlot == FMath::Clamp(CurrentPlayerSlot, 0, ClampedTeamSize - 1);
 }
+
+bool FlickTeamRules::HasRequiredClassConfirmationCount(
+	const bool bPrivateMatch,
+	const int32 ConfirmedParticipantCount,
+	const int32 PlayersPerTeam)
+{
+	if (ConfirmedParticipantCount <= 0)
+	{
+		return false;
+	}
+	return bPrivateMatch
+		|| ConfirmedParticipantCount == ClampPlayersPerTeam(PlayersPerTeam) * 2;
+}

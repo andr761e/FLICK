@@ -1343,6 +1343,7 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 	UpdateRoundAdvanceTimer();
 	UpdateShotClock();
 	UpdateTrainingBot(DeltaSeconds);
+	UpdateTutorial(DeltaSeconds);
 	if (bCinematicReplayActive)
 	{
 		UpdateCinematicRoundReplay(DeltaSeconds);
@@ -2298,6 +2299,13 @@ void AFlickGameMode::RestartMatch()
 		UE_LOG(LogFlick, Warning, TEXT("Ranked restart rejected; return to the lobby to register a new authoritative match."));
 		return;
 	}
+	if (IsTutorialMode())
+	{
+		UGameplayStatics::SetGamePaused(this, false);
+		FrontendScreen = EFlickFrontendScreen::Playing;
+		SetupTutorialStage(bTutorialCompleted ? 0 : TutorialStageIndex);
+		return;
+	}
 	if (IsFreePlayTraining())
 	{
 		UGameplayStatics::SetGamePaused(this, false);
@@ -2856,7 +2864,14 @@ bool AFlickGameMode::AreNetworkClassesConfirmed() const
 			return false;
 		}
 	}
-	return ParticipantCount == CurrentPlayersPerTeam * 2;
+	// A private-match participant can own more than one arena slot. Class choice
+	// belongs to the human participant, not to each controlled slot, so waiting
+	// for PlayersPerTeam * 2 confirmations can only end via the timeout. Public
+	// matchmaking still requires the complete one-player-per-slot roster.
+	return FlickTeamRules::HasRequiredClassConfirmationCount(
+		bPrivateMatchActive,
+		ParticipantCount,
+		CurrentPlayersPerTeam);
 }
 
 void AFlickGameMode::FinalizeNetworkClassSelection()
@@ -3151,6 +3166,10 @@ void AFlickGameMode::BeginSelectedMatch()
 	bTrainingMode = false;
 	bTrainingEditMode = false;
 	bTrainingBotMatch = false;
+	bTutorialMode = false;
+	bTutorialCompleted = false;
+	bTutorialAdvancePending = false;
+	TutorialTransitionRemaining = 0.0f;
 	ResetTrainingBotThinking();
 	UGameplayStatics::SetGamePaused(this, false);
 	FrontendScreen = EFlickFrontendScreen::Playing;
@@ -3172,11 +3191,13 @@ void AFlickGameMode::BeginSelectedMatch()
 
 void AFlickGameMode::StartTrainingMode()
 {
+	bTutorialMode = false;
 	BeginTrainingActivity(false);
 }
 
 void AFlickGameMode::StartTrainingBotMatch()
 {
+	bTutorialMode = false;
 	if (GetNetMode() != NM_Standalone
 		|| bNetworkMatchRequested
 		|| bPartyRequested
@@ -3197,6 +3218,24 @@ void AFlickGameMode::StartTrainingBotMatch()
 	SelectedMatchVariant = EFlickMatchVariant::Classic;
 	bClassSelectionStartsTrainingBotMatch = true;
 	PrepareClassSelection(false);
+}
+
+void AFlickGameMode::StartTutorialMode()
+{
+	if (GetNetMode() != NM_Standalone
+		|| bNetworkMatchRequested
+		|| bPartyRequested
+		|| bMatchmakingRequested)
+	{
+		UE_LOG(LogFlick, Warning, TEXT("Tutorial start rejected because the current session is not offline"));
+		return;
+	}
+
+	SelectedMatchVariant = EFlickMatchVariant::Classic;
+	MatchmakingPlayersPerTeam = 1;
+	bTutorialMode = true;
+	BeginTrainingActivity(false);
+	SetupTutorialStage(0);
 }
 
 void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
@@ -3257,11 +3296,15 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 	SetCameraForFrontend();
 	ApplySelectedMatchConfiguration();
 	RebuildMatch();
-	if (!bAgainstBot)
+	if (!bAgainstBot && !bTutorialMode)
 	{
 		CaptureTrainingResetSnapshot();
 	}
-	if (!bTestArenaMode)
+	if (bTutorialMode)
+	{
+		PushHudEvent(TEXT("TRAINING  |  GUIDED TUTORIAL"), FLinearColor(0.15f, 0.9f, 1.0f, 1.0f), 2.6f);
+	}
+	else if (!bTestArenaMode)
 	{
 		PushHudEvent(bAgainstBot ? TEXT("TRAINING  |  PLAY AGAINST BOT") : TEXT("TRAINING  |  FREE PLAY"),
 			bAgainstBot ? GetTeamColor(EFlickTeam::Player2) : FLinearColor(0.2f, 0.78f, 0.5f, 1.0f), 2.6f);
@@ -3275,10 +3318,230 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 		LogFlick,
 		Log,
 		TEXT("Started offline %s in %s %dv%d"),
-		bTestArenaMode ? TEXT("test arena bot match") : bAgainstBot ? TEXT("bot training") : TEXT("free-play training"),
+		bTutorialMode ? TEXT("guided tutorial") : bTestArenaMode ? TEXT("test arena bot match") : bAgainstBot ? TEXT("bot training") : TEXT("free-play training"),
 		*GetMatchVariantName(SelectedMatchVariant),
 		CurrentPlayersPerTeam,
 		CurrentPlayersPerTeam);
+}
+
+FString AFlickGameMode::GetTutorialTitle() const
+{
+	static const TCHAR* Titles[TutorialStageTotal] =
+	{
+		TEXT("DIRECT CONTACT"),
+		TEXT("CONTROL THE POWER"),
+		TEXT("SCORE A KNOCKOUT"),
+		TEXT("USE THE SWITCHYARD")
+	};
+	return bTutorialCompleted ? TEXT("TUTORIAL COMPLETE") : Titles[FMath::Clamp(TutorialStageIndex, 0, TutorialStageTotal - 1)];
+}
+
+FString AFlickGameMode::GetTutorialObjective() const
+{
+	static const TCHAR* Objectives[TutorialStageTotal] =
+	{
+		TEXT("Hit the orange puck with your blue Standard puck."),
+		TEXT("Release a controlled shot and stop inside the center circle."),
+		TEXT("Use the Striker to knock the Compact puck out of the arena."),
+		TEXT("Pass the Bouncer over the bright dot to activate its divider.")
+	};
+	return bTutorialCompleted
+		? TEXT("You are ready for Training, Casual, and Competitive play.")
+		: Objectives[FMath::Clamp(TutorialStageIndex, 0, TutorialStageTotal - 1)];
+}
+
+FString AFlickGameMode::GetTutorialHint() const
+{
+	static const TCHAR* Hints[TutorialStageTotal] =
+	{
+		TEXT("LMB aim  /  drag for power  /  release to shoot"),
+		TEXT("A shorter drag gives a softer shot. Press R to retry."),
+		TEXT("Aim through the target and use the Striker's extra launch speed."),
+		TEXT("Any moving puck can press a switch; the divider rises immediately.")
+	};
+	return bTutorialCompleted
+		? TEXT("Press R to run the tutorial again, or ESC to leave.")
+		: Hints[FMath::Clamp(TutorialStageIndex, 0, TutorialStageTotal - 1)];
+}
+
+void AFlickGameMode::SetupTutorialStage(const int32 StageIndex)
+{
+	if (!IsTutorialMode() || !GetWorld())
+	{
+		return;
+	}
+
+	TutorialStageIndex = FMath::Clamp(StageIndex, 0, TutorialStageTotal - 1);
+	bTutorialCompleted = false;
+	bTutorialAdvancePending = false;
+	TutorialTransitionRemaining = 0.0f;
+	TutorialShotPieceId = INDEX_NONE;
+	TutorialTargetPieceId = INDEX_NONE;
+	ResetTrainingBotThinking();
+	ResetShotClock();
+	ClearControllerAiming();
+	DestroyPieces();
+	if (TestArenaActor && IsValid(TestArenaActor))
+	{
+		TestArenaActor->ResetMechanisms();
+	}
+
+	int32 NextPieceId = 1001;
+	auto SpawnTutorialPiece = [this, &NextPieceId](
+		const EFlickTeam Team,
+		const EFlickPieceArchetype Archetype,
+		const FVector2D Position)
+	{
+		const FFlickPieceArchetypeRules& Rules = FlickPieceArchetypeRules::Get(Archetype);
+		const float SpawnZ = ArenaSurfaceZ + PieceThickness * Rules.ThicknessMultiplier * 0.5f + 3.0f;
+		return SpawnPiece(Team, NextPieceId++, FVector(Position.X, Position.Y, SpawnZ), Archetype);
+	};
+
+	AFlickPiece* ShotPiece = nullptr;
+	AFlickPiece* TargetPiece = nullptr;
+	switch (TutorialStageIndex)
+	{
+	case 0:
+		ShotPiece = SpawnTutorialPiece(EFlickTeam::Player1, EFlickPieceArchetype::Standard, FVector2D(0.0f, -330.0f));
+		TargetPiece = SpawnTutorialPiece(EFlickTeam::Player2, EFlickPieceArchetype::Standard, FVector2D(0.0f, 120.0f));
+		break;
+	case 1:
+		ShotPiece = SpawnTutorialPiece(EFlickTeam::Player1, EFlickPieceArchetype::Standard, FVector2D(0.0f, -390.0f));
+		break;
+	case 2:
+		ShotPiece = SpawnTutorialPiece(EFlickTeam::Player1, EFlickPieceArchetype::Striker, FVector2D(0.0f, -255.0f));
+		TargetPiece = SpawnTutorialPiece(EFlickTeam::Player2, EFlickPieceArchetype::Compact, FVector2D(0.0f, 535.0f));
+		break;
+	default:
+	{
+		FVector SwitchLocation(0.0f, -350.0f, ArenaSurfaceZ);
+		if (TestArenaActor && IsValid(TestArenaActor))
+		{
+			float LowestY = TNumericLimits<float>::Max();
+			for (int32 Index = 0; Index < TestArenaActor->GetMechanismCount(); ++Index)
+			{
+				const FVector Candidate = TestArenaActor->GetSwitchWorldCenter(Index);
+				if (Candidate.Y < LowestY)
+				{
+					LowestY = Candidate.Y;
+					SwitchLocation = Candidate;
+				}
+			}
+		}
+		FVector2D Outward(SwitchLocation.X, SwitchLocation.Y);
+		if (!Outward.Normalize())
+		{
+			Outward = FVector2D(0.0f, -1.0f);
+		}
+		ShotPiece = SpawnTutorialPiece(
+			EFlickTeam::Player1,
+			EFlickPieceArchetype::Bouncer,
+			FVector2D(SwitchLocation.X, SwitchLocation.Y) - Outward * 245.0f);
+		TargetPiece = SpawnTutorialPiece(
+			EFlickTeam::Player2,
+			EFlickPieceArchetype::Blocker,
+			FVector2D(SwitchLocation.X, SwitchLocation.Y) + Outward * 115.0f);
+		break;
+	}
+	}
+
+	TutorialShotPieceId = ShotPiece ? ShotPiece->GetPieceId() : INDEX_NONE;
+	TutorialTargetPieceId = TargetPiece ? TargetPiece->GetPieceId() : INDEX_NONE;
+	if (AFlickGameState* State = GetFlickGameState())
+	{
+		State->SetCurrentTeam(EFlickTeam::Player1);
+		State->SetCurrentTeamPlayerSlot(0);
+		State->SetActivePieceCounts(ShotPiece ? 1 : 0, TargetPiece ? 1 : 0);
+		State->SetMatchPhase(EFlickMatchPhase::Aiming);
+	}
+	SetCameraViewForTeam(EFlickTeam::Player1, true);
+	if (AudioDirector)
+	{
+		AudioDirector->PlayTurn(EFlickTeam::Player1);
+	}
+	PushHudEvent(FString::Printf(TEXT("LESSON %d / %d  |  %s"), TutorialStageIndex + 1, TutorialStageTotal, *GetTutorialTitle()),
+		FLinearColor(0.15f, 0.9f, 1.0f, 1.0f), 2.2f);
+}
+
+void AFlickGameMode::ResolveTutorialShot()
+{
+	if (!IsTutorialMode() || bTutorialAdvancePending || bTutorialCompleted)
+	{
+		return;
+	}
+
+	bool bSucceeded = false;
+	switch (TutorialStageIndex)
+	{
+	case 0:
+		bSucceeded = TutorialTargetPieceId != INDEX_NONE
+			&& ResolutionDirectContactPieceIds.Contains(TutorialTargetPieceId);
+		break;
+	case 1:
+		if (const TObjectPtr<AFlickPiece>* Entry = Pieces.FindByPredicate([this](const TObjectPtr<AFlickPiece>& Piece)
+		{
+			return Piece && IsValid(Piece) && Piece->GetPieceId() == TutorialShotPieceId;
+		}))
+		{
+			const FVector Center = ArenaActor ? ArenaActor->GetActorLocation() : FVector::ZeroVector;
+			const FVector Location = (*Entry)->GetActorLocation();
+			bSucceeded = (*Entry)->IsActive()
+				&& FVector2D::Distance(FVector2D(Location.X, Location.Y), FVector2D(Center.X, Center.Y)) <= 165.0f;
+		}
+		break;
+	case 2:
+		bSucceeded = TutorialTargetPieceId != INDEX_NONE
+			&& ResolutionEliminatedPieceIds.Contains(TutorialTargetPieceId);
+		break;
+	default:
+		bSucceeded = ResolutionActivatedSwitchMask != 0;
+		break;
+	}
+
+	bTutorialAdvancePending = bSucceeded;
+	TutorialTransitionRemaining = bSucceeded ? 1.8f : 1.25f;
+	if (AFlickGameState* State = GetFlickGameState())
+	{
+		State->SetMatchPhase(EFlickMatchPhase::WaitingToStart);
+	}
+	PushHudEvent(bSucceeded ? TEXT("LESSON COMPLETE") : TEXT("TRY AGAIN"),
+		bSucceeded ? FLinearColor(0.2f, 1.0f, 0.55f, 1.0f) : FLinearColor(1.0f, 0.45f, 0.18f, 1.0f),
+		TutorialTransitionRemaining);
+}
+
+void AFlickGameMode::UpdateTutorial(const float DeltaSeconds)
+{
+	if (!IsTutorialMode() || bTutorialCompleted || TutorialTransitionRemaining <= 0.0f)
+	{
+		return;
+	}
+
+	TutorialTransitionRemaining = FMath::Max(0.0f, TutorialTransitionRemaining - DeltaSeconds);
+	if (TutorialTransitionRemaining > 0.0f)
+	{
+		return;
+	}
+
+	if (!bTutorialAdvancePending)
+	{
+		SetupTutorialStage(TutorialStageIndex);
+		return;
+	}
+	if (TutorialStageIndex + 1 < TutorialStageTotal)
+	{
+		SetupTutorialStage(TutorialStageIndex + 1);
+		return;
+	}
+
+	bTutorialCompleted = true;
+	bTutorialAdvancePending = false;
+	DestroyPieces();
+	if (AFlickGameState* State = GetFlickGameState())
+	{
+		State->SetActivePieceCounts(0, 0);
+		State->SetMatchPhase(EFlickMatchPhase::WaitingToStart);
+	}
+	PushHudEvent(TEXT("TUTORIAL COMPLETE  |  READY TO PLAY"), FLinearColor(0.2f, 1.0f, 0.55f, 1.0f), 4.0f);
 }
 
 bool AFlickGameMode::CanEditTrainingBoard() const
@@ -3312,6 +3575,10 @@ void AFlickGameMode::ToggleTrainingEditMode()
 			TrainingPlacementArchetype = EFlickPieceArchetype::Standard;
 		}
 		bTrainingEditMode = true;
+		if (TestArenaActor)
+		{
+			TestArenaActor->SetTrainingBoardEditMode(true);
+		}
 		if (CameraPawn)
 		{
 			TrainingPreviousCameraElevation = CameraPawn->GetGameplayElevationAngle();
@@ -3323,6 +3590,10 @@ void AFlickGameMode::ToggleTrainingEditMode()
 	{
 		CaptureTrainingResetSnapshot();
 		bTrainingEditMode = false;
+		if (TestArenaActor)
+		{
+			TestArenaActor->SetTrainingBoardEditMode(false);
+		}
 		if (CameraPawn)
 		{
 			CameraPawn->SetGameplayElevationLocked(false);
@@ -3735,6 +4006,10 @@ void AFlickGameMode::StartSelectedMatchmaking()
 	bTrainingMode = false;
 	bTrainingEditMode = false;
 	bTrainingBotMatch = false;
+	bTutorialMode = false;
+	bTutorialCompleted = false;
+	bTutorialAdvancePending = false;
+	TutorialTransitionRemaining = 0.0f;
 	bClassSelectionStartsTrainingBotMatch = false;
 	bTestArenaMode = false;
 	ResetTrainingBotThinking();
@@ -5727,6 +6002,10 @@ void AFlickGameMode::ReturnToMainMenu()
 	bTrainingMode = false;
 	bTrainingEditMode = false;
 	bTrainingBotMatch = false;
+	bTutorialMode = false;
+	bTutorialCompleted = false;
+	bTutorialAdvancePending = false;
+	TutorialTransitionRemaining = 0.0f;
 	bClassSelectionStartsTrainingBotMatch = false;
 	bTestArenaMode = false;
 	ResetTrainingBotThinking();
@@ -5962,6 +6241,18 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		return;
 	}
 	const bool bClassicArenaLighting = ActiveMatchVariant == EFlickMatchVariant::Classic;
+	const bool bSettingsOverMatch = FrontendScreen == EFlickFrontendScreen::Settings
+		&& SettingsReturnScreen == EFlickFrontendScreen::Paused;
+	const bool bClassSelectionOverMatch = FrontendScreen == EFlickFrontendScreen::ClassSelect
+		&& ClassSelectionReturnScreen == EFlickFrontendScreen::Paused;
+	const bool bFrontendShowcase = FrontendScreen != EFlickFrontendScreen::Playing
+		&& FrontendScreen != EFlickFrontendScreen::Paused
+		&& !bSettingsOverMatch
+		&& !bClassSelectionOverMatch;
+	const float DirectionalMultiplier = bFrontendShowcase
+		? FrontendArenaDirectionalLightMultiplier : 1.0f;
+	const float SkyMultiplier = bFrontendShowcase ? FrontendArenaSkyLightMultiplier : 1.0f;
+	const float FillMultiplier = bFrontendShowcase ? FrontendArenaFillLightMultiplier : 1.0f;
 
 	if (!DirectionalLightActor || !IsValid(DirectionalLightActor))
 	{
@@ -6006,7 +6297,9 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			: bClassicArenaLighting
 				? FLinearColor(0.82f, 0.88f, 0.96f)
 				: FLinearColor(0.9f, 0.94f, 1.0f));
-		Light->SetIntensity(bTestArenaMode ? 1.45f : bClassicArenaLighting ? 0.78f : 1.15f);
+		Light->SetIntensity(
+			(bTestArenaMode ? 1.45f : bClassicArenaLighting ? 0.78f : 1.15f)
+			* DirectionalMultiplier);
 		Light->SetLightSourceAngle(bTestArenaMode ? 5.0f : 3.0f);
 		Light->SetSpecularScale(bTestArenaMode ? 0.60f : bClassicArenaLighting ? 0.14f : 0.32f);
 		Light->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.72f : 0.8f);
@@ -6032,7 +6325,9 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			Sky->SourceType = SLS_CapturedScene;
 			Sky->SetCubemap(nullptr);
 		}
-		Sky->SetIntensity(bTestArenaMode ? 1.05f : bClassicArenaLighting ? 0.34f : 0.28f);
+		Sky->SetIntensity(
+			(bTestArenaMode ? 1.05f : bClassicArenaLighting ? 0.34f : 0.28f)
+			* SkyMultiplier);
 	}
 
 	const auto SpawnAccentLight = [this, bClassicArenaLighting](
@@ -6084,7 +6379,9 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		ArenaFillLight->PointLightComponent->SetLightColor(bClassicArenaLighting
 			? FLinearColor(0.62f, 0.7f, 0.82f)
 			: FLinearColor(0.72f, 0.78f, 0.88f));
-		ArenaFillLight->PointLightComponent->SetIntensity(bTestArenaMode ? 440.0f : bClassicArenaLighting ? 112.0f : 190.0f);
+		ArenaFillLight->PointLightComponent->SetIntensity(
+			(bTestArenaMode ? 440.0f : bClassicArenaLighting ? 112.0f : 190.0f)
+			* FillMultiplier);
 		ArenaFillLight->PointLightComponent->SetAttenuationRadius(1280.0f * ArenaScale);
 		ArenaFillLight->PointLightComponent->SetSourceRadius((bTestArenaMode ? 240.0f : 180.0f) * ArenaScale);
 		ArenaFillLight->PointLightComponent->SetSpecularScale(bTestArenaMode ? 0.32f : bClassicArenaLighting ? 0.06f : 0.26f);
@@ -6131,6 +6428,33 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		FLinearColor(0.82f, 0.91f, 1.0f), TestPuckKeyLightIntensity, 460.0f, 170.0f);
 	ConfigurePuckSoftbox(TestPuckRimLight, FVector(600.0f, 300.0f, 450.0f),
 		FLinearColor(1.0f, 0.86f, 0.72f), TestPuckRimLightIntensity, 360.0f, 130.0f);
+}
+
+bool AFlickGameMode::ToggleTrainingDivider(const FVector& WorldLocation)
+{
+	if (!bTrainingEditMode || !CanEditTrainingBoard() || !TestArenaActor)
+	{
+		return false;
+	}
+
+	bool bEnabled = false;
+	bool bChanged = false;
+	if (!TestArenaActor->ToggleTrainingMechanismAtWorldLocation(WorldLocation, bEnabled, bChanged))
+	{
+		return false;
+	}
+
+	PushHudEvent(
+		!bChanged
+			? (TestArenaActor->GetMechanismCount() >= AFlickTestArena::MaxMechanismCount
+				? TEXT("DIVIDER LIMIT REACHED")
+				: TEXT("KEEP AT LEAST ONE DIVIDER"))
+			: bEnabled ? TEXT("DIVIDER ACTIVATED") : TEXT("DIVIDER DEACTIVATED"),
+		bChanged && bEnabled
+			? FLinearColor(0.18f, 0.9f, 1.0f, 1.0f)
+			: FLinearColor(0.62f, 0.68f, 0.72f, 1.0f),
+		1.1f);
+	return true;
 }
 
 void AFlickGameMode::SpawnArenaIfNeeded()
@@ -6279,13 +6603,15 @@ void AFlickGameMode::SpawnBobPieces()
 		RackIndex + 1,
 		BobArenaActor->GetStrikerStart(EFlickTeam::Player1, PieceThickness),
 		EFlickPieceArchetype::Standard,
-		true);
+		true,
+		0);
 	Player2BobStriker = SpawnPiece(
 		EFlickTeam::Player2,
 		RackIndex + 2,
 		BobArenaActor->GetStrikerStart(EFlickTeam::Player2, PieceThickness),
 		EFlickPieceArchetype::Standard,
-		true);
+		true,
+		1);
 }
 
 void AFlickGameMode::DestroyPieces()
@@ -6656,7 +6982,7 @@ void AFlickGameMode::BeginOpeningPhase()
 	ResetTrainingBotThinking();
 	if (AFlickGameState* FlickGameState = GetFlickGameState())
 	{
-		if (IsFreePlayTraining())
+		if (IsFreePlayTraining() || IsTutorialMode())
 		{
 			Player1NextPlayerSlot = 0;
 			Player2NextPlayerSlot = 0;
@@ -6883,6 +7209,10 @@ void AFlickGameMode::SetCameraForFrontend()
 			&& !bSettingsOverMatch
 			&& !bClassSelectionOverMatch);
 	}
+	// Existing light actors are reused across frontend and gameplay. Retune them
+	// whenever presentation state changes so showcase exposure cannot leak into
+	// a live match (or vice versa).
+	SpawnLightingIfNeeded();
 }
 
 void AFlickGameMode::SetCameraViewForTeam(const EFlickTeam Team, const bool bSnap)
@@ -8022,6 +8352,11 @@ void AFlickGameMode::CheckWinOrAdvanceTurn()
 	AFlickGameState* FlickGameState = GetFlickGameState();
 	if (!FlickGameState)
 	{
+		return;
+	}
+	if (IsTutorialMode())
+	{
+		ResolveTutorialShot();
 		return;
 	}
 	if (IsFreePlayTraining())

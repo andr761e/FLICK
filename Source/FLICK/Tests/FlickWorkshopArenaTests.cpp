@@ -151,8 +151,10 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 		SwitchArt, SwitchDotArt, SignalTraceArt, DormantSocketArt})
 	{
 		if (!FlushMechanism) continue;
-		TestTrue(TEXT("Closed mechanism top face is placed on the arena surface"),
-			FMath::IsNearlyEqual(FlushMechanism->GetRelativeLocation().Z, Arena->GetSurfaceZ(), 0.01f));
+		const bool bIsSwitchGraphic = FlushMechanism != DormantSocketArt;
+		const float ExpectedVisualZ = Arena->GetSurfaceZ() + (bIsSwitchGraphic ? 0.35f : 0.0f);
+		TestTrue(TEXT("Flush mechanism uses its stable visual depth layer"),
+			FMath::IsNearlyEqual(FlushMechanism->GetRelativeLocation().Z, ExpectedVisualZ, 0.01f));
 		TestEqual(TEXT("Flush mechanism delegates solidity to the arena floor"),
 			FlushMechanism->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		bool bUsesDedicatedFlushMaterial = false;
