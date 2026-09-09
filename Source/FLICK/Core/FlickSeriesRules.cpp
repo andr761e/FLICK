@@ -44,6 +44,8 @@ FFlickSeriesRoundResult FlickSeriesRules::ApplyRoundOutcome(
 	}
 
 	const int32 SafeRoundsToWin = FMath::Max(1, RoundsToWin);
+	const int32 SafeCompletedRound = FMath::Max(1, CompletedRoundNumber);
+	const int32 RemainingRounds = FMath::Max(0, GetMaximumRounds(SafeRoundsToWin) - SafeCompletedRound);
 	if (Result.Player1RoundsWon >= SafeRoundsToWin)
 	{
 		Result.bSeriesComplete = true;
@@ -54,7 +56,19 @@ FFlickSeriesRoundResult FlickSeriesRules::ApplyRoundOutcome(
 		Result.bSeriesComplete = true;
 		Result.SeriesWinner = EFlickTeam::Player2;
 	}
-	else if (FMath::Max(1, CompletedRoundNumber) >= GetMaximumRounds(SafeRoundsToWin))
+	else if (Result.Player1RoundsWon > Result.Player2RoundsWon + RemainingRounds)
+	{
+		// Drawn rounds still consume the finite best-of series. End as soon as the
+		// trailing player can no longer equal the leader, even below rounds-to-win.
+		Result.bSeriesComplete = true;
+		Result.SeriesWinner = EFlickTeam::Player1;
+	}
+	else if (Result.Player2RoundsWon > Result.Player1RoundsWon + RemainingRounds)
+	{
+		Result.bSeriesComplete = true;
+		Result.SeriesWinner = EFlickTeam::Player2;
+	}
+	else if (SafeCompletedRound >= GetMaximumRounds(SafeRoundsToWin))
 	{
 		Result.bSeriesComplete = true;
 		if (Result.Player1RoundsWon != Result.Player2RoundsWon)

@@ -18,6 +18,7 @@ class UPrimitiveComponent;
 class AFlickWorldFeedback;
 class ADirectionalLight;
 class APointLight;
+class ARectLight;
 class ASkyLight;
 class UFlickGameInstance;
 class UFlickMatchmakingCoordinatorSubsystem;
@@ -538,6 +539,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Replay", meta = (ClampMin = "0.5", ClampMax = "4.0"))
 	float ReplayPullbackDuration = 1.85f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Test Arena", meta = (ClampMin = "0.0", ClampMax = "1000.0"))
+	float TestPuckKeyLightIntensity = 260.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Test Arena", meta = (ClampMin = "0.0", ClampMax = "1000.0"))
+	float TestPuckRimLightIntensity = 180.0f;
+
 private:
 	void SpawnCameraIfNeeded();
 	void SpawnAudioIfNeeded();
@@ -716,6 +723,12 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<APointLight> ArenaFillLight;
+
+	UPROPERTY()
+	TObjectPtr<ARectLight> TestPuckKeyLight;
+
+	UPROPERTY()
+	TObjectPtr<ARectLight> TestPuckRimLight;
 
 	UPROPERTY()
 	TArray<TObjectPtr<AFlickPiece>> Pieces;

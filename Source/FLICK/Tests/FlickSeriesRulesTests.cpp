@@ -36,6 +36,13 @@ bool FFlickSeriesRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Draw does not award Player 2"), Draw.Player2RoundsWon, 2);
 	TestFalse(TEXT("A tied draw does not complete the series"), Draw.bSeriesComplete);
 
+	const FFlickSeriesRoundResult UncatchableLead = FlickSeriesRules::ApplyRoundOutcome(
+		EFlickMatchOutcome::Draw, 2, 0, 3, 4, 400, 250);
+	TestTrue(TEXT("A 2-0 lead after two drawn rounds ends before round five"),
+		UncatchableLead.bSeriesComplete);
+	TestEqual(TEXT("The uncatchable round leader wins the series"),
+		UncatchableLead.SeriesWinner, EFlickTeam::Player1);
+
 	const FFlickSeriesRoundResult RoundLeadAtLimit = FlickSeriesRules::ApplyRoundOutcome(
 		EFlickMatchOutcome::Draw, 2, 1, 3, 5, 200, 900);
 	TestTrue(TEXT("The fifth round always completes Best of 5"), RoundLeadAtLimit.bSeriesComplete);

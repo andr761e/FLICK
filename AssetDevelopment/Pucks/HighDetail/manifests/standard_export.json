@@ -1,0 +1,18 @@
+{
+  "asset": "SM_Puck_Standard_Blue_Prototype",
+  "dimensions_cm": [
+    90.0,
+    90.0,
+    20.0
+  ],
+  "triangles": 156608,
+  "materials": [
+    "Graphite anodized housing",
+    "Machined edge highlights",
+    "Black gasket and sockets",
+    "Cyan light diffuser",
+    "Circular brushed silver",
+    "Recessed dark titanium",
+    "Cyan center emblem"
+  ]
+}

@@ -194,11 +194,23 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 	if (bAimingShot)
 	{
 		UpdateAimFromCursor();
+		if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
+		{
+			const FVector PieceLocation = SelectedPiece ? SelectedPiece->GetActorLocation() : FVector::ZeroVector;
+			const FVector FocusPoint = bHasAimCursorPoint
+				? FMath::Lerp(PieceLocation, AimCursorWorldPoint, 0.35f)
+				: PieceLocation;
+			CameraPawn->SetAimPresentation(true, FocusPoint);
+		}
 		DrawAimDebug();
 		CurrentMouseCursor = EMouseCursor::Crosshairs;
 	}
 	else
 	{
+		if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
+		{
+			CameraPawn->SetAimPresentation(false);
+		}
 		UpdateHoveredPiece();
 		CurrentMouseCursor = HoveredPiece ? EMouseCursor::Hand : EMouseCursor::Default;
 	}
@@ -255,6 +267,10 @@ void AFlickPlayerController::UpdateCareerStatsTracking(const AFlickGameState* Fl
 
 void AFlickPlayerController::ClearAiming()
 {
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
+	{
+		CameraPawn->SetAimPresentation(false);
+	}
 	ClearHoveredPiece();
 	if (SelectedPiece)
 	{

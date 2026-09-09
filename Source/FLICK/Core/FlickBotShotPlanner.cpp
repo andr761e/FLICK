@@ -208,7 +208,8 @@ namespace
 		const float DistanceFraction,
 		const float CandidateScore,
 		const FFlickBotShotTuning& Tuning,
-		FRandomStream& RandomStream)
+		FRandomStream& RandomStream,
+		const bool bUsesDividerBank = false)
 	{
 		const float Score = CandidateScore
 			+ RandomStream.FRandRange(-Tuning.DecisionNoise, Tuning.DecisionNoise);
@@ -236,6 +237,7 @@ namespace
 			Direction.X * SinAngle + Direction.Y * CosAngle);
 		BestPlan.NormalizedPower = Power;
 		BestPlan.Score = Score;
+		BestPlan.bUsesDividerBank = bUsesDividerBank;
 	}
 }
 
@@ -318,11 +320,12 @@ FFlickBotShotPlan FlickBotShotPlanner::PlanShot(
 			}
 			for (int32 DividerIndex = 0; DividerIndex < Tuning.Dividers.Num(); ++DividerIndex)
 			{
+				const FFlickBotDividerState& BankDivider = Tuning.Dividers[DividerIndex];
 				FVector2D BankDirection;
 				FVector2D BouncePoint;
 				float BankDistance = 0.0f;
 				if (!BuildBankDirection(
-					Shooter, Target, Tuning.Dividers[DividerIndex],
+					Shooter, Target, BankDivider,
 					BankDirection, BouncePoint, BankDistance))
 				{
 					continue;
@@ -340,6 +343,16 @@ FFlickBotShotPlan FlickBotShotPlanner::PlanShot(
 					(FVector2D::DotProduct(FinalDirection, TargetOutwardDirection) + 1.0f) * 0.5f,
 					0.0f,
 					1.0f);
+				// A divider hit is only tactical when the rebound gives the target a
+				// meaningfully better route toward the edge than the direct contact.
+				// Very sideways or merely decorative banks are too sensitive to puck
+				// radius and restitution, and were the source of apparently pointless
+				// bot shots straight into dividers.
+				if (BankOutwardAlignment < 0.58f
+					|| BankOutwardAlignment < OutwardAlignment + 0.12f)
+				{
+					continue;
+				}
 				const float BankDistanceFraction = FMath::Clamp(
 					BankDistance / (SafeArenaRadius * 2.5f), 0.0f, 1.0f);
 				const float BankBlockerPenalty = GetBlockerPenalty(
@@ -349,11 +362,11 @@ FFlickBotShotPlan FlickBotShotPlanner::PlanShot(
 					+ TargetEdgeProgress * 1.35f
 					- BankDistanceFraction * 0.62f
 					- BankBlockerPenalty * 1.7f
-					+ ApproachDividerPenalty * 4.4f * Tuning.BankShotSkill
+					+ 0.45f * Tuning.BankShotSkill
 					- (1.0f - Tuning.BankShotSkill) * 2.4f;
 				ConsiderCandidate(
 					BestPlan, Shooter, Target, BankDirection, TargetEdgeProgress,
-					BankDistanceFraction, BankScore, Tuning, RandomStream);
+					BankDistanceFraction, BankScore, Tuning, RandomStream, true);
 			}
 		}
 	}

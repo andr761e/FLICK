@@ -41,6 +41,10 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	UStaticMeshComponent* FloorCollider = nullptr;
 	UStaticMeshComponent* DividerCollider = nullptr;
 	UStaticMeshComponent* DividerArt = nullptr;
+	UStaticMeshComponent* SwitchArt = nullptr;
+	UStaticMeshComponent* SwitchDotArt = nullptr;
+	UStaticMeshComponent* SignalTraceArt = nullptr;
+	UStaticMeshComponent* DormantSocketArt = nullptr;
 	int32 SocketCount = 0;
 	TInlineComponentArray<UStaticMeshComponent*> Components(Arena);
 	for (UStaticMeshComponent* Component : Components)
@@ -49,6 +53,10 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 		if (Component->GetFName() == TEXT("ArenaMesh")) FloorCollider = Component;
 		if (Component->GetFName() == TEXT("EdgeDivider_00")) DividerCollider = Component;
 		if (Component->GetFName() == TEXT("WorkshopDivider_00")) DividerArt = Component;
+		if (Component->GetFName() == TEXT("ControlSwitchOuter_00")) SwitchArt = Component;
+		if (Component->GetFName() == TEXT("ControlSwitchDot_00")) SwitchDotArt = Component;
+		if (Component->GetFName() == TEXT("ControlSignalTrace_00")) SignalTraceArt = Component;
+		if (Component->GetFName() == TEXT("DividerSocket_00")) DormantSocketArt = Component;
 		if (Component->GetName().StartsWith(TEXT("DividerSocket_"))) ++SocketCount;
 	}
 
@@ -56,14 +64,23 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Original floor collider"), FloorCollider);
 	TestNotNull(TEXT("Simple divider collider"), DividerCollider);
 	TestNotNull(TEXT("Imported divider presentation component"), DividerArt);
+	TestNotNull(TEXT("Imported switch presentation component"), SwitchArt);
+	TestNotNull(TEXT("Imported switch-dot presentation component"), SwitchDotArt);
+	TestNotNull(TEXT("Imported signal-trace presentation component"), SignalTraceArt);
+	TestNotNull(TEXT("Imported dormant-divider socket component"), DormantSocketArt);
 	TestEqual(TEXT("All designed sockets remain present"), SocketCount, AFlickTestArena::PossibleLocationCount);
 	if (StaticArt && StaticArt->GetStaticMesh())
 	{
 		const FVector Size = StaticArt->GetStaticMesh()->GetBounds().BoxExtent * 2.0f;
 		TestTrue(TEXT("Imported arena diameter is 1300 cm"),
 			FMath::IsNearlyEqual(Size.X, 1300.0f, 1.0f) && FMath::IsNearlyEqual(Size.Y, 1300.0f, 1.0f));
+		TestTrue(TEXT("Decorative arena trim stays flush with the authoritative surface"),
+			StaticArt->GetStaticMesh()->GetBounds().BoxExtent.Z
+				+ StaticArt->GetStaticMesh()->GetBounds().Origin.Z <= 3.0f);
 		TestEqual(TEXT("Arena art cannot collide"), StaticArt->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		TestTrue(TEXT("Imported arena presentation is visible"), StaticArt->IsVisible());
+		TestTrue(TEXT("Premium arena preserves its layered material separation"),
+			StaticArt->GetStaticMesh()->GetStaticMaterials().Num() >= 12);
 	}
 	else
 	{
@@ -73,7 +90,28 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("Original floor collision remains authoritative"),
 			FloorCollider->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+		TestTrue(TEXT("Authoritative floor collider remains solid to the arena edge"),
+			FMath::IsNearlyEqual(FloorCollider->GetComponentScale().X, 13.0f, 0.01f)
+			&& FMath::IsNearlyEqual(FloorCollider->GetComponentScale().Y, 13.0f, 0.01f));
 		TestFalse(TEXT("Original generated floor presentation is hidden"), FloorCollider->IsVisible());
+	}
+	for (UStaticMeshComponent* FlushMechanism : {
+		SwitchArt, SwitchDotArt, SignalTraceArt, DormantSocketArt})
+	{
+		if (!FlushMechanism) continue;
+		TestTrue(TEXT("Closed mechanism top face is placed on the arena surface"),
+			FMath::IsNearlyEqual(FlushMechanism->GetRelativeLocation().Z, Arena->GetSurfaceZ(), 0.01f));
+		TestEqual(TEXT("Flush mechanism delegates solidity to the arena floor"),
+			FlushMechanism->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		bool bUsesDedicatedFlushMaterial = false;
+		for (int32 MaterialIndex = 0; MaterialIndex < FlushMechanism->GetNumMaterials(); ++MaterialIndex)
+		{
+			const UMaterialInterface* Material = FlushMechanism->GetMaterial(MaterialIndex);
+			bUsesDedicatedFlushMaterial |= Material
+				&& Material->GetName().StartsWith(TEXT("MI_Flush_"));
+		}
+		TestTrue(TEXT("Closed mechanism uses dedicated anti-flicker materials"),
+			bUsesDedicatedFlushMaterial);
 	}
 
 	Arena->BeginReplayPresentation();
@@ -86,6 +124,8 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Imported divider becomes visible"), DividerArt->IsVisible());
 		TestEqual(TEXT("Imported divider cannot collide"),
 			DividerArt->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestTrue(TEXT("Premium divider preserves its layered material separation"),
+			DividerArt->GetStaticMesh() && DividerArt->GetStaticMesh()->GetStaticMaterials().Num() >= 7);
 		const FVector ColliderLocation = DividerCollider->GetRelativeLocation();
 		const FVector ArtLocation = DividerArt->GetRelativeLocation();
 		TestTrue(TEXT("Visual and collider share XY placement"),

@@ -1,0 +1,146 @@
+[
+  {
+    "asset": "Toppler",
+    "dimensions_cm": [
+      90.3,
+      90.3,
+      30.7
+    ],
+    "triangles": 144688,
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Cyan center emblem"
+    ]
+  },
+  {
+    "asset": "Bouncer",
+    "dimensions_cm": [
+      86.5,
+      86.5,
+      16.1
+    ],
+    "triangles": 148624,
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Cyan center emblem"
+    ]
+  },
+  {
+    "asset": "Compact",
+    "dimensions_cm": [
+      71.9,
+      71.9,
+      14.7
+    ],
+    "triangles": 117888,
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Cyan center emblem"
+    ]
+  },
+  {
+    "asset": "Blocker",
+    "dimensions_cm": [
+      106.1,
+      106.1,
+      16.5
+    ],
+    "triangles": 128848,
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Cyan center emblem"
+    ]
+  },
+  {
+    "asset": "Slider",
+    "dimensions_cm": [
+      89.9,
+      89.9,
+      18.3
+    ],
+    "triangles": 121088,
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Cyan center emblem"
+    ]
+  },
+  {
+    "asset": "Grippy",
+    "dimensions_cm": [
+      90.3,
+      90.3,
+      20.9
+    ],
+    "triangles": 185004,
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Cyan center emblem"
+    ]
+  },
+  {
+    "asset": "Striker",
+    "dimensions_cm": [
+      82.7,
+      82.7,
+      13.4
+    ],
+    "triangles": 131464,
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Cyan center emblem"
+    ]
+  },
+  {
+    "asset": "Heavy",
+    "dimensions_cm": [
+      97.5,
+      97.5,
+      27.3
+    ],
+    "triangles": 162140,
+    "materials": [
+      "Graphite anodized housing",
+      "Machined edge highlights",
+      "Black gasket and sockets",
+      "Cyan light diffuser",
+      "Circular brushed silver",
+      "Recessed dark titanium",
+      "Cyan center emblem"
+    ]
+  }
+]

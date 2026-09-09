@@ -64,6 +64,11 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAudioComponent> ReplayMusicComponent;
 
+	// Kept separately from the rolling one-shot cache so a long replay bed
+	// cannot be collected while short launch/impact cues are being generated.
+	UPROPERTY(Transient)
+	TObjectPtr<USoundWaveProcedural> ReplayMusicSound;
+
 	float LastImpactTime = -100.0f;
 	float LastRimImpactTime = -100.0f;
 	float LastUiTime = -100.0f;

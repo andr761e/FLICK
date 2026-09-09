@@ -1,51 +1,27 @@
-# Blender pucks in the divider test arena
+# High-detail pucks in the divider test arena
 
-Play > Test > Switchyard uses the nine imported workshop meshes. Other playlists
-continue using the original procedural puck visuals. The imported component has
-no collision and follows the original simulated cylinder. That cylinder still
-owns selection traces, mass, friction, restitution, impulses and elimination.
-The existing selection halo remains visible; team light emission responds to
-selection and impacts. A missing mesh falls back to the procedural presentation
-and logs a warning.
+Play > Test > Switchyard uses the nine high-detail presentation meshes. Other
+playlists retain their existing presentation. Each imported mesh is attached to
+the original simulated cylinder with collision disabled, so selection, mass,
+friction, restitution, impulses and ring-out detection are unchanged.
 
-Only nine static meshes are needed. Each class shares the same asset across both
-teams, with a dynamic material instance supplying blue or orange emission.
-Imported art preserves the current tuned diameter while using authored, art-only
-height proportions after cancelling the cylinder's inherited scale. Collision,
-mass and gameplay thickness remain unchanged. The test arena enables stronger specular lighting
-and a reflection cubemap derived from Unreal's bundled daylight environment, so
-the metallic shoulders remain readable even on an empty map. The cubemap is
-copied into the test asset folder for cooking.
+Geometry is shared between teams. Dynamic material instances replace cyan with
+orange for Player 2 while retaining the authored graphite, silver and recessed
+materials. Missing art logs a warning and falls back to the procedural visual.
 
-Assets live in `/Game/TestArena/Pucks`, explicitly included for cooking. This is
-an opt-in exception to avoiding binary art dependencies: the requested Blender
-meshes are now the test arena's artwork. The Python import tools are editor-only;
-the packaged game does not require Blender, Python or editor scripting plugins.
+## Rebuild and import
 
-## Rebuild the art
+1. Rebuild FBX files with the two exporters documented in
+   `AssetDevelopment/Pucks/HighDetail/README.md`.
+2. Run `Tools/Import-FlickBlueStandardPrototype.py` for Standard.
+3. Run `Tools/Import-FlickHighDetailPucks.py` for the other eight archetypes.
+4. Build `FLICKEditor` and run `FLICK.Visuals.WorkshopPucks`.
 
-1. Run `AssetDevelopment/Pucks/scripts/export_unreal.py` in background Blender
-   with `PuckWorkshop.blend` loaded. It writes origin-centered FBX files to
-   `AssetDevelopment/Pucks/exports/Unreal`, with per-face planar UVs for tangents.
-2. Run `Tools/Import-FlickPucks.py` using Unreal's PythonScript commandlet with
-   `PythonScriptPlugin,EditorScriptingUtilities` enabled. It imports meshes,
-   rebuilds tangents, assigns six native materials, checks units/pivots and saves
-   `Saved/PuckImportReport.json`.
-3. Build FLICKEditor, run `FLICK.Visuals.WorkshopPucks`, then capture TestArena
-   using `Tools/Capture-FlickUI.ps1`.
+The importers read only `AssetDevelopment/Pucks/HighDetail/exports` and its
+manifests. The archived procedural workshop is not part of this workflow.
 
-The FBX source paths are recorded by Unreal. These are high-detail prototype meshes;
-the procedural Blender surface grain is not baked into textures. Native Unreal
-materials reproduce base color, roughness, metal and emission. LOD/texture baking
-and packaged performance review remain separate production work.
+## Production note
 
-## Validation (2026-09-07)
-
-- FLICKEditor Win64 Development compiled successfully.
-- All 26 FLICK automation tests passed, with zero test warnings or failures.
-- WorkshopPucks checks all nine classes for both teams: shared meshes, team
-  accents, tuned bounds, selection visibility, unchanged collision mesh/mass
-  and active physics simulation.
-- Final import completed without the earlier tangent/binormal diagnostics.
-- TestArena and TestArenaStates were captured at 1600x900 and visually reviewed.
-- A packaged build and production performance profiling have not been run.
+These are detailed prototype meshes without shipping LODs or baked surface
+maps. Optimization and packaged-build profiling remain future art-production
+work; they are deliberately separate from the gameplay physics bodies.

@@ -41,6 +41,7 @@ struct FFlickBotShotPlan
 	FVector2D Direction = FVector2D::ZeroVector;
 	float NormalizedPower = 0.0f;
 	float Score = -BIG_NUMBER;
+	bool bUsesDividerBank = false;
 
 	bool IsValid() const
 	{

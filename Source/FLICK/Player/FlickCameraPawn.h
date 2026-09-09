@@ -22,6 +22,8 @@ public:
 	void AddCameraImpulse(float Strength);
 	void SetMenuPresentation(bool bInMenuPresentation);
 	void SetBobGameplayFraming(bool bInBobGameplayFraming);
+	void SetTestArenaPresentation(bool bInTestArenaPresentation);
+	void SetAimPresentation(bool bEnabled, const FVector& FocusPoint = FVector::ZeroVector);
 	void SetCompactGameplayFraming(bool bInCompactGameplayFraming);
 	void SetArenaFramingScale(float InArenaFramingScale);
 	void SetGameplayViewIndex(int32 InViewIndex, bool bSnap = false);
@@ -48,6 +50,21 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera", meta = (ClampMin = "0.75", ClampMax = "1.25"))
 	float GameplayDistanceScale = 0.9f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera", meta = (ClampMin = "0.75", ClampMax = "1.0"))
+	float TestArenaDistanceMultiplier = 0.90f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Aim", meta = (ClampMin = "0.82", ClampMax = "1.0"))
+	float AimDistanceMultiplier = 0.90f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Aim", meta = (ClampMin = "35.0", ClampMax = "55.0"))
+	float AimFieldOfView = 45.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Aim", meta = (ClampMin = "0.0", ClampMax = "0.5"))
+	float AimFocusPanStrength = 0.22f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Aim", meta = (ClampMin = "0.0", ClampMax = "5.0"))
+	float AimPitchOffset = 2.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera")
 	FVector BobCameraLocation = FVector(0.0f, -1840.0f, 1425.0f);
@@ -87,6 +104,17 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "-3.0", ClampMax = "3.0"))
 	float BobExposureBias = -0.2f;
+
+	// The divider arena uses emissive surfaces throughout the frame. Fixing its
+	// exposure prevents eye adaptation from dimming the attractive initial look.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "-10.0", ClampMax = "20.0"))
+	float TestArenaFixedExposure = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float TestArenaBloomIntensity = 0.22f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "10.0"))
+	float TestArenaBloomThreshold = 1.35f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera")
 	float PresentationBlendSpeed = 3.8f;
@@ -140,6 +168,7 @@ private:
 	int32 GameplayElevationPresetIndex = 1;
 	float ArenaFramingScale = 1.0f;
 	FVector ReplayFocus = FVector::ZeroVector;
+	FVector AimFocusPoint = FVector::ZeroVector;
 	float ReplayProgress = 0.0f;
 	float ReplayPullbackAlpha = 0.0f;
 	float ReplayOrbitAngle = 0.0f;
@@ -148,6 +177,8 @@ private:
 	bool bGameplayElevationLocked = false;
 	bool bMenuPresentation = false;
 	bool bBobGameplayFraming = false;
+	bool bTestArenaPresentation = false;
+	bool bAimPresentation = false;
 	bool bCompactGameplayFraming = false;
 	bool bCinematicReplay = false;
 };

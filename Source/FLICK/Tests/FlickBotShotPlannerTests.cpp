@@ -105,6 +105,41 @@ bool FFlickBotShotPlannerDividerAwarenessTest::RunTest(const FString& Parameters
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFlickBotShotPlannerDoesNotInventDividerBankTest,
+	"FLICK.Bot.ShotPlanner.NoUnnecessaryDividerBank",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickBotShotPlannerDoesNotInventDividerBankTest::RunTest(const FString& Parameters)
+{
+	TArray<FFlickBotPieceState> Pieces = {
+		{10, EFlickTeam::Player2, FVector2D(0.0f, 300.0f), 40.0f},
+		{20, EFlickTeam::Player1, FVector2D(0.0f, -220.0f), 40.0f}
+	};
+	FFlickBotDividerState SideDivider;
+	SideDivider.Center = FVector2D(260.0f, 30.0f);
+	SideDivider.Tangent = FVector2D(0.0f, 1.0f);
+	SideDivider.HalfLength = 150.0f;
+	SideDivider.HalfThickness = 9.0f;
+	SideDivider.bRaised = true;
+
+	FFlickBotShotTuning Tuning;
+	Tuning.AimErrorDegrees = 0.0f;
+	Tuning.PowerVariation = 0.0f;
+	Tuning.DecisionNoise = 0.0f;
+	Tuning.DividerAwareness = 1.0f;
+	Tuning.BankShotSkill = 1.0f;
+	Tuning.Dividers.Add(SideDivider);
+	FRandomStream RandomStream(29);
+
+	const FFlickBotShotPlan Plan = FlickBotShotPlanner::PlanShot(
+		Pieces, EFlickTeam::Player2, Tuning, RandomStream);
+	TestTrue(TEXT("Bot creates a clear direct shot"), Plan.IsValid());
+	TestFalse(TEXT("Bot does not invent a bank when the direct lane is open"), Plan.bUsesDividerBank);
+	TestTrue(TEXT("Bot aims directly toward the exposed target"), Plan.Direction.Y < -0.99f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFlickBotShotPlannerBobTest,
 	"FLICK.Bot.ShotPlanner.BobOwnColor",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

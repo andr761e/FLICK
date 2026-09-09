@@ -128,7 +128,8 @@ private:
 	TObjectPtr<UStaticMeshComponent> WorkshopMesh;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> WorkshopTeamMaterial;
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> WorkshopTeamMaterials;
+	bool bUsingHighDetailPuck = false;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PieceMesh;

@@ -7,6 +7,7 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "Components/RectLightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Core/FlickLog.h"
 #include "Core/FlickBobRules.h"
@@ -20,6 +21,7 @@
 #include "Engine/DirectionalLight.h"
 #include "Engine/Engine.h"
 #include "Engine/PointLight.h"
+#include "Engine/RectLight.h"
 #include "Engine/SkyLight.h"
 #include "Engine/TextureCube.h"
 #include "EngineUtils.h"
@@ -5943,6 +5945,7 @@ void AFlickGameMode::SpawnCameraIfNeeded()
 	if (CameraPawn)
 	{
 		CameraPawn->SetBobGameplayFraming(ActiveMatchVariant == EFlickMatchVariant::Bob);
+		CameraPawn->SetTestArenaPresentation(bTestArenaMode);
 		CameraPawn->SetCompactGameplayFraming(false);
 		CameraPawn->SetArenaFramingScale(
 			ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
@@ -6010,11 +6013,11 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		Light->SetMobility(EComponentMobility::Movable);
 		DirectionalLightActor->SetActorRotation(FRotator(-72.0f, -25.0f, 0.0f));
 		Light->SetLightColor(bTestArenaMode
-			? FLinearColor(0.78f, 0.87f, 1.0f)
+			? FLinearColor(0.92f, 0.95f, 1.0f)
 			: bClassicArenaLighting
 				? FLinearColor(0.82f, 0.88f, 0.96f)
 				: FLinearColor(0.9f, 0.94f, 1.0f));
-		Light->SetIntensity(bTestArenaMode ? 1.1f : bClassicArenaLighting ? 0.78f : 1.15f);
+		Light->SetIntensity(bTestArenaMode ? 1.45f : bClassicArenaLighting ? 0.78f : 1.15f);
 		Light->SetLightSourceAngle(bTestArenaMode ? 5.0f : 3.0f);
 		Light->SetSpecularScale(bTestArenaMode ? 0.60f : bClassicArenaLighting ? 0.14f : 0.32f);
 		Light->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.72f : 0.8f);
@@ -6040,7 +6043,7 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			Sky->SourceType = SLS_CapturedScene;
 			Sky->SetCubemap(nullptr);
 		}
-		Sky->SetIntensity(bTestArenaMode ? 0.82f : bClassicArenaLighting ? 0.34f : 0.28f);
+		Sky->SetIntensity(bTestArenaMode ? 1.05f : bClassicArenaLighting ? 0.34f : 0.28f);
 	}
 
 	const auto SpawnAccentLight = [this, bClassicArenaLighting](
@@ -6063,11 +6066,11 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			Light->SetLightColor(FMath::Lerp(
 				Color, FLinearColor::White,
 				bTestArenaMode ? 0.38f : bClassicArenaLighting ? 0.88f : 0.72f));
-			Light->SetIntensity(bTestArenaMode ? 220.0f : bClassicArenaLighting ? 52.0f : 165.0f);
+			Light->SetIntensity(bTestArenaMode ? 190.0f : bClassicArenaLighting ? 52.0f : 165.0f);
 			Light->SetAttenuationRadius(
-				(bClassicArenaLighting ? 720.0f : 820.0f)
-				* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
-			Light->SetSourceRadius((bTestArenaMode ? 125.0f : bClassicArenaLighting ? 260.0f : 120.0f)
+				(bTestArenaMode ? 700.0f : bClassicArenaLighting ? 720.0f : 820.0f)
+					* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
+			Light->SetSourceRadius((bTestArenaMode ? 100.0f : bClassicArenaLighting ? 260.0f : 120.0f)
 				* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
 			Light->SetSpecularScale(bTestArenaMode ? 0.52f : bClassicArenaLighting ? 0.04f : 0.48f);
 			Light->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.15f : 0.42f);
@@ -6092,13 +6095,53 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		ArenaFillLight->PointLightComponent->SetLightColor(bClassicArenaLighting
 			? FLinearColor(0.62f, 0.7f, 0.82f)
 			: FLinearColor(0.72f, 0.78f, 0.88f));
-		ArenaFillLight->PointLightComponent->SetIntensity(bTestArenaMode ? 300.0f : bClassicArenaLighting ? 112.0f : 190.0f);
+		ArenaFillLight->PointLightComponent->SetIntensity(bTestArenaMode ? 440.0f : bClassicArenaLighting ? 112.0f : 190.0f);
 		ArenaFillLight->PointLightComponent->SetAttenuationRadius(1280.0f * ArenaScale);
 		ArenaFillLight->PointLightComponent->SetSourceRadius((bTestArenaMode ? 240.0f : 180.0f) * ArenaScale);
-		ArenaFillLight->PointLightComponent->SetSpecularScale(bTestArenaMode ? 0.38f : bClassicArenaLighting ? 0.06f : 0.26f);
+		ArenaFillLight->PointLightComponent->SetSpecularScale(bTestArenaMode ? 0.32f : bClassicArenaLighting ? 0.06f : 0.26f);
 		ArenaFillLight->PointLightComponent->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.45f : 0.34f);
 		ArenaFillLight->PointLightComponent->SetCastShadows(false);
 	}
+
+	// Large neutral cards create narrow, moving highlight bands on the prototype's
+	// machined rings and graphite bevels. They are specular-first fixtures rather
+	// than another arena flood, and are disabled outside Switchyard.
+	const auto ConfigurePuckSoftbox = [this, ArenaScale](
+		TObjectPtr<ARectLight>& LightActor,
+		const FVector& Location,
+		const FLinearColor& Color,
+		const float Intensity,
+		const float Width,
+		const float Height)
+	{
+		if (!LightActor || !IsValid(LightActor))
+		{
+			LightActor = GetWorld()->SpawnActor<ARectLight>(
+				ARectLight::StaticClass(), Location, FRotator::ZeroRotator);
+		}
+		if (!LightActor || !LightActor->RectLightComponent)
+		{
+			return;
+		}
+		URectLightComponent* Light = LightActor->RectLightComponent;
+		Light->SetMobility(EComponentMobility::Movable);
+		const FVector ScaledLocation = Location * ArenaScale;
+		LightActor->SetActorLocation(ScaledLocation);
+		LightActor->SetActorRotation(
+			(FVector(0.0f, 0.0f, 45.0f * ArenaScale) - ScaledLocation).Rotation());
+		Light->SetLightColor(Color);
+		Light->SetIntensity(bTestArenaMode ? Intensity : 0.0f);
+		Light->SetAttenuationRadius(1250.0f * ArenaScale);
+		Light->SetSourceWidth(Width * ArenaScale);
+		Light->SetSourceHeight(Height * ArenaScale);
+		Light->SetSpecularScale(1.0f);
+		Light->SetIndirectLightingIntensity(0.05f);
+		Light->SetCastShadows(false);
+	};
+	ConfigurePuckSoftbox(TestPuckKeyLight, FVector(-620.0f, -420.0f, 560.0f),
+		FLinearColor(0.82f, 0.91f, 1.0f), TestPuckKeyLightIntensity, 460.0f, 170.0f);
+	ConfigurePuckSoftbox(TestPuckRimLight, FVector(600.0f, 300.0f, 450.0f),
+		FLinearColor(1.0f, 0.86f, 0.72f), TestPuckRimLightIntensity, 360.0f, 130.0f);
 }
 
 void AFlickGameMode::SpawnArenaIfNeeded()

@@ -1135,20 +1135,45 @@ void AFlickPiece::EnableTestArenaVisuals()
 		TEXT("Grippy"), TEXT("Slider"), TEXT("Blocker"), TEXT("Compact"), TEXT("Bouncer"), TEXT("Toppler")};
 	const int32 Index = static_cast<int32>(Archetype);
 	if (Index < 0 || Index >= UE_ARRAY_COUNT(Names)) return;
-	const FString Path = FString::Printf(TEXT("/Game/TestArena/Pucks/SM_Puck_%s.SM_Puck_%s"), Names[Index], Names[Index]);
-	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *Path);
+	const FString HighDetailPath = Archetype == EFlickPieceArchetype::Standard
+		? TEXT("/Game/TestArena/Pucks/PrototypeStandard/SM_Puck_Standard_Blue_Prototype.SM_Puck_Standard_Blue_Prototype")
+		: FString::Printf(
+			TEXT("/Game/TestArena/Pucks/HighDetail/SM_Puck_%s_HighDetail.SM_Puck_%s_HighDetail"),
+			Names[Index], Names[Index]);
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *HighDetailPath);
+	bUsingHighDetailPuck = Mesh != nullptr;
 	if (!Mesh)
 	{
-		UE_LOG(LogFlick, Warning, TEXT("Test arena puck mesh missing: %s; keeping procedural visuals"), *Path);
+		const FString FallbackPath = FString::Printf(
+			TEXT("/Game/TestArena/Pucks/SM_Puck_%s.SM_Puck_%s"), Names[Index], Names[Index]);
+		Mesh = LoadObject<UStaticMesh>(nullptr, *FallbackPath);
+	}
+	if (!Mesh)
+	{
+		UE_LOG(LogFlick, Warning, TEXT("Test arena puck mesh missing: %s; keeping procedural visuals"), *HighDetailPath);
 		return;
 	}
 	WorkshopMesh->SetStaticMesh(Mesh);
+	WorkshopTeamMaterials.Reset();
 	for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
 	{
-		if (Mesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString().Contains(TEXT("05_Team")))
+		const FString SlotName = Mesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString();
+		if (SlotName.Contains(TEXT("05_Team")) || SlotName.Contains(TEXT("Cyan")))
 		{
-			WorkshopTeamMaterial = WorkshopMesh->CreateDynamicMaterialInstance(Slot);
-			break;
+			if (bUsingHighDetailPuck && Team == EFlickTeam::Player2)
+			{
+				const TCHAR* OrangeMaterialPath = SlotName.Contains(TEXT("center"), ESearchCase::IgnoreCase)
+					? TEXT("/Game/TestArena/Pucks/HighDetail/MI_Orange_Center_Emblem.MI_Orange_Center_Emblem")
+					: TEXT("/Game/TestArena/Pucks/HighDetail/MI_Orange_Light_Diffuser.MI_Orange_Light_Diffuser");
+				if (UMaterialInterface* OrangeMaterial = LoadObject<UMaterialInterface>(nullptr, OrangeMaterialPath))
+				{
+					WorkshopMesh->SetMaterial(Slot, OrangeMaterial);
+				}
+			}
+			if (UMaterialInstanceDynamic* TeamMaterial = WorkshopMesh->CreateDynamicMaterialInstance(Slot))
+			{
+				WorkshopTeamMaterials.Add(TeamMaterial);
+			}
 		}
 	}
 	// Cancel only the legacy cylinder's inherited scale. The imported mesh then renders
@@ -1158,13 +1183,12 @@ void AFlickPiece::EnableTestArenaVisuals()
 		50.0f / FMath::Max(PieceRadius, 1.0f),
 		50.0f / FMath::Max(PieceRadius, 1.0f),
 		100.0f / FMath::Max(PieceThickness, 1.0f)));
-	// A broad, low-energy local light gives the machined rings a controlled
-	// highlight and a small pool of team colour on the deck. It deliberately
-	// carries little specular energy so it cannot bleach the puck markings.
-	AccentLight->SetAttenuationRadius(118.0f);
-	AccentLight->SetSourceRadius(18.0f);
-	AccentLight->SetSpecularScale(0.32f);
-	AccentLight->SetIndirectLightingIntensity(0.18f);
+	// A compact, low-energy local light gives the machined rings a controlled
+	// highlight and confines team colour to the deck immediately below the puck.
+	AccentLight->SetAttenuationRadius(64.0f);
+	AccentLight->SetSourceRadius(8.0f);
+	AccentLight->SetSpecularScale(bUsingHighDetailPuck ? 0.36f : 0.28f);
+	AccentLight->SetIndirectLightingIntensity(0.03f);
 	AccentLight->SetVolumetricScatteringIntensity(0.0f);
 	PieceMesh->SetCastShadow(false);
 	ApplyVisuals();
@@ -1184,15 +1208,34 @@ void AFlickPiece::UpdateTestArenaVisuals()
 	}
 	AccentLight->SetVisibility(!bEliminated);
 	WorkshopMesh->SetVisibility(!bEliminated);
-	if (WorkshopTeamMaterial)
+	if (!WorkshopTeamMaterials.IsEmpty())
 	{
 		const FLinearColor Color = Team == EFlickTeam::Player2
 			? FLinearColor(1.0f, 0.18f, 0.003f) : FLinearColor(0.0f, 0.5f, 1.0f);
-		WorkshopTeamMaterial->SetVectorParameterValue(TEXT("TeamColor"), Color);
+		const FLinearColor DiffuserBaseColor = Team == EFlickTeam::Player2
+			? FLinearColor(0.125f, 0.022f, 0.002f) : FLinearColor(0.004f, 0.080f, 0.125f);
 		const float Flash = FMath::Clamp(HitFlashRemaining / 0.2f, 0.0f, 1.0f) * HitFlashStrength;
-		WorkshopTeamMaterial->SetScalarParameterValue(TEXT("Emission"), (bSelected || bHovered ? 2.0f : 1.6f) + Flash);
+		// The game camera runs below neutral exposure. HDR values in this range
+		// retain saturated cores while crossing the restrained bloom threshold,
+		// giving the authored strips a narrow LED halo rather than a blurry blob.
+		for (UMaterialInstanceDynamic* TeamMaterial : WorkshopTeamMaterials)
+		{
+			if (!TeamMaterial) continue;
+			TeamMaterial->SetVectorParameterValue(TEXT("TeamColor"), Color);
+			if (bUsingHighDetailPuck)
+			{
+				TeamMaterial->SetVectorParameterValue(TEXT("BaseColor"), DiffuserBaseColor);
+			}
+			const float IdleEmission = bUsingHighDetailPuck ? 6.0f : 10.0f;
+			const float HighlightEmission = bUsingHighDetailPuck ? 8.0f : 14.0f;
+			TeamMaterial->SetScalarParameterValue(
+				TEXT("Emission"), (bSelected || bHovered ? HighlightEmission : IdleEmission) + Flash);
+		}
 	}
-	AccentLight->SetIntensity(bEliminated ? 0.0f : (bSelected || bHovered || bKickoffLocked ? 28.0f : 17.0f));
+	const float IdleLight = bUsingHighDetailPuck ? 8.0f : 11.0f;
+	const float HighlightLight = bUsingHighDetailPuck ? 14.0f : 18.0f;
+	AccentLight->SetIntensity(
+		bEliminated ? 0.0f : (bSelected || bHovered || bKickoffLocked ? HighlightLight : IdleLight));
 }
 
 void AFlickPiece::ApplyVisuals()

@@ -47,6 +47,15 @@ static_min, static_max, static_size = local_bounds(bpy.data.objects["SM_TestAren
 arena_radius = MANIFEST["arena_radius_cm"] / 100.0
 require(max(abs(static_min.x), abs(static_max.x), abs(static_min.y), abs(static_max.y)) <= arena_radius + TOLERANCE_M,
         "Static visual exceeds the authoritative 650 cm arena radius")
+# No decorative rim vertex may form a raised, non-colliding wall. The inherited
+# Unreal cylinder owns the physical top plane all the way to the 650 cm edge.
+static_mesh = bpy.data.objects["SM_TestArena_Static"].data
+rim_vertex_z = [vertex.co.z for vertex in static_mesh.vertices
+                if Vector((vertex.co.x, vertex.co.y)).length >= arena_radius * 0.959]
+require(rim_vertex_z and max(rim_vertex_z) <= TOLERANCE_M,
+        "Decorative rim rises above the authoritative play surface")
+require(static_max.z <= 0.035,
+        "Static arena contains raised non-colliding trim above the play surface")
 
 divider_min, divider_max, divider_size = local_bounds(bpy.data.objects["SM_TestArena_Divider"])
 nominal = [value / 100.0 for value in MANIFEST["divider_nominal_cm"]]
@@ -58,12 +67,21 @@ switch_min, switch_max, switch_size = local_bounds(bpy.data.objects["SM_TestAren
 switch_diameter = MANIFEST["switch_radius_cm"] * 2.0 / 100.0
 require(switch_size.x <= switch_diameter + TOLERANCE_M and switch_size.y <= switch_diameter + TOLERANCE_M,
         "Switch housing exceeds ControlZoneRadius")
+require(switch_max.z <= TOLERANCE_M and switch_min.z < 0.0,
+        "Switch housing must be authored downward from the arena surface")
 
 dot_min, dot_max, dot_size = local_bounds(bpy.data.objects["SM_TestArena_SwitchDot"])
 # The activation disc is exact; its dark gasket is deliberately 28% wider and is
 # visual-only. Validate the physical activation dimension through the manifest.
 require(abs(MANIFEST["activation_dot_radius_cm"] - 8.0) < 0.001,
         "Activation dot no longer matches SwitchActivationDotRadius")
+require(dot_max.z <= TOLERANCE_M and dot_min.z < 0.0,
+        "Switch activation dot must be authored downward from the arena surface")
+
+for flush_name in ("SM_TestArena_DividerSocket", "SM_TestArena_SignalTrace"):
+    flush_min, flush_max, _ = local_bounds(bpy.data.objects[flush_name])
+    require(flush_max.z <= TOLERANCE_M and flush_min.z < 0.0,
+            f"{flush_name} must be authored downward from the arena surface")
 
 locations = MANIFEST["possible_locations"]
 active = [location for location in locations if location["active"]]

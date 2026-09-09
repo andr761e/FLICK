@@ -9,7 +9,7 @@
       "bounds_min_m": [
         -0.73,
         -0.09,
-        0.0168
+        0.0
       ],
       "bounds_max_m": [
         0.73,
@@ -19,41 +19,41 @@
       "dimensions_m": [
         1.46,
         0.18,
-        0.5432
+        0.56
       ]
     },
     "SM_TestArena_DividerSocket": {
       "bounds_min_m": [
         -0.73,
         -0.13,
-        0.0
+        -0.016
       ],
       "bounds_max_m": [
         0.73,
         0.13,
-        0.024
+        0.0
       ],
       "dimensions_m": [
         1.46,
         0.26,
-        0.024
+        0.016
       ]
     },
     "SM_TestArena_SignalTrace": {
       "bounds_min_m": [
         0.0,
-        -0.02,
-        0.0
+        -0.025,
+        -0.01
       ],
       "bounds_max_m": [
         1.0,
-        0.02,
-        0.015
+        0.025,
+        0.0
       ],
       "dimensions_m": [
         1.0,
-        0.04,
-        0.015
+        0.05,
+        0.01
       ]
     },
     "SM_TestArena_Static": {
@@ -65,46 +65,46 @@
       "bounds_max_m": [
         6.5,
         6.5,
-        0.1145
+        0.001
       ],
       "dimensions_m": [
         13.0,
         13.0,
-        0.6145
+        0.501
       ]
     },
     "SM_TestArena_SwitchDot": {
       "bounds_min_m": [
         -0.1024,
         -0.1024,
-        0.0
+        -0.03
       ],
       "bounds_max_m": [
         0.1024,
         0.1024,
-        0.031
+        0.0
       ],
       "dimensions_m": [
         0.2048,
         0.2048,
-        0.031
+        0.03
       ]
     },
     "SM_TestArena_SwitchHousing": {
       "bounds_min_m": [
         -0.4,
         -0.4,
-        0.0
+        -0.022
       ],
       "bounds_max_m": [
         0.4,
         0.4,
-        0.034
+        0.0
       ],
       "dimensions_m": [
         0.8,
         0.8,
-        0.034
+        0.022
       ]
     }
   }

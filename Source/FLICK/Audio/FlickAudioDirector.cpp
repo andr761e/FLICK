@@ -191,7 +191,10 @@ void AFlickAudioDirector::PlayReplayMusic(const float Duration, const EFlickTeam
 	const float Root = WinningTeam == EFlickTeam::Player2 ? 92.50f : 110.0f;
 	USoundWaveProcedural* Sound = CreateSound(
 		EFlickGeneratedSoundKind::ReplayMusic,
-		FMath::Clamp(Duration, 1.25f, 8.0f),
+		// Leave a short musical tail for the replay-to-round transition. The
+		// previous exact-duration buffer could run dry a frame before the round
+		// result cue, producing an intermittent and very obvious audio hole.
+		FMath::Clamp(Duration + 0.45f, 1.25f, 8.0f),
 		Root,
 		SoundSeed++,
 		0.62f,
@@ -201,6 +204,7 @@ void AFlickAudioDirector::PlayReplayMusic(const float Duration, const EFlickTeam
 		return;
 	}
 	Sound->SoundGroup = SOUNDGROUP_Music;
+	ReplayMusicSound = Sound;
 	ReplayMusicComponent = UGameplayStatics::SpawnSound2D(this, Sound, MixedVolume, 1.0f);
 }
 
@@ -208,8 +212,10 @@ void AFlickAudioDirector::StopReplayMusic()
 {
 	if (IsValid(ReplayMusicComponent))
 	{
-		ReplayMusicComponent->FadeOut(0.18f, 0.0f);
-		ReplayMusicComponent = nullptr;
+		// Keep both the component and its procedural source referenced while the
+		// fade overlaps the round-result sting. They will be replaced safely when
+		// the next replay starts.
+		ReplayMusicComponent->FadeOut(0.32f, 0.0f);
 	}
 }
 

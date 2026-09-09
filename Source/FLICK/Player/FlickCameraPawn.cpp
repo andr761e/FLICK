@@ -68,7 +68,9 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 			: FRotator::ZeroRotator);
 	float TargetFieldOfView = bMenuPresentation
 		? MenuFieldOfView
-		: bBobGameplayFraming ? BobFieldOfView : bCompactGameplayFraming ? CompactFieldOfView : FieldOfView;
+		: bAimPresentation && bTestArenaPresentation
+			? AimFieldOfView
+			: bBobGameplayFraming ? BobFieldOfView : bCompactGameplayFraming ? CompactFieldOfView : FieldOfView;
 	float BlendSpeed = PresentationBlendSpeed;
 	if (bCinematicReplay)
 	{
@@ -147,6 +149,26 @@ void AFlickCameraPawn::SetBobGameplayFraming(const bool bInBobGameplayFraming)
 	ApplyArenaPostProcess();
 }
 
+void AFlickCameraPawn::SetTestArenaPresentation(const bool bInTestArenaPresentation)
+{
+	bTestArenaPresentation = bInTestArenaPresentation;
+	if (!bTestArenaPresentation)
+	{
+		bAimPresentation = false;
+		AimFocusPoint = FVector::ZeroVector;
+	}
+	ApplyArenaPostProcess();
+}
+
+void AFlickCameraPawn::SetAimPresentation(const bool bEnabled, const FVector& FocusPoint)
+{
+	bAimPresentation = bEnabled && bTestArenaPresentation && !bMenuPresentation && !bCinematicReplay;
+	if (bAimPresentation)
+	{
+		AimFocusPoint = FVector(FocusPoint.X, FocusPoint.Y, 0.0f);
+	}
+}
+
 void AFlickCameraPawn::ApplyArenaPostProcess()
 {
 	if (!Camera)
@@ -154,15 +176,49 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 		return;
 	}
 
-	Camera->PostProcessSettings.BloomIntensity = bBobGameplayFraming
+	Camera->PostProcessSettings.BloomIntensity = bTestArenaPresentation
+		? TestArenaBloomIntensity
+		: bBobGameplayFraming
 		? BobBloomIntensity
 		: ClassicBloomIntensity;
-	Camera->PostProcessSettings.BloomThreshold = bBobGameplayFraming
+	Camera->PostProcessSettings.BloomThreshold = bTestArenaPresentation
+		? TestArenaBloomThreshold
+		: bBobGameplayFraming
 		? BobBloomThreshold
 		: ClassicBloomThreshold;
 	Camera->PostProcessSettings.AutoExposureBias = bBobGameplayFraming
 		? BobExposureBias
 		: ClassicExposureBias;
+
+	// The test arena's numerous emissive puck and divider accents cause the
+	// histogram exposure to begin attractively bright, then rapidly darken. Keep
+	// that initial EV stable in this arena only. Disabling both overrides again
+	// restores the normal adaptive exposure used by every other mode.
+	Camera->PostProcessSettings.bOverride_AutoExposureMinBrightness = bTestArenaPresentation;
+	Camera->PostProcessSettings.bOverride_AutoExposureMaxBrightness = bTestArenaPresentation;
+	if (bTestArenaPresentation)
+	{
+		Camera->PostProcessSettings.AutoExposureMinBrightness = TestArenaFixedExposure;
+		Camera->PostProcessSettings.AutoExposureMaxBrightness = TestArenaFixedExposure;
+	}
+
+	// Tighten every Gaussian bloom stage in Switchyard so the halo hugs the
+	// authored strips. Other modes inherit Unreal's normal kernel sizes.
+	Camera->PostProcessSettings.bOverride_Bloom1Size = bTestArenaPresentation;
+	Camera->PostProcessSettings.bOverride_Bloom2Size = bTestArenaPresentation;
+	Camera->PostProcessSettings.bOverride_Bloom3Size = bTestArenaPresentation;
+	Camera->PostProcessSettings.bOverride_Bloom4Size = bTestArenaPresentation;
+	Camera->PostProcessSettings.bOverride_Bloom5Size = bTestArenaPresentation;
+	Camera->PostProcessSettings.bOverride_Bloom6Size = bTestArenaPresentation;
+	if (bTestArenaPresentation)
+	{
+		Camera->PostProcessSettings.Bloom1Size = 0.20f;
+		Camera->PostProcessSettings.Bloom2Size = 0.62f;
+		Camera->PostProcessSettings.Bloom3Size = 1.15f;
+		Camera->PostProcessSettings.Bloom4Size = 4.0f;
+		Camera->PostProcessSettings.Bloom5Size = 10.0f;
+		Camera->PostProcessSettings.Bloom6Size = 22.0f;
+	}
 }
 
 void AFlickCameraPawn::SetCompactGameplayFraming(const bool bInCompactGameplayFraming)
@@ -330,16 +386,23 @@ FVector AFlickCameraPawn::GetGameplayTargetLocation() const
 {
 	FVector TargetLocation = (bBobGameplayFraming ? BobCameraLocation : CameraLocation)
 		* ArenaFramingScale
-		* FMath::Clamp(GameplayDistanceScale, 0.75f, 1.25f);
+		* FMath::Clamp(GameplayDistanceScale, 0.75f, 1.25f)
+		* (bTestArenaPresentation ? FMath::Clamp(TestArenaDistanceMultiplier, 0.75f, 1.0f) : 1.0f)
+		* (bAimPresentation ? FMath::Clamp(AimDistanceMultiplier, 0.82f, 1.0f) : 1.0f);
 	TargetLocation.Z += GameplayElevationAngle * ElevationHeightPerDegree;
-	return TargetLocation.RotateAngleAxis(GameplayOrbitAngle, FVector::UpVector);
+	TargetLocation = TargetLocation.RotateAngleAxis(GameplayOrbitAngle, FVector::UpVector);
+	if (bAimPresentation)
+	{
+		TargetLocation += AimFocusPoint * FMath::Clamp(AimFocusPanStrength, 0.0f, 0.5f);
+	}
+	return TargetLocation;
 }
 
 FRotator AFlickCameraPawn::GetGameplayTargetRotation() const
 {
 	const FRotator& BaseRotation = bBobGameplayFraming ? BobCameraRotation : CameraRotation;
 	return FRotator(
-		BaseRotation.Pitch - GameplayElevationAngle,
+		BaseRotation.Pitch - GameplayElevationAngle + (bAimPresentation ? AimPitchOffset : 0.0f),
 		FRotator::NormalizeAxis(BaseRotation.Yaw + GameplayOrbitAngle),
 		BaseRotation.Roll);
 }

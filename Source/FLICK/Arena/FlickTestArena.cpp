@@ -792,13 +792,16 @@ void AFlickTestArena::ApplyTestLayout()
 	InstrumentDeckMesh->SetHiddenInGame(bUsingWorkshopAssets, true);
 	InstrumentDeckMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 2.1f));
 	InstrumentDeckMesh->SetRelativeScale3D(FVector(ArenaRadius * 1.98f / 100.0f, ArenaRadius * 1.98f / 100.0f, 0.004f));
-	const float SwitchSurfaceZ = SurfaceZ + 2.5f;
+	// Workshop switch, trace and dormant-socket meshes are authored downward
+	// from a shared Z=0 top face. Place that face exactly on the authoritative
+	// arena surface so pucks cannot visually enter non-colliding presentation.
+	const float SwitchSurfaceZ = SurfaceZ;
 	for (int32 LocationIndex = 0; LocationIndex < PossibleLocationCount; ++LocationIndex)
 	{
 		UStaticMeshComponent* Socket = DividerBaseMeshes[LocationIndex];
 		Socket->SetVisibility(true, true);
 		Socket->SetHiddenInGame(false, true);
-		Socket->SetRelativeLocation(FVector(PossibleDividerCenters[LocationIndex], SwitchSurfaceZ + 0.25f));
+		Socket->SetRelativeLocation(FVector(PossibleDividerCenters[LocationIndex], SwitchSurfaceZ));
 		Socket->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(PossibleDividerAngles[LocationIndex]), 0.0f));
 		Socket->SetRelativeScale3D(bUsingWorkshopAssets
 			? FVector(PossibleDividerLengths[LocationIndex] / DividerLength, 1.0f, 1.0f)
@@ -847,7 +850,7 @@ void AFlickTestArena::ApplyTestLayout()
 		ZoneInnerMeshes[Index]->SetRelativeLocation(FVector(ZoneCenter, SwitchSurfaceZ + 0.5f));
 		const float InnerRadius = FMath::Max(SwitchActivationDotRadius + 5.0f, ControlZoneRadius - 7.0f);
 		ZoneInnerMeshes[Index]->SetRelativeScale3D(FVector(InnerRadius * 2.0f / 100.0f, InnerRadius * 2.0f / 100.0f, 0.008f));
-		ZoneDotMeshes[Index]->SetRelativeLocation(FVector(ZoneCenter, SwitchSurfaceZ + 1.0f));
+		ZoneDotMeshes[Index]->SetRelativeLocation(FVector(ZoneCenter, SwitchSurfaceZ));
 		ZoneDotMeshes[Index]->SetRelativeScale3D(bUsingWorkshopAssets
 			? FVector(SwitchActivationDotRadius / 8.0f)
 			: FVector(
@@ -858,7 +861,7 @@ void AFlickTestArena::ApplyTestLayout()
 		const FVector2D TraceEnd = DividerCenter - ToDivider * (DividerThickness * 0.5f + 8.0f);
 		if (bUsingWorkshopAssets)
 		{
-			PlaceWorkshopTraceBetween(SignalTraceMeshes[Index], TraceStart, TraceEnd, SwitchSurfaceZ + 0.2f);
+			PlaceWorkshopTraceBetween(SignalTraceMeshes[Index], TraceStart, TraceEnd, SwitchSurfaceZ);
 		}
 		else
 		{
@@ -945,18 +948,18 @@ void AFlickTestArena::CreateRuntimeMaterials()
 	}
 	// Matte, non-emissive surfaces preserve puck readability and avoid adding bloom.
 	SetMaterialColor(ZoneInsetMaterial, FLinearColor(0.012f, 0.019f, 0.017f, 1.0f), 0.88f);
-	SetMaterialColor(DormantSocketMaterial, FLinearColor(0.045f, 0.056f, 0.051f, 1.0f), 0.9f);
+	SetMaterialColor(DormantSocketMaterial, FLinearColor(0.11f, 0.14f, 0.18f, 1.0f), 0.72f);
 	for (int32 Index = 0; Index < MechanismCount; ++Index)
 	{
 		const FLinearColor Accent = GetMechanismColor(Index);
 		SetMaterialColor(
 			DividerMaterials[Index],
 			FLinearColor(
-				Accent.R * 0.24f + 0.015f,
-				Accent.G * 0.24f + 0.02f,
-				Accent.B * 0.24f + 0.025f,
+				Accent.R * 0.42f + 0.07f,
+				Accent.G * 0.42f + 0.085f,
+				Accent.B * 0.42f + 0.10f,
 				1.0f),
-			0.64f);
+			0.48f);
 	}
 
 	if (!RuntimeDividerPhysicalMaterial)

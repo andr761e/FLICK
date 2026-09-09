@@ -1,0 +1,50 @@
+[
+  {
+    "asset": "Toppler",
+    "diameter_cm": 90.3,
+    "visible_height_cm": 30.7,
+    "physics_height_cm": 27
+  },
+  {
+    "asset": "Bouncer",
+    "diameter_cm": 86.5,
+    "visible_height_cm": 16.1,
+    "physics_height_cm": 18
+  },
+  {
+    "asset": "Compact",
+    "diameter_cm": 71.9,
+    "visible_height_cm": 14.7,
+    "physics_height_cm": 18
+  },
+  {
+    "asset": "Blocker",
+    "diameter_cm": 106.1,
+    "visible_height_cm": 16.5,
+    "physics_height_cm": 18.4
+  },
+  {
+    "asset": "Slider",
+    "diameter_cm": 89.9,
+    "visible_height_cm": 18.3,
+    "physics_height_cm": 20
+  },
+  {
+    "asset": "Grippy",
+    "diameter_cm": 90.3,
+    "visible_height_cm": 20.9,
+    "physics_height_cm": 20
+  },
+  {
+    "asset": "Striker",
+    "diameter_cm": 82.7,
+    "visible_height_cm": 13.4,
+    "physics_height_cm": 16.4
+  },
+  {
+    "asset": "Heavy",
+    "diameter_cm": 97.5,
+    "visible_height_cm": 27.3,
+    "physics_height_cm": 23.6
+  }
+]
