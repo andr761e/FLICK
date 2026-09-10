@@ -196,6 +196,7 @@ private:
 	EFlickLineupPreset GetSelectedClassDraft() const;
 	EFlickPieceArchetype GetSelectedClassPiece(int32 PieceSlot) const;
 	float GetSelectedClassStatValue(int32 StatIndex) const;
+	FString GetClassDisplayName(EFlickLineupPreset Preset) const;
 	const AFlickGameState* GetScoreboardGameState() const;
 	UFlickRankingSubsystem* GetRankingSubsystem() const;
 

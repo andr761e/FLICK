@@ -24,6 +24,7 @@
 #include "UObject/StrongObjectPtr.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Notifications/SProgressBar.h"
 #include "Widgets/Input/SSlider.h"
 #include "Widgets/Layout/SBorder.h"
@@ -5368,6 +5369,28 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 							})
 							.Font(UiFont(12, true)).ColorAndOpacity(Cyan)
 						]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 7.0f, 0.0f, 0.0f)
+						[
+							SNew(SBox).WidthOverride(270.0f)
+							[
+								SNew(SEditableTextBox)
+								.Text_Lambda([this]()
+								{
+									return FText::FromString(GameMode.IsValid()
+										? GetClassDisplayName(GameMode->GetLoadoutEditingPreset())
+										: TEXT("Balanced"));
+								})
+								.HintText(FText::FromString(TEXT("LINEUP NAME")))
+								.SelectAllTextWhenFocused(true)
+								.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type)
+								{
+									if (GameMode.IsValid())
+									{
+										GameMode->SetClassName(GameMode->GetLoadoutEditingPreset(), Text.ToString());
+									}
+								})
+							]
+						]
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
@@ -5408,7 +5431,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 						{
 							const int32 Count = GameMode.IsValid() ? GameMode->GetLoadoutEditingPieceCount() : 4;
 							return FText::FromString(FString::Printf(TEXT("%d PUCK LINEUP  /  %s"), Count,
-								GameMode.IsValid() ? *GetLineupPresetName(GameMode->GetLoadoutPreset(EFlickTeam::Player1)) : TEXT("CLASS 1")));
+								GameMode.IsValid() ? *GetClassDisplayName(GameMode->GetLoadoutEditingPreset()) : TEXT("CLASS 1")));
 						})
 						.Font(UiFont(10, true)).ColorAndOpacity(Muted)
 					]
@@ -5541,7 +5564,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLineupRadar()
 				+ SHorizontalBox::Slot().AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this]() { return FText::FromString(GameMode.IsValid() ? GetLineupPresetName(GameMode->GetLoadoutPreset(EFlickTeam::Player1)) : TEXT("CLASS 1")); })
+					.Text_Lambda([this]() { return FText::FromString(GameMode.IsValid() ? GetClassDisplayName(GameMode->GetLoadoutEditingPreset()) : TEXT("CLASS 1")); })
 					.Font(UiFont(10, true)).ColorAndOpacity(FLinearColor::White)
 				]
 			]
@@ -5914,7 +5937,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutPresetBar(const EFlickTeam Team
 				.Padding(FMargin(4.0f, 7.0f))
 				[
 					SNew(STextBlock)
-					.Text(FText::FromString(GetLineupPresetName(Preset)))
+					.Text_Lambda([this, Preset]() { return FText::FromString(GetClassDisplayName(Preset)); })
 					.Font(UiFont(10, true))
 					.Justification(ETextJustify::Center)
 					.ColorAndOpacity(FLinearColor::White)
@@ -5984,7 +6007,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassPlayerRow(
 					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString(GetLineupPresetName(Preset)))
+						.Text_Lambda([this, Preset]() { return FText::FromString(GetClassDisplayName(Preset)); })
 						.Font(UiFont(11, true))
 						.ColorAndOpacity(FLinearColor::White)
 					]
@@ -6211,7 +6234,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassShowcase()
 					+ SVerticalBox::Slot().AutoHeight()
 					[
 						SNew(STextBlock)
-						.Text_Lambda([this]() { return FText::FromString(GetLineupPresetName(GetSelectedClassDraft())); })
+						.Text_Lambda([this]() { return FText::FromString(GetClassDisplayName(GetSelectedClassDraft())); })
 						.Font(DisplayFont(30))
 						.ColorAndOpacity(FLinearColor::White)
 					]
@@ -6619,6 +6642,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("WORLD IMPACT EFFECTS"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->AreImpactEffectsEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetImpactEffectsEnabled(!GameMode->AreImpactEffectsEnabled()); }))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("CONTROL OVERVIEW"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsControlOverviewEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetControlOverviewEnabled(!GameMode->IsControlOverviewEnabled()); }))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("CAMERA SHAKE"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetCameraShakeIntensity() : 0.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetCameraShakeIntensity(Value); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("FREE CAMERA LOOK"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetFreeCameraLookSensitivity() : 0.33f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetFreeCameraLookSensitivity(Value); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("FREE CAMERA MOVEMENT"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetFreeCameraMoveSensitivity() : 0.38f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetFreeCameraMoveSensitivity(Value); }))]
 									]
 								]
 
@@ -6683,7 +6708,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 			[BuildTeamPlate(EFlickTeam::Player2)]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)[BuildTrainingToolsPanel()]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 132.0f, 0.0f, 0.0f)[BuildTutorialOverlay()]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 132.0f, 24.0f, 0.0f)[BuildTutorialOverlay()]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 16.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
@@ -7433,7 +7458,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTutorialOverlay()
 				? EVisibility::HitTestInvisible
 				: EVisibility::Collapsed;
 		})
-		.WidthOverride(620.0f)
+		.WidthOverride(430.0f)
 		[
 			SNew(SFlickAngularBorder)
 			.BackgroundColor(FLinearColor(0.003f, 0.014f, 0.024f, 0.94f))
@@ -9145,6 +9170,11 @@ FLinearColor SFlickGameLayer::GetCurrentModeAccent() const
 FLinearColor SFlickGameLayer::GetTeamAccent(const EFlickTeam Team) const
 {
 	return Team == EFlickTeam::Player2 ? Orange : Cyan;
+}
+
+FString SFlickGameLayer::GetClassDisplayName(const EFlickLineupPreset Preset) const
+{
+	return GameMode.IsValid() ? GameMode->GetClassName(Preset) : GetLineupPresetName(Preset);
 }
 
 EFlickTeam SFlickGameLayer::GetClassSelectionTeam() const

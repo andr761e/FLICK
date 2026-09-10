@@ -688,6 +688,12 @@ bool AFlickPlayerController::UpdateFreeCamera(const float DeltaSeconds)
 	float MouseX = 0.0f;
 	float MouseY = 0.0f;
 	GetInputMouseDelta(MouseX, MouseY);
+	if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
+	{
+		CameraPawn->SetFreeCameraSensitivity(
+			Instance->GetFreeCameraLookSensitivity(),
+			Instance->GetFreeCameraMoveSensitivity());
+	}
 	const float Forward = (IsInputKeyDown(EKeys::W) ? 1.0f : 0.0f)
 		- (IsInputKeyDown(EKeys::S) ? 1.0f : 0.0f);
 	const float Right = (IsInputKeyDown(EKeys::D) ? 1.0f : 0.0f)

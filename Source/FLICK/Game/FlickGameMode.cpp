@@ -3195,6 +3195,24 @@ void AFlickGameMode::StartTrainingMode()
 	BeginTrainingActivity(false);
 }
 
+float AFlickGameMode::GetFreeCameraLookSensitivity() const
+{
+	const UFlickGameInstance* Instance = GetFlickGameInstance();
+	return Instance ? Instance->GetFreeCameraLookSensitivity() : 0.33f;
+}
+
+float AFlickGameMode::GetFreeCameraMoveSensitivity() const
+{
+	const UFlickGameInstance* Instance = GetFlickGameInstance();
+	return Instance ? Instance->GetFreeCameraMoveSensitivity() : 0.38f;
+}
+
+FString AFlickGameMode::GetClassName(const EFlickLineupPreset Preset) const
+{
+	const UFlickGameInstance* Instance = GetFlickGameInstance();
+	return Instance ? Instance->GetClassName(Preset) : GetLineupPresetName(Preset);
+}
+
 void AFlickGameMode::StartTrainingBotMatch()
 {
 	bTutorialMode = false;
@@ -6428,6 +6446,30 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		FLinearColor(0.82f, 0.91f, 1.0f), TestPuckKeyLightIntensity, 460.0f, 170.0f);
 	ConfigurePuckSoftbox(TestPuckRimLight, FVector(600.0f, 300.0f, 450.0f),
 		FLinearColor(1.0f, 0.86f, 0.72f), TestPuckRimLightIntensity, 360.0f, 130.0f);
+}
+
+void AFlickGameMode::SetFreeCameraLookSensitivity(const float Sensitivity)
+{
+	if (UFlickGameInstance* Instance = GetFlickGameInstance())
+	{
+		Instance->SetFreeCameraLookSensitivity(Sensitivity);
+	}
+}
+
+void AFlickGameMode::SetFreeCameraMoveSensitivity(const float Sensitivity)
+{
+	if (UFlickGameInstance* Instance = GetFlickGameInstance())
+	{
+		Instance->SetFreeCameraMoveSensitivity(Sensitivity);
+	}
+}
+
+void AFlickGameMode::SetClassName(const EFlickLineupPreset Preset, const FString& Name)
+{
+	if (UFlickGameInstance* Instance = GetFlickGameInstance())
+	{
+		Instance->SetClassName(Preset, Name);
+	}
 }
 
 bool AFlickGameMode::ToggleTrainingDivider(const FVector& WorldLocation)

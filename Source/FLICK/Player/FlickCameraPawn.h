@@ -37,6 +37,7 @@ public:
 	void EndCinematicReplay();
 	void SetFreeCameraEnabled(bool bEnabled);
 	void AddFreeCameraInput(float Forward, float Right, float Up, const FVector2D& LookDelta, bool bBoost, float DeltaSeconds);
+	void SetFreeCameraSensitivity(float LookSensitivity, float MoveSensitivity);
 	bool IsFreeCameraEnabled() const { return bFreeCameraEnabled; }
 	float GetGameplayOrbitAngle() const { return GameplayOrbitAngle; }
 	float GetGameplayElevationAngle() const { return GameplayElevationAngle; }

@@ -14,6 +14,7 @@ namespace
 	const TCHAR* FlickSettingsSection = TEXT("FLICK.GameplaySettings");
 	const TCHAR* FlickProfileSection = TEXT("FLICK.ProfileStats");
 	constexpr int32 MaxLoadoutSlots = 4;
+	constexpr int32 MaxClassNameLength = 20;
 	constexpr int32 MaxRecentProfileMatches = 8;
 	const TCHAR* AccoladeConfigKeys[FlickAccoladeCount] =
 	{
@@ -65,6 +66,19 @@ namespace
 			SavedValues.Add(FString::FromInt(static_cast<int32>(Archetype)));
 		}
 		return SavedValues;
+	}
+
+	int32 GetClassIndex(const EFlickLineupPreset Preset)
+	{
+		switch (Preset)
+		{
+		case EFlickLineupPreset::Power: return 1;
+		case EFlickLineupPreset::Speed: return 2;
+		case EFlickLineupPreset::Control: return 3;
+		case EFlickLineupPreset::Balanced:
+		case EFlickLineupPreset::Custom:
+		default: return 0;
+		}
 	}
 
 	bool ParseProfileMatchRecord(const FString& Value, FFlickProfileMatchRecord& OutRecord)
@@ -207,6 +221,17 @@ void UFlickGameInstance::Init()
 	LoadLoadout(TEXT("Class2Loadout"), FlickPieceArchetypeRules::GetPreset(EFlickLineupPreset::Power), Class2Loadout);
 	LoadLoadout(TEXT("Class3Loadout"), FlickPieceArchetypeRules::GetPreset(EFlickLineupPreset::Speed), Class3Loadout);
 	LoadLoadout(TEXT("Class4Loadout"), FlickPieceArchetypeRules::GetPreset(EFlickLineupPreset::Control), Class4Loadout);
+	ClassNames = { TEXT("Balanced"), TEXT("Power"), TEXT("Speed"), TEXT("Control") };
+	TArray<FString> SavedClassNames;
+	GConfig->GetArray(FlickSettingsSection, TEXT("ClassNames"), SavedClassNames, GGameUserSettingsIni);
+	for (int32 Index = 0; Index < FMath::Min(SavedClassNames.Num(), ClassNames.Num()); ++Index)
+	{
+		SavedClassNames[Index].TrimStartAndEndInline();
+		if (!SavedClassNames[Index].IsEmpty())
+		{
+			ClassNames[Index] = SavedClassNames[Index].Left(MaxClassNameLength);
+		}
+	}
 
 	GConfig->GetBool(FlickSettingsSection, TEXT("AimGuideEnabled"), bAimGuideEnabled, GGameUserSettingsIni);
 	GConfig->GetBool(FlickSettingsSection, TEXT("ImpactEffectsEnabled"), bImpactEffectsEnabled, GGameUserSettingsIni);
@@ -221,10 +246,16 @@ void UFlickGameInstance::Init()
 	GConfig->GetFloat(FlickSettingsSection, TEXT("MasterVolume"), MasterVolume, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("EffectsVolume"), EffectsVolume, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("InterfaceVolume"), InterfaceVolume, GGameUserSettingsIni);
+	GConfig->GetFloat(FlickSettingsSection, TEXT("FreeCameraLookSensitivity"), FreeCameraLookSensitivity, GGameUserSettingsIni);
+	GConfig->GetFloat(FlickSettingsSection, TEXT("FreeCameraMoveSensitivity"), FreeCameraMoveSensitivity, GGameUserSettingsIni);
+	GConfig->GetFloat(FlickSettingsSection, TEXT("ShotMouseSensitivity"), ShotMouseSensitivity, GGameUserSettingsIni);
 	CameraShakeIntensity = FMath::Clamp(CameraShakeIntensity, 0.0f, 1.0f);
 	MasterVolume = FMath::Clamp(MasterVolume, 0.0f, 1.0f);
 	EffectsVolume = FMath::Clamp(EffectsVolume, 0.0f, 1.0f);
 	InterfaceVolume = FMath::Clamp(InterfaceVolume, 0.0f, 1.0f);
+	FreeCameraLookSensitivity = FMath::Clamp(FreeCameraLookSensitivity, 0.0f, 1.0f);
+	FreeCameraMoveSensitivity = FMath::Clamp(FreeCameraMoveSensitivity, 0.0f, 1.0f);
+	ShotMouseSensitivity = FMath::Clamp(ShotMouseSensitivity, 0.0f, 1.0f);
 
 	GConfig->GetInt(FlickProfileSection, TEXT("MatchesPlayed"), ProfileStats.MatchesPlayed, GGameUserSettingsIni);
 	GConfig->GetInt(FlickProfileSection, TEXT("Wins"), ProfileStats.Wins, GGameUserSettingsIni);
@@ -277,6 +308,12 @@ EFlickPieceArchetype UFlickGameInstance::GetLoadoutPiece(const EFlickTeam Team, 
 	return Loadout->IsValidIndex(SlotIndex)
 		? (*Loadout)[SlotIndex]
 		: EFlickPieceArchetype::Standard;
+}
+
+FString UFlickGameInstance::GetClassName(const EFlickLineupPreset Preset) const
+{
+	const int32 Index = GetClassIndex(Preset);
+	return ClassNames.IsValidIndex(Index) ? ClassNames[Index] : GetLineupPresetName(Preset);
 }
 
 EFlickLineupPreset UFlickGameInstance::GetLoadoutPreset(const EFlickTeam Team) const
@@ -473,6 +510,39 @@ void UFlickGameInstance::SetInterfaceVolume(const float Volume)
 	SaveFrontendSettings();
 }
 
+void UFlickGameInstance::SetFreeCameraLookSensitivity(const float Sensitivity)
+{
+	FreeCameraLookSensitivity = FMath::Clamp(Sensitivity, 0.0f, 1.0f);
+	SaveFrontendSettings();
+}
+
+void UFlickGameInstance::SetFreeCameraMoveSensitivity(const float Sensitivity)
+{
+	FreeCameraMoveSensitivity = FMath::Clamp(Sensitivity, 0.0f, 1.0f);
+	SaveFrontendSettings();
+}
+
+void UFlickGameInstance::SetShotMouseSensitivity(const float Sensitivity)
+{
+	ShotMouseSensitivity = FMath::Clamp(Sensitivity, 0.0f, 1.0f);
+	SaveFrontendSettings();
+}
+
+void UFlickGameInstance::SetClassName(const EFlickLineupPreset Preset, const FString& Name)
+{
+	const int32 Index = GetClassIndex(Preset);
+	if (!ClassNames.IsValidIndex(Index))
+	{
+		return;
+	}
+	FString CleanName = Name;
+	CleanName.TrimStartAndEndInline();
+	ClassNames[Index] = CleanName.IsEmpty()
+		? GetLineupPresetName(Preset)
+		: CleanName.Left(MaxClassNameLength);
+	SaveFrontendSettings();
+}
+
 void UFlickGameInstance::RecordCompletedMatch(
 	const int32 Points,
 	const int32 Knockouts,
@@ -552,6 +622,7 @@ void UFlickGameInstance::SaveFrontendSettings() const
 	GConfig->SetArray(FlickSettingsSection, TEXT("Class2Loadout"), SaveLoadout(Class2Loadout), GGameUserSettingsIni);
 	GConfig->SetArray(FlickSettingsSection, TEXT("Class3Loadout"), SaveLoadout(Class3Loadout), GGameUserSettingsIni);
 	GConfig->SetArray(FlickSettingsSection, TEXT("Class4Loadout"), SaveLoadout(Class4Loadout), GGameUserSettingsIni);
+	GConfig->SetArray(FlickSettingsSection, TEXT("ClassNames"), ClassNames, GGameUserSettingsIni);
 	GConfig->SetBool(FlickSettingsSection, TEXT("AimGuideEnabled"), bAimGuideEnabled, GGameUserSettingsIni);
 	GConfig->SetBool(FlickSettingsSection, TEXT("ImpactEffectsEnabled"), bImpactEffectsEnabled, GGameUserSettingsIni);
 	GConfig->SetBool(FlickSettingsSection, TEXT("ControlOverviewEnabled"), bControlOverviewEnabled, GGameUserSettingsIni);
@@ -560,5 +631,8 @@ void UFlickGameInstance::SaveFrontendSettings() const
 	GConfig->SetFloat(FlickSettingsSection, TEXT("MasterVolume"), MasterVolume, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("EffectsVolume"), EffectsVolume, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("InterfaceVolume"), InterfaceVolume, GGameUserSettingsIni);
+	GConfig->SetFloat(FlickSettingsSection, TEXT("FreeCameraLookSensitivity"), FreeCameraLookSensitivity, GGameUserSettingsIni);
+	GConfig->SetFloat(FlickSettingsSection, TEXT("FreeCameraMoveSensitivity"), FreeCameraMoveSensitivity, GGameUserSettingsIni);
+	GConfig->SetFloat(FlickSettingsSection, TEXT("ShotMouseSensitivity"), ShotMouseSensitivity, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 }

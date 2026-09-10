@@ -13,7 +13,11 @@ Opdater assets
 Currently we are testing what the final arenas should look like in the test arena.
 Once that is perfected, we will add 
 
+Til OH;
+- Starting pucks in BOB need to be more distinct from the standard pucks
+- Fix the red cups in the BOB Arena.
+- Make red ring in BOB Arena smaller so it encloses the pucks
+
 Things to implement;
-- Make a high detail map for BOB in Blender (keep same dimensions as now). And make sorroundings for the BOB arena
-- Move the guide in tutorial so it doesn't cover the arena
-- Make ring in bob arena smaller. And fix the cups.
+-Add an option to settings to adjust the general mouse sensitivity (for when you move the mouse around and aim)
+I think there might still be some flicker over some of the switches in the 1v1, 2v2 and 3v3 arenas. Especially if the overlap with a grey line

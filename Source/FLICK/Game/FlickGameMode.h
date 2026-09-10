@@ -243,6 +243,9 @@ public:
 	float GetMasterVolume() const;
 	float GetEffectsVolume() const;
 	float GetInterfaceVolume() const;
+	float GetFreeCameraLookSensitivity() const;
+	float GetFreeCameraMoveSensitivity() const;
+	FString GetClassName(EFlickLineupPreset Preset) const;
 	bool IsVSyncEnabled() const;
 	FString GetWindowModeLabel() const;
 	FString GetResolutionLabel() const;
@@ -322,6 +325,9 @@ public:
 	void SetMasterVolume(float Volume);
 	void SetEffectsVolume(float Volume);
 	void SetInterfaceVolume(float Volume);
+	void SetFreeCameraLookSensitivity(float Sensitivity);
+	void SetFreeCameraMoveSensitivity(float Sensitivity);
+	void SetClassName(EFlickLineupPreset Preset, const FString& Name);
 	void PlayMenuSound(bool bConfirm) const;
 	UFlickSessionSubsystem* GetFlickSessionSubsystem() const;
 	UFlickMatchmakingCoordinatorSubsystem* GetFlickMatchmakingCoordinatorSubsystem() const;

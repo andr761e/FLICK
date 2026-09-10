@@ -96,6 +96,10 @@ public:
 	float GetMasterVolume() const { return MasterVolume; }
 	float GetEffectsVolume() const { return EffectsVolume; }
 	float GetInterfaceVolume() const { return InterfaceVolume; }
+	float GetFreeCameraLookSensitivity() const { return FreeCameraLookSensitivity; }
+	float GetFreeCameraMoveSensitivity() const { return FreeCameraMoveSensitivity; }
+	float GetShotMouseSensitivity() const { return ShotMouseSensitivity; }
+	FString GetClassName(EFlickLineupPreset Preset) const;
 	const FFlickProfileStats& GetProfileStats() const { return ProfileStats; }
 	const TArray<FFlickProfileMatchRecord>& GetRecentMatches() const { return RecentMatches; }
 
@@ -112,6 +116,10 @@ public:
 	void SetMasterVolume(float Volume);
 	void SetEffectsVolume(float Volume);
 	void SetInterfaceVolume(float Volume);
+	void SetFreeCameraLookSensitivity(float Sensitivity);
+	void SetFreeCameraMoveSensitivity(float Sensitivity);
+	void SetShotMouseSensitivity(float Sensitivity);
+	void SetClassName(EFlickLineupPreset Preset, const FString& Name);
 	void RecordCompletedMatch(
 		int32 Points,
 		int32 Knockouts,
@@ -143,6 +151,10 @@ private:
 	float MasterVolume = 0.85f;
 	float EffectsVolume = 0.85f;
 	float InterfaceVolume = 0.7f;
+	float FreeCameraLookSensitivity = 0.33f;
+	float FreeCameraMoveSensitivity = 0.38f;
+	float ShotMouseSensitivity = 0.5f;
+	TArray<FString> ClassNames;
 	FFlickProfileStats ProfileStats;
 	TArray<FFlickProfileMatchRecord> RecentMatches;
 	bool bStartupLoadingScreenConfigured = false;

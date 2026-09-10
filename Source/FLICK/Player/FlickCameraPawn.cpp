@@ -453,6 +453,12 @@ void AFlickCameraPawn::AddFreeCameraInput(
 	SetActorLocation(NewLocation);
 }
 
+void AFlickCameraPawn::SetFreeCameraSensitivity(const float LookSensitivity, const float MoveSensitivity)
+{
+	FreeCameraMouseSensitivity = FMath::Lerp(0.04f, 0.25f, FMath::Clamp(LookSensitivity, 0.0f, 1.0f));
+	FreeCameraMoveSpeed = FMath::Lerp(300.0f, 1400.0f, FMath::Clamp(MoveSensitivity, 0.0f, 1.0f));
+}
+
 FVector AFlickCameraPawn::GetGameplayTargetLocation() const
 {
 	FVector TargetLocation = (bBobGameplayFraming ? BobCameraLocation : CameraLocation)
