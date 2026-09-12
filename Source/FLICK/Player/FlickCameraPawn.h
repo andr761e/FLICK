@@ -27,7 +27,8 @@ public:
 	void SetCompactGameplayFraming(bool bInCompactGameplayFraming);
 	void SetArenaFramingScale(float InArenaFramingScale);
 	void SetGameplayViewIndex(int32 InViewIndex, bool bSnap = false);
-	void RotateGameplayOrbit(float Direction, float DeltaSeconds);
+	void RotateGameplayOrbit(float Direction, float DeltaSeconds, float Sensitivity = 0.35f);
+	void AdjustGameplayElevationFine(int32 StepDirection, float Sensitivity = 0.35f);
 	void ResetGameplayView(int32 InViewIndex, bool bResetElevation = true);
 	void AdjustGameplayElevation(int32 StepDirection);
 	void SetGameplayElevation(float InElevation, bool bSnap = false);

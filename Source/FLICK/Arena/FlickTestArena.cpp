@@ -958,7 +958,10 @@ void AFlickTestArena::ApplyTestLayout()
 	// Keep the authored switch graphics visually flush while giving their top
 	// faces a sub-centimetre depth separation from the arena's curved linework.
 	// These components never collide, so gameplay geometry remains exactly flat.
-	const float SwitchSurfaceZ = SurfaceZ + 0.35f;
+	// Keep the complete switch assembly above both the deck and its etched line
+	// layer. A one-centimetre visual separation is imperceptible at puck scale,
+	// but prevents depth-buffer contention where switches cross curved markings.
+	const float SwitchSurfaceZ = SurfaceZ + 1.15f;
 	for (int32 LocationIndex = 0; LocationIndex < MaxPossibleLocationCount; ++LocationIndex)
 	{
 		UStaticMeshComponent* Socket = DividerBaseMeshes[LocationIndex];

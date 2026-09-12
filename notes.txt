@@ -19,5 +19,4 @@ Til OH;
 - Make red ring in BOB Arena smaller so it encloses the pucks
 
 Things to implement;
--Add an option to settings to adjust the general mouse sensitivity (for when you move the mouse around and aim)
-I think there might still be some flicker over some of the switches in the 1v1, 2v2 and 3v3 arenas. Especially if the overlap with a grey line
+-

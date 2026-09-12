@@ -153,7 +153,7 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	{
 		if (!FlushMechanism) continue;
 		const bool bIsSwitchGraphic = FlushMechanism != DormantSocketArt;
-		const float ExpectedVisualZ = Arena->GetSurfaceZ() + (bIsSwitchGraphic ? 0.35f : 0.0f);
+		const float ExpectedVisualZ = Arena->GetSurfaceZ() + (bIsSwitchGraphic ? 1.15f : 0.0f);
 		TestTrue(TEXT("Flush mechanism uses its stable visual depth layer"),
 			FMath::IsNearlyEqual(FlushMechanism->GetRelativeLocation().Z, ExpectedVisualZ, 0.01f));
 		TestEqual(TEXT("Flush mechanism delegates solidity to the arena floor"),

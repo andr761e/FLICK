@@ -3,9 +3,9 @@
 #include "Rendering/DrawElements.h"
 #include "RenderingThread.h"
 
-UTexture2D* SFlickLogoWidget::LoadPreparedTexture()
+UTexture2D* SFlickLogoWidget::LoadPreparedTexture(const FString& TexturePath)
 {
-	UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/UI/FlickLogo.FlickLogo"));
+	UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, *TexturePath);
 	if (!Texture)
 	{
 		return nullptr;
@@ -31,7 +31,8 @@ void SFlickLogoWidget::Construct(const FArguments& InArgs)
 {
 	Opacity = InArgs._Opacity;
 	bCropToArtwork = InArgs._CropToArtwork;
-	LogoTexture.Reset(LoadPreparedTexture());
+	DesiredSize = InArgs._DesiredSize;
+	LogoTexture.Reset(LoadPreparedTexture(InArgs._TexturePath));
 	LogoBrush.SetResourceObject(LogoTexture.Get());
 	if (bCropToArtwork)
 	{
@@ -42,7 +43,9 @@ void SFlickLogoWidget::Construct(const FArguments& InArgs)
 	}
 	else
 	{
-		LogoBrush.ImageSize = LogoTexture.IsValid()
+		LogoBrush.ImageSize = !DesiredSize.IsNearlyZero()
+			? DesiredSize
+			: LogoTexture.IsValid()
 			? FVector2D(LogoTexture->GetSizeX(), LogoTexture->GetSizeY())
 			: FVector2D(1536.0f, 1024.0f);
 	}

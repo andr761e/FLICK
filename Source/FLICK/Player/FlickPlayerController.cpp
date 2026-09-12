@@ -720,6 +720,12 @@ void AFlickPlayerController::UpdateAimFromCursor()
 	{
 		return;
 	}
+	if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
+	{
+		const float SensitivityScale = FMath::Lerp(0.4f, 1.6f, Instance->GetShotMouseSensitivity());
+		CursorPoint = SelectedPiece->GetActorLocation()
+			+ (CursorPoint - SelectedPiece->GetActorLocation()) * SensitivityScale;
+	}
 	AimCursorWorldPoint = CursorPoint;
 	bHasAimCursorPoint = true;
 
@@ -1258,7 +1264,11 @@ void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
 		CameraPawn && !FMath::IsNearlyZero(Direction))
 	{
-		CameraPawn->RotateGameplayOrbit(Direction, DeltaSeconds);
+		const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>();
+		CameraPawn->RotateGameplayOrbit(
+			Direction,
+			DeltaSeconds,
+			Instance ? Instance->GetGameplayCameraSensitivity() : 0.35f);
 		ClearHoveredPiece();
 	}
 }
@@ -1273,7 +1283,10 @@ void AFlickPlayerController::AdjustLocalCameraElevation(const int32 Direction)
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		ClearHoveredPiece();
-		CameraPawn->AdjustGameplayElevation(Direction);
+		const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>();
+		CameraPawn->AdjustGameplayElevationFine(
+			Direction,
+			Instance ? Instance->GetGameplayCameraSensitivity() : 0.35f);
 	}
 }
 

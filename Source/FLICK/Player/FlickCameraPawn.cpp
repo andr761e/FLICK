@@ -268,7 +268,7 @@ void AFlickCameraPawn::SetGameplayViewIndex(const int32 InViewIndex, const bool 
 	}
 }
 
-void AFlickCameraPawn::RotateGameplayOrbit(const float Direction, const float DeltaSeconds)
+void AFlickCameraPawn::RotateGameplayOrbit(const float Direction, const float DeltaSeconds, const float Sensitivity)
 {
 	if (FMath::IsNearlyZero(Direction) || DeltaSeconds <= 0.0f || bMenuPresentation)
 	{
@@ -277,10 +277,22 @@ void AFlickCameraPawn::RotateGameplayOrbit(const float Direction, const float De
 
 	GameplayOrbitAngle = FRotator::NormalizeAxis(
 		GameplayOrbitAngle
-		+ FMath::Clamp(Direction, -1.0f, 1.0f) * GameplayOrbitDegreesPerSecond * DeltaSeconds);
+		+ FMath::Clamp(Direction, -1.0f, 1.0f) * GameplayOrbitDegreesPerSecond
+			* FMath::Lerp(0.35f, 1.5f, FMath::Clamp(Sensitivity, 0.0f, 1.0f)) * DeltaSeconds);
 	bGameplayOrbitManuallyControlled = true;
 	ShakeTrauma = 0.0f;
 	bGameplayViewTransitioning = true;
+}
+
+void AFlickCameraPawn::AdjustGameplayElevationFine(const int32 StepDirection, const float Sensitivity)
+{
+	if (StepDirection == 0 || bMenuPresentation || bGameplayElevationLocked)
+	{
+		return;
+	}
+	const float StepDegrees = FMath::Lerp(0.75f, 5.0f, FMath::Clamp(Sensitivity, 0.0f, 1.0f));
+	SetGameplayElevation(GameplayElevationAngle + FMath::Sign(StepDirection) * StepDegrees);
+	GameplayElevationPresetIndex = 1;
 }
 
 void AFlickCameraPawn::ResetGameplayView(const int32 InViewIndex, const bool bResetElevation)

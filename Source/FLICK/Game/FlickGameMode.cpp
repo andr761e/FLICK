@@ -3207,6 +3207,18 @@ float AFlickGameMode::GetFreeCameraMoveSensitivity() const
 	return Instance ? Instance->GetFreeCameraMoveSensitivity() : 0.38f;
 }
 
+float AFlickGameMode::GetShotMouseSensitivity() const
+{
+	const UFlickGameInstance* Instance = GetFlickGameInstance();
+	return Instance ? Instance->GetShotMouseSensitivity() : 0.5f;
+}
+
+float AFlickGameMode::GetGameplayCameraSensitivity() const
+{
+	const UFlickGameInstance* Instance = GetFlickGameInstance();
+	return Instance ? Instance->GetGameplayCameraSensitivity() : 0.35f;
+}
+
 FString AFlickGameMode::GetClassName(const EFlickLineupPreset Preset) const
 {
 	const UFlickGameInstance* Instance = GetFlickGameInstance();
@@ -6461,6 +6473,22 @@ void AFlickGameMode::SetFreeCameraMoveSensitivity(const float Sensitivity)
 	if (UFlickGameInstance* Instance = GetFlickGameInstance())
 	{
 		Instance->SetFreeCameraMoveSensitivity(Sensitivity);
+	}
+}
+
+void AFlickGameMode::SetShotMouseSensitivity(const float Sensitivity)
+{
+	if (UFlickGameInstance* Instance = GetFlickGameInstance())
+	{
+		Instance->SetShotMouseSensitivity(Sensitivity);
+	}
+}
+
+void AFlickGameMode::SetGameplayCameraSensitivity(const float Sensitivity)
+{
+	if (UFlickGameInstance* Instance = GetFlickGameInstance())
+	{
+		Instance->SetGameplayCameraSensitivity(Sensitivity);
 	}
 }
 

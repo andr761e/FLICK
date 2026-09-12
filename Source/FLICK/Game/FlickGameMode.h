@@ -245,6 +245,8 @@ public:
 	float GetInterfaceVolume() const;
 	float GetFreeCameraLookSensitivity() const;
 	float GetFreeCameraMoveSensitivity() const;
+	float GetShotMouseSensitivity() const;
+	float GetGameplayCameraSensitivity() const;
 	FString GetClassName(EFlickLineupPreset Preset) const;
 	bool IsVSyncEnabled() const;
 	FString GetWindowModeLabel() const;
@@ -327,6 +329,8 @@ public:
 	void SetInterfaceVolume(float Volume);
 	void SetFreeCameraLookSensitivity(float Sensitivity);
 	void SetFreeCameraMoveSensitivity(float Sensitivity);
+	void SetShotMouseSensitivity(float Sensitivity);
+	void SetGameplayCameraSensitivity(float Sensitivity);
 	void SetClassName(EFlickLineupPreset Preset, const FString& Name);
 	void PlayMenuSound(bool bConfirm) const;
 	UFlickSessionSubsystem* GetFlickSessionSubsystem() const;

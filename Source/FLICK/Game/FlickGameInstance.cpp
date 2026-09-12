@@ -249,6 +249,7 @@ void UFlickGameInstance::Init()
 	GConfig->GetFloat(FlickSettingsSection, TEXT("FreeCameraLookSensitivity"), FreeCameraLookSensitivity, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("FreeCameraMoveSensitivity"), FreeCameraMoveSensitivity, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("ShotMouseSensitivity"), ShotMouseSensitivity, GGameUserSettingsIni);
+	GConfig->GetFloat(FlickSettingsSection, TEXT("GameplayCameraSensitivity"), GameplayCameraSensitivity, GGameUserSettingsIni);
 	CameraShakeIntensity = FMath::Clamp(CameraShakeIntensity, 0.0f, 1.0f);
 	MasterVolume = FMath::Clamp(MasterVolume, 0.0f, 1.0f);
 	EffectsVolume = FMath::Clamp(EffectsVolume, 0.0f, 1.0f);
@@ -256,6 +257,7 @@ void UFlickGameInstance::Init()
 	FreeCameraLookSensitivity = FMath::Clamp(FreeCameraLookSensitivity, 0.0f, 1.0f);
 	FreeCameraMoveSensitivity = FMath::Clamp(FreeCameraMoveSensitivity, 0.0f, 1.0f);
 	ShotMouseSensitivity = FMath::Clamp(ShotMouseSensitivity, 0.0f, 1.0f);
+	GameplayCameraSensitivity = FMath::Clamp(GameplayCameraSensitivity, 0.0f, 1.0f);
 
 	GConfig->GetInt(FlickProfileSection, TEXT("MatchesPlayed"), ProfileStats.MatchesPlayed, GGameUserSettingsIni);
 	GConfig->GetInt(FlickProfileSection, TEXT("Wins"), ProfileStats.Wins, GGameUserSettingsIni);
@@ -528,6 +530,12 @@ void UFlickGameInstance::SetShotMouseSensitivity(const float Sensitivity)
 	SaveFrontendSettings();
 }
 
+void UFlickGameInstance::SetGameplayCameraSensitivity(const float Sensitivity)
+{
+	GameplayCameraSensitivity = FMath::Clamp(Sensitivity, 0.0f, 1.0f);
+	SaveFrontendSettings();
+}
+
 void UFlickGameInstance::SetClassName(const EFlickLineupPreset Preset, const FString& Name)
 {
 	const int32 Index = GetClassIndex(Preset);
@@ -634,5 +642,6 @@ void UFlickGameInstance::SaveFrontendSettings() const
 	GConfig->SetFloat(FlickSettingsSection, TEXT("FreeCameraLookSensitivity"), FreeCameraLookSensitivity, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("FreeCameraMoveSensitivity"), FreeCameraMoveSensitivity, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("ShotMouseSensitivity"), ShotMouseSensitivity, GGameUserSettingsIni);
+	GConfig->SetFloat(FlickSettingsSection, TEXT("GameplayCameraSensitivity"), GameplayCameraSensitivity, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 }

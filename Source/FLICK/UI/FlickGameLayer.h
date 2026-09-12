@@ -42,6 +42,13 @@ enum class EFlickProfileTab : uint8
 	MatchHistory
 };
 
+enum class EFlickSettingsTab : uint8
+{
+	GameFeel,
+	Sound,
+	Display
+};
+
 class SFlickGameLayer final : public SCompoundWidget
 {
 public:
@@ -248,8 +255,10 @@ private:
 	float StartupOverlayHoldDuration = 0.0f;
 	float StartupOverlayFadeDuration = 0.35f;
 	EFlickPlayPlaylist SelectedPlayPlaylist = EFlickPlayPlaylist::None;
+	int32 SelectedPlayFormat = 0;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;
 	EFlickProfileTab SelectedProfileTab = EFlickProfileTab::Stats;
+	EFlickSettingsTab SelectedSettingsTab = EFlickSettingsTab::GameFeel;
 	int32 Player1SelectedLoadoutSlot = 0;
 	int32 Player2SelectedLoadoutSlot = 0;
 	TOptional<EFlickPieceArchetype> Player1HoveredLoadoutArchetype;
