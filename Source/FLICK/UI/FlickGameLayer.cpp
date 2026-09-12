@@ -771,7 +771,6 @@ namespace
 				DrawLine(Arc, Paper.CopyWithNewOpacity(0.035f * Alpha), 1.0f);
 			}
 			DrawLine({{32.0f, 30.0f}, {100.0f, 30.0f}}, Brand.CopyWithNewOpacity(0.8f * Alpha), 3.0f, 2);
-			DrawLine({{Size.X - 100.0f, Size.Y - 30.0f}, {Size.X - 32.0f, Size.Y - 30.0f}}, Brand.CopyWithNewOpacity(0.6f * Alpha), 3.0f, 2);
 
 			return LayerId + 2;
 		}
@@ -1882,7 +1881,34 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
-			[SNew(STextBlock).Text(FText::FromString(TEXT("PHYSICS. PRECISION. RIVALRY."))).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
+			[
+				SNew(SHorizontalBox)
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(0.0f, 0.0f, 18.0f, 0.0f)
+				[
+					SNew(SBox)
+					.WidthOverride(42.0f)
+					.HeightOverride(3.0f)
+					[
+						SNew(SBorder)
+						.BorderImage(WhiteBrush())
+						.BorderBackgroundColor(Brand)
+					]
+				]
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(FText::FromString(TEXT("PHYSICS. PRECISION. RIVALRY.")))
+					.Font(UiFont(11, true))
+					.ColorAndOpacity(Brand)
+				]
+			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(-5.0f, 0.0f, 0.0f, 0.0f)
 			[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK"))).Font(DisplayFont(116, true)).ColorAndOpacity(Paper)]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
