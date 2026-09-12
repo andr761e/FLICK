@@ -90,42 +90,6 @@ namespace
 		}
 	}
 
-	FString GetLineupPresetSummary(const EFlickLineupPreset Preset)
-	{
-		switch (Preset)
-		{
-		case EFlickLineupPreset::Power: return TEXT("A HEAVIER LINEUP BUILT TO HOLD SPACE AND WIN COLLISIONS.");
-		case EFlickLineupPreset::Speed: return TEXT("A MOBILE LINEUP BUILT FOR FAST ATTACKS, BANKS, AND RECOVERY.");
-		case EFlickLineupPreset::Control: return TEXT("A PRECISE LINEUP BUILT TO STOP CLEANLY AND SHAPE THE BOARD.");
-		case EFlickLineupPreset::Balanced:
-		default: return TEXT("A VERSATILE LINEUP WITH AN ANSWER FOR EVERY SITUATION.");
-		}
-	}
-
-	FString GetLineupPresetStrengths(const EFlickLineupPreset Preset)
-	{
-		switch (Preset)
-		{
-		case EFlickLineupPreset::Power: return TEXT("MASS  |  BOARD CONTROL  |  DEFENSE");
-		case EFlickLineupPreset::Speed: return TEXT("PACE  |  REBOUNDS  |  MOBILITY");
-		case EFlickLineupPreset::Control: return TEXT("PRECISION  |  GRIP  |  POSITIONING");
-		case EFlickLineupPreset::Balanced:
-		default: return TEXT("VERSATILITY  |  ADAPTABILITY  |  RELIABILITY");
-		}
-	}
-
-	FString GetLineupPresetTradeoffs(const EFlickLineupPreset Preset)
-	{
-		switch (Preset)
-		{
-		case EFlickLineupPreset::Power: return TEXT("LOWER SPEED AND RECOVERY");
-		case EFlickLineupPreset::Speed: return TEXT("LOWER MASS AND HOLDING POWER");
-		case EFlickLineupPreset::Control: return TEXT("LOWER COAST AND HIGHER EXECUTION RISK");
-		case EFlickLineupPreset::Balanced:
-		default: return TEXT("NO EXTREME SPECIALTY");
-		}
-	}
-
 	float GetDisplayStatValue(const FFlickPieceDisplayStats& Stats, const int32 StatIndex)
 	{
 		switch (StatIndex)
@@ -821,7 +785,7 @@ namespace
 			const FVector2D Size = AllottedGeometry.GetLocalSize();
 			const FVector2D Center = Size * 0.5f;
 			const FLinearColor Tint = Color.Get();
-			const auto Draw = [&OutDrawElements, &AllottedGeometry, &Tint, LayerId](const TArray<FVector2D>& Points, const float Thickness = 1.6f, const float Opacity = 1.0f)
+			const auto Draw = [&OutDrawElements, &AllottedGeometry, &Tint, LayerId](const TArray<FVector2D>& Points, const float Thickness = 2.15f, const float Opacity = 1.0f)
 			{
 				FSlateDrawElement::MakeLines(
 					OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Points,
@@ -830,9 +794,9 @@ namespace
 			const auto Circle = [](const FVector2D& CircleCenter, const float Radius)
 			{
 				TArray<FVector2D> Points;
-				for (int32 Segment = 0; Segment <= 28; ++Segment)
+				for (int32 Segment = 0; Segment <= 40; ++Segment)
 				{
-					const float Angle = 2.0f * PI * static_cast<float>(Segment) / 28.0f;
+					const float Angle = 2.0f * PI * static_cast<float>(Segment) / 40.0f;
 					Points.Add(CircleCenter + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Radius);
 				}
 				return Points;
@@ -841,27 +805,27 @@ namespace
 			switch (Playlist)
 			{
 			case EFlickPlayPlaylist::Competitive:
-				Draw({Center + FVector2D(0.0f, -21.0f), Center + FVector2D(20.0f, -12.0f), Center + FVector2D(16.0f, 11.0f), Center + FVector2D(0.0f, 23.0f), Center + FVector2D(-16.0f, 11.0f), Center + FVector2D(-20.0f, -12.0f), Center + FVector2D(0.0f, -21.0f)}, 1.8f);
-				Draw({Center + FVector2D(-8.0f, 2.0f), Center + FVector2D(0.0f, -7.0f), Center + FVector2D(8.0f, 2.0f)}, 2.2f);
+				Draw({Center + FVector2D(0.0f, -21.0f), Center + FVector2D(20.0f, -12.0f), Center + FVector2D(16.0f, 11.0f), Center + FVector2D(0.0f, 23.0f), Center + FVector2D(-16.0f, 11.0f), Center + FVector2D(-20.0f, -12.0f), Center + FVector2D(0.0f, -21.0f)}, 2.25f);
+				Draw({Center + FVector2D(-8.0f, 2.0f), Center + FVector2D(0.0f, -7.0f), Center + FVector2D(8.0f, 2.0f)}, 2.8f);
 				break;
 			case EFlickPlayPlaylist::Training:
-				Draw(Circle(Center, 22.0f), 1.25f, 0.62f);
-				Draw(Circle(Center, 13.0f), 1.5f, 0.82f);
-				Draw(Circle(Center, 4.0f), 2.5f);
+				Draw(Circle(Center, 22.0f), 1.65f, 0.72f);
+				Draw(Circle(Center, 13.0f), 2.0f, 0.9f);
+				Draw(Circle(Center, 4.0f), 2.9f);
 				Draw({Center + FVector2D(0.0f, -27.0f), Center + FVector2D(0.0f, -17.0f)});
 				Draw({Center + FVector2D(27.0f, 0.0f), Center + FVector2D(17.0f, 0.0f)});
 				break;
 			case EFlickPlayPlaylist::PrivateMatch:
-				Draw({Center + FVector2D(-17.0f, -3.0f), Center + FVector2D(-17.0f, 20.0f), Center + FVector2D(17.0f, 20.0f), Center + FVector2D(17.0f, -3.0f), Center + FVector2D(-17.0f, -3.0f)}, 1.7f);
-				Draw({Center + FVector2D(-11.0f, -3.0f), Center + FVector2D(-11.0f, -13.0f), Center + FVector2D(-6.0f, -20.0f), Center + FVector2D(6.0f, -20.0f), Center + FVector2D(11.0f, -13.0f), Center + FVector2D(11.0f, -3.0f)}, 1.7f);
+				Draw({Center + FVector2D(-17.0f, -3.0f), Center + FVector2D(-17.0f, 20.0f), Center + FVector2D(17.0f, 20.0f), Center + FVector2D(17.0f, -3.0f), Center + FVector2D(-17.0f, -3.0f)}, 2.2f);
+				Draw({Center + FVector2D(-11.0f, -3.0f), Center + FVector2D(-11.0f, -13.0f), Center + FVector2D(-6.0f, -20.0f), Center + FVector2D(6.0f, -20.0f), Center + FVector2D(11.0f, -13.0f), Center + FVector2D(11.0f, -3.0f)}, 2.2f);
 				Draw(Circle(Center + FVector2D(0.0f, 7.0f), 3.0f), 1.8f);
 				break;
 			case EFlickPlayPlaylist::Casual:
 			default:
-				Draw(Circle(Center + FVector2D(-14.0f, 7.0f), 14.0f), 1.8f);
-				Draw(Circle(Center + FVector2D(14.0f, -7.0f), 14.0f), 1.8f);
-				Draw(Circle(Center + FVector2D(-14.0f, 7.0f), 5.0f), 1.25f, 0.72f);
-				Draw(Circle(Center + FVector2D(14.0f, -7.0f), 5.0f), 1.25f, 0.72f);
+				Draw(Circle(Center + FVector2D(-14.0f, 7.0f), 14.0f), 2.3f);
+				Draw(Circle(Center + FVector2D(14.0f, -7.0f), 14.0f), 2.3f);
+				Draw(Circle(Center + FVector2D(-14.0f, 7.0f), 5.0f), 1.65f, 0.82f);
+				Draw(Circle(Center + FVector2D(14.0f, -7.0f), 5.0f), 1.65f, 0.82f);
 				break;
 			}
 			return LayerId;
@@ -1343,7 +1307,17 @@ namespace
 				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
 				{Size.X, Size.Y}, {Cut, Size.Y}, {0.0f, Size.Y - Cut}};
 			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
-			const FLinearColor Fill = BackgroundColor.Get() * Tint;
+			FLinearColor RequestedFill = BackgroundColor.Get();
+			// Keep legacy dark panels in the same teal-black glass family as the
+			// redesigned menu cards while preserving intentional colored states.
+			if (RequestedFill.R < 0.08f && RequestedFill.G < 0.08f && RequestedFill.B < 0.08f)
+			{
+				RequestedFill.R = Panel.R;
+				RequestedFill.G = Panel.G;
+				RequestedFill.B = Panel.B;
+				RequestedFill.A = FMath::Min(RequestedFill.A, Panel.A);
+			}
+			const FLinearColor Fill = RequestedFill * Tint;
 			const FLinearColor Accent = AccentColor.Get() * Tint;
 			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			TArray<FSlateVertex> Vertices;
@@ -1364,7 +1338,7 @@ namespace
 				TArray<FVector2D> Outline = Points;
 				Outline.Add(FVector2D::ZeroVector);
 				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
-					Outline, Effect, bUseAccentForOutline ? Accent : Hairline * Tint, true, BorderWidth);
+					Outline, Effect, FLinearColor(0.27f, 0.36f, 0.39f, bUseAccentForOutline ? 0.82f : 0.62f) * Tint, true, BorderWidth);
 			}
 			if (Accent.A > KINDA_SMALL_NUMBER)
 			{
@@ -1396,6 +1370,7 @@ namespace
 			, _CutSize(12.0f)
 			, _BorderWidth(1.15f)
 			, _ShowPuckWatermark(false)
+			, _RichShowcaseBorder(false)
 			, _Padding(FMargin(0.0f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, BackgroundColor)
@@ -1403,6 +1378,7 @@ namespace
 			SLATE_ARGUMENT(float, CutSize)
 			SLATE_ARGUMENT(float, BorderWidth)
 			SLATE_ARGUMENT(bool, ShowPuckWatermark)
+			SLATE_ARGUMENT(bool, RichShowcaseBorder)
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
@@ -1414,6 +1390,7 @@ namespace
 			CutSize = InArgs._CutSize;
 			BorderWidth = InArgs._BorderWidth;
 			bShowPuckWatermark = InArgs._ShowPuckWatermark;
+			bRichShowcaseBorder = InArgs._RichShowcaseBorder;
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
 		}
 
@@ -1474,7 +1451,354 @@ namespace
 				DrawWatermarkRing(FrontPuck, FVector2D(46.0f, 19.0f), 4.0f);
 				DrawWatermarkRing(FrontPuck, FVector2D(25.0f, 10.0f), 1.5f);
 			}
+			if (bRichShowcaseBorder)
+			{
+				TArray<FVector2D> Outline = Points;
+				Outline.Add(Points[0]);
 
+				// ---------------------------------------------------------------------
+				// COLORS
+				// ---------------------------------------------------------------------
+
+				// Main structural outline: cold blue/steel instead of neutral grey.
+				const FLinearColor BaseEdge =
+					FLinearColor::FromSRGBColor(FColor(55, 76, 82, 220)) * Tint;
+
+				// Brighter "technical" cyan rail.
+				const FLinearColor CyanEdge =
+					FLinearColor::FromSRGBColor(FColor(15, 170, 195, 220)) * Tint;
+
+				// Very subdued cyan used for secondary rails.
+				const FLinearColor CyanSoft =
+					FLinearColor::FromSRGBColor(FColor(15, 150, 175, 90)) * Tint;
+
+				// Existing brand lime.
+				const FLinearColor Lime = Accent;
+
+				const FLinearColor LimeSoft =
+					Lime.CopyWithNewOpacity(0.42f);
+
+				const FLinearColor LimeGlow =
+					Lime.CopyWithNewOpacity(0.11f);
+
+				const FLinearColor CyanGlow =
+					CyanEdge.CopyWithNewOpacity(0.085f);
+
+				// ---------------------------------------------------------------------
+				// THICKNESS
+				// ---------------------------------------------------------------------
+
+				const float BaseWidth = FMath::Max(1.0f, BorderWidth);
+				const float CyanWidth = 1.65f;
+				const float LimeWidth = 2.35f;
+
+				// ---------------------------------------------------------------------
+				// HELPERS
+				// ---------------------------------------------------------------------
+
+				const auto DrawPath =
+					[&](const TArray<FVector2D>& Path,
+						const FLinearColor& Color,
+						const float Width,
+						const int32 LayerOffset)
+					{
+						if (Path.Num() < 2)
+						{
+							return;
+						}
+
+						FSlateDrawElement::MakeLines(
+							OutDrawElements,
+							LayerId + LayerOffset,
+							AllottedGeometry.ToPaintGeometry(),
+							Path,
+							Effect,
+							Color,
+							true,
+							Width);
+					};
+
+				const auto DrawLine =
+					[&](const FVector2D& A,
+						const FVector2D& B,
+						const FLinearColor& Color,
+						const float Width,
+						const int32 LayerOffset)
+					{
+						DrawPath(
+							TArray<FVector2D>{ A, B },
+							Color,
+							Width,
+							LayerOffset);
+					};
+
+				const auto DrawGlowLine =
+					[&](const FVector2D& A,
+						const FVector2D& B,
+						const FLinearColor& GlowColor,
+						const float Width)
+					{
+						DrawLine(
+							A,
+							B,
+							GlowColor,
+							Width,
+							4);
+					};
+
+				// =====================================================================
+				// 1. STRUCTURAL OUTLINE
+				// =====================================================================
+
+				// Thin outline around the entire panel.
+				DrawPath(
+					Outline,
+					BaseEdge,
+					BaseWidth,
+					3);
+
+				// =====================================================================
+				// 2. TOP-LEFT CORNER
+				//
+				// Strong lime anchor, then cyan takes over.
+				// =====================================================================
+
+				const float TopLeftLimeEnd = Cut + 32.0f;
+
+				const TArray<FVector2D> TopLeftLime =
+				{
+					FVector2D(0.0f, Cut),
+					FVector2D(Cut, 0.0f),
+					FVector2D(TopLeftLimeEnd, 0.0f)
+				};
+
+				// Glow beneath lime.
+				DrawPath(
+					TopLeftLime,
+					LimeGlow,
+					6.0f,
+					4);
+
+				// Sharp lime on top.
+				DrawPath(
+					TopLeftLime,
+					Lime,
+					LimeWidth,
+					6);
+
+				// Cyan continuation after lime.
+				const float TopCyanStart = TopLeftLimeEnd + 5.0f;
+				const float TopCyanEnd = Size.X * 0.245f;
+
+				DrawGlowLine(
+					FVector2D(TopCyanStart, 0.0f),
+					FVector2D(TopCyanEnd, 0.0f),
+					CyanGlow,
+					5.0f);
+
+				DrawLine(
+					FVector2D(TopCyanStart, 0.0f),
+					FVector2D(TopCyanEnd, 0.0f),
+					CyanEdge,
+					CyanWidth,
+					6);
+
+				// Tiny secondary rail underneath the main top rail.
+				DrawLine(
+					FVector2D(TopCyanStart + 22.0f, 3.0f),
+					FVector2D(Size.X * 0.185f, 3.0f),
+					CyanSoft,
+					1.0f,
+					5);
+
+				// =====================================================================
+				// 3. TOP MID SECTION
+				//
+				// Broken segments instead of one continuous highlight.
+				// =====================================================================
+
+				DrawLine(
+					FVector2D(Size.X * 0.36f, 0.0f),
+					FVector2D(Size.X * 0.49f, 0.0f),
+					BaseEdge.CopyWithNewOpacity(0.85f),
+					1.5f,
+					5);
+
+				// Very subtle lime "energy" hit.
+				DrawGlowLine(
+					FVector2D(Size.X * 0.57f, 0.0f),
+					FVector2D(Size.X * 0.675f, 0.0f),
+					LimeGlow,
+					4.5f);
+
+				DrawLine(
+					FVector2D(Size.X * 0.585f, 0.0f),
+					FVector2D(Size.X * 0.665f, 0.0f),
+					LimeSoft,
+					1.35f,
+					6);
+
+				// Small break after this intentionally.
+				DrawLine(
+					FVector2D(Size.X * 0.72f, 0.0f),
+					FVector2D(Size.X - Cut - 18.0f, 0.0f),
+					CyanSoft,
+					1.0f,
+					5);
+
+				// =====================================================================
+				// 4. LEFT EDGE
+				//
+				// Reference has a subtle cyan presence down the left side.
+				// =====================================================================
+
+				DrawGlowLine(
+					FVector2D(0.0f, Cut + 14.0f),
+					FVector2D(0.0f, Size.Y * 0.40f),
+					CyanGlow,
+					4.5f);
+
+				DrawLine(
+					FVector2D(0.0f, Cut + 14.0f),
+					FVector2D(0.0f, Size.Y * 0.40f),
+					CyanEdge.CopyWithNewOpacity(0.66f),
+					1.35f,
+					5);
+
+				// Very small lime fragment directly underneath the corner.
+				DrawLine(
+					FVector2D(0.0f, Cut + 4.0f),
+					FVector2D(0.0f, Cut + 17.0f),
+					LimeSoft,
+					1.65f,
+					6);
+
+				// =====================================================================
+				// 5. BOTTOM LEFT + MID
+				//
+				// Multiple separate cyan rails with gaps.
+				// =====================================================================
+
+				const float BottomY = Size.Y;
+
+				DrawGlowLine(
+					FVector2D(Cut + 8.0f, BottomY),
+					FVector2D(Size.X * 0.27f, BottomY),
+					CyanGlow,
+					4.0f);
+
+				DrawLine(
+					FVector2D(Cut + 8.0f, BottomY),
+					FVector2D(Size.X * 0.27f, BottomY),
+					CyanEdge.CopyWithNewOpacity(0.72f),
+					1.5f,
+					6);
+
+				// Gap.
+
+				DrawLine(
+					FVector2D(Size.X * 0.34f, BottomY),
+					FVector2D(Size.X * 0.61f, BottomY),
+					CyanSoft,
+					1.25f,
+					5);
+
+				// Secondary inner rail.
+				DrawLine(
+					FVector2D(Size.X * 0.40f, BottomY - 3.0f),
+					FVector2D(Size.X * 0.55f, BottomY - 3.0f),
+					CyanSoft.CopyWithNewOpacity(0.26f),
+					1.0f,
+					5);
+
+				// =====================================================================
+				// 6. BOTTOM-RIGHT ENERGY SECTION
+				//
+				// This should be the strongest part after the top-left corner.
+				// =====================================================================
+
+				const float BottomLimeStart = Size.X * 0.79f;
+
+				// A subdued cyan lead-in before lime takes over.
+				DrawLine(
+					FVector2D(Size.X * 0.66f, BottomY),
+					FVector2D(BottomLimeStart - 7.0f, BottomY),
+					CyanEdge.CopyWithNewOpacity(0.48f),
+					1.35f,
+					5);
+
+				const TArray<FVector2D> BottomRightLime =
+				{
+					FVector2D(BottomLimeStart, BottomY),
+					FVector2D(Size.X - Cut, BottomY),
+					FVector2D(Size.X, BottomY - Cut),
+					FVector2D(Size.X, BottomY - Cut - 18.0f)
+				};
+
+				// Larger glow.
+				DrawPath(
+					BottomRightLime,
+					LimeGlow,
+					6.5f,
+					4);
+
+				// Crisp rail.
+				DrawPath(
+					BottomRightLime,
+					Lime,
+					LimeWidth,
+					6);
+
+				// Short parallel lime rail just inside the bottom border.
+				DrawLine(
+					FVector2D(Size.X * 0.845f, BottomY - 3.5f),
+					FVector2D(Size.X - Cut - 12.0f, BottomY - 3.5f),
+					Lime.CopyWithNewOpacity(0.32f),
+					1.0f,
+					5);
+
+				// =====================================================================
+				// 7. RIGHT EDGE
+				//
+				// Keep this subdued. We don't want symmetry.
+				// =====================================================================
+
+				DrawLine(
+					FVector2D(Size.X, Size.Y * 0.50f),
+					FVector2D(Size.X, Size.Y * 0.70f),
+					CyanSoft,
+					1.0f,
+					5);
+
+				// =====================================================================
+				// 8. SMALL TECHNICAL TICKS
+				//
+				// These tiny interruptions add a surprising amount of "designed" feel.
+				// =====================================================================
+
+				DrawLine(
+					FVector2D(Size.X * 0.315f, 0.0f),
+					FVector2D(Size.X * 0.315f, 4.0f),
+					CyanEdge.CopyWithNewOpacity(0.38f),
+					1.0f,
+					6);
+
+				DrawLine(
+					FVector2D(Size.X * 0.685f, BottomY),
+					FVector2D(Size.X * 0.685f, BottomY - 4.0f),
+					CyanEdge.CopyWithNewOpacity(0.38f),
+					1.0f,
+					6);
+
+				return SCompoundWidget::OnPaint(
+					Args,
+					AllottedGeometry,
+					MyCullingRect,
+					OutDrawElements,
+					LayerId + 7,
+					InWidgetStyle,
+					bParentEnabled);
+			}
 			TArray<FVector2D> Outline = Points;
 			Outline.Add(Points[0]);
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
@@ -1497,6 +1821,217 @@ namespace
 		float CutSize = 12.0f;
 		float BorderWidth = 1.15f;
 		bool bShowPuckWatermark = false;
+		bool bRichShowcaseBorder = false;
+	};
+
+	class SFlickPlayHeaderPanel final : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SFlickPlayHeaderPanel) : _Padding(FMargin(0.0f)) {}
+			SLATE_ARGUMENT(FMargin, Padding)
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
+		}
+
+		virtual int32 OnPaint(
+			const FPaintArgs& Args, const FGeometry& AllottedGeometry,
+			const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
+			const int32 LayerId, const FWidgetStyle& InWidgetStyle, const bool bParentEnabled) const override
+		{
+			const FVector2D Size = AllottedGeometry.GetLocalSize();
+			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
+			const float Cut = FMath::Min(14.0f, Size.Y * 0.2f);
+			const TArray<FVector2D> Frame = {
+				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
+				{Size.X, Size.Y}, {Cut, Size.Y}, {0.0f, Size.Y - Cut}};
+			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
+			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
+			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
+			TArray<FSlateVertex> Vertices;
+			TArray<SlateIndex> Indices;
+			const FLinearColor Fill = FLinearColor::FromSRGBColor(FColor(10, 18, 21, 232)) * Tint;
+			for (const FVector2D& Point : Frame)
+			{
+				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
+			}
+			for (int32 Index = 1; Index + 1 < Frame.Num(); ++Index)
+			{
+				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
+			}
+			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
+				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
+				TArray<FVector2D>{{Size.X * 0.28f, 1.0f}, {Size.X * 0.36f, Size.Y - 1.0f}},
+				Effect, FLinearColor(0.14f, 0.25f, 0.29f, 0.12f) * Tint, true, 46.0f);
+
+			TArray<FVector2D> Outline = Frame;
+			Outline.Add(FVector2D::ZeroVector);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
+				Outline, Effect, FLinearColor(0.31f, 0.42f, 0.47f, 0.82f) * Tint, true, 1.0f);
+			const FLinearColor CoolRail(0.19f, 0.56f, 0.65f, 0.62f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+				TArray<FVector2D>{{Size.X * 0.12f, 0.0f}, {Size.X * 0.22f, 0.0f}}, Effect, CoolRail * Tint, false, 1.2f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+				TArray<FVector2D>{{Size.X * 0.61f, Size.Y}, {Size.X * 0.76f, Size.Y}}, Effect, CoolRail * Tint, false, 1.2f);
+
+			const FLinearColor Lime = Brand * Tint;
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 4, AllottedGeometry.ToPaintGeometry(),
+				TArray<FVector2D>{{Size.X - Cut, 0.0f}, {Size.X, Cut}},
+				Effect, Lime, false, 5.0f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 4, AllottedGeometry.ToPaintGeometry(),
+				TArray<FVector2D>{{0.0f, Size.Y - Cut}, {Cut, Size.Y}},
+				Effect, Lime, false, 5.0f);
+			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
+				OutDrawElements, LayerId + 5, InWidgetStyle, bParentEnabled);
+		}
+	};
+
+	class SFlickPlaylistCardPanel final : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SFlickPlaylistCardPanel) : _Selected(false), _Padding(FMargin(0.0f)) {}
+			SLATE_ATTRIBUTE(bool, Selected)
+			SLATE_ARGUMENT(FMargin, Padding)
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			Selected = InArgs._Selected;
+			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
+		}
+
+		virtual int32 OnPaint(
+			const FPaintArgs& Args, const FGeometry& AllottedGeometry,
+			const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
+			const int32 LayerId, const FWidgetStyle& InWidgetStyle, const bool bParentEnabled) const override
+		{
+			const FVector2D Size = AllottedGeometry.GetLocalSize();
+			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
+			const float Cut = FMath::Min(13.0f, Size.Y * 0.16f);
+			const TArray<FVector2D> Frame = {
+				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
+				{Size.X, Size.Y}, {Cut, Size.Y}, {0.0f, Size.Y - Cut}};
+			const bool bSelected = Selected.Get(false);
+			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
+			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
+			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
+
+			TArray<FSlateVertex> Vertices;
+			TArray<SlateIndex> Indices;
+			const FLinearColor Fill = FLinearColor::FromSRGBColor(FColor(9, 17, 19, bSelected ? 240 : 226)) * Tint;
+			for (const FVector2D& Point : Frame)
+			{
+				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
+			}
+			for (int32 Index = 1; Index + 1 < Frame.Num(); ++Index)
+			{
+				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
+			}
+			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
+				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
+
+			TArray<FVector2D> Outline = Frame;
+			Outline.Add(Frame[0]);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
+				Outline, Effect, FLinearColor(0.30f, 0.40f, 0.44f, bSelected ? 0.92f : 0.72f) * Tint, true, 1.0f);
+
+			if (bSelected)
+			{
+				const FLinearColor Lime = Brand * Tint;
+				// The active state carries a fine gold-lime circuit continuously around the frame.
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					Outline, Effect, Lime.CopyWithNewOpacity(0.92f), true, 1.7f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{0.0f, Size.Y - Cut}, {Cut, Size.Y}}, Effect, Lime, false, 5.0f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{Size.X - Cut, 0.0f}, {Size.X, Cut}}, Effect, Lime, false, 6.0f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{0.0f, 0.0f}, {Size.X * 0.18f, 0.0f}}, Effect, Lime.CopyWithNewOpacity(0.82f), false, 1.8f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{Cut, Size.Y}, {Size.X * 0.72f, Size.Y}}, Effect, Lime.CopyWithNewOpacity(0.88f), false, 1.8f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{0.0f, Cut * 1.6f}, {0.0f, Size.Y - Cut}}, Effect, Lime.CopyWithNewOpacity(0.76f), false, 1.6f);
+			}
+			else
+			{
+				const FLinearColor Cool(0.38f, 0.46f, 0.49f, 0.78f);
+				// Idle cards retain the heavy structural chamfer caps, but never inherit lime.
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{0.0f, Size.Y - Cut}, {Cut, Size.Y}}, Effect, Cool * Tint, false, 4.0f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{Size.X - Cut, 0.0f}, {Size.X, Cut}}, Effect, Cool * Tint, false, 4.0f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{0.0f, 0.0f}, {Size.X * 0.10f, 0.0f}}, Effect, Cool * Tint, false, 1.0f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{Size.X * 0.82f, Size.Y}, {Size.X, Size.Y}}, Effect, Cool * Tint, false, 1.0f);
+			}
+
+			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
+				OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
+		}
+
+	private:
+		TAttribute<bool> Selected;
+	};
+
+	class SFlickPlayFooterPanel final : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SFlickPlayFooterPanel) : _Padding(FMargin(0.0f)) {}
+			SLATE_ARGUMENT(FMargin, Padding)
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
+		}
+
+		virtual int32 OnPaint(
+			const FPaintArgs& Args, const FGeometry& AllottedGeometry,
+			const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
+			const int32 LayerId, const FWidgetStyle& InWidgetStyle, const bool bParentEnabled) const override
+		{
+			const FVector2D Size = AllottedGeometry.GetLocalSize();
+			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
+			const float Cut = FMath::Min(12.0f, Size.Y * 0.18f);
+			const TArray<FVector2D> Frame = {
+				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
+				{Size.X, Size.Y - Cut}, {Size.X - Cut, Size.Y}, {Cut, Size.Y},
+				{0.0f, Size.Y - Cut}};
+			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
+			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
+			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
+			TArray<FSlateVertex> Vertices;
+			TArray<SlateIndex> Indices;
+			const FLinearColor Fill = Panel * Tint;
+			for (const FVector2D& Point : Frame)
+			{
+				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
+			}
+			for (int32 Index = 1; Index + 1 < Frame.Num(); ++Index)
+			{
+				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
+			}
+			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
+				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
+			TArray<FVector2D> Outline = Frame;
+			Outline.Add(Frame[0]);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
+				Outline, Effect, FLinearColor(0.31f, 0.43f, 0.46f, 0.82f) * Tint, true, 1.0f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
+				TArray<FVector2D>{{0.0f, Size.Y - Cut}, {Cut, Size.Y}}, Effect, Brand * Tint, false, 3.5f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
+				TArray<FVector2D>{{0.0f, 0.0f}, {Size.X * 0.18f, 0.0f}}, Effect,
+				FLinearColor(0.18f, 0.58f, 0.64f, 0.54f) * Tint, false, 1.2f);
+			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
+				OutDrawElements, LayerId + 3, InWidgetStyle, bParentEnabled);
+		}
 	};
 
 	class SFlickShowcaseProgress final : public SLeafWidget
@@ -2158,8 +2693,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 				SNew(SFlickMainMenuPanel)
 				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(14, 23, 25, 242)))
 				.AccentColor(Brand)
-				.CutSize(12.0f)
-				.BorderWidth(1.15f)
+				.CutSize(16.0f)
+				.BorderWidth(1.0f)
+				.RichShowcaseBorder(true)
 				.Padding(FMargin(30.0f, 17.0f, 30.0f, 15.0f))
 				[
 					SNew(SVerticalBox)
@@ -3967,6 +4503,52 @@ TSharedRef<SWidget> SFlickGameLayer::BuildShopItemCard(
 
 TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 {
+	TSharedRef<SButton> BackButton = SNew(SButton)
+		.ButtonStyle(&TransparentButtonStyle)
+		.ContentPadding(0.0f)
+		.Cursor(EMouseCursor::Hand)
+		.OnClicked_Lambda([this]()
+		{
+			if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training
+				&& SelectedTrainingActivity != EFlickTrainingActivity::None)
+			{
+				SelectedTrainingActivity = EFlickTrainingActivity::None;
+			}
+			else if (SelectedPlayPlaylist != EFlickPlayPlaylist::None)
+			{
+				SelectedPlayPlaylist = EFlickPlayPlaylist::None;
+				SelectedTrainingActivity = EFlickTrainingActivity::None;
+			}
+			else if (GameMode.IsValid())
+			{
+				GameMode->CloseModeSelect();
+			}
+			return FReply::Handled();
+		});
+	const TWeakPtr<SButton> WeakBackButton = BackButton;
+	BackButton->SetContent(
+		SNew(SFlickPlaylistCardPanel)
+		.Selected_Lambda([WeakBackButton]()
+		{
+			const TSharedPtr<SButton> Button = WeakBackButton.Pin();
+			return Button.IsValid() && (Button->IsHovered() || Button->HasKeyboardFocus());
+		})
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(14.0f, 0.0f, 14.0f, 0.0f)
+			[
+				SNew(SBox).WidthOverride(3.0f).HeightOverride(24.0f)
+				[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Brand)]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(16, true)).ColorAndOpacity(Brand)
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(18.0f, 0.0f, 20.0f, 0.0f)
+			[
+				SNew(STextBlock).Text(FText::FromString(TEXT("BACK"))).Font(UiFont(14, true)).ColorAndOpacity(Paper)
+			]
+		]);
 	return SNew(SOverlay)
 		+ SOverlay::Slot()
 		[
@@ -3984,38 +4566,33 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 			.Visibility(EVisibility::HitTestInvisible)
 			.Opacity(0.2f)
 		]
-		+ SOverlay::Slot().VAlign(VAlign_Top)
+		+ SOverlay::Slot().VAlign(VAlign_Top).Padding(8.0f, 24.0f, 8.0f, 0.0f)
 		[
 			SNew(SBox).HeightOverride(UiMetrics::ModeHeaderHeight)
 			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(Panel)
-				.AccentColor_Lambda([this]()
-				{
-					return SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive
-						? Orange.CopyWithNewOpacity(0.88f)
-						: SelectedPlayPlaylist == EFlickPlayPlaylist::Training
-							? FLinearColor(0.2f, 0.78f, 0.5f, 0.88f)
-							: Brand.CopyWithNewOpacity(0.82f);
-				})
-				.UseAccentForOutline(true)
-				.CutSize(11.0f)
-				.BorderWidth(1.15f)
+				SNew(SFlickPlayHeaderPanel)
 				.Padding(FMargin(34.0f, 13.0f))
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
-						SNew(SBox).WidthOverride(190.0f).HeightOverride(62.0f)
+						SNew(SBox).WidthOverride(240.0f).HeightOverride(80.0f)
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("FLICK"))).Font(DisplayFont(42, true)).ColorAndOpacity(Paper)
+							SNew(SScaleBox)
+							.Stretch(EStretch::ScaleToFit)
+							.StretchDirection(EStretchDirection::DownOnly)
+							[
+								SNew(SFlickLogoWidget)
+								.TexturePath(TEXT("/Game/UI/FlickKnockoutWordmark.FlickKnockoutWordmark"))
+								.DesiredSize(FVector2D(2048.0f, 683.0f))
+							]
 						]
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(20.0f, 6.0f, 20.0f, 6.0f)
 					[
-						SNew(SBox).WidthOverride(2.0f)
+						SNew(SBox).WidthOverride(1.0f).HeightOverride(62.0f)
 						[
-							SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(0.72f))
+							SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.48f, 0.54f, 0.56f, 0.82f))
 						]
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
@@ -4187,37 +4764,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 				+ SUniformGridPanel::Slot(1, 1)[BuildPlayFormatCard(1, true)]
 			]
 		]
-		+ SOverlay::Slot().VAlign(VAlign_Bottom).Padding(24.0f, 0.0f, 24.0f, 16.0f)
+		+ SOverlay::Slot().VAlign(VAlign_Bottom).Padding(20.0f, 0.0f, 20.0f, 18.0f)
 		[
 			SNew(SBox).HeightOverride(UiMetrics::ModeFooterHeight)
 			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.002f, 0.007f, 0.014f, 0.93f))
-				.AccentColor(Cyan.CopyWithNewOpacity(0.58f))
-				.UseAccentForOutline(true)
-				.CutSize(10.0f)
-				.BorderWidth(1.1f)
-				.Padding(FMargin(20.0f, 12.0f))
+				SNew(SFlickPlayFooterPanel)
+				.Padding(FMargin(22.0f, 12.0f))
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(164.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]()
-					{
-						if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training
-							&& SelectedTrainingActivity != EFlickTrainingActivity::None)
-						{
-							SelectedTrainingActivity = EFlickTrainingActivity::None;
-						}
-						else if (SelectedPlayPlaylist != EFlickPlayPlaylist::None)
-						{
-							SelectedPlayPlaylist = EFlickPlayPlaylist::None;
-							SelectedTrainingActivity = EFlickTrainingActivity::None;
-						}
-						else if (GameMode.IsValid())
-						{
-							GameMode->CloseModeSelect();
-						}
-						return FReply::Handled();
-					}), false, false, UiMetrics::ActionHeight)]]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(164.0f)[BackButton]]
 					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
 					+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 14.0f, 0.0f)
 					[
@@ -4330,8 +4885,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSlot(
 				: EVisibility::Collapsed;
 		})
 		[
-			SNew(SFlickAngularBorder)
-			.BackgroundColor_Lambda([this, Team, PlayerSlot, Accent]()
+			SNew(SFlickPlaylistCardPanel)
+			.Selected_Lambda([this, Team, PlayerSlot]()
 			{
 				const AFlickPlayerState* Owner = GameMode.IsValid()
 					? GameMode->GetPrivateSlotOwner(Team, PlayerSlot)
@@ -4339,13 +4894,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSlot(
 				const AFlickPlayerState* Local = PlayerController.IsValid()
 					? PlayerController->GetPlayerState<AFlickPlayerState>()
 					: nullptr;
-				return Owner && Owner == Local
-					? Accent.CopyWithNewOpacity(0.18f)
-					: FLinearColor(0.004f, 0.013f, 0.024f, 0.96f);
+				return Owner && Owner == Local;
 			})
-			.AccentColor(Accent.CopyWithNewOpacity(0.9f))
-			.CutSize(10.0f)
-			.BorderWidth(1.1f)
 			.Padding(1.0f)
 			[
 				SNew(SButton)
@@ -4569,14 +5119,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayPlaylistCard(
 		return bAvailable && Button.IsValid() && (Button->IsHovered() || Button->HasKeyboardFocus());
 	};
 	CardButton->SetContent(
-		SNew(SBorder)
-		.BorderImage(WhiteBrush())
-		.BorderBackgroundColor_Lambda([IsActive]() { return IsActive() ? Brand : Hairline.CopyWithNewOpacity(0.5f); })
-		.Padding(1.0f)
+		SNew(SFlickPlaylistCardPanel)
+		.Selected_Lambda(IsActive)
 		[
 			SNew(SBorder)
 			.BorderImage(WhiteBrush())
-			.BorderBackgroundColor_Lambda([IsActive]() { return IsActive() ? FMath::Lerp(PanelRaised, Brand, 0.04f) : Panel; })
+			.BorderBackgroundColor(FLinearColor::Transparent)
 			.Padding(FMargin(24.0f, 17.0f))
 			[
 				SNew(SHorizontalBox)
@@ -4597,18 +5145,39 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayPlaylistCard(
 						SNew(STextBlock).Text(FText::FromString(Summary)).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)
 					]
 				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.0f, 0.0f, 0.0f, 0.0f)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Fill).Padding(14.0f, 0.0f, 0.0f, 0.0f)
 				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Fill).Padding(0.0f, 2.0f, 18.0f, 2.0f)
 					[
-						SNew(SBox).WidthOverride(58.0f).HeightOverride(58.0f)
-						[SNew(SFlickPlaylistGlyph).Playlist(Playlist).Color(Accent.CopyWithNewOpacity(bAvailable ? 0.72f : 0.25f))]
+						SNew(SBox).WidthOverride(1.0f)
+						[
+							SNew(SBorder).BorderImage(WhiteBrush())
+							.BorderBackgroundColor(FLinearColor(0.42f, 0.48f, 0.50f, 0.52f))
+						]
 					]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, 7.0f, 0.0f, 0.0f)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
-						SNew(STextBlock).Text(FText::FromString(bAvailable ? TEXT("PLAY  >") : TEXT("SOON")))
-						.Font(UiFont(10, true)).ColorAndOpacity_Lambda([IsActive]() { return IsActive() ? Brand : Muted; })
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+						[
+							SNew(SBox).WidthOverride(66.0f).HeightOverride(66.0f)
+							[SNew(SFlickPlaylistGlyph).Playlist(Playlist).Color(Accent.CopyWithNewOpacity(bAvailable ? 1.0f : 0.3f))]
+						]
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 5.0f, 0.0f, 0.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+							[
+								SNew(STextBlock).Text(FText::FromString(bAvailable ? TEXT("PLAY") : TEXT("SOON")))
+								.Font(UiFont(12, true)).ColorAndOpacity(bAvailable ? Paper : Muted)
+							]
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.0f, 0.0f, 0.0f, 0.0f)
+							[
+								SNew(STextBlock).Text(FText::FromString(bAvailable ? TEXT(">") : TEXT("")))
+								.Font(UiFont(12, true)).ColorAndOpacity(Brand)
+							]
+						]
 					]
 				]
 			]
@@ -4663,14 +5232,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 		return Button.IsValid() && (Button->IsHovered() || Button->HasKeyboardFocus());
 	};
 	CardButton->SetContent(
-		SNew(SBorder)
-		.BorderImage(WhiteBrush())
-		.BorderBackgroundColor_Lambda([IsActive]() { return IsActive() ? Brand : Hairline.CopyWithNewOpacity(0.5f); })
-		.Padding(1.0f)
+		SNew(SFlickPlaylistCardPanel)
+		.Selected_Lambda(IsActive)
 		[
 			SNew(SBorder)
 			.BorderImage(WhiteBrush())
-			.BorderBackgroundColor_Lambda([IsActive]() { return IsActive() ? FMath::Lerp(PanelRaised, Brand, 0.04f) : Panel; })
+			.BorderBackgroundColor(FLinearColor::Transparent)
 			.Padding(FMargin(24.0f, 20.0f))
 			[
 				SNew(SVerticalBox)
@@ -4742,14 +5309,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayFormatCard(
 		return bAvailable && Button.IsValid() && (Button->IsHovered() || Button->HasKeyboardFocus());
 	};
 	CardButton->SetContent(
-		SNew(SBorder)
-		.BorderImage(WhiteBrush())
-		.BorderBackgroundColor_Lambda([IsActive, IsSelected]() { return IsSelected() || IsActive() ? Brand : Hairline.CopyWithNewOpacity(0.5f); })
-		.Padding(1.0f)
+		SNew(SFlickPlaylistCardPanel)
+		.Selected_Lambda([IsActive, IsSelected]() { return IsSelected() || IsActive(); })
 		[
 			SNew(SBorder)
 			.BorderImage(WhiteBrush())
-			.BorderBackgroundColor_Lambda([IsSelected, IsActive]() { return IsSelected() ? FMath::Lerp(Panel, Brand, 0.065f) : IsActive() ? PanelRaised : Panel; })
+			.BorderBackgroundColor(FLinearColor::Transparent)
 			.Padding(FMargin(24.0f, 17.0f))
 			[
 				SNew(SVerticalBox)
@@ -5922,19 +6487,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutComparison(const EFlickTeam Tea
 					.Font(UiFont(8, true))
 					.ColorAndOpacity(Muted)
 				]
-				+ SHorizontalBox::Slot().AutoWidth()
-				[
-					SNew(STextBlock)
-					.Text_Lambda([this, Team]()
-					{
-						const bool bHovering = Team == EFlickTeam::Player1
-							? Player1HoveredLoadoutArchetype.IsSet()
-							: Player2HoveredLoadoutArchetype.IsSet();
-						return FText::FromString(bHovering ? TEXT("HOVER PREVIEW") : TEXT("EQUIPPED"));
-					})
-					.Font(UiFont(9, true))
-					.ColorAndOpacity_Lambda([this, Team]() { return FSlateColor(FlickPieceArchetypeRules::GetVisualAccent(GetPreviewLoadoutArchetype(Team), GetTeamAccent(Team))); })
-				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)
 			[
@@ -6387,28 +6939,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassShowcase()
 						.AutoWrapText(true)
 						.ColorAndOpacity(FLinearColor::White)
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
-					[
-						SNew(STextBlock)
-						.Text_Lambda([this]() { return FText::FromString(GetLineupPresetSummary(GetSelectedClassDraft())); })
-						.Font(UiFont(10))
-						.ColorAndOpacity(Muted)
-						.AutoWrapText(true)
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 4.0f)
-					[
-						SNew(STextBlock)
-						.Text_Lambda([this]() { return FText::FromString(TEXT("+  ") + GetLineupPresetStrengths(GetSelectedClassDraft())); })
-						.Font(UiFont(9, true))
-						.ColorAndOpacity(FLinearColor(0.28f, 0.9f, 0.55f, 1.0f))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 14.0f)
-					[
-						SNew(STextBlock)
-						.Text_Lambda([this]() { return FText::FromString(TEXT("-  ") + GetLineupPresetTradeoffs(GetSelectedClassDraft())); })
-						.Font(UiFont(9, true))
-						.ColorAndOpacity(FLinearColor(1.0f, 0.42f, 0.18f, 1.0f))
-					]
 					+ SVerticalBox::Slot().AutoHeight()[BuildClassProfileStatRow(TEXT("SPEED"), 0)]
 					+ SVerticalBox::Slot().AutoHeight()[BuildClassProfileStatRow(TEXT("WEIGHT"), 1)]
 					+ SVerticalBox::Slot().AutoHeight()[BuildClassProfileStatRow(TEXT("IMPACT"), 2)]
@@ -6693,15 +7223,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildArchetypeChoice(
 				+ SVerticalBox::Slot().FillHeight(1.0f)
 				[
 					StatRows
-				]
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 3.0f, 0.0f, 0.0f)
-				[
-					SNew(STextBlock)
-					.Text_Lambda([this, Team, Archetype]()
-					{
-						return FText::FromString(GameMode.IsValid() && GameMode->GetLoadoutPiece(Team, GetSelectedLoadoutSlot(Team)) == Archetype ? TEXT("EQUIPPED") : TEXT("SELECT"));
-					})
-					.Font(UiFont(7, true)).ColorAndOpacity(Accent)
 				]
 			]
 		];

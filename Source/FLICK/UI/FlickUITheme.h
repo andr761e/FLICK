@@ -5,9 +5,9 @@
 // Presentation only. Team identity remains cyan/orange; lime identifies actions.
 namespace FlickUITheme
 {
-	inline const FLinearColor Ink(0.006f, 0.008f, 0.008f, 0.98f);
-	inline const FLinearColor Panel(0.014f, 0.019f, 0.019f, 0.97f);
-	inline const FLinearColor PanelRaised(0.028f, 0.035f, 0.034f, 0.98f);
+	inline const FLinearColor Ink = FLinearColor::FromSRGBColor(FColor(9, 17, 19, 246));
+	inline const FLinearColor Panel = FLinearColor::FromSRGBColor(FColor(14, 23, 25, 242));
+	inline const FLinearColor PanelRaised = FLinearColor::FromSRGBColor(FColor(22, 33, 36, 242));
 	inline const FLinearColor Paper(0.93f, 0.94f, 0.85f, 1.0f);
 	inline const FLinearColor Muted(0.48f, 0.55f, 0.53f, 1.0f);
 	inline const FLinearColor Brand(0.64f, 0.95f, 0.035f, 1.0f);
