@@ -36,6 +36,10 @@ AFlickBobArena::AFlickBobArena()
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> HighDetailArenaAsset(
 		TEXT("/Game/BOB/Arena/SM_BobArena_HighDetail.SM_BobArena_HighDetail"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HighDetailStadiumStructureAsset(
+		TEXT("/Game/BOB/Stadium/SM_BobStadium_Structure.SM_BobStadium_Structure"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HighDetailStadiumLightsAsset(
+		TEXT("/Game/BOB/Stadium/SM_BobStadium_Lights.SM_BobStadium_Lights"));
 
 	const auto CreateMesh = [this](const FName Name, UStaticMesh* Mesh)
 	{
@@ -66,6 +70,24 @@ AFlickBobArena::AFlickBobArena()
 	{
 		HighDetailArenaMesh->SetStaticMesh(HighDetailArenaAsset.Object);
 		bUsingHighDetailArena = true;
+	}
+	HighDetailStadiumStructure = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HighDetailStadiumStructure"));
+	HighDetailStadiumStructure->SetupAttachment(SceneRoot);
+	HighDetailStadiumStructure->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HighDetailStadiumStructure->SetGenerateOverlapEvents(false);
+	HighDetailStadiumStructure->SetCanEverAffectNavigation(false);
+	HighDetailStadiumStructure->SetCastShadow(true);
+	HighDetailStadiumLights = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HighDetailStadiumLights"));
+	HighDetailStadiumLights->SetupAttachment(SceneRoot);
+	HighDetailStadiumLights->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HighDetailStadiumLights->SetGenerateOverlapEvents(false);
+	HighDetailStadiumLights->SetCanEverAffectNavigation(false);
+	HighDetailStadiumLights->SetCastShadow(false);
+	if (HighDetailStadiumStructureAsset.Succeeded() && HighDetailStadiumLightsAsset.Succeeded())
+	{
+		HighDetailStadiumStructure->SetStaticMesh(HighDetailStadiumStructureAsset.Object);
+		HighDetailStadiumLights->SetStaticMesh(HighDetailStadiumLightsAsset.Object);
+		bUsingHighDetailStadium = true;
 	}
 	PlayingSurface = CreateMesh(TEXT("PlayingSurface"), CubeMesh.Object);
 	CenterRingOuter = CreateMesh(TEXT("CenterRingOuter"), CylinderMesh.Object);
@@ -369,6 +391,17 @@ void AFlickBobArena::ApplyArenaShape()
 		HighDetailArenaMesh->SetHiddenInGame(!bUsingHighDetailArena, true);
 	}
 	SetLegacyArenaPresentationVisible(!bUsingHighDetailArena);
+	const float StadiumScale = BoardHalfExtent / 620.0f;
+	for (UStaticMeshComponent* StadiumComponent : {
+		HighDetailStadiumStructure.Get(), HighDetailStadiumLights.Get()})
+	{
+		if (!StadiumComponent) continue;
+		StadiumComponent->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ));
+		StadiumComponent->SetRelativeScale3D(FVector(StadiumScale));
+		StadiumComponent->SetVisibility(bUsingHighDetailStadium, true);
+		StadiumComponent->SetHiddenInGame(!bUsingHighDetailStadium, true);
+	}
+	SetLegacyVenuePresentationVisible(!bUsingHighDetailStadium);
 	PlayingSurface->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 0.8f));
 	PlayingSurface->SetRelativeScale3D(FVector((BoardHalfExtent - 18.0f) / 50.0f, (BoardHalfExtent - 18.0f) / 50.0f, 0.018f));
 	const float VisibleSurfaceTop = SurfaceZ + 1.7f;
@@ -624,6 +657,23 @@ void AFlickBobArena::SetLegacyArenaPresentationVisible(const bool bVisible)
 			Component->SetVisibility(bVisible, true);
 			Component->SetHiddenInGame(!bVisible, true);
 		}
+	}
+}
+
+void AFlickBobArena::SetLegacyVenuePresentationVisible(const bool bVisible)
+{
+	TArray<UStaticMeshComponent*> VenuePresentation = {
+		Pedestal.Get(), Backdrop.Get(), StageBase.Get(), VenueBackWall.Get()
+	};
+	for (UStaticMeshComponent* Component : VenuePylons) VenuePresentation.Add(Component);
+	for (UStaticMeshComponent* Component : VenueBannerPanels) VenuePresentation.Add(Component);
+	for (UStaticMeshComponent* Component : VenueLightBars) VenuePresentation.Add(Component);
+	for (UStaticMeshComponent* Component : FloorGridSegments) VenuePresentation.Add(Component);
+	for (UStaticMeshComponent* Component : VenuePresentation)
+	{
+		if (!Component) continue;
+		Component->SetVisibility(bVisible, true);
+		Component->SetHiddenInGame(!bVisible, true);
 	}
 }
 

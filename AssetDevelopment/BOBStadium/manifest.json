@@ -1,0 +1,17 @@
+{
+  "concept": "Pocket Foundry",
+  "board_outer_span_cm": 1308.0,
+  "centre_opening_cm": 1364.0,
+  "outer_dimensions_cm": [
+    4240.0,
+    4040.0
+  ],
+  "floor_z_cm": -54.0,
+  "wall_top_z_cm": 560.0,
+  "gameplay_camera_radius_cm": 1580.0,
+  "nearest_tall_frame_cm": 1839.9999999999998,
+  "exports": [
+    "SM_BobStadium_Structure",
+    "SM_BobStadium_Lights"
+  ]
+}

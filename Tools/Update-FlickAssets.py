@@ -14,6 +14,7 @@ importers = (
     "Import-FlickArena.py",
     "Import-FlickStadium.py",
     "Import-FlickBobArena.py",
+    "Import-FlickBobStadium.py",
 )
 
 for importer in importers:

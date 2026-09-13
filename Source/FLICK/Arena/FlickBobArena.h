@@ -72,6 +72,7 @@ private:
 	void ApplyArenaShape();
 	void ApplyPhysicsMaterials();
 	void SetLegacyArenaPresentationVisible(bool bVisible);
+	void SetLegacyVenuePresentationVisible(bool bVisible);
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<USceneComponent> SceneRoot;
@@ -88,6 +89,15 @@ private:
 	TObjectPtr<UStaticMeshComponent> HighDetailArenaMesh;
 
 	bool bUsingHighDetailArena = false;
+	bool bUsingHighDetailStadium = false;
+
+	/** Blender-authored Pocket Foundry architecture; visual only. */
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> HighDetailStadiumStructure;
+
+	/** Separate emissive fixture mesh for the Pocket Foundry venue. */
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> HighDetailStadiumLights;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PlayingSurface;

@@ -218,6 +218,9 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	Arena->InitializeArena(620.0f, 50.0f, 250.0f);
 
 	UStaticMeshComponent* HighDetailArt = nullptr;
+	UStaticMeshComponent* StadiumStructure = nullptr;
+	UStaticMeshComponent* StadiumLights = nullptr;
+	UStaticMeshComponent* LegacyVenue = nullptr;
 	UStaticMeshComponent* BoardCollider = nullptr;
 	UStaticMeshComponent* PocketedBoardCollider = nullptr;
 	UStaticMeshComponent* RailCollider = nullptr;
@@ -225,12 +228,17 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	for (UStaticMeshComponent* Component : Components)
 	{
 		if (Component->GetFName() == TEXT("HighDetailArenaMesh")) HighDetailArt = Component;
+		if (Component->GetFName() == TEXT("HighDetailStadiumStructure")) StadiumStructure = Component;
+		if (Component->GetFName() == TEXT("HighDetailStadiumLights")) StadiumLights = Component;
+		if (Component->GetFName() == TEXT("VenueBackWall")) LegacyVenue = Component;
 		if (Component->GetFName() == TEXT("BoardBase")) BoardCollider = Component;
 		if (Component->GetFName() == TEXT("BoardCollision_0")) PocketedBoardCollider = Component;
 		if (Component->GetFName() == TEXT("Rail_0")) RailCollider = Component;
 	}
 
 	TestNotNull(TEXT("Imported high-detail BOB presentation"), HighDetailArt);
+	TestNotNull(TEXT("Imported BOB Pocket Foundry structure"), StadiumStructure);
+	TestNotNull(TEXT("Imported BOB Pocket Foundry lights"), StadiumLights);
 	TestNotNull(TEXT("Original BOB board presentation"), BoardCollider);
 	TestNotNull(TEXT("Pocketed BOB board collider"), PocketedBoardCollider);
 	TestNotNull(TEXT("Original BOB rail collider"), RailCollider);
@@ -249,6 +257,38 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	else
 	{
 		AddError(TEXT("High-detail BOB mesh asset was not loaded"));
+	}
+	if (StadiumStructure && StadiumStructure->GetStaticMesh())
+	{
+		const FVector Size = StadiumStructure->GetStaticMesh()->GetBounds().BoxExtent * 2.0f;
+		TestTrue(TEXT("Pocket Foundry preserves its authored rectangular footprint"),
+			FMath::IsNearlyEqual(Size.X, 4240.0f, 1.0f)
+			&& FMath::IsNearlyEqual(Size.Y, 4040.0f, 1.0f));
+		TestEqual(TEXT("Pocket Foundry structure cannot affect puck physics"),
+			StadiumStructure->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestTrue(TEXT("Pocket Foundry structure is visible"), StadiumStructure->IsVisible());
+		TestTrue(TEXT("Pocket Foundry structure preserves its material separation"),
+			StadiumStructure->GetStaticMesh()->GetStaticMaterials().Num() >= 5);
+	}
+	else
+	{
+		AddError(TEXT("Pocket Foundry structure asset was not loaded"));
+	}
+	if (StadiumLights && StadiumLights->GetStaticMesh())
+	{
+		TestEqual(TEXT("Pocket Foundry lights cannot affect puck physics"),
+			StadiumLights->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestTrue(TEXT("Pocket Foundry lights are visible"), StadiumLights->IsVisible());
+		TestTrue(TEXT("Pocket Foundry keeps warm, cyan, and orange emissive groups"),
+			StadiumLights->GetStaticMesh()->GetStaticMaterials().Num() >= 3);
+	}
+	else
+	{
+		AddError(TEXT("Pocket Foundry lights asset was not loaded"));
+	}
+	if (LegacyVenue)
+	{
+		TestFalse(TEXT("Legacy procedural BOB surroundings are hidden"), LegacyVenue->IsVisible());
 	}
 	if (BoardCollider)
 	{

@@ -44,7 +44,9 @@ $requiredFiles = @(
     'AssetDevelopment\Arena\exports\SM_TestArena_SignalTrace.fbx',
     'AssetDevelopment\Stadium\exports\SM_TestStadium_Structure.fbx',
 	'AssetDevelopment\Stadium\exports\SM_TestStadium_Lights.fbx',
-	'AssetDevelopment\BOB Arena\exports\SM_BobArena_HighDetail.fbx'
+	'AssetDevelopment\BOB Arena\exports\SM_BobArena_HighDetail.fbx',
+	'AssetDevelopment\BOBStadium\exports\SM_BobStadium_Structure.fbx',
+	'AssetDevelopment\BOBStadium\exports\SM_BobStadium_Lights.fbx'
 )
 
 $missingFiles = @($requiredFiles | Where-Object {
