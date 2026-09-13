@@ -437,7 +437,7 @@ void AFlickCameraPawn::AddFreeCameraInput(
 	Rotation.Pitch = FMath::Clamp(
 		Rotation.Pitch - LookDelta.Y * FreeCameraMouseSensitivity,
 		-85.0f,
-		10.0f);
+		70.0f);
 	Rotation.Roll = 0.0f;
 	SetActorRotation(Rotation);
 
@@ -467,7 +467,7 @@ void AFlickCameraPawn::AddFreeCameraInput(
 
 void AFlickCameraPawn::SetFreeCameraSensitivity(const float LookSensitivity, const float MoveSensitivity)
 {
-	FreeCameraMouseSensitivity = FMath::Lerp(0.04f, 0.25f, FMath::Clamp(LookSensitivity, 0.0f, 1.0f));
+	FreeCameraMouseSensitivity = FMath::Lerp(0.08f, 0.75f, FMath::Clamp(LookSensitivity, 0.0f, 1.0f));
 	FreeCameraMoveSpeed = FMath::Lerp(300.0f, 1400.0f, FMath::Clamp(MoveSensitivity, 0.0f, 1.0f));
 }
 

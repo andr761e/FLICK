@@ -14,7 +14,7 @@ namespace
 	const TCHAR* FlickSettingsSection = TEXT("FLICK.GameplaySettings");
 	const TCHAR* FlickProfileSection = TEXT("FLICK.ProfileStats");
 	constexpr int32 MaxLoadoutSlots = 4;
-	constexpr int32 MaxClassNameLength = 20;
+	constexpr int32 MaxClassNameLength = 16;
 	constexpr int32 MaxRecentProfileMatches = 8;
 	const TCHAR* AccoladeConfigKeys[FlickAccoladeCount] =
 	{

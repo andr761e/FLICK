@@ -114,16 +114,16 @@ AFlickBobArena::AFlickBobArena()
 		FloorGridSegments.Add(CreateMesh(*FString::Printf(TEXT("FloorGrid_%02d"), Index), CubeMesh.Object));
 	}
 
-	// A single simple box is the authoritative tabletop. Decorative markings and
-	// pocket geometry never participate in collision, so there are no hidden triangle
-	// seams or raised visual strips capable of steering a moving puck.
-	BoardBase->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// Keep one uninterrupted collider under the entire tabletop. The old nine-tile
+	// pocket cutout produced coplanar collision seams whose contact normals could
+	// redirect a puck even though no obstruction was visible.
+	BoardBase->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	BoardBase->SetCollisionObjectType(ECC_WorldStatic);
+	BoardBase->SetCollisionResponseToAllChannels(ECR_Block);
 	BoardBase->SetGenerateOverlapEvents(false);
 	for (UStaticMeshComponent* Tile : BoardCollisionTiles)
 	{
-		Tile->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		Tile->SetCollisionObjectType(ECC_WorldStatic);
-		Tile->SetCollisionResponseToAllChannels(ECR_Block);
+		Tile->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Tile->SetGenerateOverlapEvents(false);
 		Tile->SetVisibility(false, true);
 		Tile->SetHiddenInGame(true, true);
@@ -238,10 +238,10 @@ bool AFlickBobArena::IsCapturedByPocket(const FVector& WorldLocation, const floa
 {
 	const FVector LocalLocation = GetActorTransform().InverseTransformPosition(WorldLocation);
 	const float SafePieceRadius = FMath::Max(0.0f, PieceRadius);
-	// Wait until the puck has visibly descended into the cup. Previously the
-	// planar radius check removed it while it was still sitting on the tabletop.
-	const float CapturePlane = SurfaceZ - FMath::Max(PocketCaptureDepth, SafePieceRadius * 0.25f);
-	if (LocalLocation.Z > CapturePlane
+	// The tabletop is deliberately one seamless collider, so pocket capture is
+	// determined by the puck center crossing the inset opening rather than by a
+	// physical hole assembled from several collision tiles.
+	if (LocalLocation.Z > SurfaceZ + SafePieceRadius
 		|| LocalLocation.Z < SurfaceZ - BoardThickness)
 	{
 		return false;
@@ -324,10 +324,8 @@ void AFlickBobArena::ApplyArenaShape()
 	const float PedestalHeight = FMath::Max(80.0f, BottomZ);
 	BoardBase->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - BoardThickness * 0.5f));
 	BoardBase->SetRelativeScale3D(FVector(BoardHalfExtent / 50.0f, BoardHalfExtent / 50.0f, BoardThickness / 100.0f));
-	// Nine slightly overlapping slabs support the board while leaving four
-	// square apertures hidden precisely beneath the round pocket artwork.
-	// The visual red sleeve masks the corners; the generous opening lets the
-	// small BOB pucks drop under gravity instead of resting on a solid slab.
+	// Keep the legacy pocket-cutout components aligned for asset compatibility.
+	// They are presentation-only now; BoardBase is the seamless collider.
 	if (BoardCollisionTiles.Num() == 9)
 	{
 		const float HoleCenter = BoardHalfExtent - PocketInset;

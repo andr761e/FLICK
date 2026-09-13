@@ -252,21 +252,25 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	}
 	if (BoardCollider)
 	{
-		TestEqual(TEXT("Solid legacy slab no longer blocks the pocket openings"),
-			BoardCollider->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestEqual(TEXT("BOB uses one seamless authoritative tabletop collider"),
+			BoardCollider->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
 	}
-	for (UStaticMeshComponent* Collider : { PocketedBoardCollider, RailCollider })
+	if (PocketedBoardCollider)
 	{
-		if (!Collider) continue;
+		TestEqual(TEXT("Legacy pocket-cutout tiles cannot create collision seams"),
+			PocketedBoardCollider->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+	}
+	if (RailCollider)
+	{
 		TestEqual(TEXT("Legacy BOB collision remains authoritative"),
-			Collider->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
-		TestFalse(TEXT("Legacy BOB collision presentation is hidden"), Collider->IsVisible());
+			RailCollider->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+		TestFalse(TEXT("Legacy BOB collision presentation is hidden"), RailCollider->IsVisible());
 	}
 	const FVector Pocket = Arena->GetPocketWorldLocation(0);
-	TestFalse(TEXT("Puck is not captured before it descends into the cup"),
-		Arena->IsCapturedByPocket(FVector(Pocket.X, Pocket.Y, 250.0f), 24.0f));
-	TestTrue(TEXT("Puck is captured after it visibly falls below the tabletop"),
-		Arena->IsCapturedByPocket(FVector(Pocket.X, Pocket.Y, 240.0f), 24.0f));
+	TestTrue(TEXT("Puck is captured after its center crosses the pocket opening"),
+		Arena->IsCapturedByPocket(FVector(Pocket.X, Pocket.Y, 262.0f), 24.0f));
+	TestFalse(TEXT("Tabletop positions away from a pocket are not captured"),
+		Arena->IsCapturedByPocket(FVector(0.0f, 0.0f, 262.0f), 24.0f));
 
 	Arena->Destroy();
 	World->DestroyWorld(false);

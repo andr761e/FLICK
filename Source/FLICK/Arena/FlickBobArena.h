@@ -79,7 +79,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> BoardBase;
 
-	/** Invisible tabletop tiles leave genuine openings beneath the four visual cups. */
+	/** Legacy pocket-cutout tiles retained for component compatibility; collision is disabled. */
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> BoardCollisionTiles;
 

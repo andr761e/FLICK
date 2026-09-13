@@ -134,6 +134,7 @@ private:
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> WorkshopTeamMaterials;
 	bool bUsingHighDetailPuck = false;
 	bool bUsingHighDetailPlayerIdentity = false;
+	bool bUsingHighDetailBobStriker = false;
 
 	UPROPERTY(ReplicatedUsing = OnRep_HighDetailVisuals)
 	bool bHighDetailVisualsEnabled = false;

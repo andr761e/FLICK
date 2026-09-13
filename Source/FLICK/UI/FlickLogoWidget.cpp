@@ -13,10 +13,19 @@ UTexture2D* SFlickLogoWidget::LoadPreparedTexture(const FString& TexturePath)
 
 	const bool bNeedsResourceRefresh = !Texture->NeverStream
 		|| Texture->LODGroup != TEXTUREGROUP_UI
-		|| Texture->Filter != TF_Trilinear;
+		|| Texture->Filter != TF_Trilinear
+		|| Texture->LODBias != 0
+		|| Texture->AddressX != TA_Clamp
+		|| Texture->AddressY != TA_Clamp;
 	Texture->NeverStream = true;
 	Texture->LODGroup = TEXTUREGROUP_UI;
 	Texture->Filter = TF_Trilinear;
+	// These assets are displayed far below source resolution. Let the sharpened
+	// imported mip chain select its natural level instead of forcing an aliased,
+	// overly detailed mip into a small card viewport.
+	Texture->LODBias = 0;
+	Texture->AddressX = TA_Clamp;
+	Texture->AddressY = TA_Clamp;
 	Texture->SetForceMipLevelsToBeResident(30.0f);
 	if (bNeedsResourceRefresh)
 	{

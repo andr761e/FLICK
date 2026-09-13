@@ -3521,7 +3521,9 @@ void AFlickGameMode::ResolveTutorialShot()
 		break;
 	case 2:
 		bSucceeded = TutorialTargetPieceId != INDEX_NONE
-			&& ResolutionEliminatedPieceIds.Contains(TutorialTargetPieceId);
+			&& ResolutionEliminatedPieceIds.Contains(TutorialTargetPieceId)
+			&& TutorialShotPieceId != INDEX_NONE
+			&& !ResolutionEliminatedPieceIds.Contains(TutorialShotPieceId);
 		break;
 	default:
 		bSucceeded = ResolutionActivatedSwitchMask != 0;

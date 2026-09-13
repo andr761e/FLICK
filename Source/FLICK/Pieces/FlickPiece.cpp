@@ -1152,8 +1152,18 @@ void AFlickPiece::EnableTestArenaVisuals()
 	const int32 Index = static_cast<int32>(Archetype);
 	if (Index < 0 || Index >= UE_ARRAY_COUNT(Names)) return;
 	bUsingHighDetailPlayerIdentity = false;
+	bUsingHighDetailBobStriker = false;
 	FString HighDetailPath;
-	if (bShowPlayerIdentity && OwningPlayerSlot >= 0 && OwningPlayerSlot < 3)
+	if (bBobStriker)
+	{
+		// BOB uses authored, integrated player emblems instead of a floating
+		// text renderer. P1/P2 also give the two shooting pieces distinct crowns.
+		const FString Identity = Team == EFlickTeam::Player2 ? TEXT("P2") : TEXT("P1");
+		HighDetailPath = FString::Printf(
+			TEXT("/Game/TestArena/Pucks/HighDetail/PlayerIdentity/%s/SM_Puck_Standard_%s_HighDetail.SM_Puck_Standard_%s_HighDetail"),
+			*Identity, *Identity, *Identity);
+	}
+	else if (bShowPlayerIdentity && OwningPlayerSlot >= 0 && OwningPlayerSlot < 3)
 	{
 		const FString Identity = FString::Printf(TEXT("P%d"), OwningPlayerSlot + 1);
 		HighDetailPath = FString::Printf(
@@ -1170,7 +1180,14 @@ void AFlickPiece::EnableTestArenaVisuals()
 	}
 	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *HighDetailPath);
 	bUsingHighDetailPlayerIdentity = Mesh != nullptr && bShowPlayerIdentity;
+	bUsingHighDetailBobStriker = Mesh != nullptr && bBobStriker;
 	bUsingHighDetailPuck = Mesh != nullptr;
+	if (!Mesh && bBobStriker)
+	{
+		HighDetailPath = TEXT("/Game/TestArena/Pucks/PrototypeStandard/SM_Puck_Standard_Blue_Prototype.SM_Puck_Standard_Blue_Prototype");
+		Mesh = LoadObject<UStaticMesh>(nullptr, *HighDetailPath);
+		bUsingHighDetailPuck = Mesh != nullptr;
+	}
 	if (!Mesh && bShowPlayerIdentity)
 	{
 		HighDetailPath = Archetype == EFlickPieceArchetype::Standard
@@ -1232,10 +1249,10 @@ void AFlickPiece::EnableTestArenaVisuals()
 				if (UMaterialInstanceDynamic* StrikerMaterial = WorkshopMesh->CreateDynamicMaterialInstance(Slot))
 				{
 					const FLinearColor CrownColor = FMath::Lerp(
-						FLinearColor(0.78f, 0.84f, 0.91f, 1.0f), GetTeamColor(Team), 0.20f);
+						FLinearColor(0.82f, 0.88f, 0.94f, 1.0f), GetTeamColor(Team), 0.34f);
 					StrikerMaterial->SetVectorParameterValue(
 						TEXT("BaseColor"),
-						bSilverCrown ? CrownColor : FLinearColor(0.065f, 0.085f, 0.115f, 1.0f));
+						bSilverCrown ? CrownColor : FMath::Lerp(FLinearColor(0.055f, 0.072f, 0.095f, 1.0f), GetTeamColor(Team), 0.13f));
 					StrikerMaterial->SetScalarParameterValue(TEXT("Metallic"), bSilverCrown ? 0.98f : 0.72f);
 					StrikerMaterial->SetScalarParameterValue(TEXT("Roughness"), bSilverCrown ? 0.16f : 0.24f);
 					StrikerMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), bSilverCrown ? 0.40f : 0.10f);
@@ -1504,6 +1521,7 @@ void AFlickPiece::ApplyVisuals()
 		? (bSelected ? 31.0f : 29.0f)
 		: (bSelected ? 29.0f : 26.0f));
 	PlayerLabel->SetVisibility(
-		(bBobStriker || (bShowPlayerIdentity && !bUsingHighDetailPlayerIdentity)) && !bEliminated);
+		((bBobStriker && !bUsingHighDetailBobStriker)
+			|| (bShowPlayerIdentity && !bUsingHighDetailPlayerIdentity)) && !bEliminated);
 	UpdateTestArenaVisuals();
 }

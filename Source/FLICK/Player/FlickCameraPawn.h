@@ -171,7 +171,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera", meta = (ClampMin = "1.0", ClampMax = "6.0"))
 	float FreeCameraBoostMultiplier = 2.5f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera", meta = (ClampMin = "0.02", ClampMax = "0.5"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera", meta = (ClampMin = "0.02", ClampMax = "1.0"))
 	float FreeCameraMouseSensitivity = 0.11f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Free Camera", meta = (ClampMin = "500.0", ClampMax = "4000.0"))
