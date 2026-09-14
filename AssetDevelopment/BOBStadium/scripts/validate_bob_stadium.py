@@ -20,6 +20,10 @@ if manifest["floor_z_cm"] >= 0.0:
     errors.append("Surrounding deck must remain below the play surface")
 if manifest["nearest_tall_frame_cm"] - manifest["gameplay_camera_radius_cm"] < 250.0:
     errors.append("Tall venue architecture must leave at least 250 cm around the gameplay camera orbit")
+if manifest.get("enclosure_sides") != 4:
+    errors.append("Pocket Foundry must retain all four enclosure walls")
+if manifest.get("detail_pass") != "enclosed_venue_enrichment":
+    errors.append("Enclosed venue enrichment pass is missing")
 report = {"status": "failed" if errors else "passed", "errors": errors, **manifest}
 (ROOT / "validation.json").write_text(json.dumps(report, indent=2))
 print("FLICK_BOB_STADIUM_VALIDATION", json.dumps(report))

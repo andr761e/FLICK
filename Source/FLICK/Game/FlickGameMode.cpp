@@ -6273,6 +6273,7 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		return;
 	}
 	const bool bClassicArenaLighting = ActiveMatchVariant == EFlickMatchVariant::Classic;
+	const bool bBobArenaLighting = ActiveMatchVariant == EFlickMatchVariant::Bob;
 	const bool bSettingsOverMatch = FrontendScreen == EFlickFrontendScreen::Settings
 		&& SettingsReturnScreen == EFlickFrontendScreen::Paused;
 	const bool bClassSelectionOverMatch = FrontendScreen == EFlickFrontendScreen::ClassSelect
@@ -6330,7 +6331,7 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 				? FLinearColor(0.82f, 0.88f, 0.96f)
 				: FLinearColor(0.9f, 0.94f, 1.0f));
 		Light->SetIntensity(
-			(bTestArenaMode ? 1.45f : bClassicArenaLighting ? 0.78f : 1.15f)
+			(bTestArenaMode ? 1.45f : bClassicArenaLighting ? 0.78f : bBobArenaLighting ? 1.32f : 1.15f)
 			* DirectionalMultiplier);
 		Light->SetLightSourceAngle(bTestArenaMode ? 5.0f : 3.0f);
 		Light->SetSpecularScale(bTestArenaMode ? 0.60f : bClassicArenaLighting ? 0.14f : 0.32f);
@@ -6358,11 +6359,11 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			Sky->SetCubemap(nullptr);
 		}
 		Sky->SetIntensity(
-			(bTestArenaMode ? 1.05f : bClassicArenaLighting ? 0.34f : 0.28f)
+			(bTestArenaMode ? 1.05f : bClassicArenaLighting ? 0.34f : bBobArenaLighting ? 0.55f : 0.28f)
 			* SkyMultiplier);
 	}
 
-	const auto SpawnAccentLight = [this, bClassicArenaLighting](
+	const auto SpawnAccentLight = [this, bClassicArenaLighting, bBobArenaLighting](
 		TObjectPtr<APointLight>& LightActor,
 		const FVector& Location,
 		const FLinearColor& Color)
@@ -6382,9 +6383,9 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			Light->SetLightColor(FMath::Lerp(
 				Color, FLinearColor::White,
 				bTestArenaMode ? 0.38f : bClassicArenaLighting ? 0.88f : 0.72f));
-			Light->SetIntensity(bTestArenaMode ? 190.0f : bClassicArenaLighting ? 52.0f : 165.0f);
+			Light->SetIntensity(bTestArenaMode ? 190.0f : bClassicArenaLighting ? 52.0f : bBobArenaLighting ? 205.0f : 165.0f);
 			Light->SetAttenuationRadius(
-				(bTestArenaMode ? 700.0f : bClassicArenaLighting ? 720.0f : 820.0f)
+				(bTestArenaMode ? 700.0f : bClassicArenaLighting ? 720.0f : bBobArenaLighting ? 1500.0f : 820.0f)
 					* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
 			Light->SetSourceRadius((bTestArenaMode ? 100.0f : bClassicArenaLighting ? 260.0f : 120.0f)
 				* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
@@ -6412,9 +6413,10 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			? FLinearColor(0.62f, 0.7f, 0.82f)
 			: FLinearColor(0.72f, 0.78f, 0.88f));
 		ArenaFillLight->PointLightComponent->SetIntensity(
-			(bTestArenaMode ? 440.0f : bClassicArenaLighting ? 112.0f : 190.0f)
+			(bTestArenaMode ? 440.0f : bClassicArenaLighting ? 112.0f : bBobArenaLighting ? 260.0f : 190.0f)
 			* FillMultiplier);
-		ArenaFillLight->PointLightComponent->SetAttenuationRadius(1280.0f * ArenaScale);
+		ArenaFillLight->PointLightComponent->SetAttenuationRadius(
+			(bBobArenaLighting ? 2400.0f : 1280.0f) * ArenaScale);
 		ArenaFillLight->PointLightComponent->SetSourceRadius((bTestArenaMode ? 240.0f : 180.0f) * ArenaScale);
 		ArenaFillLight->PointLightComponent->SetSpecularScale(bTestArenaMode ? 0.32f : bClassicArenaLighting ? 0.06f : 0.26f);
 		ArenaFillLight->PointLightComponent->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.45f : 0.34f);

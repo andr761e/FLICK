@@ -1,5 +1,5 @@
 {
-  "concept": "Pocket Foundry",
+  "concept": "Pocket Foundry Enclosed",
   "board_outer_span_cm": 1308.0,
   "centre_opening_cm": 1364.0,
   "outer_dimensions_cm": [
@@ -10,6 +10,9 @@
   "wall_top_z_cm": 560.0,
   "gameplay_camera_radius_cm": 1580.0,
   "nearest_tall_frame_cm": 1839.9999999999998,
+  "camera_clearance_cm": 259.9999999999998,
+  "enclosure_sides": 4,
+  "detail_pass": "enclosed_venue_enrichment",
   "exports": [
     "SM_BobStadium_Structure",
     "SM_BobStadium_Lights"

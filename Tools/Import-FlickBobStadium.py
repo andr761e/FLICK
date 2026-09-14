@@ -41,14 +41,15 @@ if not parent:
     u.EditorAssetLibrary.save_loaded_asset(parent)
 
 specs = {
-    "01_Foundry_Black": ((.012, .022, .029), .55, .29, 0.0),
-    "02_Blue_Steel": ((.075, .12, .145), .82, .24, 0.0),
-    "03_Gunmetal": ((.19, .24, .27), .90, .20, 0.0),
-    "04_Smoked_Concrete": ((.20, .23, .24), .04, .62, 0.0),
-    "05_Aged_Brass": ((.48, .25, .055), .86, .27, 0.0),
-    "06_Warm_Pocket_Light": ((1.0, .58, .16), .05, .20, 5.0),
-    "07_Cyan_Score_Light": ((.0, .58, .88), .04, .16, 5.8),
-    "08_Orange_Score_Light": ((1.0, .16, .018), .04, .16, 5.8),
+    "01_Foundry_Black": ((.028, .052, .061), .48, .34, 0.0),
+    "02_Blue_Steel": ((.12, .20, .24), .76, .28, 0.0),
+    "03_Gunmetal": ((.27, .34, .37), .84, .23, 0.0),
+    "04_Smoked_Concrete": ((.34, .39, .40), .04, .58, 0.0),
+    "05_Aged_Brass": ((.62, .37, .09), .82, .29, 0.0),
+    "06_Warm_Pocket_Light": ((1.0, .68, .28), .04, .18, 6.5),
+    "07_Cyan_Score_Light": ((.02, .72, 1.0), .03, .14, 7.5),
+    "08_Orange_Score_Light": ((1.0, .25, .035), .03, .14, 7.5),
+    "09_Light_Composite": ((.58, .66, .68), .16, .36, 0.0),
 }
 materials = {}
 for key, (rgb, metallic, roughness, emission) in specs.items():

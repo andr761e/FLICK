@@ -1,9 +1,11 @@
 # BOB Pocket Foundry stadium
 
 This is the visual-only venue surrounding the square BOB arena. It is an
-original rectangular broadcast-hall concept rather than a variation of the
-Switchyard stadium: a sunken chamfered deck, four diagonal corner galleries,
-pocket-ring score pylons, and suspended gantries frame the four-corner game.
+original, fully enclosed rectangular broadcast-hall concept rather than a
+variation of the Switchyard stadium: a bright machined service apron, four
+detailed diagonal corner galleries, pocket-ring score pylons, equipment bays,
+four framed walls, suspended gantries, maintenance walks, clerestory panels,
+observation pods, and perimeter floodlight banks frame the four-corner game.
 Tall architecture begins outside the gameplay-camera orbit, leaving a dedicated
 clear envelope for Q/E rotation and elevation changes.
 
