@@ -732,6 +732,10 @@ void AFlickTestArena::OnRep_DividerState()
 
 void AFlickTestArena::OnRep_TestLayout()
 {
+	// Initial replication can invoke this notify before BeginPlay on a joining
+	// client. Build the client-only dynamic material arrays before applying the
+	// replicated layout so the first mechanism cannot index an empty array.
+	CreateRuntimeMaterials();
 	BuildLayoutFromSeed();
 	ApplyTestLayout();
 	ApplyMechanismState();
@@ -1043,7 +1047,8 @@ void AFlickTestArena::ApplyTestLayout()
 		}
 
 		if (ActiveLocationIndices.IsValidIndex(Index)
-			&& DividerBaseMeshes.IsValidIndex(ActiveLocationIndices[Index]))
+			&& DividerBaseMeshes.IsValidIndex(ActiveLocationIndices[Index])
+			&& AccentMaterials.IsValidIndex(Index))
 		{
 			SetAccentMaterial(DividerBaseMeshes[ActiveLocationIndices[Index]], AccentMaterials[Index]);
 			DividerBaseMeshes[ActiveLocationIndices[Index]]->SetRelativeScale3D(bUsingWorkshopAssets
