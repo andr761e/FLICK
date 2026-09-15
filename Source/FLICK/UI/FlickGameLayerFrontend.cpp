@@ -879,6 +879,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 			{
 				bSocialPanelOpen = true;
 				bShowingRecentPlayers = false;
+				bShowingOnlineFriends = false;
 				bSocialPartyExpanded = true;
 				return FReply::Handled();
 			})
@@ -948,21 +949,24 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 
 TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 {
-	auto MakeSocialTab = [this](const FString& Label, const bool bRecentTab) -> TSharedRef<SWidget>
+	auto MakeSocialTab = [this](const FString& Label, const int32 Tab) -> TSharedRef<SWidget>
 	{
 		return SNew(SBox).HeightOverride(38.0f)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor_Lambda([this, bRecentTab]()
+				.BackgroundColor_Lambda([this, Tab]()
 				{
-					const bool bSelected = bShowingRecentPlayers == bRecentTab;
+					const bool bSelected = Tab == 2 ? bShowingRecentPlayers
+						: !bShowingRecentPlayers && bShowingOnlineFriends == (Tab == 1);
 					return bSelected
 						? FLinearColor::FromSRGBColor(FColor(22, 39, 39, 244))
 						: FLinearColor::FromSRGBColor(FColor(12, 22, 25, 226));
 				})
-				.AccentColor_Lambda([this, bRecentTab]()
+				.AccentColor_Lambda([this, Tab]()
 				{
-					return bShowingRecentPlayers == bRecentTab ? Brand : Hairline;
+					const bool bSelected = Tab == 2 ? bShowingRecentPlayers
+						: !bShowingRecentPlayers && bShowingOnlineFriends == (Tab == 1);
+					return bSelected ? Brand : Hairline;
 				})
 				.UseAccentForOutline(false)
 				.CutSize(6.0f)
@@ -973,25 +977,32 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					.ButtonStyle(&TransparentButtonStyle)
 					.HAlign(HAlign_Center)
 					.VAlign(VAlign_Center)
-					.OnClicked_Lambda([this, bRecentTab]()
+					.OnClicked_Lambda([this, Tab]()
 					{
-						bShowingRecentPlayers = bRecentTab;
+						bShowingRecentPlayers = Tab == 2;
+						bShowingOnlineFriends = Tab == 1;
 						return FReply::Handled();
 					})
 					[
 						SNew(STextBlock)
-						.Text_Lambda([this, Label, bRecentTab]()
+						.Text_Lambda([this, Label, Tab]()
 						{
 							const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
-							const int32 Count = Sessions
-								? (bRecentTab ? Sessions->GetRecentPlayers().Num() : Sessions->GetFriends().Num())
-								: 0;
+							int32 Count = 0;
+							if (Sessions)
+							{
+								if (Tab == 2) Count = Sessions->GetRecentPlayers().Num();
+								else if (Tab == 0) Count = Sessions->GetFriends().Num();
+								else for (const FFlickSocialPlayerEntry& Friend : Sessions->GetFriends()) Count += Friend.bOnline ? 1 : 0;
+							}
 							return FText::FromString(FString::Printf(TEXT("%s  %d"), *Label, Count));
 						})
 						.Font(UiFont(11, true))
-						.ColorAndOpacity_Lambda([this, bRecentTab]()
+						.ColorAndOpacity_Lambda([this, Tab]()
 						{
-							return FSlateColor(bShowingRecentPlayers == bRecentTab ? Brand : Paper);
+							const bool bSelected = Tab == 2 ? bShowingRecentPlayers
+								: !bShowingRecentPlayers && bShowingOnlineFriends == (Tab == 1);
+							return FSlateColor(bSelected ? Brand : Paper);
 						})
 					]
 				]
@@ -1126,11 +1137,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 3.0f, 0.0f)
 				[
-					MakeSocialTab(TEXT("FRIENDS"), false)
+					MakeSocialTab(TEXT("ALL"), 0)
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(3.0f, 0.0f)
+				[
+					MakeSocialTab(TEXT("ONLINE"), 1)
 				]
 				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(3.0f, 0.0f, 0.0f, 0.0f)
 				[
-					MakeSocialTab(TEXT("RECENT PLAYERS"), true)
+					MakeSocialTab(TEXT("RECENT"), 2)
 				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 6.0f)
@@ -1250,9 +1265,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 						.Visibility_Lambda([this]()
 						{
 							const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
-							const bool bEmpty = !Sessions || (bShowingRecentPlayers
-								? Sessions->GetRecentPlayers().IsEmpty()
-								: Sessions->GetFriends().IsEmpty());
+							bool bEmpty = !Sessions;
+							if (Sessions)
+							{
+								bEmpty = bShowingRecentPlayers ? Sessions->GetRecentPlayers().IsEmpty() : Sessions->GetFriends().IsEmpty();
+								if (bShowingOnlineFriends && !bShowingRecentPlayers)
+								{
+									bEmpty = !Sessions->GetFriends().ContainsByPredicate([](const FFlickSocialPlayerEntry& Friend) { return Friend.bOnline; });
+								}
+							}
 							const bool bExpanded = bShowingRecentPlayers ? bSocialRecentExpanded : bSocialFriendsExpanded;
 							return bEmpty && bExpanded ? EVisibility::Visible : EVisibility::Collapsed;
 						})
@@ -1265,38 +1286,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 								SNew(STextBlock)
 								.Text_Lambda([this]()
 								{
-									return FText::FromString(bShowingRecentPlayers
-										? TEXT("NO RECENT PLAYERS  //  PLAY ONLINE TO BUILD YOUR LIST")
+								return FText::FromString(bShowingRecentPlayers
+									? TEXT("NO RECENT PLAYERS  //  PLAY ONLINE TO BUILD YOUR LIST")
+									: bShowingOnlineFriends
+										? TEXT("NO STEAM FRIENDS ARE CURRENTLY ONLINE")
 										: TEXT("NO PLATFORM FRIENDS FOUND  //  TRY REFRESH"));
 								})
 								.Font(UiFont(8, true)).ColorAndOpacity(Muted).AutoWrapText(true)
 							]
 						]
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(0)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(1)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(2)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(3)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(4)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(5)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(6)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(7)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(8)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(9)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(10)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildSocialFriendRow(11)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(0)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(1)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(2)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(3)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(4)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(5)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(6)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(7)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(8)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(9)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(10)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)[BuildRecentPlayerRow(11)]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SAssignNew(SocialPlayerList, SVerticalBox)
+					]
 				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
@@ -1552,13 +1555,44 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 		];
 }
 
+void SFlickGameLayer::RebuildSocialPlayerList()
+{
+	if (!SocialPlayerList.IsValid())
+	{
+		return;
+	}
+	SocialPlayerList->ClearChildren();
+	const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
+	CachedSocialFriendCount = Sessions ? Sessions->GetFriends().Num() : 0;
+	CachedSocialRecentCount = Sessions ? Sessions->GetRecentPlayers().Num() : 0;
+	for (int32 FriendIndex = 0; FriendIndex < CachedSocialFriendCount; ++FriendIndex)
+	{
+		SocialPlayerList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)
+		[
+			BuildSocialFriendRow(FriendIndex)
+		];
+	}
+	for (int32 RecentIndex = 0; RecentIndex < CachedSocialRecentCount; ++RecentIndex)
+	{
+		SocialPlayerList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)
+		[
+			BuildRecentPlayerRow(RecentIndex)
+		];
+	}
+}
+
 TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendIndex)
 {
 	return SNew(SVerticalBox)
 		.Visibility_Lambda([this, FriendIndex]()
 		{
 			const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
-			return !bShowingRecentPlayers && bSocialFriendsExpanded && Sessions && Sessions->GetFriends().IsValidIndex(FriendIndex)
+			if (bShowingRecentPlayers || !bSocialFriendsExpanded || !Sessions
+				|| !Sessions->GetFriends().IsValidIndex(FriendIndex))
+			{
+				return EVisibility::Collapsed;
+			}
+			return !bShowingOnlineFriends || Sessions->GetFriends()[FriendIndex].bOnline
 				? EVisibility::Visible : EVisibility::Collapsed;
 		})
 		+ SVerticalBox::Slot().AutoHeight()

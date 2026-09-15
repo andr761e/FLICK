@@ -410,6 +410,16 @@ void SFlickGameLayer::Tick(
 	{
 		return;
 	}
+	if (bSocialPanelOpen)
+	{
+		const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
+		const int32 FriendCount = Sessions ? Sessions->GetFriends().Num() : 0;
+		const int32 RecentCount = Sessions ? Sessions->GetRecentPlayers().Num() : 0;
+		if (FriendCount != CachedSocialFriendCount || RecentCount != CachedSocialRecentCount)
+		{
+			RebuildSocialPlayerList();
+		}
+	}
 
 	const EFlickFrontendScreen CurrentScreen = GameMode->GetFrontendScreen();
 	if (CurrentScreen == EFlickFrontendScreen::Loadout

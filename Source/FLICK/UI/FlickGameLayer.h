@@ -69,6 +69,7 @@ private:
 	TSharedRef<SWidget> BuildSocialPanel();
 	TSharedRef<SWidget> BuildSocialFriendRow(int32 FriendIndex);
 	TSharedRef<SWidget> BuildRecentPlayerRow(int32 RecentIndex);
+	void RebuildSocialPlayerList();
 	TSharedRef<SWidget> BuildPartyMemberRow(int32 PartySlot);
 	TSharedRef<SWidget> BuildMainMenuPartyMember(int32 PartySlot);
 	TSharedRef<SWidget> BuildItemShop();
@@ -222,12 +223,16 @@ private:
 	bool bHasAppliedInitialFocus = false;
 	bool bSocialPanelOpen = false;
 	bool bShowingRecentPlayers = false;
+	bool bShowingOnlineFriends = false;
 	bool bSocialPartyExpanded = true;
 	bool bSocialFriendsExpanded = true;
 	bool bSocialInGameExpanded = true;
 	bool bSocialOnlineExpanded = true;
 	bool bSocialOfflineExpanded = false;
 	bool bSocialRecentExpanded = true;
+	TSharedPtr<SVerticalBox> SocialPlayerList;
+	int32 CachedSocialFriendCount = INDEX_NONE;
+	int32 CachedSocialRecentCount = INDEX_NONE;
 	bool bStartupOverlayVisible = false;
 	float StartupOverlayElapsed = 0.0f;
 	float StartupOverlayHoldDuration = 0.0f;
