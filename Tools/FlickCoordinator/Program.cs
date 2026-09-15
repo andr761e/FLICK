@@ -657,6 +657,7 @@ sealed class CoordinatorState
                     lastSupervisionUtc = DateTimeOffset.UtcNow;
 					foreach (var ticket in tickets.Values.Where(item =>
 						item.Status == "searching"
+						&& settings.QueueTimeoutSeconds > 0
 						&& lastSupervisionUtc - item.CreatedUtc > TimeSpan.FromSeconds(settings.QueueTimeoutSeconds)))
 					{
 						ticket.Status = "expired";
@@ -1272,7 +1273,7 @@ sealed class CoordinatorSettings
 			CasualMmrExpansionSeconds = ReadInt("FLICK_CASUAL_MMR_EXPANSION_SECONDS", 6),
 			MaximumMmrGap = ReadInt("FLICK_COORDINATOR_MAXIMUM_MMR_GAP", 600),
 			MaximumCandidateParties = ReadInt("FLICK_COORDINATOR_MAXIMUM_CANDIDATES", 24),
-			QueueTimeoutSeconds = ReadInt("FLICK_COORDINATOR_QUEUE_TIMEOUT", 300)
+			QueueTimeoutSeconds = ReadInt("FLICK_COORDINATOR_QUEUE_TIMEOUT", 0)
         };
     }
 
@@ -1318,7 +1319,7 @@ sealed class CoordinatorSettings
             errors.Add("Server lifecycle timeouts are below their safe minimums.");
 		if (RankedInitialMmrGap < 0 || CasualInitialMmrGap < 0 || MaximumMmrGap < RankedInitialMmrGap
 			|| MaximumMmrGap < CasualInitialMmrGap || RankedMmrExpansionSeconds < 1
-			|| CasualMmrExpansionSeconds < 1 || MaximumCandidateParties < 4 || QueueTimeoutSeconds < 30)
+			|| CasualMmrExpansionSeconds < 1 || MaximumCandidateParties < 4 || QueueTimeoutSeconds < 0)
 			errors.Add("Matchmaking expansion settings are invalid.");
         return errors;
     }

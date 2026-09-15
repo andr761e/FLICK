@@ -98,8 +98,6 @@ void AFlickGameMode::StartSelectedMatchmaking()
 	{
 		return;
 	}
-	FrontendScreen = EFlickFrontendScreen::OnlineBrowser;
-	SetCameraForFrontend();
 	RankedQueueRating = FlickRankRules::DefaultRating;
 	if (bRankedQueueSelected)
 	{
@@ -427,7 +425,9 @@ void AFlickGameMode::VerifyCoordinatorReservation(
 			PlayerState->SetVerifiedOnlineAccountId(Result.AccountId);
 			PlayerState->SetTeam(Result.Team);
 			PlayerState->SetTeamPlayerSlot(Result.PlayerSlot);
-			PlayerState->SetLobbyReady(false);
+			// Joining the public queue is the ready confirmation. Start as soon as
+			// the dedicated server has verified the complete reserved roster.
+			PlayerState->SetLobbyReady(true);
 			GameMode->VerifiedCoordinatorPlayers.Add(Controller);
 			GameMode->DisconnectedPlayerTeams.Remove(Result.AccountId);
 			GameMode->DisconnectedPlayerSlots.Remove(Result.AccountId);

@@ -78,6 +78,7 @@ private:
 	TSharedRef<SWidget> BuildPrivateMatchSlot(EFlickTeam Team, int32 PlayerSlot);
 	TSharedRef<SWidget> BuildOnlineBrowser();
 	TSharedRef<SWidget> BuildOnlineSessionRow(int32 ResultIndex);
+	TSharedRef<SWidget> BuildMatchmakingStatusBar();
 	TSharedRef<SWidget> BuildNetworkLobby();
 	TSharedRef<SWidget> BuildLoadout();
 	TSharedRef<SWidget> BuildLoadoutWorkspace();
@@ -150,6 +151,7 @@ private:
 		const FOnClicked& Next) const;
 
 	EVisibility GetScreenVisibility(EFlickFrontendScreen Screen) const;
+	EVisibility GetMatchmakingStatusVisibility() const;
 	EVisibility GetMatchHudVisibility() const;
 	EVisibility GetScoreboardVisibility() const;
 	EVisibility GetScoreboardPlayerVisibility(int32 PlayerSlot) const;

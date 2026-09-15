@@ -1,5 +1,6 @@
 #include "UI/FlickGameLayer.h"
 #include "UI/FlickGameLayerPrivate.h"
+#include "Online/FlickMatchmakingCoordinatorSubsystem.h"
 
 SFlickGameLayer::SFlickGameLayer()
 {
@@ -241,6 +242,20 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		]
 
 		+ SOverlay::Slot()
+		.HAlign(HAlign_Center)
+		.VAlign(VAlign_Top)
+		.Padding(0.0f, 18.0f, 0.0f, 0.0f)
+		[
+			SNew(SBox)
+			.WidthOverride(720.0f)
+			.HeightOverride(58.0f)
+			.Visibility_Lambda([this]() { return GetMatchmakingStatusVisibility(); })
+			[
+				BuildMatchmakingStatusBar()
+			]
+		]
+
+		+ SOverlay::Slot()
 		[
 			SAssignNew(StartupOverlayWidget, SBox)
 			.Visibility_Lambda([this]() { return bStartupOverlayVisible ? EVisibility::Visible : EVisibility::Collapsed; })
@@ -252,6 +267,111 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		]
 	];
 
+}
+
+TSharedRef<SWidget> SFlickGameLayer::BuildMatchmakingStatusBar()
+{
+	return SNew(SFlickAngularBorder)
+		.BackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 244)))
+		.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
+		.UseAccentForOutline(false)
+		.CutSize(9.0f)
+		.BorderWidth(1.1f)
+		.Padding(FMargin(16.0f, 7.0f))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Fill)
+			[
+				SNew(SBox).WidthOverride(4.0f)
+				[
+					SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Brand)
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(13.0f, 0.0f, 18.0f, 0.0f)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this]()
+					{
+						if (!GameMode.IsValid()) return FText::GetEmpty();
+						const FString QueueType = GameMode->IsRankedQueueSelected() ? TEXT("COMPETITIVE") : TEXT("CASUAL");
+						const EFlickMatchVariant Variant = GameMode->GetSelectedMatchVariant();
+						const FString Playlist = Variant == EFlickMatchVariant::Bob
+							? TEXT("BOB")
+							: FString::Printf(TEXT("%dV%d KNOCKOUT"), GameMode->GetMatchmakingPlayersPerTeam(), GameMode->GetMatchmakingPlayersPerTeam());
+						return FText::FromString(FString::Printf(TEXT("%s  /  %s"), *QueueType, *Playlist));
+					})
+					.Font(UiFont(12, true))
+					.ColorAndOpacity(Paper)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this]()
+					{
+						const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
+						return FText::FromString(Sessions ? Sessions->GetStatusMessage() : TEXT("MATCHMAKING UNAVAILABLE"));
+					})
+					.Font(UiFont(9, true))
+					.ColorAndOpacity(Brand)
+				]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f)
+			[
+				SNew(SSpacer)
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(112.0f).HeightOverride(36.0f)
+				[
+					SNew(SButton)
+					.ButtonStyle(&TransparentButtonStyle)
+					.HAlign(HAlign_Center)
+					.VAlign(VAlign_Center)
+					.OnClicked_Lambda([this]()
+					{
+						if (GameMode.IsValid()) GameMode->CancelUnrankedMatchmaking();
+						return FReply::Handled();
+					})
+					[
+						SNew(STextBlock)
+						.Text(FText::FromString(TEXT("CANCEL  X")))
+						.Font(UiFont(10, true))
+						.ColorAndOpacity(Muted)
+					]
+				]
+			]
+		];
+}
+
+EVisibility SFlickGameLayer::GetMatchmakingStatusVisibility() const
+{
+	if (!GameMode.IsValid())
+	{
+		return EVisibility::Collapsed;
+	}
+	const EFlickFrontendScreen Screen = GameMode->GetFrontendScreen();
+	if (Screen == EFlickFrontendScreen::Playing
+		|| Screen == EFlickFrontendScreen::Paused
+		|| Screen == EFlickFrontendScreen::ClassSelect
+		|| Screen == EFlickFrontendScreen::NetworkLobby)
+	{
+		return EVisibility::Collapsed;
+	}
+	const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
+	if (Sessions && Sessions->IsMatchmakingActive())
+	{
+		return EVisibility::Visible;
+	}
+	const UGameInstance* GameInstance = PlayerController.IsValid() ? PlayerController->GetGameInstance() : nullptr;
+	const UFlickMatchmakingCoordinatorSubsystem* Coordinator = GameInstance
+		? GameInstance->GetSubsystem<UFlickMatchmakingCoordinatorSubsystem>()
+		: nullptr;
+	return Coordinator && Coordinator->GetQueueState() == EFlickCoordinatorQueueState::Allocated
+		? EVisibility::Visible
+		: EVisibility::Collapsed;
 }
 
 void SFlickGameLayer::Tick(

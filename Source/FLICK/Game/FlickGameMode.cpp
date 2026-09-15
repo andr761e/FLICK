@@ -939,7 +939,9 @@ void AFlickGameMode::PostLogin(APlayerController* NewPlayer)
 		}
 		FlickPlayerState->SetTeam(AssignedTeam);
 		FlickPlayerState->SetTeamPlayerSlot(AssignedPlayerSlot);
-		FlickPlayerState->SetLobbyReady(false);
+		// Public matchmaking does not ask for a second ready confirmation.
+		// Coordinator admissions become ready after reservation verification.
+		FlickPlayerState->SetLobbyReady(bMatchmakingRequested && !bHasCoordinatorAdmission);
 		FString PlayerName;
 		IOnlineSubsystem* OnlineSubsystem = Online::GetSubsystem(GetWorld());
 		const IOnlineIdentityPtr Identity = OnlineSubsystem ? OnlineSubsystem->GetIdentityInterface() : nullptr;

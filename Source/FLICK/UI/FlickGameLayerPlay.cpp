@@ -861,7 +861,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayFormatCard(
 	TSharedRef<SButton> CardButton = SNew(SButton)
 		.ButtonStyle(&TransparentButtonStyle)
 		.ContentPadding(0.0f)
-		.IsEnabled_Lambda([bAvailable, FitsDisplayedParty]() { return bAvailable && FitsDisplayedParty(); })
+		.IsEnabled_Lambda([this, bAvailable, FitsDisplayedParty]()
+		{
+			const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
+			return bAvailable && FitsDisplayedParty() && (!Sessions || !Sessions->IsMatchmakingActive());
+		})
 		.Cursor(bAvailable ? EMouseCursor::Hand : EMouseCursor::Default)
 		.OnClicked_Lambda([this, PlayersPerTeam, bBob, FitsDisplayedParty]()
 		{
