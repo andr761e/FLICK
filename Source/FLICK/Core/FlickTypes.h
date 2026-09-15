@@ -154,8 +154,18 @@ enum class EFlickFrontendScreen : uint8
 inline constexpr int32 FlickMaximumPartyMembers = 6;
 
 UENUM(BlueprintType)
+enum class EFlickMatchVariant : uint8
+{
+	Classic UMETA(DisplayName = "Knockout"),
+	Bob UMETA(DisplayName = "BOB"),
+	// Retained only so old settings and network data using value 2 can migrate safely.
+	Blitz UMETA(Hidden)
+};
+
+UENUM(BlueprintType)
 enum class EFlickPrivateMatchSetting : uint8
 {
+	Mode UMETA(DisplayName = "Mode"),
 	TeamSize UMETA(DisplayName = "Team Size"),
 	RoundsToWin UMETA(DisplayName = "Rounds To Win"),
 	ArenaScale UMETA(DisplayName = "Arena Size"),
@@ -169,6 +179,9 @@ USTRUCT(BlueprintType)
 struct FFlickPrivateMatchSettings
 {
 	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match")
+	EFlickMatchVariant Variant = EFlickMatchVariant::Classic;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match")
 	int32 PlayersPerTeam = 2;
@@ -202,15 +215,6 @@ inline int32 EncodePrivatePlayerSlot(const EFlickTeam Team, const int32 PlayerSl
 		? PlayerSlot
 		: Team == EFlickTeam::Player2 ? 3 + PlayerSlot : INDEX_NONE;
 }
-
-UENUM(BlueprintType)
-enum class EFlickMatchVariant : uint8
-{
-	Classic UMETA(DisplayName = "Knockout"),
-	Bob UMETA(DisplayName = "BOB"),
-	// Retained only so old settings and network data using value 2 can migrate safely.
-	Blitz UMETA(Hidden)
-};
 
 inline EFlickMatchVariant NormalizeMatchVariant(const EFlickMatchVariant Variant)
 {
@@ -331,7 +335,7 @@ inline FString GetMatchVariantSummary(const EFlickMatchVariant Variant)
 		return TEXT("POCKET YOUR COLOR  |  STANDARD PUCKS ONLY");
 	case EFlickMatchVariant::Classic:
 	default:
-		return TEXT("4 PUCKS PER PLAYER  |  BEST OF 5");
+		return TEXT("4 PUCKS PER PLAYER  |  FIRST TO 3 ROUNDS");
 	}
 }
 
@@ -351,7 +355,7 @@ inline FString GetMatchVariantSeriesLabel(const EFlickMatchVariant Variant)
 {
 	return Variant == EFlickMatchVariant::Bob
 		? TEXT("ONE BOARD  |  CLEAR YOUR COLOR")
-		: TEXT("BEST OF 5  |  FIRST TO 3 ROUNDS");
+		: TEXT("FIRST TO 3 ROUND WINS");
 }
 
 inline FString GetPieceArchetypeName(const EFlickPieceArchetype Archetype)

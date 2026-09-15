@@ -27,6 +27,7 @@ Builds/
 *.pdb
 __pycache__/
 *.pyc
+*.blend1
 
 # Local OS noise
 Thumbs.db

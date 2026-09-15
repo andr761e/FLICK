@@ -1,4 +1,6 @@
 #include "Core/FlickMatchmakingRules.h"
+#include "Core/FlickLineupRules.h"
+#include "Core/FlickPrivateMatchRules.h"
 #include "Misc/AutomationTest.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -11,8 +13,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FFlickMatchmakingCompatibilityTest::RunTest(const FString& Parameters)
 {
 	TestEqual(TEXT("Trios requires six players"), FlickMatchmakingRules::GetRequiredPlayerCount(3), 6);
+	TestTrue(TEXT("Solo party fits 1v1 and BOB"), FlickMatchmakingRules::IsPartySizeValid(1, 1));
+	TestFalse(TEXT("Two-player party cannot queue 1v1 or BOB"), FlickMatchmakingRules::IsPartySizeValid(2, 1));
 	TestTrue(TEXT("Two-player party fits doubles"), FlickMatchmakingRules::IsPartySizeValid(2, 2));
 	TestFalse(TEXT("Three-player party cannot queue doubles"), FlickMatchmakingRules::IsPartySizeValid(3, 2));
+	TestTrue(TEXT("Three-player party fits trios"), FlickMatchmakingRules::IsPartySizeValid(3, 3));
+	TestFalse(TEXT("Four-player party cannot queue a public playlist"), FlickMatchmakingRules::IsPartySizeValid(4, 3));
 	TestTrue(
 		TEXT("Matching queue is compatible"),
 		FlickMatchmakingRules::IsCompatibleLobby(
@@ -63,6 +69,27 @@ bool FFlickPrivateMatchSlotEncodingTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Spectators do not encode as players"), EncodePrivatePlayerSlot(EFlickTeam::None, 0), INDEX_NONE);
 	TestEqual(TEXT("Out-of-range slots are rejected"), EncodePrivatePlayerSlot(EFlickTeam::Player1, 3), INDEX_NONE);
 	TestFalse(TEXT("A four-player party cannot enter public trios"), FlickMatchmakingRules::IsPartySizeValid(4, 3));
+
+	FFlickPrivateMatchSettings Settings;
+	Settings.Variant = EFlickMatchVariant::Classic;
+	Settings.PlayersPerTeam = 1;
+	FlickPrivateMatchRules::CycleMode(Settings, 1);
+	TestEqual(TEXT("Private mode advances from 1v1 to 2v2"), Settings.PlayersPerTeam, 2);
+	FlickPrivateMatchRules::CycleMode(Settings, 1);
+	FlickPrivateMatchRules::CycleMode(Settings, 1);
+	TestEqual(TEXT("Private mode advances from 3v3 to BOB"), Settings.Variant, EFlickMatchVariant::Bob);
+	TestEqual(TEXT("BOB always reserves one player per side"), FlickPrivateMatchRules::GetRequiredPlayingSlots(Settings), 2);
+	FlickPrivateMatchRules::CycleMode(Settings, -1);
+	TestEqual(TEXT("Cycling backward from BOB returns to 3v3"), Settings.PlayersPerTeam, 3);
+	const TArray<EFlickPieceArchetype> ValidLineup = {
+		EFlickPieceArchetype::Standard,
+		EFlickPieceArchetype::Heavy,
+		EFlickPieceArchetype::Striker,
+		EFlickPieceArchetype::Grippy};
+	TestTrue(TEXT("Four distinct archetypes form a legal network lineup"), FlickLineupRules::IsValid(ValidLineup));
+	TArray<EFlickPieceArchetype> DuplicateLineup = ValidLineup;
+	DuplicateLineup[3] = EFlickPieceArchetype::Standard;
+	TestFalse(TEXT("Duplicate archetypes are rejected at the network boundary"), FlickLineupRules::IsValid(DuplicateLineup));
 	return true;
 }
 

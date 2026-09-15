@@ -63,7 +63,7 @@ When the roster fills, the Steam lobby stops advertising and becomes a match-fou
 
 The listen server owns the match ID, result, completion timestamp, and disconnect-forfeit decision. A finalized result is immutable. Premade members retain their party slots throughout matchmaking and return together after the match; players who joined as opponents leave that host party. Solo players return to the frontend.
 
-Party leaders can queue their connected group for unranked 2v2 or 3v3 from the Social drawer. A persistent FLICK party identity is kept separately from the disposable Steam session used for discovery and gameplay. A premade first searches as a connected group; when it finds a compatible host, every member migrates into that exact match session with the same party ID and reserved team slots. If no match exists, the leader opens the current party as the accepting matchmaking lobby.
+Party leaders can queue only playlists that can hold the entire connected group on one team: solo parties can use 1v1/BOB, doubles or trios; two-player parties can use doubles or trios; three-player parties can use trios; parties of four or more cannot enter a public queue. A persistent FLICK party identity is kept separately from the disposable Steam session used for discovery and gameplay. A premade first searches as a connected group; when it finds a compatible host, every member migrates into that exact match session with the same party ID and reserved team slots. If no match exists, the leader opens the current party as the accepting matchmaking lobby.
 
 After a match, each premade is rebuilt as its own private party and solo players return to the frontend. Party members retry discovery while their leader recreates the party. If the gameplay host drops, the visiting party leader rebuilds its group and the original host party's second slot may take over restoration. Validate migration, restoration, invites, and host loss with separate Steam accounts because one signed-in account cannot represent multiple Steam users correctly.
 
@@ -81,7 +81,7 @@ These commands open the required independent clients, auto-confirm ready, and ex
 
 Public matchmaking now has a production-shaped coordinator path in addition to the Steam-session fallback. When configured, a solo player or complete connected party submits one queue ticket, polls for an allocation, and receives a separate opaque reservation for each member. The party leader relays the allocation to every connected member, so the group leaves its party lobby together and joins the same dedicated authority. The game server does not trust travel options: it verifies each reservation with the coordinator before assigning the canonical account, team, or player slot.
 
-Run `play-flick-coordinator-local.cmd [1|2|3] [casual|ranked] [variant]` to exercise the natural queue-to-server flow. The command starts `Tools/FlickCoordinator`, opens the requested number of independent clients, queues them, launches an `UnrealEditor-Cmd.exe -server` authority on an allocated port, and lets each client confirm ready normally. Variant values are `0` for 4v4 Knockout, `1` for BOB, and `2` for 3v3 Knockout. `run-flick-local-coordinator.cmd` starts only the service, while `test-flick-coordinator.cmd` runs a fast HTTP allocation and reservation smoke test without launching Unreal.
+Run `play-flick-coordinator-local.cmd [1|2|3] [casual|ranked] [variant]` to exercise the natural queue-to-server flow. The command starts `Tools/FlickCoordinator`, opens the required independent clients, queues them, launches an `UnrealEditor-Cmd.exe -server` authority on an allocated port, and lets each client confirm ready normally. Variant `0` is Knockout and `1` is BOB; the first argument selects the Knockout team size. `run-flick-local-coordinator.cmd` starts only the service. `test-flick-coordinator.cmd` runs the allocation/reservation, failed-server lifecycle, and expanding canonical-rating checks as one suite.
 
 The coordinator is enabled locally by `-FlickCoordinatorUrl=http://127.0.0.1:8090`; without that option, existing Steam lobby matchmaking remains unchanged. Shipping builds require the remote HTTPS path. Allocated clients retain their reservation for three reconnect attempts, and the authority waits the configured 45-second grace period before recording a disconnect forfeit. Servers heartbeat while active and report normal or forfeited completion once. The full protocol and production security requirements are in `Docs/MatchmakingCoordinatorApi.md`.
 
@@ -96,11 +96,13 @@ This packages `FLICKServer` and publishes the .NET coordinator under `Builds\Onl
 
 ## Steam Social And Parties
 
-The main menu `SOCIAL` drawer reads the signed-in Steam account's friends list and presence. Online friends and locally remembered recent FLICK opponents can be invited directly. Sending the first invite creates a private three-person Steam party lobby; later invites reuse that lobby. Accepting an invite leaves any existing FLICK lobby first, then connects to the party leader.
+The main menu `SOCIAL` drawer reads the signed-in Steam account's friends list and presence. Online friends and locally remembered recent FLICK opponents can be invited directly. Sending the first invite creates a private six-person Steam party lobby; later invites reuse that lobby. Accepting an invite leaves any existing FLICK lobby first, then connects to the party leader.
 
 Party membership and leader state replicate to every connected player. The leader can remove members or disband the party, guests can leave from their party screen, and connection or host failures return affected players to the frontend. Recent players are stored locally because Unreal's Steam friends interface does not provide Steam recent-player history.
 
-The party leader can queue the group for public unranked 2v2 or 3v3 from the Social drawer. Existing party members stay together on Team 1, the Steam session expands to four or six players, and open positions are filled through matchmaking. Every player receives a replicated team slot and controls only the pucks assigned to that slot. All players must ready before the Team 1 slot-one host can start.
+For a fast transport/replication check without Steam, run `play-flick-private-local.cmd`. It opens a listen-server party and one direct-IP guest. Use two real Steam accounts on separate computers for the final invite, overlay, disconnect, and reconnect validation.
+
+The party leader can queue any public Casual or Competitive playlist large enough to hold the complete party on one team. Coordinator matchmaking keeps premades indivisible, prefers similarly shaped opposing parties, and assigns every verified account an authoritative team and slot. All reserved players must connect and ready before the dedicated authority starts.
 
 For a single-machine replication test, run either:
 
@@ -136,10 +138,11 @@ Expected startup:
 
 - An elevated marked tabletop, pedestal, and dark backdrop appear.
 - The main menu appears over a live preview that cycles through all three arenas without changing the selected next match.
-- Play opens a dedicated 3v3 Knockout, 4v4 Knockout, and BOB mode browser.
+- Play opens Casual, Competitive, Training, and Private Match, with 1v1, 2v2, 3v3, and BOB playlists where applicable.
 - Home and matches use separate cinematic and competitive tabletop camera framing.
 - A mode can start with saved lineups, while Lineups remains directly accessible for role changes.
-- Knockout matches are Best of 5 (first to three round wins), with simultaneous opening flicks and the first planner alternating each round.
+- Knockout matches continue until one side wins three rounds; drawn rounds award no win and do not impose a round limit.
+- Every Knockout player brings four distinct puck archetypes; duplicate archetypes are not allowed within one lineup.
 - BOB is one standard-puck board: clear all twelve pucks of your color before the opponent.
 
 No Blueprint setup is currently required.
@@ -148,8 +151,9 @@ No Blueprint setup is currently required.
 
 | Mode | Pieces per team | Match format |
 | --- | ---: | --- |
-| 3v3 Knockout | 3 | Best of 5 on the compact, faster circular arena |
-| 4v4 Knockout | 4 | Best of 5 on the full tactical circular arena |
+| 1v1 Knockout | 4 per player | First side to win 3 rounds |
+| 2v2 Knockout | 4 per player | First side to win 3 rounds |
+| 3v3 Knockout | 4 per player | First side to win 3 rounds |
 | BOB | 12 plus one striker per player | One square-board race to pocket your color |
 
 ## Puck Roles

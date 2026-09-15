@@ -1,5 +1,7 @@
 #include "Player/FlickPlayerState.h"
 
+#include "Core/FlickLineupRules.h"
+
 #include "Net/UnrealNetwork.h"
 
 AFlickPlayerState::AFlickPlayerState()
@@ -15,6 +17,7 @@ void AFlickPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AFlickPlayerState, bLobbyReady);
 	DOREPLIFETIME(AFlickPlayerState, NetworkSelectedClass);
 	DOREPLIFETIME(AFlickPlayerState, bNetworkClassConfirmed);
+	DOREPLIFETIME(AFlickPlayerState, NetworkSelectedLineup);
 	DOREPLIFETIME(AFlickPlayerState, bPartyLeader);
 	DOREPLIFETIME(AFlickPlayerState, PartySlot);
 	DOREPLIFETIME(AFlickPlayerState, PartyId);
@@ -31,6 +34,7 @@ void AFlickPlayerState::ResetNetworkClassSelection(const EFlickLineupPreset InCl
 		NetworkSelectedClass = InClass == EFlickLineupPreset::Custom
 			? EFlickLineupPreset::Balanced
 			: InClass;
+		NetworkSelectedLineup.Reset();
 		bNetworkClassConfirmed = false;
 		ForceNetUpdate();
 	}
@@ -43,6 +47,17 @@ void AFlickPlayerState::SetNetworkSelectedClass(const EFlickLineupPreset InClass
 		NetworkSelectedClass = InClass;
 		ForceNetUpdate();
 	}
+}
+
+bool AFlickPlayerState::SetNetworkSelectedLineup(const TArray<EFlickPieceArchetype>& InLineup)
+{
+	if (!HasAuthority() || bNetworkClassConfirmed || !FlickLineupRules::IsValid(InLineup))
+	{
+		return false;
+	}
+	NetworkSelectedLineup = InLineup;
+	ForceNetUpdate();
+	return true;
 }
 
 void AFlickPlayerState::SetNetworkClassConfirmed(const bool bInConfirmed)

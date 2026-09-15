@@ -13,6 +13,8 @@ This deployment runs one coordinator and its allocated Windows dedicated-server 
 
 Set the variables listed in `production.env.example` through the host or service manager. Use the actual `FLICKServer.exe` path from the transferred archive. `FLICK_STEAM_WEB_API_KEY` must be a publisher Web API key kept in the host's secret store; it must never enter Unreal config, a client package, logs, or source control. `FLICK_STEAM_TICKET_IDENTITY` must match Unreal's `SteamTicketAudience` setting (`FLICK` by default).
 
+The ranked and casual MMR variables control their independent initial search ranges and timed expansion. Keep `FLICK_COORDINATOR_MAXIMUM_MMR_GAP` as a hard ceiling, and set the season ID explicitly before accepting ranked matches.
+
 The coordinator's internal listener can remain HTTP (`ASPNETCORE_URLS=http://0.0.0.0:8090`) behind a reverse proxy, but `FLICK_COORDINATOR_PUBLIC_URL` must be its externally reachable HTTPS URL. Forward the configured UDP game-port range to this machine and set `FLICK_SERVER_PUBLIC_HOST` to the hostname clients can reach.
 
 ## Run And Observe

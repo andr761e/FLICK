@@ -9,6 +9,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/DateTime.h"
+#include "Misc/NetworkVersion.h"
 #include "Misc/Parse.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
@@ -137,7 +138,19 @@ bool UFlickMatchmakingCoordinatorSubsystem::QueueParty(
 		return false;
 	}
 	ActiveRequest = Request;
-	ActiveRequest.Region = Region.IsEmpty() ? TEXT("auto") : Request.Region;
+	if (ActiveRequest.RequestId.IsEmpty())
+	{
+		ActiveRequest.RequestId = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	}
+	if (ActiveRequest.BuildId.IsEmpty())
+	{
+		ActiveRequest.BuildId = FString::Printf(
+			TEXT("%u"),
+			FNetworkVersion::GetLocalNetworkVersion());
+	}
+	ActiveRequest.Region = Request.Region.IsEmpty() || Request.Region.Equals(TEXT("auto"), ESearchCase::IgnoreCase)
+		? (Region.IsEmpty() ? TEXT("auto") : Region)
+		: Request.Region;
 	QueueTicketId.Reset();
 	LastAllocation = FFlickCoordinatorAllocation();
 	LocalReservation = FFlickCoordinatorReservation();
@@ -145,13 +158,15 @@ bool UFlickMatchmakingCoordinatorSubsystem::QueueParty(
 	SetState(EFlickCoordinatorQueueState::Submitting, TEXT("CONTACTING MATCHMAKING COORDINATOR..."));
 
 	const TSharedRef<FJsonObject> Json = MakeShared<FJsonObject>();
-	Json->SetStringField(TEXT("party_id"), Request.PartyId);
+	Json->SetStringField(TEXT("request_id"), ActiveRequest.RequestId);
+	Json->SetStringField(TEXT("build_id"), ActiveRequest.BuildId);
+	Json->SetStringField(TEXT("party_id"), ActiveRequest.PartyId);
 	Json->SetStringField(TEXT("region"), ActiveRequest.Region);
-	Json->SetNumberField(TEXT("variant"), static_cast<int32>(Request.Variant));
-	Json->SetNumberField(TEXT("players_per_team"), Request.PlayersPerTeam);
-	Json->SetBoolField(TEXT("ranked"), Request.bRanked);
+	Json->SetNumberField(TEXT("variant"), static_cast<int32>(ActiveRequest.Variant));
+	Json->SetNumberField(TEXT("players_per_team"), ActiveRequest.PlayersPerTeam);
+	Json->SetBoolField(TEXT("ranked"), ActiveRequest.bRanked);
 	TArray<TSharedPtr<FJsonValue>> Members;
-	for (const FFlickCoordinatorPartyMember& Member : Request.Members)
+	for (const FFlickCoordinatorPartyMember& Member : ActiveRequest.Members)
 	{
 		const TSharedRef<FJsonObject> MemberJson = MakeShared<FJsonObject>();
 		MemberJson->SetStringField(TEXT("account_id"), Member.AccountId);
@@ -257,6 +272,15 @@ void UFlickMatchmakingCoordinatorSubsystem::PollQueue()
 					AllocationError.IsEmpty() ? TEXT("DEDICATED SERVER ALLOCATION FAILED") : AllocationError.ToUpper());
 				return;
 			}
+			const int32 SearchSeconds = ReadJsonInt(Response, TEXT("search_elapsed_seconds"), 0);
+			const int32 RatingTolerance = ReadJsonInt(Response, TEXT("rating_tolerance"), 0);
+			SetState(
+				EFlickCoordinatorQueueState::Searching,
+				FString::Printf(
+					TEXT("SEARCHING / %02d:%02d / SKILL RANGE +/-%d"),
+					SearchSeconds / 60,
+					SearchSeconds % 60,
+					RatingTolerance));
 			SchedulePoll();
 		});
 }
@@ -395,6 +419,7 @@ void UFlickMatchmakingCoordinatorSubsystem::BeginServerHeartbeat(const FString& 
 		return;
 	}
 	HeartbeatMatchId = MatchId;
+	bStartReported = false;
 	bCompletionReported = false;
 	UE_LOG(
 		LogFlick,
@@ -403,6 +428,47 @@ void UFlickMatchmakingCoordinatorSubsystem::BeginServerHeartbeat(const FString& 
 		*HeartbeatMatchId,
 		*ServerId);
 	SendHeartbeat();
+}
+
+void UFlickMatchmakingCoordinatorSubsystem::NotifyServerMatchStarted()
+{
+	if (HeartbeatMatchId.IsEmpty() || bStartReported)
+	{
+		return;
+	}
+	bStartReported = true;
+	const FString StartedMatchId = HeartbeatMatchId;
+	const TSharedRef<FJsonObject> Json = MakeShared<FJsonObject>();
+	Json->SetStringField(TEXT("match_id"), StartedMatchId);
+	Json->SetStringField(TEXT("server_id"), ServerId);
+	Json->SetNumberField(TEXT("started_unix_time"), FDateTime::UtcNow().ToUnixTimestamp());
+	SendJsonRequest(
+		TEXT("POST"),
+		FString::Printf(
+			TEXT("/v1/servers/matches/%s/started"),
+			*FGenericPlatformHttp::UrlEncode(StartedMatchId)),
+		Json,
+		true,
+		[this, StartedMatchId](const bool bSuccess, const TSharedPtr<FJsonObject>&, const FString& Error)
+		{
+			if (!bSuccess)
+			{
+				bStartReported = false;
+			}
+			if (bSuccess)
+			{
+				UE_LOG(LogFlick, Log, TEXT("COORDINATOR_MATCH_STARTED: match=%s accepted=1"), *StartedMatchId);
+			}
+			else
+			{
+				UE_LOG(
+					LogFlick,
+					Warning,
+					TEXT("COORDINATOR_MATCH_STARTED: match=%s accepted=0 error=%s"),
+					*StartedMatchId,
+					*Error);
+			}
+		});
 }
 
 void UFlickMatchmakingCoordinatorSubsystem::NotifyServerMatchComplete(

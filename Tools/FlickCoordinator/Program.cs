@@ -74,6 +74,17 @@ app.MapPost("/v1/servers/heartbeat", (HttpRequest http, ServerHeartbeatRequest r
         : Results.NotFound(new { error = "Allocated match was not found." });
 });
 
+app.MapPost("/v1/servers/matches/{matchId}/started", (HttpRequest http, string matchId, ServerMatchStartedRequest request) =>
+{
+	if (!coordinator.IsServerAuthorized(http, matchId, request.ServerId))
+	{
+		return Results.Json(new { error = "Invalid game-server credential." }, statusCode: StatusCodes.Status401Unauthorized);
+	}
+	return coordinator.MarkMatchStarted(matchId, request)
+		? Results.Ok(new { accepted = true, match_id = matchId })
+		: Results.Json(new { error = "The reserved roster is not ready." }, statusCode: StatusCodes.Status409Conflict);
+});
+
 app.MapPost("/v1/servers/matches/{matchId}/complete", (HttpRequest http, string matchId, ServerMatchCompleteRequest request) =>
 {
     if (!coordinator.IsServerAuthorized(http, matchId, request.ServerId))
@@ -180,6 +191,9 @@ sealed class CoordinatorState
                 starting_servers = matches.Values.Count(match => !match.Ready && !match.Completed && !match.Failed),
                 ready_servers = matches.Values.Count(match => match.Ready && !match.Completed && !match.Failed),
                 failed_servers = matches.Values.Count(match => match.Failed),
+				server_lifecycle = matches.Values
+					.GroupBy(match => match.Lifecycle)
+					.ToDictionary(group => group.Key, group => group.Count()),
                 auto_launch = settings.AutoLaunchServers,
                 production = settings.IsProduction,
                 steam_validation = settings.RequireSteamTickets,
@@ -191,6 +205,12 @@ sealed class CoordinatorState
 
     public async Task<(string? TicketId, string? Error)> EnqueueAsync(QueueRequest request, CancellationToken cancellationToken)
     {
+		request = request with
+		{
+			RequestId = string.IsNullOrWhiteSpace(request.RequestId) ? Guid.NewGuid().ToString("N") : request.RequestId.Trim(),
+			BuildId = string.IsNullOrWhiteSpace(request.BuildId) ? "development" : request.BuildId.Trim(),
+			Region = string.IsNullOrWhiteSpace(request.Region) ? "auto" : request.Region.Trim().ToLowerInvariant()
+		};
         var error = ValidateQueueRequest(request);
         if (error is not null)
         {
@@ -214,11 +234,35 @@ sealed class CoordinatorState
         };
         lock (gate)
         {
+            var existingRequest = tickets.Values.FirstOrDefault(ticket =>
+                string.Equals(ticket.Request.RequestId, request.RequestId, StringComparison.Ordinal));
+            if (existingRequest is not null)
+            {
+                var sameRequest = existingRequest.Request.PartyId == request.PartyId
+                    && existingRequest.Request.BuildId == request.BuildId
+                    && existingRequest.Request.Variant == request.Variant
+                    && existingRequest.Request.PlayersPerTeam == request.PlayersPerTeam
+                    && existingRequest.Request.Ranked == request.Ranked
+                    && existingRequest.Request.Members.Select(member => member.AccountId).SequenceEqual(
+                        request.Members.Select(member => member.AccountId), StringComparer.Ordinal);
+                return sameRequest
+                    ? (existingRequest.Id, null)
+                    : (null, "The request ID is already associated with a different queue request.");
+            }
             var memberIds = request.Members.Select(member => member.AccountId).ToHashSet(StringComparer.Ordinal);
             if (tickets.Values.Any(ticket => ticket.Status == "searching" && ticket.Request.Members.Any(member => memberIds.Contains(member.AccountId))))
             {
                 return (null, "A party member already has an active matchmaking ticket.");
             }
+            var playlist = GetPlaylistKey(request);
+            request = request with
+            {
+                Members = request.Members.Select(member => member with
+                {
+                    // Diagnostic client snapshots are never matchmaking authority.
+					RatingSnapshot = GetOrCreateProgress(member.AccountId, settings.SeasonId, playlist).Rating
+                }).ToList()
+            };
             var ticket = new QueueTicket(Guid.NewGuid().ToString("N"), request, DateTimeOffset.UtcNow);
             tickets.Add(ticket.Id, ticket);
             logger.LogInformation(
@@ -243,9 +287,21 @@ sealed class CoordinatorState
             }
             if (ticket.Status == "allocating")
             {
-                return new TicketSnapshot(ticket.Id, ticket.Status, null, null);
+                return new TicketSnapshot(
+                    ticket.Id,
+                    ticket.Status,
+                    null,
+                    null,
+                    GetSearchElapsedSeconds(ticket),
+                    GetRatingTolerance(ticket));
             }
-            return new TicketSnapshot(ticket.Id, ticket.Status, ticket.Allocation, ticket.Error);
+            return new TicketSnapshot(
+                ticket.Id,
+                ticket.Status,
+                ticket.Allocation,
+                ticket.Error,
+                GetSearchElapsedSeconds(ticket),
+                GetRatingTolerance(ticket));
         }
     }
 
@@ -253,10 +309,16 @@ sealed class CoordinatorState
     {
         lock (gate)
         {
-            if (!tickets.TryGetValue(ticketId, out var ticket) || ticket.Status != "searching")
+            if (!tickets.TryGetValue(ticketId, out var ticket)
+                || ticket.Status is not ("searching" or "allocating"))
             {
                 return false;
             }
+			if (ticket.Status == "allocating")
+			{
+				CancelAllocatingTicket(ticket);
+				return true;
+			}
             ticket.Status = "cancelled";
             return true;
         }
@@ -331,6 +393,12 @@ sealed class CoordinatorState
             var verifiedReservation = reservation!;
             verifiedReservation.LastVerifiedUtc = DateTimeOffset.UtcNow;
             verifiedReservation.ReconnectDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(settings.ReconnectGraceSeconds);
+			match!.VerifiedAccounts.Add(verifiedReservation.AccountId);
+			if (match.VerifiedAccounts.Count == match.Reservations.Count && match.Lifecycle == "waiting_for_players")
+			{
+				match.Lifecycle = "ready_check";
+				logger.LogInformation("Reserved roster verified for match {Match}", match.MatchId);
+			}
             return new ReservationVerifyResponse(
                 true,
                 verifiedReservation.AccountId,
@@ -361,6 +429,7 @@ sealed class CoordinatorState
             if (!match.Ready)
             {
                 match.Ready = true;
+				match.Lifecycle = "waiting_for_players";
                 match.FirstHeartbeatUtc = match.LastHeartbeatUtc;
                 SetMatchTicketsReady(match);
                 logger.LogInformation("Server {Server} is ready for match {Match}", match.ServerId, match.MatchId);
@@ -374,17 +443,76 @@ sealed class CoordinatorState
         MatchAllocationState? match;
         lock (gate)
         {
-            if (!matches.TryGetValue(matchId, out match) || match.ServerId != request.ServerId)
+			if (!matches.TryGetValue(matchId, out match) || match.ServerId != request.ServerId)
             {
                 return false;
             }
+			if (match.Completed)
+			{
+				return match.CompletionOutcome == request.Outcome && match.CompletionForfeit == request.Forfeit;
+			}
+			if (match.Lifecycle != "playing") return false;
+			if (!match.Ranked)
+			{
+				UpdateCasualRatings(match, request.Outcome);
+			}
+			match.Lifecycle = "completing";
+			match.CompletionOutcome = request.Outcome;
+			match.CompletionForfeit = request.Forfeit;
             match.Completed = true;
             match.CompletedUtc = DateTimeOffset.UtcNow;
             match.CredentialExpiresUtc = DateTimeOffset.UtcNow.AddSeconds(120);
+			if (!match.Ranked)
+			{
+				match.Lifecycle = "result_accepted";
+			}
         }
         _ = RetireServerAfterDelay(match, TimeSpan.FromSeconds(90));
         return true;
     }
+
+	private void UpdateCasualRatings(MatchAllocationState match, int outcome)
+	{
+		if (outcome is < 1 or > 3) return;
+		var playlist = $"casual-{match.Variant}-{match.PlayersPerTeam}";
+		var snapshots = match.Reservations.ToDictionary(
+			reservation => reservation.AccountId,
+			reservation => GetOrCreateProgress(reservation.AccountId, settings.SeasonId, playlist).Clone(),
+			StringComparer.Ordinal);
+		foreach (var reservation in match.Reservations)
+		{
+			var progress = snapshots[reservation.AccountId];
+			var opponents = match.Reservations.Where(other => other.Team != reservation.Team).ToList();
+			var opponentRating = opponents.Average(other => snapshots[other.AccountId].Rating);
+			var score = outcome == 3 ? 0.5 : outcome == reservation.Team ? 1.0 : 0.0;
+			var expected = 1.0 / (1.0 + Math.Pow(10.0, (opponentRating - progress.Rating) / 400.0));
+			var updated = GetOrCreateProgress(reservation.AccountId, settings.SeasonId, playlist);
+			updated.Rating = Math.Clamp(progress.Rating + (int)Math.Round(24.0 * (score - expected)), 0, 3000);
+			updated.MatchesPlayed++;
+			if (score > 0.5) updated.Wins++;
+			else if (score < 0.5) updated.Losses++;
+			else updated.Draws++;
+		}
+		SaveRatings();
+	}
+
+	public bool MarkMatchStarted(string matchId, ServerMatchStartedRequest request)
+	{
+		lock (gate)
+		{
+			if (!matches.TryGetValue(matchId, out var match)
+				|| match.ServerId != request.ServerId
+				|| match.Completed
+				|| match.VerifiedAccounts.Count != match.Reservations.Count)
+			{
+				return false;
+			}
+			match.Lifecycle = "playing";
+			match.StartedUtc ??= DateTimeOffset.UtcNow;
+			logger.LogInformation("Match {Match} entered Playing", matchId);
+			return true;
+		}
+	}
 
     public PlayerProgress GetProgress(string accountId, string seasonId, string playlist)
     {
@@ -407,7 +535,16 @@ sealed class CoordinatorState
                 return "The coordinator has no active allocation for this match.";
             }
             var allocatedAccounts = allocation.Reservations.Select(item => item.AccountId).ToHashSet(StringComparer.Ordinal);
-            if (request.Participants.Any(participant => !allocatedAccounts.Contains(participant.AccountId)))
+			var participantAccounts = request.Participants.Select(participant => participant.AccountId).ToHashSet(StringComparer.Ordinal);
+			if (!allocation.Ranked
+				|| request.Variant != allocation.Variant
+				|| request.PlayersPerTeam != allocation.PlayersPerTeam
+				|| participantAccounts.Count != request.Participants.Count
+				|| !participantAccounts.SetEquals(allocatedAccounts)
+				|| request.Participants.Any(participant => !allocation.Reservations.Any(reservation =>
+					reservation.AccountId == participant.AccountId
+					&& reservation.Team == participant.Team
+					&& reservation.PlayerSlot == participant.PlayerSlot)))
             {
                 return "The ranked roster differs from the allocated roster.";
             }
@@ -438,6 +575,14 @@ sealed class CoordinatorState
             {
                 return (null, "The match outcome is invalid.");
             }
+			if (request.SeasonId != registration.SeasonId
+				|| request.Playlist != registration.Playlist
+				|| request.Variant != registration.Variant
+				|| request.PlayersPerTeam != registration.PlayersPerTeam
+				|| JsonSerializer.Serialize(request.Participants) != JsonSerializer.Serialize(registration.Participants))
+			{
+				return (null, "The ranked result does not match its registered authoritative roster.");
+			}
 
             var oldProgress = registration.Participants.ToDictionary(
                 participant => participant.AccountId,
@@ -472,6 +617,10 @@ sealed class CoordinatorState
             }
             var response = new RankedSettlementResponse(true, false, matchId, updates);
             settledMatches.Add(matchId, response);
+			if (matches.TryGetValue(matchId, out var completedAllocation))
+			{
+				completedAllocation.Lifecycle = "result_accepted";
+			}
             SaveRatings();
             AppendMatchHistory(registration, request, response);
             return (response, null);
@@ -506,6 +655,13 @@ sealed class CoordinatorState
                 lock (gate)
                 {
                     lastSupervisionUtc = DateTimeOffset.UtcNow;
+					foreach (var ticket in tickets.Values.Where(item =>
+						item.Status == "searching"
+						&& lastSupervisionUtc - item.CreatedUtc > TimeSpan.FromSeconds(settings.QueueTimeoutSeconds)))
+					{
+						ticket.Status = "expired";
+						ticket.Error = "The matchmaking search reached its time limit.";
+					}
                     foreach (var match in matches.Values.Where(item => !item.Completed && !item.Failed).ToList())
                     {
                         if (match.Process is not null && HasExited(match.Process))
@@ -527,8 +683,18 @@ sealed class CoordinatorState
                             && lastSupervisionUtc - match.LastHeartbeatUtc > TimeSpan.FromSeconds(settings.HeartbeatTimeoutSeconds))
                         {
                             FailMatch(match, "Server heartbeat timed out.");
+							continue;
+						}
+						if (match.Ready
+							&& match.Lifecycle == "waiting_for_players"
+							&& match.FirstHeartbeatUtc.HasValue
+							&& lastSupervisionUtc - match.FirstHeartbeatUtc.Value > TimeSpan.FromSeconds(settings.PlayerJoinTimeoutSeconds))
+						{
+                            FailMatch(match, "The reserved roster did not connect before the join timeout.");
                         }
                     }
+					// Re-evaluate waiting tickets so widening skill ranges work even when no new party queues.
+					TryAllocateMatches();
                 }
             }
         }
@@ -544,9 +710,10 @@ sealed class CoordinatorState
         {
             return "The party does not fit the selected team size.";
         }
-        if (request.Variant is < 0 or > 2 || string.IsNullOrWhiteSpace(request.PartyId))
+        if (request.Variant is < 0 or > 2 || string.IsNullOrWhiteSpace(request.PartyId)
+            || string.IsNullOrWhiteSpace(request.RequestId) || string.IsNullOrWhiteSpace(request.BuildId))
         {
-            return "The playlist or party identity is invalid.";
+            return "The playlist, build, request, or party identity is invalid.";
         }
         if (request.Members.Any(member => string.IsNullOrWhiteSpace(member.AccountId))
             || request.Members.Select(member => member.AccountId).Distinct(StringComparer.Ordinal).Count() != request.Members.Count)
@@ -557,45 +724,102 @@ sealed class CoordinatorState
         {
             return "Every party member needs a Steam WebAPI ticket.";
         }
+		if (request.Members.Any(member => member.PartySlot < 0 || member.PartySlot >= request.Members.Count)
+			|| request.Members.Select(member => member.PartySlot).Distinct().Count() != request.Members.Count)
+		{
+			return "Party slots must be unique and contiguous within the submitted party.";
+		}
         return null;
     }
 
     private void TryAllocateMatches()
     {
-        var searching = tickets.Values.Where(ticket => ticket.Status == "searching").OrderBy(ticket => ticket.CreatedUtc).ToList();
-        foreach (var group in searching.GroupBy(ticket => new
-        {
-            ticket.Request.Region,
-            ticket.Request.Variant,
-            ticket.Request.PlayersPerTeam,
-            ticket.Request.Ranked
-        }))
-        {
-            var candidates = group.Take(12).ToList();
-            var combinations = FindCombinations(candidates, group.Key.PlayersPerTeam);
-            foreach (var teamOne in combinations)
-            {
-                var remaining = candidates.Except(teamOne).ToList();
-                var teamTwo = FindCombinations(remaining, group.Key.PlayersPerTeam).FirstOrDefault();
-                if (teamTwo is null)
-                {
-                    continue;
-                }
-                if (group.Key.Ranked)
-                {
-                    var oneRating = teamOne.SelectMany(ticket => ticket.Request.Members).Average(member => member.RatingSnapshot);
-                    var twoRating = teamTwo.SelectMany(ticket => ticket.Request.Members).Average(member => member.RatingSnapshot);
-                    if (Math.Abs(oneRating - twoRating) > settings.MaximumInitialMmrGap)
-                    {
-                        continue;
-                    }
-                }
-                Allocate(teamOne, teamTwo);
-                TryAllocateMatches();
-                return;
-            }
-        }
+		while (true)
+		{
+			var searching = tickets.Values
+				.Where(ticket => ticket.Status == "searching")
+				.OrderBy(ticket => ticket.CreatedUtc)
+				.ToList();
+			MatchCandidate? best = null;
+			foreach (var group in searching.GroupBy(ticket => new
+			{
+				ticket.Request.BuildId,
+				ticket.Request.Region,
+				ticket.Request.Variant,
+				ticket.Request.PlayersPerTeam,
+				ticket.Request.Ranked
+			}))
+			{
+				var candidates = group.Take(settings.MaximumCandidateParties).ToList();
+				var teams = FindCombinations(candidates, group.Key.PlayersPerTeam);
+				foreach (var teamOne in teams)
+				{
+					foreach (var teamTwo in teams)
+					{
+						if (teamOne.Any(teamTwo.Contains)) continue;
+						var candidate = ScoreCandidate(teamOne, teamTwo, group.Key.Ranked);
+						if (candidate is not null && (best is null || candidate.Score < best.Score))
+						{
+							best = candidate;
+						}
+					}
+				}
+			}
+			if (best is null) return;
+			Allocate(best.TeamOne, best.TeamTwo);
+		}
     }
+
+	private MatchCandidate? ScoreCandidate(
+		IReadOnlyList<QueueTicket> teamOne,
+		IReadOnlyList<QueueTicket> teamTwo,
+		bool ranked)
+	{
+		var oneRating = GetTeamMatchmakingRating(teamOne);
+		var twoRating = GetTeamMatchmakingRating(teamTwo);
+		var ratingGap = Math.Abs(oneRating - twoRating);
+		// Every party must have independently widened far enough to accept the match.
+		// A long-waiting party must not drag a newly queued party into a wide search.
+		var tolerance = teamOne.Concat(teamTwo).Min(GetRatingTolerance);
+		if (ratingGap > tolerance) return null;
+
+		var onePartySizes = teamOne.Select(ticket => ticket.Request.Members.Count).OrderDescending().ToArray();
+		var twoPartySizes = teamTwo.Select(ticket => ticket.Request.Members.Count).OrderDescending().ToArray();
+		var partyShapePenalty = Math.Abs(onePartySizes.Length - twoPartySizes.Length) * 80;
+		for (var index = 0; index < Math.Min(onePartySizes.Length, twoPartySizes.Length); index++)
+		{
+			partyShapePenalty += Math.Abs(onePartySizes[index] - twoPartySizes[index]) * 50;
+		}
+		var oldestWait = teamOne.Concat(teamTwo).Max(GetSearchElapsedSeconds);
+		var rankedWeight = ranked ? 4.0 : 1.5;
+		return new MatchCandidate(
+			teamOne,
+			teamTwo,
+			ratingGap * rankedWeight + partyShapePenalty - Math.Min(oldestWait, 120));
+	}
+
+	private static double GetTeamMatchmakingRating(IEnumerable<QueueTicket> team)
+	{
+		var members = team.SelectMany(ticket => ticket.Request.Members).ToList();
+		var average = members.Average(member => member.RatingSnapshot);
+		var strongest = members.Max(member => member.RatingSnapshot);
+		return average * 0.35 + strongest * 0.65;
+	}
+
+	private int GetRatingTolerance(QueueTicket ticket)
+	{
+		var elapsed = GetSearchElapsedSeconds(ticket);
+		var initial = ticket.Request.Ranked ? settings.RankedInitialMmrGap : settings.CasualInitialMmrGap;
+		var step = ticket.Request.Ranked ? settings.RankedMmrExpansionStep : settings.CasualMmrExpansionStep;
+		var interval = ticket.Request.Ranked ? settings.RankedMmrExpansionSeconds : settings.CasualMmrExpansionSeconds;
+		return Math.Min(settings.MaximumMmrGap, initial + elapsed / Math.Max(1, interval) * step);
+	}
+
+	private static int GetSearchElapsedSeconds(QueueTicket ticket) =>
+		Math.Max(0, (int)(DateTimeOffset.UtcNow - ticket.CreatedUtc).TotalSeconds);
+
+	private static string GetPlaylistKey(QueueRequest request) =>
+		$"{(request.Ranked ? "ranked" : "casual")}-{request.Variant}-{request.PlayersPerTeam}";
 
     private static List<List<QueueTicket>> FindCombinations(IReadOnlyList<QueueTicket> tickets, int targetPlayers)
     {
@@ -633,11 +857,15 @@ sealed class CoordinatorState
         AddTeamReservations(teamTwo, 2, matchId, allReservations);
         var workloadCredential = CreateToken();
         var allTickets = teamOne.Concat(teamTwo).ToList();
+		var sample = allTickets[0].Request;
         var match = new MatchAllocationState(
             matchId,
             serverId,
             address,
             port,
+			sample.Variant,
+			sample.PlayersPerTeam,
+			sample.Ranked,
             allReservations,
             allTickets.Select(ticket => ticket.Id).ToList(),
             SHA256.HashData(Encoding.UTF8.GetBytes(workloadCredential)),
@@ -648,7 +876,6 @@ sealed class CoordinatorState
         {
             reservations.Add(reservation.Token, reservation);
         }
-        var sample = allTickets[0].Request;
         if (settings.AutoLaunchServers && !StartServer(match, sample, workloadCredential))
         {
             FailMatch(match, "The coordinator could not launch an Unreal server process.");
@@ -657,6 +884,7 @@ sealed class CoordinatorState
         if (!settings.AutoLaunchServers)
         {
             match.Ready = true;
+			match.Lifecycle = "waiting_for_players";
             match.FirstHeartbeatUtc = DateTimeOffset.UtcNow;
             match.LastHeartbeatUtc = DateTimeOffset.UtcNow;
         }
@@ -785,6 +1013,7 @@ sealed class CoordinatorState
         }
         match.Failed = true;
         match.Failure = reason;
+		match.Lifecycle = "failed";
         match.Completed = true;
         match.CompletedUtc = DateTimeOffset.UtcNow;
         foreach (var ticketId in match.TicketIds)
@@ -799,6 +1028,39 @@ sealed class CoordinatorState
         StopServer(match);
         logger.LogError("Allocation {Match} on {Server} failed: {Reason}", match.MatchId, match.ServerId, reason);
     }
+
+	private void CancelAllocatingTicket(QueueTicket cancelledTicket)
+	{
+		var match = matches.Values.FirstOrDefault(candidate =>
+			!candidate.Completed && candidate.TicketIds.Contains(cancelledTicket.Id));
+		cancelledTicket.Status = "cancelled";
+		cancelledTicket.Allocation = null;
+		if (match is null) return;
+
+		match.Failed = true;
+		match.Completed = true;
+		match.Lifecycle = "cancelled";
+		match.CompletedUtc = DateTimeOffset.UtcNow;
+		match.Failure = "A party cancelled while the server was allocating.";
+		foreach (var reservation in match.Reservations)
+		{
+			reservations.Remove(reservation.Token);
+		}
+		foreach (var ticketId in match.TicketIds.Where(id => id != cancelledTicket.Id))
+		{
+			if (tickets.TryGetValue(ticketId, out var peer))
+			{
+				peer.Status = "searching";
+				peer.Allocation = null;
+				peer.Error = null;
+			}
+		}
+		StopServer(match);
+		logger.LogInformation(
+			"Cancelled allocating ticket {Ticket}; remaining parties returned to search",
+			cancelledTicket.Id);
+		TryAllocateMatches();
+	}
 
     private static bool HasExited(Process process)
     {
@@ -939,6 +1201,7 @@ sealed class CoordinatorSettings
     public required string SteamWebApiKey { get; init; }
     public required string SteamAppId { get; init; }
     public required string SteamTicketIdentity { get; init; }
+	public required string SeasonId { get; init; }
     public required string RatingsPath { get; init; }
     public required string MatchHistoryPath { get; init; }
     public bool AutoLaunchServers { get; init; }
@@ -951,11 +1214,22 @@ sealed class CoordinatorSettings
     public int SupervisionIntervalSeconds { get; init; }
     public int ServerCredentialLifetimeSeconds { get; init; }
     public int ReconnectGraceSeconds { get; init; }
-    public int MaximumInitialMmrGap { get; init; }
+	public int PlayerJoinTimeoutSeconds { get; init; }
+	public int RankedInitialMmrGap { get; init; }
+	public int RankedMmrExpansionStep { get; init; }
+	public int RankedMmrExpansionSeconds { get; init; }
+	public int CasualInitialMmrGap { get; init; }
+	public int CasualMmrExpansionStep { get; init; }
+	public int CasualMmrExpansionSeconds { get; init; }
+	public int MaximumMmrGap { get; init; }
+	public int MaximumCandidateParties { get; init; }
+	public int QueueTimeoutSeconds { get; init; }
 
     public static CoordinatorSettings FromEnvironment(string contentRoot)
     {
-        var repositoryRoot = Path.GetFullPath(Path.Combine(contentRoot, "..", ".."));
+		var repositoryRoot = Directory.Exists(Path.Combine(contentRoot, "Source", "FLICK"))
+			? Path.GetFullPath(contentRoot)
+			: Path.GetFullPath(Path.Combine(contentRoot, "..", ".."));
         var environmentName = Environment.GetEnvironmentVariable("FLICK_COORDINATOR_ENVIRONMENT") ?? "Development";
         var isProduction = string.Equals(environmentName, "Production", StringComparison.OrdinalIgnoreCase);
         return new CoordinatorSettings
@@ -974,8 +1248,11 @@ sealed class CoordinatorSettings
             SteamWebApiKey = Environment.GetEnvironmentVariable("FLICK_STEAM_WEB_API_KEY") ?? string.Empty,
             SteamAppId = Environment.GetEnvironmentVariable("FLICK_STEAM_APP_ID") ?? "480",
             SteamTicketIdentity = Environment.GetEnvironmentVariable("FLICK_STEAM_TICKET_IDENTITY") ?? "FLICK",
-            RatingsPath = Path.Combine(repositoryRoot, "Saved", "Coordinator", "ratings.json"),
-            MatchHistoryPath = Path.Combine(repositoryRoot, "Saved", "Coordinator", "match-history.jsonl"),
+			SeasonId = Environment.GetEnvironmentVariable("FLICK_COORDINATOR_SEASON_ID") ?? "PRESEASON",
+			RatingsPath = Environment.GetEnvironmentVariable("FLICK_COORDINATOR_RATINGS_PATH")
+				?? Path.Combine(repositoryRoot, "Saved", "Coordinator", "ratings.json"),
+			MatchHistoryPath = Environment.GetEnvironmentVariable("FLICK_COORDINATOR_MATCH_HISTORY_PATH")
+				?? Path.Combine(repositoryRoot, "Saved", "Coordinator", "match-history.jsonl"),
             AutoLaunchServers = !string.Equals(Environment.GetEnvironmentVariable("FLICK_COORDINATOR_AUTO_LAUNCH"), "false", StringComparison.OrdinalIgnoreCase),
             RequireSteamTickets = isProduction || string.Equals(Environment.GetEnvironmentVariable("FLICK_COORDINATOR_REQUIRE_STEAM"), "true", StringComparison.OrdinalIgnoreCase),
             EnableSteamOnServers = isProduction || string.Equals(Environment.GetEnvironmentVariable("FLICK_SERVER_ENABLE_STEAM"), "true", StringComparison.OrdinalIgnoreCase),
@@ -986,7 +1263,16 @@ sealed class CoordinatorSettings
             SupervisionIntervalSeconds = ReadInt("FLICK_COORDINATOR_SUPERVISION_INTERVAL", 2),
             ServerCredentialLifetimeSeconds = ReadInt("FLICK_SERVER_CREDENTIAL_LIFETIME", 7200),
             ReconnectGraceSeconds = ReadInt("FLICK_COORDINATOR_RECONNECT_GRACE", 45),
-            MaximumInitialMmrGap = ReadInt("FLICK_COORDINATOR_MMR_GAP", 350)
+			PlayerJoinTimeoutSeconds = ReadInt("FLICK_COORDINATOR_PLAYER_JOIN_TIMEOUT", 90),
+			RankedInitialMmrGap = ReadInt("FLICK_RANKED_INITIAL_MMR_GAP", 50),
+			RankedMmrExpansionStep = ReadInt("FLICK_RANKED_MMR_EXPANSION_STEP", 50),
+			RankedMmrExpansionSeconds = ReadInt("FLICK_RANKED_MMR_EXPANSION_SECONDS", 12),
+			CasualInitialMmrGap = ReadInt("FLICK_CASUAL_INITIAL_MMR_GAP", 150),
+			CasualMmrExpansionStep = ReadInt("FLICK_CASUAL_MMR_EXPANSION_STEP", 100),
+			CasualMmrExpansionSeconds = ReadInt("FLICK_CASUAL_MMR_EXPANSION_SECONDS", 6),
+			MaximumMmrGap = ReadInt("FLICK_COORDINATOR_MAXIMUM_MMR_GAP", 600),
+			MaximumCandidateParties = ReadInt("FLICK_COORDINATOR_MAXIMUM_CANDIDATES", 24),
+			QueueTimeoutSeconds = ReadInt("FLICK_COORDINATOR_QUEUE_TIMEOUT", 300)
         };
     }
 
@@ -1018,6 +1304,8 @@ sealed class CoordinatorSettings
             errors.Add("Production cannot use Valve's shared test App ID 480.");
         if (RequireSteamTickets && string.IsNullOrWhiteSpace(SteamTicketIdentity))
             errors.Add("Steam ticket validation requires FLICK_STEAM_TICKET_IDENTITY.");
+		if (string.IsNullOrWhiteSpace(SeasonId))
+			errors.Add("FLICK_COORDINATOR_SEASON_ID cannot be empty.");
         if (IsProduction && string.IsNullOrWhiteSpace(ServerExecutablePath))
             errors.Add("Production requires a packaged FLICK_SERVER_EXECUTABLE.");
         if (IsProduction && (string.IsNullOrWhiteSpace(ServerPublicHost)
@@ -1025,9 +1313,13 @@ sealed class CoordinatorSettings
             errors.Add("Production requires a public FLICK_SERVER_PUBLIC_HOST.");
         if (!IsServerLaunchAvailable())
             errors.Add($"The configured server host does not exist: {GetServerHostPath()}.");
-        if (ServerStartupTimeoutSeconds < 5 || HeartbeatTimeoutSeconds < 5 || SupervisionIntervalSeconds < 1
+		if (ServerStartupTimeoutSeconds < 5 || HeartbeatTimeoutSeconds < 5 || PlayerJoinTimeoutSeconds < 10 || SupervisionIntervalSeconds < 1
             || ServerCredentialLifetimeSeconds < 300)
             errors.Add("Server lifecycle timeouts are below their safe minimums.");
+		if (RankedInitialMmrGap < 0 || CasualInitialMmrGap < 0 || MaximumMmrGap < RankedInitialMmrGap
+			|| MaximumMmrGap < CasualInitialMmrGap || RankedMmrExpansionSeconds < 1
+			|| CasualMmrExpansionSeconds < 1 || MaximumCandidateParties < 4 || QueueTimeoutSeconds < 30)
+			errors.Add("Matchmaking expansion settings are invalid.");
         return errors;
     }
 
@@ -1052,6 +1344,9 @@ sealed class MatchAllocationState(
     string serverId,
     string address,
     int port,
+	int variant,
+	int playersPerTeam,
+	bool ranked,
     List<ReservationState> reservations,
     List<string> ticketIds,
     byte[] credentialHash,
@@ -1062,6 +1357,9 @@ sealed class MatchAllocationState(
     public string ServerId { get; } = serverId;
     public string Address { get; } = address;
     public int Port { get; } = port;
+	public int Variant { get; } = variant;
+	public int PlayersPerTeam { get; } = playersPerTeam;
+	public bool Ranked { get; } = ranked;
     public List<ReservationState> Reservations { get; } = reservations;
     public List<string> TicketIds { get; } = ticketIds;
     public byte[] CredentialHash { get; } = credentialHash;
@@ -1071,10 +1369,15 @@ sealed class MatchAllocationState(
     public DateTimeOffset LastHeartbeatUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? FirstHeartbeatUtc { get; set; }
     public DateTimeOffset? CompletedUtc { get; set; }
+	public DateTimeOffset? StartedUtc { get; set; }
     public string? Failure { get; set; }
+	public string Lifecycle { get; set; } = "allocated";
+	public HashSet<string> VerifiedAccounts { get; } = new(StringComparer.Ordinal);
     public bool Ready { get; set; }
     public bool Failed { get; set; }
     public bool Completed { get; set; }
+	public int CompletionOutcome { get; set; }
+	public bool CompletionForfeit { get; set; }
 }
 
 sealed class ReservationState(
@@ -1231,14 +1534,23 @@ sealed record SteamTicketVerification(bool Accepted, string AccountId, string? E
     public static SteamTicketVerification Rejected(string error) => new(false, string.Empty, error);
 }
 
-sealed record QueueRequest(string PartyId, string Region, int Variant, int PlayersPerTeam, bool Ranked, List<QueueMember> Members);
+sealed record QueueRequest(
+	string PartyId,
+	string Region,
+	int Variant,
+	int PlayersPerTeam,
+	bool Ranked,
+	List<QueueMember> Members,
+	string RequestId = "",
+	string BuildId = "development");
 sealed record QueueMember(string AccountId, string DisplayName, string SteamTicket, int PartySlot, int RatingSnapshot);
-sealed record TicketSnapshot(string TicketId, string Status, AllocationResponse? Allocation, string? Error);
+sealed record TicketSnapshot(string TicketId, string Status, AllocationResponse? Allocation, string? Error, int SearchElapsedSeconds, int RatingTolerance);
 sealed record AllocationResponse(string MatchId, string ServerId, string Address, int Variant, int PlayersPerTeam, bool Ranked, long ExpiresUnix, List<ReservationResponse> Reservations);
 sealed record ReservationResponse(string AccountId, string Token, int Team, int PlayerSlot);
 sealed record ReservationVerifyRequest(string MatchId, string AccountId, string ReservationToken);
 sealed record ReservationVerifyResponse(bool Accepted, string AccountId, int Team, int PlayerSlot, long ReconnectDeadlineUnix, string? Error);
 sealed record ServerHeartbeatRequest(string MatchId, string ServerId, long UnixTime);
+sealed record ServerMatchStartedRequest(string MatchId, string ServerId, long StartedUnixTime);
 sealed record ServerMatchCompleteRequest(string MatchId, string ServerId, int Outcome, bool Forfeit, long CompletedUnixTime);
 sealed record RankedAuthRequest(string ClaimedAccountId, string SteamTicket, string SteamTicketAudience, string SeasonId, string Playlist);
 sealed record RankedParticipant(string AccountId, int Team, int PlayerSlot, int AuthenticatedRating);
@@ -1246,3 +1558,4 @@ sealed record RankedMatchRequest(string MatchId, string ServerId, string SeasonI
 sealed record RankedResultRequest(string MatchId, string ServerId, string SeasonId, string Playlist, int Variant, int PlayersPerTeam, long StartedUnixTime, List<RankedParticipant> Participants, int Outcome, bool Forfeit, long CompletedUnixTime);
 sealed record RankedPlayerUpdate(string AccountId, int OldRating, int NewRating, int MatchesPlayed, int OldTier, int NewTier, int OldDivision, int NewDivision);
 sealed record RankedSettlementResponse(bool Accepted, bool Duplicate, string MatchId, List<RankedPlayerUpdate> Updates);
+sealed record MatchCandidate(IReadOnlyList<QueueTicket> TeamOne, IReadOnlyList<QueueTicket> TeamTwo, double Score);

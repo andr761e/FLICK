@@ -10,10 +10,9 @@ class AFlickGameMode;
 class AFlickGameState;
 class AFlickHUD;
 class AFlickPlayerController;
+class AFlickPlayerState;
 class UFlickRankingSubsystem;
-class SButton;
-class SBox;
-class SOverlay;
+class UFlickSessionSubsystem;
 class SWidget;
 struct FFlickPlayerMatchStats;
 
@@ -81,7 +80,6 @@ private:
 	TSharedRef<SWidget> BuildOnlineSessionRow(int32 ResultIndex);
 	TSharedRef<SWidget> BuildNetworkLobby();
 	TSharedRef<SWidget> BuildLoadout();
-	TSharedRef<SWidget> BuildLoadoutModeButton(EFlickMatchVariant Variant, const FString& Label);
 	TSharedRef<SWidget> BuildLoadoutWorkspace();
 	TSharedRef<SWidget> BuildLineupRadar();
 	TSharedRef<SWidget> BuildLoadoutFormation(EFlickTeam Team);
@@ -115,36 +113,28 @@ private:
 	TSharedRef<SWidget> BuildPlayPlaylistCard(
 		EFlickPlayPlaylist Playlist,
 		const FString& Label,
-		const FString& Summary,
-		const FLinearColor& Accent,
-		bool bAvailable,
-		TSharedPtr<SButton>* OutButton = nullptr);
+		const FString& Summary);
 	TSharedRef<SWidget> BuildTrainingActivityCard(
 		EFlickTrainingActivity Activity,
 		const FString& Label,
 		const FString& Summary,
 		const FString& Detail,
-		const FLinearColor& Accent,
-		TSharedPtr<SButton>* OutButton = nullptr);
+		const FLinearColor& Accent);
 	TSharedRef<SWidget> BuildPlayFormatCard(
 		int32 PlayersPerTeam,
-		bool bBob,
-		TSharedPtr<SButton>* OutButton = nullptr);
+		bool bBob);
 	TSharedRef<SWidget> MakeMenuButton(
 		const FString& Label,
 		const FOnClicked& OnClicked,
 		bool bPrimary = false,
 		bool bDanger = false,
-		float Height = 50.0f,
-		TSharedPtr<SButton>* OutButton = nullptr);
+		float Height = 50.0f);
 	TSharedRef<SWidget> MakeMainMenuButton(
 		const FString& Label,
 		const FOnClicked& OnClicked,
 		bool bPrimary = false,
 		bool bDanger = false,
-		float Height = 74.0f,
-		TSharedPtr<SButton>* OutButton = nullptr);
-	TSharedRef<SWidget> MakeSectionLabel(const FString& Label) const;
+		float Height = 74.0f);
 	TSharedRef<SWidget> MakeToggleRow(
 		const FString& Label,
 		const TAttribute<ECheckBoxState>& State,
@@ -184,8 +174,6 @@ private:
 	FText GetRoundScoreText() const;
 	FText GetPieceCountText(EFlickTeam Team) const;
 	FText GetRoundsText(EFlickTeam Team) const;
-	FText GetLoadoutName(EFlickTeam Team, int32 SlotIndex) const;
-	FText GetLoadoutSummary(EFlickTeam Team, int32 SlotIndex) const;
 	int32 GetSelectedLoadoutSlot(EFlickTeam Team) const;
 	void SelectLoadoutSlot(EFlickTeam Team, int32 SlotIndex);
 	EFlickPieceArchetype GetPreviewLoadoutArchetype(EFlickTeam Team) const;
@@ -198,6 +186,12 @@ private:
 	FLinearColor GetModeAccent(EFlickMatchVariant Variant) const;
 	FLinearColor GetCurrentModeAccent() const;
 	FLinearColor GetTeamAccent(EFlickTeam Team) const;
+	const FFlickPrivateMatchSettings& GetDisplayedPrivateMatchSettings() const;
+	AFlickPlayerState* GetDisplayedPrivateSlotOwner(EFlickTeam Team, int32 PlayerSlot) const;
+	UFlickSessionSubsystem* GetDisplayedSessionSubsystem() const;
+	bool IsDisplayedPartyActive() const;
+	AFlickPlayerState* GetDisplayedPartyMember(int32 PartySlot) const;
+	int32 GetDisplayedPartyMemberCount() const;
 	EFlickTeam GetClassSelectionTeam() const;
 	int32 GetClassSelectionPlayerSlot() const;
 	EFlickLineupPreset GetSelectedClassDraft() const;
@@ -220,25 +214,7 @@ private:
 	FCheckBoxStyle ToggleStyle;
 	FSliderStyle SliderStyle;
 	FProgressBarStyle ShotClockBarStyle;
-	TSharedPtr<SButton> MainMenuDefaultButton;
-	TSharedPtr<SButton> ItemShopDefaultButton;
-	TSharedPtr<SButton> ProfileDefaultButton;
-	TSharedPtr<SButton> ModeSelectDefaultButton;
-	TSharedPtr<SButton> TrainingActivityDefaultButton;
-	TSharedPtr<SButton> ModeFormatDefaultButton;
-	TSharedPtr<SButton> PrivateMatchDefaultButton;
-	TSharedPtr<SButton> OnlineBrowserDefaultButton;
-	TSharedPtr<SButton> LobbyDefaultButton;
-	TSharedPtr<SButton> LoadoutDefaultButton;
-	TSharedPtr<SButton> ClassSelectDefaultButton;
-	TSharedPtr<SButton> SettingsDefaultButton;
-	TSharedPtr<SButton> PauseDefaultButton;
-	TSharedPtr<SButton> RoundOverDefaultButton;
 	TSharedPtr<SWidget> StartupOverlayWidget;
-	TSharedPtr<SBox> MainMenuScreenWidget;
-	TSharedPtr<SBox> ProfileScreenWidget;
-	TSharedPtr<SOverlay> MainMenuInteractiveWidget;
-	TSharedPtr<SBox> MainMenuSelectionWidget;
 	EFlickFrontendScreen LastFocusedScreen = EFlickFrontendScreen::Playing;
 	bool bLastRoundOverVisible = false;
 	bool bHasAppliedInitialFocus = false;

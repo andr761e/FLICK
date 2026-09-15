@@ -23,9 +23,11 @@ public:
 	bool IsLobbyReady() const { return bLobbyReady; }
 	void ResetNetworkClassSelection(EFlickLineupPreset InClass = EFlickLineupPreset::Balanced);
 	void SetNetworkSelectedClass(EFlickLineupPreset InClass);
+	bool SetNetworkSelectedLineup(const TArray<EFlickPieceArchetype>& InLineup);
 	void SetNetworkClassConfirmed(bool bInConfirmed);
 	EFlickLineupPreset GetNetworkSelectedClass() const { return NetworkSelectedClass; }
 	bool IsNetworkClassConfirmed() const { return bNetworkClassConfirmed; }
+	const TArray<EFlickPieceArchetype>& GetNetworkSelectedLineup() const { return NetworkSelectedLineup; }
 	void SetPartyRole(bool bInLeader, int32 InPartySlot);
 	void SetPartyIdentity(const FString& InPartyId, bool bInLeader, int32 InPartySlot);
 	bool IsPartyLeader() const { return bPartyLeader; }
@@ -56,6 +58,9 @@ private:
 
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Player|Class")
 	bool bNetworkClassConfirmed = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Player|Class")
+	TArray<EFlickPieceArchetype> NetworkSelectedLineup;
 
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Party")
 	bool bPartyLeader = false;

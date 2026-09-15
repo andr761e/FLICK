@@ -97,17 +97,7 @@ private:
 	void DrawPartyFrontend(const AFlickGameState& GameState, const AFlickPlayerController& Controller, float Width, float Height);
 	void DrawControls(float Height);
 	void DrawTeamBlock(EFlickTeam Team, int32 ActivePieces, int32 StartingPieces, int32 ShotsTaken, int32 RoundsWon, int32 RoundsToWin, float X, float Y, float Width, bool bCurrent);
-	void DrawMainMenu(const AFlickGameMode& GameMode, float Width, float Height);
-	void DrawLoadoutMenu(const AFlickGameMode& GameMode, float Width, float Height);
-	void DrawPauseMenu(const AFlickGameMode& GameMode, float Width, float Height);
-	void DrawSettingsMenu(const AFlickGameMode& GameMode, float Width, float Height);
 	void DrawMenuButton(EFlickMenuAction Action, const FString& Label, float X, float Y, float Width, float Height, const FLinearColor& Accent, bool bPrimary = false);
-	void DrawModeCard(const AFlickGameMode& GameMode, EFlickMatchVariant Variant, float X, float Y, float Width, float Height);
-	void DrawLoadoutSlot(const AFlickGameMode& GameMode, EFlickTeam Team, int32 SlotIndex, float X, float Y, float Width, float Height);
-	void DrawArchetypeReference(float X, float Y, float Width);
-	void DrawToggleRow(EFlickMenuAction Action, const FString& Label, bool bEnabled, float X, float Y, float Width);
-	void DrawSliderRow(EFlickMenuAction Action, const FString& Label, float Value, float X, float Y, float Width);
-	void DrawCycleRow(EFlickMenuAction PreviousAction, EFlickMenuAction NextAction, const FString& Label, const FString& Value, float X, float Y, float Width);
 	void AddMenuHitRegion(
 		EFlickMenuAction Action,
 		const FBox2D& Bounds,

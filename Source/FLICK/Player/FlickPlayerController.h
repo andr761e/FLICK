@@ -138,7 +138,7 @@ private:
 	void ServerRequestStartNetworkMatch();
 
 	UFUNCTION(Server, Reliable)
-	void ServerSelectNetworkClass(EFlickLineupPreset Preset);
+	void ServerSelectNetworkClass(EFlickLineupPreset Preset, const TArray<EFlickPieceArchetype>& Lineup);
 
 	UFUNCTION(Server, Reliable)
 	void ServerConfirmNetworkClass();
@@ -252,6 +252,7 @@ private:
 	bool bNetworkAutoReadySubmitted = false;
 	bool bNetworkAutoStartSubmitted = false;
 	bool bNetworkAutoClassSubmitted = false;
+	bool bNetworkClassLineupSubmitted = false;
 	bool bCareerStatsRecordedForCurrentSeries = false;
 	float NetworkGameplayElapsed = 0.0f;
 };

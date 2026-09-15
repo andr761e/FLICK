@@ -143,7 +143,7 @@ void AFlickHUD::DrawHUD()
 	{
 		return;
 	}
-	if (!FlickGameMode && FlickGameState->bPrivateMatchLobbyActive && FlickController)
+	if (!FlickGameMode && !GameLayer.IsValid() && FlickGameState->bPrivateMatchLobbyActive && FlickController)
 	{
 		DrawPrivateMatchFrontend(*FlickGameState, *FlickController, Width, Height);
 		return;
@@ -153,7 +153,7 @@ void AFlickHUD::DrawHUD()
 		DrawNetworkLobby(*FlickGameState, *FlickController, Width, Height);
 		return;
 	}
-	if (!FlickGameMode && FlickGameState->bPartyActive && FlickController)
+	if (!FlickGameMode && !GameLayer.IsValid() && FlickGameState->bPartyActive && FlickController)
 	{
 		DrawPartyFrontend(*FlickGameState, *FlickController, Width, Height);
 		return;
@@ -717,7 +717,7 @@ void AFlickHUD::DrawRoundOver(const AFlickGameState& GameState, const float Widt
 		ResultColor,
 		18.0f);
 	const FString Result = GameState.bDraw
-		? GameState.bSeriesComplete ? TEXT("MATCH DRAW") : TEXT("ROUND DRAW")
+		? TEXT("ROUND DRAW")
 		: (GameState.bSeriesComplete
 			? FString::Printf(TEXT("PLAYER %d CHAMPION"), GetTeamNumber(GameState.WinnerTeam))
 			: FString::Printf(TEXT("PLAYER %d TAKES ROUND"), GetTeamNumber(GameState.WinnerTeam)));
@@ -729,14 +729,10 @@ void AFlickHUD::DrawRoundOver(const AFlickGameState& GameState, const float Widt
 		MutedTextColor,
 		0.76f);
 	DrawCenteredText(Result, Width * 0.5f, Height * 0.38f, ResultColor, 1.85f, true);
-	const FString SeriesScore = GameState.bSeriesComplete && GameState.Player1RoundsWon == GameState.Player2RoundsWon
-		? FString::Printf(
-			TEXT("SERIES  %d - %d   |   POINTS  %d - %d"),
-			GameState.Player1RoundsWon,
-			GameState.Player2RoundsWon,
-			GameState.GetTeamScore(EFlickTeam::Player1),
-			GameState.GetTeamScore(EFlickTeam::Player2))
-		: FString::Printf(TEXT("SERIES  %d  -  %d"), GameState.Player1RoundsWon, GameState.Player2RoundsWon);
+	const FString SeriesScore = FString::Printf(
+		TEXT("SERIES  %d  -  %d"),
+		GameState.Player1RoundsWon,
+		GameState.Player2RoundsWon);
 	DrawCenteredText(
 		SeriesScore,
 		Width * 0.5f,
@@ -1366,252 +1362,6 @@ bool AFlickHUD::HandleMenuClick(const FVector2D& ScreenPosition)
 	return false;
 }
 
-void AFlickHUD::DrawMainMenu(const AFlickGameMode& GameMode, const float Width, const float Height)
-{
-	DrawPanel(0.0f, 0.0f, Width, Height, FLinearColor(0.005f, 0.008f, 0.013f, 0.82f));
-	const float Margin = FMath::Max(54.0f, Width * 0.055f);
-	const float LeftWidth = FMath::Min(400.0f, Width * 0.34f);
-	const float RightX = FMath::Max(Width * 0.48f, Margin + LeftWidth + 42.0f);
-	const float RightWidth = Width - RightX - Margin;
-	const FLinearColor SelectedColor = GetModeColor(GameMode.GetSelectedMatchVariant());
-
-	DrawPanel(Margin, 76.0f, 7.0f, 190.0f, SelectedColor);
-	DrawText(TEXT("FLICK"), FLinearColor::White, Margin + 28.0f, 74.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 3.1f);
-	DrawText(TEXT("TABLETOP KNOCKOUT"), MutedTextColor, Margin + 31.0f, 176.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.9f);
-	DrawText(
-		GetMatchVariantName(GameMode.GetSelectedMatchVariant()),
-		SelectedColor,
-		Margin + 31.0f,
-		226.0f,
-		GEngine ? GEngine->GetLargeFont() : nullptr,
-		1.05f);
-	DrawText(
-		GetMatchVariantSummary(GameMode.GetSelectedMatchVariant()),
-		MutedTextColor,
-		Margin + 31.0f,
-		262.0f,
-		GEngine ? GEngine->GetSmallFont() : nullptr,
-		0.68f);
-
-	const float ButtonY = Height - 238.0f;
-	DrawMenuButton(EFlickMenuAction::OpenLoadout, TEXT("BUILD LINEUPS"), Margin, ButtonY, LeftWidth, 56.0f, SelectedColor, true);
-	DrawMenuButton(EFlickMenuAction::OpenSettings, TEXT("SETTINGS"), Margin, ButtonY + 68.0f, LeftWidth, 48.0f, FLinearColor(0.38f, 0.43f, 0.48f, 1.0f));
-	DrawMenuButton(EFlickMenuAction::Quit, TEXT("QUIT"), Margin, ButtonY + 128.0f, LeftWidth, 48.0f, FLinearColor(0.52f, 0.25f, 0.24f, 1.0f));
-
-	DrawPanel(RightX - 24.0f, 56.0f, RightWidth + 48.0f, Height - 112.0f, FLinearColor(0.025f, 0.032f, 0.043f, 0.82f));
-	DrawText(TEXT("SELECT MODE"), FLinearColor::White, RightX, 82.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 1.0f);
-	DrawText(TEXT("FOUR PUCKS PER SIDE  |  BOB OBJECTIVE MODE"), MutedTextColor, RightX, 116.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f);
-
-	const float CardHeight = 104.0f;
-	DrawModeCard(GameMode, EFlickMatchVariant::Classic, RightX, 190.0f, RightWidth, CardHeight);
-	DrawModeCard(GameMode, EFlickMatchVariant::Bob, RightX, 326.0f, RightWidth, CardHeight);
-
-	DrawText(TEXT("MOUSE"), SelectedColor, RightX, Height - 86.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f);
-	DrawText(TEXT("SELECT  /  PULL  /  RELEASE"), MutedTextColor, RightX + 72.0f, Height - 86.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f);
-}
-
-void AFlickHUD::DrawLoadoutMenu(const AFlickGameMode& GameMode, const float Width, const float Height)
-{
-	DrawPanel(0.0f, 0.0f, Width, Height, FLinearColor(0.004f, 0.007f, 0.011f, 0.9f));
-	const float PanelWidth = FMath::Min(1120.0f, Width - 64.0f);
-	const float PanelHeight = FMath::Min(640.0f, Height - 48.0f);
-	const float X = (Width - PanelWidth) * 0.5f;
-	const float Y = (Height - PanelHeight) * 0.5f;
-	const float Accent = 5.0f;
-	const FLinearColor ModeColor = GetModeColor(GameMode.GetSelectedMatchVariant());
-	const int32 PieceCount = GameMode.GetCurrentStartingPiecesPerTeam();
-
-	DrawPanel(X, Y, PanelWidth, PanelHeight, FLinearColor(0.018f, 0.024f, 0.033f, 0.98f));
-	DrawPanel(X, Y, PanelWidth, Accent, ModeColor);
-	DrawText(TEXT("BUILD YOUR LINEUP"), FLinearColor::White, X + 36.0f, Y + 26.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 1.55f);
-	DrawText(
-		FString::Printf(TEXT("%s  |  %d %s EACH"), *GetMatchVariantName(GameMode.GetSelectedMatchVariant()), PieceCount, PieceCount == 1 ? TEXT("PUCK") : TEXT("PUCKS")),
-		ModeColor,
-		X + 38.0f,
-		Y + 76.0f,
-		GEngine ? GEngine->GetSmallFont() : nullptr,
-		0.78f);
-
-	const float ContentX = X + 36.0f;
-	const float Gap = 28.0f;
-	const float ColumnWidth = (PanelWidth - 72.0f - Gap) * 0.5f;
-	const float Player2X = ContentX + ColumnWidth + Gap;
-	DrawText(TEXT("PLAYER 1"), GetTeamColor(EFlickTeam::Player1), ContentX, Y + 112.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 0.92f);
-	DrawText(TEXT("PLAYER 2"), GetTeamColor(EFlickTeam::Player2), Player2X, Y + 112.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 0.92f);
-
-	const float RowStartY = Y + 148.0f;
-	constexpr float RowHeight = 66.0f;
-	constexpr float RowStep = 76.0f;
-	for (int32 SlotIndex = 0; SlotIndex < PieceCount; ++SlotIndex)
-	{
-		const float RowY = RowStartY + SlotIndex * RowStep;
-		DrawLoadoutSlot(GameMode, EFlickTeam::Player1, SlotIndex, ContentX, RowY, ColumnWidth, RowHeight);
-		DrawLoadoutSlot(GameMode, EFlickTeam::Player2, SlotIndex, Player2X, RowY, ColumnWidth, RowHeight);
-	}
-
-	DrawText(TEXT("PUCK CLASSES"), MutedTextColor, ContentX, Y + PanelHeight - 228.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.65f);
-	DrawArchetypeReference(ContentX, Y + PanelHeight - 204.0f, PanelWidth - 72.0f);
-
-	const float ButtonY = Y + PanelHeight - 68.0f;
-	DrawMenuButton(EFlickMenuAction::Back, TEXT("BACK"), ContentX, ButtonY, 180.0f, 44.0f, FLinearColor(0.4f, 0.45f, 0.5f, 1.0f));
-	DrawMenuButton(
-		EFlickMenuAction::StartMatch,
-		FString::Printf(TEXT("START %s"), *GetMatchVariantName(GameMode.GetSelectedMatchVariant())),
-		X + PanelWidth - 256.0f,
-		ButtonY,
-		220.0f,
-		44.0f,
-		ModeColor,
-		true);
-}
-
-void AFlickHUD::DrawLoadoutSlot(
-	const AFlickGameMode& GameMode,
-	const EFlickTeam Team,
-	const int32 SlotIndex,
-	const float X,
-	const float Y,
-	const float Width,
-	const float Height)
-{
-	const EFlickPieceArchetype Archetype = GameMode.GetLoadoutPiece(Team, SlotIndex);
-	const FFlickPieceArchetypeRules& Rules = FlickPieceArchetypeRules::Get(Archetype);
-	const FLinearColor TeamColor = GetTeamColor(Team);
-	const FLinearColor AccentColor = Rules.AccentColor;
-	const FBox2D PreviousBounds(FVector2D(X + 50.0f, Y + 14.0f), FVector2D(X + 84.0f, Y + 52.0f));
-	const FBox2D NextBounds(FVector2D(X + Width - 42.0f, Y + 14.0f), FVector2D(X + Width - 8.0f, Y + 52.0f));
-
-	DrawPanel(X, Y, Width, Height, FLinearColor(0.045f, 0.055f, 0.07f, 0.96f));
-	DrawPanel(X, Y, 4.0f, Height, AccentColor);
-	DrawCircle(FVector2D(X + 27.0f, Y + Height * 0.5f), 15.0f, TeamColor, 24, 4.0f);
-	DrawCenteredText(GetPieceArchetypeMark(Archetype), X + 27.0f, Y + 23.0f, AccentColor, 0.68f, true);
-
-	AddMenuHitRegion(EFlickMenuAction::PreviousLoadoutPiece, PreviousBounds, EFlickMatchVariant::Classic, Team, SlotIndex);
-	AddMenuHitRegion(EFlickMenuAction::NextLoadoutPiece, NextBounds, EFlickMatchVariant::Classic, Team, SlotIndex);
-	DrawPanel(PreviousBounds.Min.X, PreviousBounds.Min.Y, 34.0f, 38.0f, IsMenuRegionHovered(PreviousBounds) ? TeamColor : FLinearColor(0.12f, 0.14f, 0.17f, 1.0f));
-	DrawPanel(NextBounds.Min.X, NextBounds.Min.Y, 34.0f, 38.0f, IsMenuRegionHovered(NextBounds) ? TeamColor : FLinearColor(0.12f, 0.14f, 0.17f, 1.0f));
-	DrawCenteredText(TEXT("<"), PreviousBounds.Min.X + 17.0f, PreviousBounds.Min.Y + 8.0f, FLinearColor::White, 0.75f, true);
-	DrawCenteredText(TEXT(">"), NextBounds.Min.X + 17.0f, NextBounds.Min.Y + 8.0f, FLinearColor::White, 0.75f, true);
-
-	const float TextX = X + 100.0f;
-	DrawText(GetPieceArchetypeName(Archetype), AccentColor, TextX, Y + 10.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 0.8f);
-	DrawText(Rules.Summary, MutedTextColor, TextX, Y + 37.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.6f);
-}
-
-void AFlickHUD::DrawArchetypeReference(const float X, const float Y, const float Width)
-{
-	constexpr int32 ColumnCount = 3;
-	constexpr float Gap = 6.0f;
-	constexpr float ItemHeight = 38.0f;
-	const float ItemWidth = (Width - Gap * (ColumnCount - 1)) / ColumnCount;
-	for (int32 Index = 0; Index < FlickPieceArchetypeRules::ArchetypeCount; ++Index)
-	{
-		const EFlickPieceArchetype Archetype = static_cast<EFlickPieceArchetype>(Index);
-		const FFlickPieceArchetypeRules& Rules = FlickPieceArchetypeRules::Get(Archetype);
-		const int32 Column = Index % ColumnCount;
-		const int32 Row = Index / ColumnCount;
-		const float ItemX = X + Column * (ItemWidth + Gap);
-		const float ItemY = Y + Row * (ItemHeight + Gap);
-		DrawPanel(ItemX, ItemY, ItemWidth, ItemHeight, FLinearColor(0.038f, 0.047f, 0.06f, 0.96f));
-		DrawPanel(ItemX, ItemY, 3.0f, ItemHeight, Rules.AccentColor);
-		DrawText(GetPieceArchetypeName(Archetype), Rules.AccentColor, ItemX + 10.0f, ItemY + 5.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 0.55f);
-		DrawText(Rules.ClassLabel, MutedTextColor, ItemX + 10.0f, ItemY + 22.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.42f);
-	}
-}
-
-void AFlickHUD::DrawPauseMenu(const AFlickGameMode& GameMode, const float Width, const float Height)
-{
-	DrawPanel(0.0f, 0.0f, Width, Height, FLinearColor(0.004f, 0.006f, 0.01f, 0.72f));
-	const float PanelWidth = FMath::Min(440.0f, Width - 80.0f);
-	const float PanelHeight = FMath::Min(530.0f, Height - 90.0f);
-	const float X = (Width - PanelWidth) * 0.5f;
-	const float Y = (Height - PanelHeight) * 0.5f;
-	const FLinearColor Accent = GetModeColor(GameMode.GetSelectedMatchVariant());
-
-	DrawPanel(X, Y, PanelWidth, PanelHeight, FLinearColor(0.018f, 0.024f, 0.033f, 0.97f));
-	DrawPanel(X, Y, PanelWidth, 5.0f, Accent);
-	DrawCenteredText(TEXT("PAUSED"), Width * 0.5f, Y + 42.0f, FLinearColor::White, 1.7f, true);
-	const AFlickGameState* GameState = GameMode.GetFlickGameState();
-	DrawCenteredText(
-		GameState
-			? FString::Printf(
-				TEXT("%s  |  ROUND %d  |  %d-%d"),
-				*GetMatchVariantName(GameMode.GetSelectedMatchVariant()),
-				GameState->RoundNumber,
-				GameState->Player1RoundsWon,
-				GameState->Player2RoundsWon)
-			: GetMatchVariantName(GameMode.GetSelectedMatchVariant()),
-		Width * 0.5f,
-		Y + 94.0f,
-		Accent,
-		0.72f);
-
-	const float ButtonX = X + 54.0f;
-	const float ButtonWidth = PanelWidth - 108.0f;
-	DrawMenuButton(EFlickMenuAction::Resume, TEXT("RESUME"), ButtonX, Y + 145.0f, ButtonWidth, 52.0f, Accent, true);
-	DrawMenuButton(EFlickMenuAction::Restart, TEXT("RESTART MATCH"), ButtonX, Y + 211.0f, ButtonWidth, 48.0f, FLinearColor(0.42f, 0.47f, 0.52f, 1.0f));
-	DrawMenuButton(EFlickMenuAction::OpenSettings, TEXT("SETTINGS"), ButtonX, Y + 273.0f, ButtonWidth, 48.0f, FLinearColor(0.42f, 0.47f, 0.52f, 1.0f));
-	DrawMenuButton(EFlickMenuAction::MainMenu, TEXT("MAIN MENU"), ButtonX, Y + 335.0f, ButtonWidth, 48.0f, FLinearColor(0.52f, 0.25f, 0.24f, 1.0f));
-	DrawCenteredText(TEXT("ESC  RESUME"), Width * 0.5f, Y + PanelHeight - 42.0f, MutedTextColor, 0.66f);
-}
-
-void AFlickHUD::DrawSettingsMenu(const AFlickGameMode& GameMode, const float Width, const float Height)
-{
-	DrawPanel(0.0f, 0.0f, Width, Height, FLinearColor(0.003f, 0.006f, 0.01f, 0.9f));
-	const float PanelWidth = FMath::Min(1040.0f, Width - 56.0f);
-	const float PanelHeight = FMath::Min(650.0f, Height - 40.0f);
-	const float X = (Width - PanelWidth) * 0.5f;
-	const float Y = (Height - PanelHeight) * 0.5f;
-	const FLinearColor Accent(0.08f, 0.78f, 0.88f, 1.0f);
-	const float ColumnGap = 42.0f;
-	const float ColumnWidth = (PanelWidth - 138.0f) * 0.5f;
-	const float LeftX = X + 48.0f;
-	const float RightX = LeftX + ColumnWidth + ColumnGap;
-
-	DrawPanel(X, Y, PanelWidth, PanelHeight, FLinearColor(0.018f, 0.024f, 0.033f, 0.98f));
-	DrawPanel(X, Y, PanelWidth, 5.0f, Accent);
-	DrawText(TEXT("SETTINGS"), FLinearColor::White, LeftX, Y + 24.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 1.35f);
-	DrawText(TEXT("GAMEPLAY"), Accent, LeftX, Y + 82.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f);
-	DrawToggleRow(EFlickMenuAction::ToggleAimGuide, TEXT("AIM + CONTACT GUIDE"), GameMode.IsAimGuideEnabled(), LeftX, Y + 105.0f, ColumnWidth);
-	DrawToggleRow(EFlickMenuAction::ToggleWorldEffects, TEXT("WORLD IMPACT FX"), GameMode.AreImpactEffectsEnabled(), LeftX, Y + 157.0f, ColumnWidth);
-	DrawSliderRow(EFlickMenuAction::SetCameraShake, TEXT("CAMERA SHAKE"), GameMode.GetCameraShakeIntensity(), LeftX, Y + 209.0f, ColumnWidth);
-
-	DrawText(TEXT("AUDIO MIX"), Accent, LeftX, Y + 280.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f);
-	DrawSliderRow(EFlickMenuAction::SetMasterVolume, TEXT("MASTER"), GameMode.GetMasterVolume(), LeftX, Y + 303.0f, ColumnWidth);
-	DrawSliderRow(EFlickMenuAction::SetEffectsVolume, TEXT("PHYSICS FX"), GameMode.GetEffectsVolume(), LeftX, Y + 355.0f, ColumnWidth);
-	DrawSliderRow(EFlickMenuAction::SetInterfaceVolume, TEXT("INTERFACE"), GameMode.GetInterfaceVolume(), LeftX, Y + 407.0f, ColumnWidth);
-
-	DrawText(TEXT("DISPLAY"), Accent, RightX, Y + 82.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f);
-	DrawToggleRow(EFlickMenuAction::ToggleVSync, TEXT("V-SYNC"), GameMode.IsVSyncEnabled(), RightX, Y + 105.0f, ColumnWidth);
-	DrawCycleRow(
-		EFlickMenuAction::PreviousWindowMode,
-		EFlickMenuAction::NextWindowMode,
-		TEXT("WINDOW MODE"),
-		GameMode.GetWindowModeLabel(),
-		RightX,
-		Y + 157.0f,
-		ColumnWidth);
-	DrawCycleRow(
-		EFlickMenuAction::PreviousResolution,
-		EFlickMenuAction::NextResolution,
-		TEXT("RESOLUTION"),
-		GameMode.GetResolutionLabel(),
-		RightX,
-		Y + 209.0f,
-		ColumnWidth);
-
-	DrawPanel(RightX, Y + 292.0f, ColumnWidth, 160.0f, FLinearColor(0.032f, 0.041f, 0.054f, 0.94f));
-	DrawPanel(RightX, Y + 292.0f, 4.0f, 160.0f, GetModeColor(GameMode.GetSelectedMatchVariant()));
-	DrawText(TEXT("MATCH FORMAT"), MutedTextColor, RightX + 20.0f, Y + 314.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f);
-	DrawText(GameMode.IsBobMode() ? TEXT("ONE BOARD") : TEXT("BEST OF FIVE"), FLinearColor::White, RightX + 20.0f, Y + 347.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 1.0f);
-	DrawText(GameMode.IsBobMode() ? TEXT("STANDARD PUCKS ONLY") : TEXT("FIRST TO 3 ROUNDS"), GetModeColor(GameMode.GetSelectedMatchVariant()), RightX + 20.0f, Y + 386.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f);
-	DrawText(TEXT("OPENING PLAYER ALTERNATES"), MutedTextColor, RightX + 20.0f, Y + 417.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f);
-
-	const float ButtonY = Y + PanelHeight - 69.0f;
-	DrawMenuButton(EFlickMenuAction::Back, TEXT("BACK"), LeftX, ButtonY, 180.0f, 44.0f, FLinearColor(0.4f, 0.45f, 0.5f, 1.0f));
-	DrawMenuButton(EFlickMenuAction::ApplyDisplay, TEXT("APPLY DISPLAY"), X + PanelWidth - 254.0f, ButtonY, 200.0f, 44.0f, Accent, true);
-}
-
 void AFlickHUD::DrawMenuButton(
 	const EFlickMenuAction Action,
 	const FString& Label,
@@ -1631,97 +1381,6 @@ void AFlickHUD::DrawMenuButton(
 	DrawPanel(X, Y, Width, Height, Background);
 	DrawPanel(X, Y, bHovered || bPrimary ? 5.0f : 2.0f, Height, Accent);
 	DrawCenteredText(Label, X + Width * 0.5f, Y + Height * 0.27f, FLinearColor::White, bPrimary ? 0.92f : 0.8f, bPrimary);
-}
-
-void AFlickHUD::DrawModeCard(
-	const AFlickGameMode& GameMode,
-	const EFlickMatchVariant Variant,
-	const float X,
-	const float Y,
-	const float Width,
-	const float Height)
-{
-	const FBox2D Bounds(FVector2D(X, Y), FVector2D(X + Width, Y + Height));
-	AddMenuHitRegion(EFlickMenuAction::SelectMode, Bounds, Variant);
-	const bool bSelected = GameMode.GetSelectedMatchVariant() == Variant;
-	const bool bHovered = IsMenuRegionHovered(Bounds);
-	const FLinearColor Accent = GetModeColor(Variant);
-	DrawPanel(
-		X,
-		Y,
-		Width,
-		Height,
-		bSelected || bHovered ? FLinearColor(0.075f, 0.09f, 0.11f, 0.98f) : FLinearColor(0.042f, 0.052f, 0.068f, 0.94f));
-	DrawPanel(X, Y, bSelected ? 7.0f : 3.0f, Height, Accent);
-	DrawText(GetMatchVariantName(Variant), bSelected ? Accent : FLinearColor::White, X + 24.0f, Y + 18.0f, GEngine ? GEngine->GetLargeFont() : nullptr, 0.95f);
-	DrawText(GetMatchVariantSummary(Variant), MutedTextColor, X + 24.0f, Y + 58.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f);
-	if (bSelected)
-	{
-		DrawCircle(FVector2D(X + Width - 32.0f, Y + Height * 0.5f), 10.0f, Accent, 24, 3.0f);
-		DrawCircle(FVector2D(X + Width - 32.0f, Y + Height * 0.5f), 3.0f, FLinearColor::White, 16, 2.0f);
-	}
-}
-
-void AFlickHUD::DrawToggleRow(
-	const EFlickMenuAction Action,
-	const FString& Label,
-	const bool bEnabled,
-	const float X,
-	const float Y,
-	const float Width)
-{
-	DrawText(Label, FLinearColor::White, X, Y + 13.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f);
-	DrawPanel(X, Y + 51.0f, Width, 1.0f, FLinearColor(0.16f, 0.18f, 0.21f, 0.8f));
-	const float ToggleWidth = 94.0f;
-	const FBox2D Bounds(FVector2D(X + Width - ToggleWidth, Y + 8.0f), FVector2D(X + Width, Y + 42.0f));
-	AddMenuHitRegion(Action, Bounds);
-	const FLinearColor Accent = bEnabled ? FLinearColor(0.08f, 0.78f, 0.88f, 1.0f) : FLinearColor(0.23f, 0.25f, 0.28f, 1.0f);
-	DrawPanel(Bounds.Min.X, Bounds.Min.Y, ToggleWidth, 34.0f, IsMenuRegionHovered(Bounds) ? FMath::Lerp(Accent, FLinearColor::White, 0.18f) : Accent);
-	DrawCenteredText(bEnabled ? TEXT("ON") : TEXT("OFF"), Bounds.Min.X + ToggleWidth * 0.5f, Bounds.Min.Y + 8.0f, FLinearColor::White, 0.7f);
-}
-
-void AFlickHUD::DrawSliderRow(
-	const EFlickMenuAction Action,
-	const FString& Label,
-	const float Value,
-	const float X,
-	const float Y,
-	const float Width)
-{
-	const float SafeValue = FMath::Clamp(Value, 0.0f, 1.0f);
-	DrawText(Label, FLinearColor::White, X, Y + 13.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f);
-	DrawText(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(SafeValue * 100.0f)), MutedTextColor, X + Width - 344.0f, Y + 13.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.7f);
-	DrawPanel(X, Y + 51.0f, Width, 1.0f, FLinearColor(0.16f, 0.18f, 0.21f, 0.8f));
-	const float SliderWidth = 260.0f;
-	const float SliderX = X + Width - SliderWidth;
-	const FBox2D Bounds(FVector2D(SliderX, Y + 10.0f), FVector2D(SliderX + SliderWidth, Y + 42.0f));
-	AddMenuHitRegion(Action, Bounds);
-	DrawPanel(SliderX, Y + 22.0f, SliderWidth, 8.0f, FLinearColor(0.16f, 0.18f, 0.21f, 1.0f));
-	DrawPanel(SliderX, Y + 22.0f, SliderWidth * SafeValue, 8.0f, FLinearColor(0.08f, 0.78f, 0.88f, 1.0f));
-	DrawCircle(FVector2D(SliderX + SliderWidth * SafeValue, Y + 26.0f), IsMenuRegionHovered(Bounds) ? 9.0f : 7.0f, FLinearColor::White, 20, 3.0f);
-}
-
-void AFlickHUD::DrawCycleRow(
-	const EFlickMenuAction PreviousAction,
-	const EFlickMenuAction NextAction,
-	const FString& Label,
-	const FString& Value,
-	const float X,
-	const float Y,
-	const float Width)
-{
-	DrawText(Label, FLinearColor::White, X, Y + 13.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f);
-	DrawPanel(X, Y + 51.0f, Width, 1.0f, FLinearColor(0.16f, 0.18f, 0.21f, 0.8f));
-	const float ControlX = X + Width - 300.0f;
-	const FBox2D PreviousBounds(FVector2D(ControlX, Y + 7.0f), FVector2D(ControlX + 42.0f, Y + 43.0f));
-	const FBox2D NextBounds(FVector2D(ControlX + 258.0f, Y + 7.0f), FVector2D(ControlX + 300.0f, Y + 43.0f));
-	AddMenuHitRegion(PreviousAction, PreviousBounds);
-	AddMenuHitRegion(NextAction, NextBounds);
-	DrawPanel(PreviousBounds.Min.X, PreviousBounds.Min.Y, 42.0f, 36.0f, IsMenuRegionHovered(PreviousBounds) ? FLinearColor(0.12f, 0.72f, 0.82f, 1.0f) : FLinearColor(0.18f, 0.21f, 0.25f, 1.0f));
-	DrawPanel(NextBounds.Min.X, NextBounds.Min.Y, 42.0f, 36.0f, IsMenuRegionHovered(NextBounds) ? FLinearColor(0.12f, 0.72f, 0.82f, 1.0f) : FLinearColor(0.18f, 0.21f, 0.25f, 1.0f));
-	DrawCenteredText(TEXT("<"), PreviousBounds.Min.X + 21.0f, PreviousBounds.Min.Y + 8.0f, FLinearColor::White, 0.8f, true);
-	DrawCenteredText(TEXT(">"), NextBounds.Min.X + 21.0f, NextBounds.Min.Y + 8.0f, FLinearColor::White, 0.8f, true);
-	DrawCenteredText(Value, ControlX + 150.0f, Y + 15.0f, FLinearColor(0.08f, 0.78f, 0.88f, 1.0f), 0.72f);
 }
 
 void AFlickHUD::AddMenuHitRegion(

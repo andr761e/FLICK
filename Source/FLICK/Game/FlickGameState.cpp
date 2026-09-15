@@ -136,14 +136,11 @@ void AFlickGameState::CompleteRound(const EFlickMatchOutcome Outcome)
 		Outcome,
 		Player1RoundsWon,
 		Player2RoundsWon,
-		RoundsToWin,
-		RoundNumber,
-		GetTeamScore(EFlickTeam::Player1),
-		GetTeamScore(EFlickTeam::Player2));
+		RoundsToWin);
 	Player1RoundsWon = Result.Player1RoundsWon;
 	Player2RoundsWon = Result.Player2RoundsWon;
 	WinnerTeam = Result.bSeriesComplete ? Result.SeriesWinner : Result.RoundWinner;
-	bDraw = Result.bSeriesComplete ? Result.bSeriesDraw : Result.bRoundDraw;
+	bDraw = Result.bRoundDraw;
 	bSeriesComplete = Result.bSeriesComplete;
 	MatchPhase = EFlickMatchPhase::RoundOver;
 }

@@ -76,7 +76,7 @@ public:
 	bool FindSessions();
 	bool JoinSession(int32 ResultIndex);
 	bool UpdateSessionVariant(EFlickMatchVariant Variant);
-	bool ConvertPartyToPrivateMatch(EFlickMatchVariant Variant, int32 PlayersPerTeam);
+	bool UpdatePartyMemberCount(int32 PartySize);
 	bool StartMatchmaking(
 		EFlickMatchVariant Variant,
 		int32 PlayersPerTeam,

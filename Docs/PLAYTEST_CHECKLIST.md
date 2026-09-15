@@ -7,7 +7,7 @@ Use this after each meaningful physics tuning pass.
 - Does the main-menu background rotate through 4v4, 3v3, and BOB while `Next Match` remains the player's selected mode?
 - Does each automatic arena change ease through its transition without a visible one-frame rebuild or input interruption?
 - Are 3v3 Knockout, 4v4 Knockout, and BOB the only selectable modes?
-- Do both Knockout cards and result screens consistently say Best of 5 / first to three rounds?
+- Do all Knockout cards and result screens consistently say first to three round wins?
 - Does a Knockout match continue at two round wins and end exactly on the third?
 - Does Knockout rematch reset the series to 0-0 and restart behavior preserve the selected format?
 - Can Player 1 configure every active lineup slot before starting without an unnecessary mirrored editor?

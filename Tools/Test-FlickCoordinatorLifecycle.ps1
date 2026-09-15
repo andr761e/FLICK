@@ -29,6 +29,8 @@ try {
 
     function Add-QueueTicket([string]$AccountId) {
         $Body = @{
+            request_id = "request-$AccountId"
+            build_id = 'lifecycle-build'
             party_id = "crash-$AccountId"
             region = 'local'
             variant = 0

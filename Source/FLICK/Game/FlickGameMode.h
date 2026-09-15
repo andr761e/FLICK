@@ -171,7 +171,6 @@ public:
 	FVector GetCinematicReplayShotDirection(int32 ShotIndex) const;
 	float GetCinematicReplayShotPower(int32 ShotIndex) const;
 	const AFlickTestArena* GetTestArena() const { return TestArenaActor; }
-	float GetShotTimeRemaining() const;
 	float GetShotClockFraction(EFlickTeam Team) const;
 	float GetInitialClassSelectionTimeRemaining() const { return FMath::Max(0.0f, InitialClassSelectionTimeRemaining); }
 	float GetRoundAdvanceTimeRemaining() const;
@@ -187,8 +186,6 @@ public:
 	int32 GetMatchmakingPlayersPerTeam() const { return MatchmakingPlayersPerTeam; }
 	int32 GetPartyMemberCount() const;
 	AFlickPlayerState* GetPartyMember(int32 PartySlot) const;
-	bool CanOpenPartyTeamLobby(int32 PlayersPerTeam) const;
-	void OpenPartyTeamLobby(int32 PlayersPerTeam);
 	bool CanQueuePartyForMatchmaking(int32 PlayersPerTeam) const;
 	void QueuePartyForMatchmaking(int32 PlayersPerTeam);
 	void PreparePartyMigrationToMatch(const FString& TargetSessionId);
@@ -221,7 +218,6 @@ public:
 	EFlickLineupPreset GetLoadoutPreset(EFlickTeam Team) const;
 	EFlickPieceArchetype GetClassLoadoutPiece(EFlickLineupPreset Preset, int32 SlotIndex) const;
 	EFlickLineupPreset GetPlayerClass(EFlickTeam Team, int32 PlayerSlot, bool bUseDraft = false) const;
-	int32 GetClassSelectionPlayersPerTeam() const;
 	bool IsChangingClassForNextRound() const { return bClassSelectionForNextRound; }
 	bool IsPreparingTrainingBotMatch() const { return bClassSelectionStartsTrainingBotMatch; }
 	bool HasPendingClassChanges() const { return bHasPendingClassChanges; }
@@ -259,7 +255,6 @@ public:
 	void CloseOnlineBrowser();
 	void OpenLoadout();
 	void CloseLoadout();
-	void SelectLoadoutEditingVariant(EFlickMatchVariant Variant);
 	void SelectLoadoutEditingPreset(EFlickLineupPreset Preset);
 	void OpenItemShop();
 	void CloseItemShop();
@@ -277,7 +272,7 @@ public:
 	void StartPrivateMatch(APlayerController* RequestingPlayer);
 	void SelectPlayerClass(EFlickTeam Team, int32 PlayerSlot, EFlickLineupPreset Preset);
 	void ConfirmClassSelection();
-	void SetNetworkPlayerClass(APlayerController* RequestingPlayer, EFlickLineupPreset Preset);
+	void SetNetworkPlayerClass(APlayerController* RequestingPlayer, EFlickLineupPreset Preset, const TArray<EFlickPieceArchetype>& Lineup);
 	void ConfirmNetworkPlayerClass(APlayerController* RequestingPlayer);
 	void CancelClassSelection();
 	void OpenClassChange();
@@ -300,7 +295,6 @@ public:
 	void ToggleRankedQueue();
 	void SetRankedQueueSelected(bool bRanked);
 	void StartSelectedMatchmaking();
-	void StartUnrankedMatchmaking();
 	void CancelUnrankedMatchmaking();
 	void RemovePartyMember(int32 PartySlot);
 	void DisbandParty();
@@ -609,6 +603,7 @@ private:
 	void AutoAssignPrivateMatchSlots();
 	void RefreshPrivatePrimaryAssignments();
 	void ResetPrivateMatchReadiness();
+	void SynchronizePartyState();
 	void PushPrivateMatchState();
 	EFlickPieceArchetype GetPlayerClassPiece(EFlickTeam Team, int32 PlayerSlot, int32 PieceSlot) const;
 	void DestroyPieces();
@@ -640,7 +635,6 @@ private:
 		int32 PartySize,
 		EFlickTeam& OutTeam,
 		int32& OutPlayerSlot);
-	EFlickTeam FindAvailableTeam(const APlayerController* PlayerToIgnore = nullptr) const;
 	bool FindAvailableTeamAndSlot(
 		const APlayerController* PlayerToIgnore,
 		EFlickTeam& OutTeam,
@@ -896,6 +890,7 @@ private:
 	bool bCoordinatorQueuePending = false;
 	int32 PendingCoordinatorTeamSize = 1;
 	FString CoordinatorMatchId;
+	FString ActivePartyId;
 	FDelegateHandle CoordinatorAllocatedHandle;
 	bool bMatchmakingLobbyLocked = false;
 	float MatchmakingQueueElapsed = 0.0f;
@@ -904,6 +899,10 @@ private:
 	float MatchFoundConfirmationTimeoutSeconds = 30.0f;
 	TMap<FString, EFlickTeam> DisconnectedPlayerTeams;
 	TMap<FString, int32> DisconnectedPlayerSlots;
+	TMap<FString, TArray<int32>> DisconnectedPrivateControlledSlots;
+
+	UPROPERTY(EditDefaultsOnly, Category = "FLICK|Online", meta = (ClampMin = "5.0", ClampMax = "180.0"))
+	float PrivateMatchReconnectGraceSeconds = 45.0f;
 	TMap<APlayerController*, FString> IncomingPartyIds;
 	TMap<APlayerController*, int32> IncomingPartySlots;
 	TMap<APlayerController*, int32> IncomingPartySizes;

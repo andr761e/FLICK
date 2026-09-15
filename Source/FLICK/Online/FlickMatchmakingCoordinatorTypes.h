@@ -31,6 +31,8 @@ struct FFlickCoordinatorPartyMember
 
 struct FFlickCoordinatorQueueRequest
 {
+	FString RequestId;
+	FString BuildId;
 	FString PartyId;
 	FString Region = TEXT("auto");
 	EFlickMatchVariant Variant = EFlickMatchVariant::Classic;
@@ -71,4 +73,3 @@ struct FFlickCoordinatorReservationResult
 
 using FFlickCoordinatorQueueCallback = TFunction<void(bool, const FString&)>;
 using FFlickCoordinatorReservationCallback = TFunction<void(const FFlickCoordinatorReservationResult&)>;
-

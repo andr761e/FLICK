@@ -50,6 +50,7 @@ public:
 	bool TryReconnect(APlayerController* LocalController);
 	void ClearReconnectReservation();
 	void BeginServerHeartbeat(const FString& MatchId);
+	void NotifyServerMatchStarted();
 	void NotifyServerMatchComplete(EFlickMatchOutcome Outcome, bool bForfeit);
 
 	FOnFlickCoordinatorChanged OnCoordinatorChanged;
@@ -89,6 +90,7 @@ private:
 	float ReconnectGraceSeconds = 45.0f;
 	bool bRequireSteamAuthentication = false;
 	bool bRequestInFlight = false;
+	bool bStartReported = false;
 	bool bCompletionReported = false;
 	FFlickCoordinatorQueueRequest ActiveRequest;
 	FFlickCoordinatorAllocation LastAllocation;

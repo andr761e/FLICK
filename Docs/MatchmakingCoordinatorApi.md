@@ -8,6 +8,8 @@ The coordinator sits between a queued Steam party and an authoritative game serv
 
 ```json
 {
+  "request_id": "retry-safe-client-generated-id",
+  "build_id": "network-compatible-build-id",
   "party_id": "persistent-party-guid",
   "region": "eu-north",
   "variant": 0,
@@ -25,9 +27,11 @@ The coordinator sits between a queued Steam party and an authoritative game serv
 }
 ```
 
-Production services must validate every Steam ticket and load canonical ratings. `rating_snapshot` is useful for diagnostics only. Parties are indivisible and may never be split across teams.
+`request_id` makes retries idempotent: resubmitting the same request returns the original ticket, while reusing it for different parameters is rejected. `build_id` prevents network-incompatible clients from sharing a match.
 
-The response contains a `ticket_id`. Poll `GET /v1/matchmaking/tickets/{ticket_id}` until its status is `allocated`; `allocating` means the process exists but has not sent its first heartbeat. Cancel with `DELETE` on the same path.
+Production services validate every Steam ticket and load canonical ratings. `rating_snapshot` is useful for diagnostics only and is replaced by the coordinator's stored playlist rating before matching. Parties are indivisible and may never be split across teams. Party strength is weighted toward its strongest member, and similarly shaped parties are preferred.
+
+The response contains a `ticket_id`. Poll `GET /v1/matchmaking/tickets/{ticket_id}` until its status is `allocated`; `allocating` means the process exists but has not sent its first heartbeat. Search responses include elapsed seconds and the current rating tolerance. Ranked starts at approximately ±50 MMR and widens every 12 seconds; casual starts wider and expands faster. Cancel with `DELETE` on the same path. Cancelling an allocating party retires that incomplete allocation and returns unaffected parties to search.
 
 An allocation contains a backend-generated match ID, server address, expiry, and one opaque reservation per member of the requesting party. Each reservation fixes that account to one team and player slot. Only deliver a party's own reservations to that party.
 
@@ -39,9 +43,12 @@ Tokens must be random, short-lived, bound to one match and account, stored hashe
 
 ## Server Lifecycle
 
+- Internal allocation state follows `allocated → waiting_for_players → ready_check → playing → completing → result_accepted`.
 - `POST /v1/servers/heartbeat` keeps an allocation healthy.
+- `POST /v1/servers/matches/{match_id}/started` is accepted only after every reserved account has been verified.
 - `POST /v1/servers/matches/{match_id}/complete` marks normal or forfeited completion.
 - Missing heartbeats cause the allocator to quarantine or replace the server.
+- A healthy server is retired if its complete reserved roster does not arrive before the configured join timeout.
 - Completion eventually recycles the process after clients have viewed the post-match screen.
 
 All server endpoints require `Authorization: Bearer <workload credential>` and `X-Flick-Server-Id`. The coordinator creates a random credential for each allocation, stores only its SHA-256 digest, injects the raw value into that server process, and expires it after the configured lifetime. The shared development key is accepted only outside `Production` and can be disabled with `FLICK_ALLOW_DEVELOPMENT_SERVER_KEY=false`.

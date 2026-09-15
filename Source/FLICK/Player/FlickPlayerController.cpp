@@ -95,6 +95,21 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 			}
 		}
 	}
+	if (NetworkState && NetworkState->bNetworkClassSelectionActive)
+	{
+		if (!bNetworkClassLineupSubmitted)
+		{
+			bNetworkClassLineupSubmitted = true;
+			const AFlickPlayerState* LocalState = GetPlayerState<AFlickPlayerState>();
+			RequestSelectClass(LocalState
+				? LocalState->GetNetworkSelectedClass()
+				: EFlickLineupPreset::Balanced);
+		}
+	}
+	else
+	{
+		bNetworkClassLineupSubmitted = false;
+	}
 	if (bNetworkAutoReadyRequested && NetworkState
 		&& NetworkState->bNetworkClassSelectionActive && !bNetworkAutoClassSubmitted)
 	{
@@ -1033,13 +1048,21 @@ void AFlickPlayerController::RequestSelectClass(const EFlickLineupPreset Preset)
 	const AFlickGameState* FlickGameState = GetFlickGameState();
 	if (FlickGameState && FlickGameState->bNetworkClassSelectionActive)
 	{
+		TArray<EFlickPieceArchetype> Lineup;
+		if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
+		{
+			for (int32 PieceSlot = 0; PieceSlot < 4; ++PieceSlot)
+			{
+				Lineup.Add(Instance->GetClassLoadoutPiece(Preset, PieceSlot));
+			}
+		}
 		if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 		{
-			FlickGameMode->SetNetworkPlayerClass(this, Preset);
+			FlickGameMode->SetNetworkPlayerClass(this, Preset, Lineup);
 		}
 		else
 		{
-			ServerSelectNetworkClass(Preset);
+			ServerSelectNetworkClass(Preset, Lineup);
 		}
 		return;
 	}
@@ -1108,6 +1131,11 @@ void AFlickPlayerController::LeaveNetworkSession()
 	{
 		if (UFlickSessionSubsystem* Sessions = GameInstance->GetSubsystem<UFlickSessionSubsystem>())
 		{
+			if (Sessions->IsPartySession())
+			{
+				Sessions->LeaveSession(true);
+				return;
+			}
 			if (Sessions->HasPersistentPartyIdentity())
 			{
 				Sessions->RestorePersistentParty(Sessions->IsPersistentPartyLeader());
@@ -1333,11 +1361,13 @@ void AFlickPlayerController::ServerRequestStartNetworkMatch_Implementation()
 	}
 }
 
-void AFlickPlayerController::ServerSelectNetworkClass_Implementation(const EFlickLineupPreset Preset)
+void AFlickPlayerController::ServerSelectNetworkClass_Implementation(
+	const EFlickLineupPreset Preset,
+	const TArray<EFlickPieceArchetype>& Lineup)
 {
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
-		FlickGameMode->SetNetworkPlayerClass(this, Preset);
+		FlickGameMode->SetNetworkPlayerClass(this, Preset, Lineup);
 	}
 }
 

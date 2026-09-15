@@ -36,6 +36,57 @@ namespace
 		return FlickPieceArchetypeRules::GetPreset(EFlickLineupPreset::Balanced);
 	}
 
+	void EnsureUniqueLoadout(
+		TArray<EFlickPieceArchetype>& Loadout,
+		const TArray<EFlickPieceArchetype>& PreferredReplacements)
+	{
+		TArray<EFlickPieceArchetype> UsedArchetypes;
+		for (int32 SlotIndex = 0; SlotIndex < Loadout.Num(); ++SlotIndex)
+		{
+			if (!UsedArchetypes.Contains(Loadout[SlotIndex]))
+			{
+				UsedArchetypes.Add(Loadout[SlotIndex]);
+				continue;
+			}
+
+			bool bReplaced = false;
+			for (const EFlickPieceArchetype Candidate : PreferredReplacements)
+			{
+				if (!UsedArchetypes.Contains(Candidate))
+				{
+					Loadout[SlotIndex] = Candidate;
+					UsedArchetypes.Add(Candidate);
+					bReplaced = true;
+					break;
+				}
+			}
+			for (int32 Value = 0; !bReplaced && Value < FlickPieceArchetypeRules::ArchetypeCount; ++Value)
+			{
+				const EFlickPieceArchetype Candidate = static_cast<EFlickPieceArchetype>(Value);
+				if (!UsedArchetypes.Contains(Candidate))
+				{
+					Loadout[SlotIndex] = Candidate;
+					UsedArchetypes.Add(Candidate);
+					bReplaced = true;
+				}
+			}
+		}
+	}
+
+	void SetUniqueLoadoutPiece(
+		TArray<EFlickPieceArchetype>& Loadout,
+		const int32 SlotIndex,
+		const EFlickPieceArchetype Archetype)
+	{
+		const int32 ExistingSlot = Loadout.Find(Archetype);
+		if (ExistingSlot != INDEX_NONE && ExistingSlot != SlotIndex)
+		{
+			Swap(Loadout[ExistingSlot], Loadout[SlotIndex]);
+			return;
+		}
+		Loadout[SlotIndex] = Archetype;
+	}
+
 	void LoadLoadout(
 		const TCHAR* Key,
 		const TArray<EFlickPieceArchetype>& DefaultLoadout,
@@ -52,6 +103,7 @@ namespace
 				static_cast<int32>(EFlickPieceArchetype::Toppler));
 			OutLoadout[Index] = static_cast<EFlickPieceArchetype>(Value);
 		}
+		EnsureUniqueLoadout(OutLoadout, DefaultLoadout);
 	}
 
 	TArray<FString> SaveLoadout(const TArray<EFlickPieceArchetype>& Loadout)
@@ -383,7 +435,16 @@ void UFlickGameInstance::CycleLoadoutPiece(
 		return;
 	}
 
-	Loadout[SlotIndex] = FlickPieceArchetypeRules::Cycle(Loadout[SlotIndex], Direction);
+	EFlickPieceArchetype Candidate = Loadout[SlotIndex];
+	for (int32 Step = 0; Step < FlickPieceArchetypeRules::ArchetypeCount; ++Step)
+	{
+		Candidate = FlickPieceArchetypeRules::Cycle(Candidate, Direction);
+		if (!Loadout.Contains(Candidate))
+		{
+			Loadout[SlotIndex] = Candidate;
+			break;
+		}
+	}
 	SaveFrontendSettings();
 }
 
@@ -404,7 +465,7 @@ void UFlickGameInstance::SetLoadoutPiece(
 		static_cast<int32>(Archetype),
 		static_cast<int32>(EFlickPieceArchetype::Standard),
 		static_cast<int32>(EFlickPieceArchetype::Toppler));
-	Loadout[SlotIndex] = static_cast<EFlickPieceArchetype>(SafeValue);
+	SetUniqueLoadoutPiece(Loadout, SlotIndex, static_cast<EFlickPieceArchetype>(SafeValue));
 	SaveFrontendSettings();
 }
 
@@ -456,7 +517,7 @@ void UFlickGameInstance::SetClassLoadoutPiece(
 		static_cast<int32>(Archetype),
 		static_cast<int32>(EFlickPieceArchetype::Standard),
 		static_cast<int32>(EFlickPieceArchetype::Toppler));
-	(*Loadout)[SlotIndex] = static_cast<EFlickPieceArchetype>(SafeValue);
+	SetUniqueLoadoutPiece(*Loadout, SlotIndex, static_cast<EFlickPieceArchetype>(SafeValue));
 	SaveFrontendSettings();
 }
 

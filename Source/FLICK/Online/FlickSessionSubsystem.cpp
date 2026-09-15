@@ -360,42 +360,32 @@ bool UFlickSessionSubsystem::UpdateSessionVariant(const EFlickMatchVariant Varia
 	return true;
 }
 
-bool UFlickSessionSubsystem::ConvertPartyToPrivateMatch(
-	const EFlickMatchVariant Variant,
-	const int32 PlayersPerTeam)
+bool UFlickSessionSubsystem::UpdatePartyMemberCount(const int32 PartySize)
 {
 	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
 	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
 	FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
 	if (!NamedSession || ActivePurpose != EFlickSessionPurpose::Party)
 	{
-		SetState(EFlickSessionState::Error, TEXT("CREATE A PARTY BEFORE OPENING A TEAM LOBBY"));
 		return false;
 	}
 
-	const int32 TeamSize = FMath::Clamp(PlayersPerTeam, 2, 3);
+	PersistentPartySize = FMath::Clamp(PartySize, 1, FlickMaximumPartyMembers);
 	FOnlineSessionSettings UpdatedSettings = NamedSession->SessionSettings;
-	UpdatedSettings.NumPublicConnections = TeamSize * 2;
-	UpdatedSettings.bShouldAdvertise = false;
-	UpdatedSettings.bAllowJoinInProgress = true;
-	UpdatedSettings.bAllowInvites = true;
-	UpdatedSettings.bAllowJoinViaPresence = true;
-	UpdatedSettings.bAllowJoinViaPresenceFriendsOnly = true;
-	UpdatedSettings.Set(FlickVariantKey, static_cast<int32>(Variant), EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
-	UpdatedSettings.Set(FlickTeamSizeKey, TeamSize, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
-	UpdatedSettings.Set(FlickPurposeKey, FlickMatchPurpose, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
-	UpdatedSettings.Set(FlickRankedKey, 0, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	UpdatedSettings.Set(
+		FlickPartySizeKey,
+		PersistentPartySize,
+		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	UpdatedSettings.Set(
+		FlickAcceptingPlayersKey,
+		PersistentPartySize < FlickMaximumPartyMembers ? 1 : 0,
+		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 	if (!Sessions->UpdateSession(NAME_GameSession, UpdatedSettings, true))
 	{
-		SetState(EFlickSessionState::Error, TEXT("STEAM COULD NOT EXPAND THE PARTY INTO A TEAM LOBBY"));
+		UE_LOG(LogFlick, Warning, TEXT("Steam could not refresh the advertised party size"));
 		return false;
 	}
-
-	ActivePurpose = EFlickSessionPurpose::Match;
-	bPendingRanked = false;
-	SetState(
-		EFlickSessionState::InSession,
-		FString::Printf(TEXT("PRIVATE %dV%d LOBBY READY - INVITE THE OPPOSING TEAM"), TeamSize, TeamSize));
+	OnSessionsChanged.Broadcast();
 	return true;
 }
 
@@ -708,6 +698,10 @@ bool UFlickSessionSubsystem::RestorePersistentParty(const bool bLeader)
 		return LeaveSession(true);
 	}
 	bRestoreAsPartyLeader = bLeader;
+	if (bRestoreAsPartyLeader)
+	{
+		bPersistentPartyLeader = true;
+	}
 	bRestorePartyAfterDestroy = false;
 	bPartyRestoreSearch = false;
 	PartyRestoreAttempts = 0;
@@ -757,6 +751,18 @@ void UFlickSessionSubsystem::SchedulePartyRestoreRetry()
 		SetState(EFlickSessionState::Error, TEXT("YOUR PARTY COULD NOT BE RESTORED - RETURNING TO THE FRONTEND"));
 		ClearPersistentPartyIdentity();
 		TravelToFrontend();
+		return;
+	}
+	const int32 TakeoverAttempt = 3 + FMath::Max(0, PersistentPartySlot - 1) * 2;
+	if (!bPersistentPartyLeader && PersistentPartySlot > 0 && PartyRestoreAttempts >= TakeoverAttempt)
+	{
+		bPersistentPartyLeader = true;
+		bRestoreAsPartyLeader = true;
+		PendingMaximumPlayers = FlickMaximumPartyMembers;
+		PendingPartySize = FMath::Max(PersistentPartySize - 1, 1);
+		PendingPurpose = EFlickSessionPurpose::Party;
+		SetState(EFlickSessionState::Creating, TEXT("PARTY HOST LOST - REBUILDING THE PARTY..."));
+		BeginCreateSession(EFlickMatchVariant::Classic, PendingMaximumPlayers, PendingPurpose);
 		return;
 	}
 	FTimerHandle RetryTimer;
@@ -1553,6 +1559,11 @@ void UFlickSessionSubsystem::HandleInviteAccepted(
 		SetState(EFlickSessionState::Error, TEXT("THE STEAM INVITE WAS NO LONGER VALID"));
 		return;
 	}
+	if (State == EFlickSessionState::Joining || bJoinAfterDestroy || PendingJoinResult.IsValid())
+	{
+		UE_LOG(LogFlick, Verbose, TEXT("Ignored duplicate party invite acceptance while a join is already in progress"));
+		return;
+	}
 	UE_LOG(LogFlick, Log, TEXT("Steam lobby invite accepted by local controller %d"), ControllerId);
 	if (HasActiveSession())
 	{
@@ -1589,7 +1600,8 @@ void UFlickSessionSubsystem::HandleNetworkFailure(
 	}
 	UE_LOG(LogFlick, Warning, TEXT("Online network failure (%d): %s"), static_cast<int32>(FailureType), *ErrorString);
 	SetState(EFlickSessionState::Error, FString::Printf(TEXT("CONNECTION LOST: %s"), *ErrorString.ToUpper()));
-	if (ActivePurpose == EFlickSessionPurpose::Matchmaking && HasPersistentPartyIdentity())
+	if ((ActivePurpose == EFlickSessionPurpose::Matchmaking || ActivePurpose == EFlickSessionPurpose::Party)
+		&& HasPersistentPartyIdentity())
 	{
 		RestorePersistentParty(ShouldLeadPartyRestorationAfterFailure());
 		return;
@@ -1615,7 +1627,8 @@ void UFlickSessionSubsystem::HandleTravelFailure(
 		}
 	}
 	SetState(EFlickSessionState::Error, FString::Printf(TEXT("COULD NOT ENTER LOBBY: %s"), *ErrorString.ToUpper()));
-	if (ActivePurpose == EFlickSessionPurpose::Matchmaking && HasPersistentPartyIdentity())
+	if ((ActivePurpose == EFlickSessionPurpose::Matchmaking || ActivePurpose == EFlickSessionPurpose::Party)
+		&& HasPersistentPartyIdentity())
 	{
 		RestorePersistentParty(ShouldLeadPartyRestorationAfterFailure());
 		return;
@@ -1630,15 +1643,9 @@ bool UFlickSessionSubsystem::ShouldLeadPartyRestorationAfterFailure() const
 		return true;
 	}
 
-	const APlayerController* LocalController = GetGameInstance()
-		? GetGameInstance()->GetFirstLocalPlayerController()
-		: nullptr;
-	const AFlickPlayerState* LocalPlayerState = LocalController
-		? LocalController->GetPlayerState<AFlickPlayerState>()
-		: nullptr;
-	return LocalPlayerState
-		&& LocalPlayerState->GetTeam() == EFlickTeam::Player1
-		&& PersistentPartySlot == 1;
+	// If the original listen host disappears, the next stable party slot is the
+	// deterministic replacement. Everyone else searches for that recreated lobby.
+	return PersistentPartySlot == 1;
 }
 
 void UFlickSessionSubsystem::TravelToFrontend()
