@@ -730,7 +730,9 @@ void AFlickGameMode::PushPrivateMatchState()
 
 void AFlickGameMode::OpenPrivateMatchSetup()
 {
-	if (bMatchmakingRequested || bNetworkMatchStarted)
+	// Private matches reuse the party leader's listen server, never an
+	// allocated public server. Standalone remains available for local play.
+	if (GetNetMode() == NM_DedicatedServer || bMatchmakingRequested || bNetworkMatchStarted)
 	{
 		return;
 	}
@@ -739,7 +741,11 @@ void AFlickGameMode::OpenPrivateMatchSetup()
 	{
 		return;
 	}
-	if (bPartyRequested && (!Participants[0] || !Participants[0]->IsPartyLeader()))
+	const APlayerController* HostController = GetWorld()->GetFirstPlayerController();
+	const AFlickPlayerState* HostState = HostController
+		? HostController->GetPlayerState<AFlickPlayerState>() : nullptr;
+	if (bPartyRequested && (!HostController || !HostController->IsLocalController()
+		|| !HostState || !HostState->IsPartyLeader()))
 	{
 		return;
 	}
@@ -809,7 +815,12 @@ void AFlickGameMode::CyclePrivateMatchSetting(
 	const EFlickPrivateMatchSetting Setting,
 	const int32 Direction)
 {
-	if (!bPrivateMatchSetupActive || Direction == 0)
+	const APlayerController* HostController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	const AFlickPlayerState* HostState = HostController
+		? HostController->GetPlayerState<AFlickPlayerState>() : nullptr;
+	if (!bPrivateMatchSetupActive || Direction == 0 || GetNetMode() == NM_DedicatedServer
+		|| (bPartyRequested && (!HostController || !HostController->IsLocalController()
+			|| !HostState || !HostState->IsPartyLeader())))
 	{
 		return;
 	}
@@ -923,7 +934,7 @@ void AFlickGameMode::SetPrivateMatchSpectating(APlayerController* RequestingPlay
 
 bool AFlickGameMode::CanStartPrivateMatch() const
 {
-	if (!bPrivateMatchSetupActive || !IsNetworkLobby())
+	if (GetNetMode() == NM_DedicatedServer || !bPrivateMatchSetupActive || !IsNetworkLobby())
 	{
 		return false;
 	}
@@ -946,13 +957,16 @@ void AFlickGameMode::StartPrivateMatch(APlayerController* RequestingPlayer)
 	const AFlickPlayerState* RequestingState = RequestingPlayer
 		? RequestingPlayer->GetPlayerState<AFlickPlayerState>()
 		: nullptr;
-	const bool bHost = RequestingPlayer && !RequestingPlayer->GetNetConnection();
+	const bool bHost = RequestingPlayer && RequestingPlayer->IsLocalController();
 	if (!CanStartPrivateMatch()
-		|| (!bHost && (!RequestingState || !RequestingState->IsPartyLeader())))
+		|| !bHost || (bPartyRequested && (!RequestingState || !RequestingState->IsPartyLeader())))
 	{
 		return;
 	}
 	FlickPrivateMatchRules::Normalize(PrivateMatchSettings);
+	// Custom games must never register or settle a competitive result.
+	bMatchmakingRequested = false;
+	bRankedRequested = false;
 	SelectedMatchVariant = NormalizeMatchVariant(PrivateMatchSettings.Variant);
 	MatchmakingPlayersPerTeam = PrivateMatchSettings.PlayersPerTeam;
 	CompleteNetworkMatchStart(FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphens));

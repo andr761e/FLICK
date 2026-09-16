@@ -19,4 +19,8 @@ Til OH;
 - Make red ring in BOB Arena smaller so it encloses the pucks
 
 Things to implement;
--
+- Add the option to view the board from the top
+- Add local host to private matches
+- There was some leftover test arena text in shot replays
+- Make sure that the picture adjusts to the screen (See OH's ultra wide screen for example)
+- Expand settings
