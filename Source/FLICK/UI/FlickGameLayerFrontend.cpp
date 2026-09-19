@@ -106,7 +106,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			SNew(SOverlay)
 			.Visibility_Lambda([this]()
 			{
-				if (!GameMode.IsValid()) return EVisibility::Collapsed;
+				// A joined party client has no local authority GameMode, but should
+				// still retain the normal frontend rather than seeing only the arena.
+				if (!GameMode.IsValid()) return EVisibility::Visible;
 				if (GameMode->GetFrontendScreen() == EFlickFrontendScreen::MainMenu) return EVisibility::Visible;
 				return EVisibility::Collapsed;
 			})
@@ -125,6 +127,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					[
 						MakeMainMenuButton(TEXT("PLAY"), FOnClicked::CreateLambda([this]()
 						{
+							if (!GameMode.IsValid()) return FReply::Handled();
 							SelectedPlayPlaylist = EFlickPlayPlaylist::None;
 							SelectedTrainingActivity = EFlickTrainingActivity::None;
 							if (GameMode.IsValid()) GameMode->OpenModeSelect();
@@ -139,7 +142,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					[
 						MakeMainMenuButton(TEXT("LINEUPS"), FOnClicked::CreateLambda([this]()
 						{
-							if (GameMode.IsValid()) GameMode->OpenLoadout();
+							if (GameMode.IsValid()) GameMode->OpenLoadout(); else RemotePartyScreen = EFlickFrontendScreen::Loadout;
 							return FReply::Handled();
 						}), false, false, MainMenuStackMetrics::GetRowHeight(1))
 					]
@@ -151,7 +154,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						MakeMainMenuButton(TEXT("PROFILE"), FOnClicked::CreateLambda([this]()
 						{
 							SelectedProfileTab = EFlickProfileTab::Stats;
-							if (GameMode.IsValid()) GameMode->OpenProfile();
+							if (GameMode.IsValid()) GameMode->OpenProfile(); else RemotePartyScreen = EFlickFrontendScreen::Profile;
 							return FReply::Handled();
 						}), false, false, MainMenuStackMetrics::GetRowHeight(2))
 					]
@@ -162,7 +165,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					[
 						MakeMainMenuButton(TEXT("ITEM SHOP"), FOnClicked::CreateLambda([this]()
 						{
-							if (GameMode.IsValid()) GameMode->OpenItemShop();
+							if (GameMode.IsValid()) GameMode->OpenItemShop(); else RemotePartyScreen = EFlickFrontendScreen::ItemShop;
 							return FReply::Handled();
 						}), false, false, MainMenuStackMetrics::GetRowHeight(3))
 					]
@@ -173,7 +176,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					[
 						MakeMainMenuButton(TEXT("SETTINGS"), FOnClicked::CreateLambda([this]()
 						{
-							if (GameMode.IsValid()) GameMode->OpenSettings();
+							if (GameMode.IsValid()) GameMode->OpenSettings(); else RemotePartyScreen = EFlickFrontendScreen::Settings;
 							return FReply::Handled();
 						}), false, false, MainMenuStackMetrics::GetRowHeight(4))
 					]
@@ -268,91 +271,88 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		]
 		+ SOverlay::Slot()
 		.VAlign(VAlign_Bottom)
-		.Padding(38.0f, 0.0f, 48.0f, 31.0f)
+		.Padding(38.0f, 0.0f, 48.0f, 28.0f)
 		[
-			SNew(SBox).HeightOverride(59.0f)
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
 			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(Ink)
-				.AccentColor(FLinearColor(0.16f, 0.38f, 0.5f, 0.45f))
-				.CutSize(3.0f)
-				.BorderWidth(0.7f)
-				.Padding(FMargin(34.0f, 0.0f))
+				SNew(SBox).WidthOverride(380.0f).HeightOverride(82.0f)
+				[
+				SNew(SFlickMainMenuPanel)
+				.BackgroundColor_Lambda([this]()
+				{
+					return SelectedBannerStyle == 2
+						? FLinearColor(0.018f, 0.075f, 0.105f, 0.97f)
+						: SelectedBannerStyle == 1
+							? FLinearColor(0.045f, 0.065f, 0.04f, 0.97f)
+							: FLinearColor::FromSRGBColor(FColor(14, 23, 25, 247));
+				})
+				.AccentColor_Lambda([this]() { return SelectedAvatarBorder == 2 ? Brand : SelectedAvatarBorder == 1 ? Cyan : Hairline; })
+				.CutSize(10.0f).BorderWidth(1.15f).Padding(FMargin(12.0f, 9.0f))
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 11.0f, 0.0f)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Fill).Padding(0.0f, 0.0f, 13.0f, 0.0f)
 					[
-						SNew(SFlickStatusGlobe).Color(Cyan.CopyWithNewOpacity(0.94f))
-					]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("READY TO FLICK"))).Font(UiFont(11, true)).ColorAndOpacity(Brand)
-					]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(28.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(0)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(1)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(2)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(3)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(4)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(5)]
-					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth()
+						SNew(SBox).WidthOverride(62.0f)
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("TABLE RULES"))).Font(UiFont(10, true)).ColorAndOpacity(FLinearColor(0.84f, 0.89f, 0.93f, 0.94f))
+						SNew(SFlickAngularBorder)
+						.BackgroundColor(PanelRaised)
+						.AccentColor_Lambda([this]() { return SelectedAvatarBorder == 2 ? Brand : SelectedAvatarBorder == 1 ? Cyan : Hairline; })
+						.CutSize(8.0f).BorderWidth(1.4f).Padding(FMargin(12.0f, 8.0f))
+						[SNew(SFlickStatusGlobe).Color(Cyan.CopyWithNewOpacity(0.94f))]
 						]
-						+ SHorizontalBox::Slot().AutoWidth().Padding(11.0f, 0.0f)
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PLAYER PROFILE"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f)[SNew(STextBlock).Text_Lambda([this]() { const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER")); }).Font(UiFont(15, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda([this]() { static const TCHAR* Tags[] = {TEXT("READY TO FLICK"), TEXT("TABLE TACTICIAN"), TEXT("RIVAL INCOMING")}; return FText::FromString(Tags[SelectedBannerTag % 3]); }).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+					]
+				]
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(12.0f, 0.0f, 0.0f, 0.0f)
+			[
+				SNew(SBox).HeightOverride(82.0f)
+				.Visibility_Lambda([this]() { return IsDisplayedPartyActive() ? EVisibility::Visible : EVisibility::Collapsed; })
+				[
+					SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Hairline).CutSize(8.0f).BorderWidth(0.8f).Padding(FMargin(11.0f, 7.0f))
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PARTY ROSTER  //  CLICK FOR CONTROLS"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(10, true)).ColorAndOpacity(Orange)
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(0)]
+							+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f)[BuildMainMenuPartyMember(1)]
+							+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(2)]
+							+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f)[BuildMainMenuPartyMember(3)]
+							+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(4)]
+							+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(5)]
 						]
-						+ SHorizontalBox::Slot().AutoWidth()
+					]
+				]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
+			[
+				SNew(SBox).WidthOverride(330.0f).HeightOverride(58.0f)
+				[
+					SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(FLinearColor(0.16f, 0.38f, 0.5f, 0.45f)).CutSize(7.0f).BorderWidth(0.8f).Padding(FMargin(15.0f, 8.0f))
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("CURRENT TABLE"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f)
 						[
-							SNew(STextBlock)
-							.Text_Lambda([this]()
+							SNew(STextBlock).Text_Lambda([this]()
 							{
-								const EFlickMatchVariant Variant = GameMode.IsValid()
-									? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
+								const EFlickMatchVariant Variant = GameMode.IsValid() ? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
 								const int32 TeamSize = GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1;
 								return FText::FromString(Variant == EFlickMatchVariant::Bob
-									? TEXT("BOB")
-									: FString::Printf(TEXT("%dV%d KNOCKOUT"), TeamSize, TeamSize));
-							})
-							.Font(UiFont(10, true)).ColorAndOpacity(FLinearColor(0.84f, 0.89f, 0.93f, 0.94f))
-						]
-						+ SHorizontalBox::Slot().AutoWidth().Padding(11.0f, 0.0f)
-						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(10, true)).ColorAndOpacity(Orange)
-						]
-						+ SHorizontalBox::Slot().AutoWidth()
-						[
-							SNew(STextBlock)
-							.Text_Lambda([this]()
-							{
-								const EFlickMatchVariant Variant = GameMode.IsValid()
-									? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
-								if (Variant == EFlickMatchVariant::Bob) return FText::FromString(TEXT("POCKET YOUR COLOR"));
-								const int32 TeamSize = GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1;
-								return FText::FromString(TeamSize == 1 ? TEXT("PRECISION DUEL")
-									: TeamSize == 2 ? TEXT("TWO PLAYER ROTATION") : TEXT("THREE PLAYER ROTATION"));
-							})
-							.Font(UiFont(10, true)).ColorAndOpacity(FLinearColor(0.84f, 0.89f, 0.93f, 0.94f))
-						]
-						+ SHorizontalBox::Slot().AutoWidth().Padding(11.0f, 0.0f)
-						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)
-						]
-						+ SHorizontalBox::Slot().AutoWidth()
-						[
-							SNew(STextBlock)
-							.Text_Lambda([this]()
-							{
-								const EFlickMatchVariant Variant = GameMode.IsValid()
-									? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
-								return FText::FromString(Variant == EFlickMatchVariant::Bob
-									? TEXT("STANDARD PUCKS ONLY") : TEXT("FIRST TO 3"));
-							})
-							.Font(UiFont(10, true)).ColorAndOpacity(FLinearColor(0.84f, 0.89f, 0.93f, 0.94f))
+									? TEXT("BOB  //  POCKET YOUR COLOR")
+									: FString::Printf(TEXT("%dV%d KNOCKOUT  //  FIRST TO 3"), TeamSize, TeamSize));
+							}).Font(UiFont(10, true)).ColorAndOpacity(Paper)
 						]
 					]
 				]
@@ -759,6 +759,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 0.0f)[MakeTab(EFlickProfileTab::Stats, TEXT("STATS"))]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 0.0f)[MakeTab(EFlickProfileTab::Leaderboards, TEXT("LEADERBOARDS"))]
 				+ SHorizontalBox::Slot().AutoWidth()[MakeTab(EFlickProfileTab::MatchHistory, TEXT("MATCH HISTORY"))]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(8.0f, 0.0f, 0.0f, 0.0f)[MakeTab(EFlickProfileTab::Customization, TEXT("CUSTOMIZE"))]
 			]
 			+ SVerticalBox::Slot().AutoHeight()
 			[
@@ -766,6 +767,22 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				.HeightOverride(500.0f)
 				[
 				SNew(SOverlay)
+				+ SOverlay::Slot()
+				[
+					SNew(SBox)
+					.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Visible : EVisibility::Collapsed; })
+					[
+						SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Brand).UseAccentForOutline(false).CutSize(14.0f).BorderWidth(1.1f).Padding(FMargin(32.0f, 28.0f))
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PLAYER IDENTITY"))).Font(DisplayFont(28)).ColorAndOpacity(Paper)]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 22.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("Choose how your player plate appears in menus and parties."))).Font(UiFont(11)).ColorAndOpacity(Muted)]
+							+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("BANNER"), TAttribute<FText>::CreateLambda([this]() { static const TCHAR* Names[] = {TEXT("CARBON"), TEXT("ARENA"), TEXT("GLACIER")}; return FText::FromString(Names[SelectedBannerStyle % 3]); }), FOnClicked::CreateLambda([this]() { SelectedBannerStyle = (SelectedBannerStyle + 2) % 3; GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("BannerStyle"), SelectedBannerStyle, GGameUserSettingsIni); GConfig->Flush(false, GGameUserSettingsIni); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { SelectedBannerStyle = (SelectedBannerStyle + 1) % 3; GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("BannerStyle"), SelectedBannerStyle, GGameUserSettingsIni); GConfig->Flush(false, GGameUserSettingsIni); return FReply::Handled(); }))]
+							+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("BANNER TAG"), TAttribute<FText>::CreateLambda([this]() { static const TCHAR* Names[] = {TEXT("READY TO FLICK"), TEXT("TABLE TACTICIAN"), TEXT("RIVAL INCOMING")}; return FText::FromString(Names[SelectedBannerTag % 3]); }), FOnClicked::CreateLambda([this]() { SelectedBannerTag = (SelectedBannerTag + 2) % 3; GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("BannerTag"), SelectedBannerTag, GGameUserSettingsIni); GConfig->Flush(false, GGameUserSettingsIni); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { SelectedBannerTag = (SelectedBannerTag + 1) % 3; GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("BannerTag"), SelectedBannerTag, GGameUserSettingsIni); GConfig->Flush(false, GGameUserSettingsIni); return FReply::Handled(); }))]
+							+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("AVATAR BORDER"), TAttribute<FText>::CreateLambda([this]() { static const TCHAR* Names[] = {TEXT("STANDARD"), TEXT("CYAN CIRCUIT"), TEXT("LIME CHAMPION")}; return FText::FromString(Names[SelectedAvatarBorder % 3]); }), FOnClicked::CreateLambda([this]() { SelectedAvatarBorder = (SelectedAvatarBorder + 2) % 3; GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("AvatarBorder"), SelectedAvatarBorder, GGameUserSettingsIni); GConfig->Flush(false, GGameUserSettingsIni); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { SelectedAvatarBorder = (SelectedAvatarBorder + 1) % 3; GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("AvatarBorder"), SelectedAvatarBorder, GGameUserSettingsIni); GConfig->Flush(false, GGameUserSettingsIni); return FReply::Handled(); }))]
+						]
+					]
+				]
 				+ SOverlay::Slot()
 				[
 					SNew(SBox)
@@ -849,7 +866,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
 			[
 				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(160.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseProfile(); return FReply::Handled(); }))]]
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(160.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseProfile(); else RemotePartyScreen = EFlickFrontendScreen::MainMenu; return FReply::Handled(); }))]]
 				+ SHorizontalBox::Slot().FillWidth(1.0f).HAlign(HAlign_Right).VAlign(VAlign_Center)
 				[SNew(STextBlock).Text(FText::FromString(TEXT("PROFILE DATA SAVES AUTOMATICALLY"))).Font(UiFont(10)).ColorAndOpacity(Muted)]
 			]
@@ -861,17 +878,28 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartySlot)
 {
 	return SNew(SBox)
-		.WidthOverride(154.0f)
+		.WidthOverride(118.0f)
 		.HeightOverride(42.0f)
 		.Visibility_Lambda([this, PartySlot]()
 		{
-			if (IsDisplayedPartyActive())
-			{
-				return GetDisplayedPartyMember(PartySlot) ? EVisibility::Visible : EVisibility::Collapsed;
-			}
-			return PartySlot == 0 ? EVisibility::Visible : EVisibility::Collapsed;
+			return IsDisplayedPartyActive() && GetDisplayedPartyMember(PartySlot)
+				? EVisibility::Visible : EVisibility::Collapsed;
 		})
 		[
+			SNew(SBorder)
+			.BorderImage(WhiteBrush())
+			.BorderBackgroundColor(FLinearColor::Transparent)
+			.Padding(0.0f)
+			.OnMouseButtonDown_Lambda([this](const FGeometry&, const FPointerEvent& Event)
+			{
+				if (Event.GetEffectingButton() != EKeys::RightMouseButton) return FReply::Unhandled();
+				bSocialPanelOpen = true;
+				bShowingRecentPlayers = false;
+				bShowingOnlineFriends = false;
+				bSocialPartyExpanded = true;
+				return FReply::Handled();
+			})
+			[
 			SNew(SButton)
 			.ButtonStyle(&TransparentButtonStyle)
 			.ContentPadding(0.0f)
@@ -942,6 +970,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 						.Font(UiFont(7, true)).ColorAndOpacity(Cyan.CopyWithNewOpacity(0.82f))
 					]
 				]
+			]
 			]
 			]
 		];
@@ -1439,7 +1468,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 			{
 				return GetDisplayedPartyMember(PartySlot) ? EVisibility::Visible : EVisibility::Collapsed;
 			}
-			return PartySlot == 0 ? EVisibility::Visible : EVisibility::Collapsed;
+			return EVisibility::Collapsed;
 		})
 		[
 			SNew(SFlickAngularBorder)
@@ -1535,6 +1564,22 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					]
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(SButton).ButtonStyle(&CompactMenuButtonStyle)
+					.Visibility_Lambda([this, PartySlot]()
+					{
+						const AFlickPlayerState* Host = GameMode.IsValid() ? GameMode->GetPartyMember(0) : nullptr;
+						return PartySlot > 0 && Host && Host->IsPartyLeader() && GameMode->GetPartyMember(PartySlot)
+							? EVisibility::Visible : EVisibility::Collapsed;
+					})
+					.OnClicked_Lambda([this, PartySlot]()
+					{
+						if (GameMode.IsValid()) GameMode->PromotePartyMember(PartySlot);
+						return FReply::Handled();
+					})
+					[SNew(STextBlock).Text(FText::FromString(TEXT("PROMOTE"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(5.0f, 0.0f, 0.0f, 0.0f)
 				[
 					SNew(SButton).ButtonStyle(&DangerButtonStyle)
 					.Visibility_Lambda([this, PartySlot]()
@@ -1949,7 +1994,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildItemShop()
 						[
 							MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]()
 							{
-								if (GameMode.IsValid()) GameMode->CloseItemShop();
+								if (GameMode.IsValid()) GameMode->CloseItemShop(); else RemotePartyScreen = EFlickFrontendScreen::MainMenu;
 								return FReply::Handled();
 							}), false, false, 50.0f)
 						]

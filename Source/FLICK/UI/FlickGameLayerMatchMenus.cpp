@@ -569,6 +569,10 @@ EVisibility SFlickGameLayer::GetScreenVisibility(const EFlickFrontendScreen Scre
 		{
 			return EVisibility::Collapsed;
 		}
+		if (State->bPartyActive && !State->bPrivateMatchLobbyActive && !State->bNetworkLobbyActive)
+		{
+			return Screen == RemotePartyScreen ? EVisibility::Visible : EVisibility::Collapsed;
+		}
 		const bool bVisible = Screen == EFlickFrontendScreen::PrivateMatch
 			? State->bPrivateMatchLobbyActive
 			: Screen == EFlickFrontendScreen::NetworkLobby

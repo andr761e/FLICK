@@ -242,6 +242,7 @@ void AFlickCameraPawn::SetArenaFramingScale(const float InArenaFramingScale)
 
 void AFlickCameraPawn::SetGameplayViewIndex(const int32 InViewIndex, const bool bSnap)
 {
+	if (bTopDownView) return;
 	// Automatic turn-facing changes remain useful until the player chooses a
 	// custom orbit. After that, preserve their chosen angle for the whole match.
 	if (bGameplayOrbitManuallyControlled && !bSnap)
@@ -270,7 +271,7 @@ void AFlickCameraPawn::SetGameplayViewIndex(const int32 InViewIndex, const bool 
 
 void AFlickCameraPawn::RotateGameplayOrbit(const float Direction, const float DeltaSeconds, const float Sensitivity)
 {
-	if (FMath::IsNearlyZero(Direction) || DeltaSeconds <= 0.0f || bMenuPresentation)
+	if (FMath::IsNearlyZero(Direction) || DeltaSeconds <= 0.0f || bMenuPresentation || bTopDownView)
 	{
 		return;
 	}
@@ -286,13 +287,32 @@ void AFlickCameraPawn::RotateGameplayOrbit(const float Direction, const float De
 
 void AFlickCameraPawn::AdjustGameplayElevationFine(const int32 StepDirection, const float Sensitivity)
 {
-	if (StepDirection == 0 || bMenuPresentation || bGameplayElevationLocked)
+	if (StepDirection == 0 || bMenuPresentation || bGameplayElevationLocked || bTopDownView)
 	{
 		return;
 	}
 	const float StepDegrees = FMath::Lerp(0.75f, 5.0f, FMath::Clamp(Sensitivity, 0.0f, 1.0f));
 	SetGameplayElevation(GameplayElevationAngle + FMath::Sign(StepDirection) * StepDegrees);
 	GameplayElevationPresetIndex = 1;
+}
+
+void AFlickCameraPawn::ToggleTopDownView()
+{
+	if (bMenuPresentation || bCinematicReplay || bFreeCameraEnabled) return;
+	if (!bTopDownView)
+	{
+		SavedGameplayOrbitAngle = GameplayOrbitAngle;
+		SavedGameplayElevationAngle = GameplayElevationAngle;
+		bTopDownView = true;
+	}
+	else
+	{
+		bTopDownView = false;
+		GameplayOrbitAngle = SavedGameplayOrbitAngle;
+		GameplayElevationAngle = SavedGameplayElevationAngle;
+	}
+	ShakeTrauma = 0.0f;
+	bGameplayViewTransitioning = true;
 }
 
 void AFlickCameraPawn::ResetGameplayView(const int32 InViewIndex, const bool bResetElevation)
@@ -473,6 +493,11 @@ void AFlickCameraPawn::SetFreeCameraSensitivity(const float LookSensitivity, con
 
 FVector AFlickCameraPawn::GetGameplayTargetLocation() const
 {
+	if (bTopDownView)
+	{
+		const float Height = (bBobGameplayFraming ? 2450.0f : 2200.0f) * ArenaFramingScale;
+		return FVector(0.0f, 0.0f, Height);
+	}
 	FVector TargetLocation = (bBobGameplayFraming ? BobCameraLocation : CameraLocation)
 		* ArenaFramingScale
 		* FMath::Clamp(GameplayDistanceScale, 0.75f, 1.25f)
@@ -489,6 +514,7 @@ FVector AFlickCameraPawn::GetGameplayTargetLocation() const
 
 FRotator AFlickCameraPawn::GetGameplayTargetRotation() const
 {
+	if (bTopDownView) return FRotator(-90.0f, SavedGameplayOrbitAngle + 90.0f, 0.0f);
 	const FRotator& BaseRotation = bBobGameplayFraming ? BobCameraRotation : CameraRotation;
 	return FRotator(
 		BaseRotation.Pitch - GameplayElevationAngle + (bAimPresentation ? AimPitchOffset : 0.0f),

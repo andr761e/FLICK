@@ -32,6 +32,8 @@ public:
 	void ResetGameplayView(int32 InViewIndex, bool bResetElevation = true);
 	void AdjustGameplayElevation(int32 StepDirection);
 	void SetGameplayElevation(float InElevation, bool bSnap = false);
+	void ToggleTopDownView();
+	bool IsTopDownView() const { return bTopDownView; }
 	void SetGameplayElevationLocked(bool bLocked) { bGameplayElevationLocked = bLocked; }
 	void BeginCinematicReplay(const FVector& InitialFocus, EFlickTeam ShootingTeam);
 	void UpdateCinematicReplay(const FVector& Focus, float NormalizedProgress, float PullbackAlpha);
@@ -216,4 +218,7 @@ private:
 	bool bCompactGameplayFraming = false;
 	bool bCinematicReplay = false;
 	bool bFreeCameraEnabled = false;
+	bool bTopDownView = false;
+	float SavedGameplayOrbitAngle = 0.0f;
+	float SavedGameplayElevationAngle = 0.0f;
 };

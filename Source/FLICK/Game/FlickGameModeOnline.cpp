@@ -1293,6 +1293,19 @@ void AFlickGameMode::RemovePartyMember(const int32 PartySlot)
 	}
 }
 
+void AFlickGameMode::PromotePartyMember(const int32 PartySlot)
+{
+	if (!bPartyRequested || PartySlot <= 0) return;
+	AFlickPlayerState* NewLeader = GetPartyMember(PartySlot);
+	AFlickPlayerState* CurrentLeader = GetPartyMember(0);
+	if (!NewLeader || !CurrentLeader || !CurrentLeader->IsPartyLeader()) return;
+	const int32 OldLeaderSlot = CurrentLeader->GetPartySlot();
+	CurrentLeader->SetPartyRole(false, NewLeader->GetPartySlot());
+	NewLeader->SetPartyRole(true, OldLeaderSlot);
+	SynchronizePartyState();
+	UE_LOG(LogFlick, Log, TEXT("Promoted %s to party leader"), *NewLeader->GetPlayerName());
+}
+
 void AFlickGameMode::DisbandParty()
 {
 	if (!bPartyRequested || !GetWorld())

@@ -297,6 +297,7 @@ public:
 	void StartSelectedMatchmaking();
 	void CancelUnrankedMatchmaking();
 	void RemovePartyMember(int32 PartySlot);
+	void PromotePartyMember(int32 PartySlot);
 	void DisbandParty();
 	void HostLocalNetworkMatch();
 	void JoinLocalNetworkMatch(const FString& Address = TEXT("127.0.0.1"));

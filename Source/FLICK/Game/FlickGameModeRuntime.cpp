@@ -259,15 +259,9 @@ void AFlickGameMode::CycleWindowMode(const int32 Direction)
 		return;
 	}
 
-	const TArray<EWindowMode::Type> Modes = {
-		EWindowMode::Windowed,
-		EWindowMode::WindowedFullscreen,
-		EWindowMode::Fullscreen
-	};
-	int32 CurrentIndex = Modes.IndexOfByKey(Settings->GetFullscreenMode());
-	CurrentIndex = CurrentIndex == INDEX_NONE ? 0 : CurrentIndex;
-	const int32 Step = Direction < 0 ? -1 : 1;
-	Settings->SetFullscreenMode(Modes[(CurrentIndex + Step + Modes.Num()) % Modes.Num()]);
+	// FLICK is presented as a fullscreen title. Borderless fullscreen adapts to
+	// ultrawide and unusual desktop resolutions without a disruptive mode switch.
+	Settings->SetFullscreenMode(EWindowMode::WindowedFullscreen);
 }
 
 void AFlickGameMode::CycleResolution(const int32 Direction)
@@ -294,6 +288,8 @@ void AFlickGameMode::ApplyDisplaySettings()
 {
 	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
 	{
+		Settings->SetFullscreenMode(EWindowMode::WindowedFullscreen);
+		Settings->SetScreenResolution(Settings->GetDesktopResolution());
 		Settings->ApplySettings(false);
 		Settings->SaveSettings();
 	}

@@ -69,6 +69,9 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	OwnerHud = InArgs._OwnerHud;
 	GameMode = InArgs._GameMode;
 	PlayerController = InArgs._PlayerController;
+	GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("BannerStyle"), SelectedBannerStyle, GGameUserSettingsIni);
+	GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("BannerTag"), SelectedBannerTag, GGameUserSettingsIni);
+	GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("AvatarBorder"), SelectedAvatarBorder, GGameUserSettingsIni);
 	if (const UFlickGameInstance* FlickGameInstance = PlayerController.IsValid()
 		? Cast<UFlickGameInstance>(PlayerController->GetGameInstance())
 		: nullptr)
@@ -92,6 +95,21 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
+		SNew(SOverlay)
+		+ SOverlay::Slot()
+		[
+			SNew(SBox)
+			.Visibility_Lambda([this]() { return GetScreenVisibility(EFlickFrontendScreen::MainMenu); })
+			[
+				// This backdrop uses the real viewport geometry, so ultrawide displays
+				// never expose the edges of the 16:9 reference canvas.
+				SNew(SOverlay)
+				+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility(EVisibility::HitTestInvisible).Opacity(0.9f)]
+				+ SOverlay::Slot()[SNew(SFlickDiagonalPanel).Visibility(EVisibility::HitTestInvisible).PanelColor(Ink).EdgeColor(Hairline)]
+			]
+		]
+		+ SOverlay::Slot()
+		[
 		SNew(SScaleBox)
 		.Stretch(EStretch::ScaleToFit)
 		[
@@ -262,6 +280,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			[
 				BuildStartupOverlay()
 			]
+		]
 		]
 		]
 		]

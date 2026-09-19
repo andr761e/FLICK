@@ -10,8 +10,16 @@ Byg development build:
 Opdater assets
 .\update-flick-assets.cmd
 
-Currently we are testing what the final arenas should look like in the test arena.
-Once that is perfected, we will add 
+MAC COMMANDS:
+Run this once:
+chmod +x ./play-flick.sh ./package-flick-development.sh
+
+Launch FLICK:
+./play-flick.sh
+
+Package the Mac Development build:
+./package-flick-development.sh
+
 
 Til OH;
 - Starting pucks in BOB need to be more distinct from the standard pucks
@@ -19,8 +27,4 @@ Til OH;
 - Make red ring in BOB Arena smaller so it encloses the pucks
 
 Things to implement;
-- Add the option to view the board from the top
-- Add local host to private matches
-- There was some leftover test arena text in shot replays
-- Make sure that the picture adjusts to the screen (See OH's ultra wide screen for example)
-- Expand settings
+

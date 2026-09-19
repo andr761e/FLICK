@@ -101,6 +101,7 @@ private:
 	void HandleTrainingClearPressed();
 	void HandleTrainingRemovePressed();
 	void HandleFreeCameraTogglePressed();
+	void HandleTopDownViewPressed();
 	void SetFreeCameraInputMode(bool bEnabled);
 	bool UpdateFreeCamera(float DeltaSeconds);
 	void UpdateAimFromCursor();

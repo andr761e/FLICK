@@ -121,6 +121,42 @@ void AFlickGameMode::UpdateShotClock()
 
 	if (FlickGameState->GetShotClockTimeRemaining() <= 0.0f)
 	{
+		if (FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning)
+		{
+			// Kickoff planning has one shared deadline. Commit a zero-power shot for
+			// every player who has not submitted, then release all shots together.
+			for (const EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+			{
+				for (int32 PlayerSlot = 0; PlayerSlot < CurrentPlayersPerTeam; ++PlayerSlot)
+				{
+					const bool bAlreadyLocked = LockedKickoffShots.ContainsByPredicate(
+						[Team, PlayerSlot](const FFlickLockedKickoffShot& Shot)
+						{
+							return Shot.Team == Team && Shot.PlayerSlot == PlayerSlot;
+						});
+					if (bAlreadyLocked) continue;
+					AFlickPiece* TimeoutPiece = nullptr;
+					for (AFlickPiece* Candidate : Pieces)
+					{
+						if (Candidate && IsValid(Candidate) && Candidate->IsActive()
+							&& Candidate->IsSelectableBy(Team) && Candidate->GetOwningPlayerSlot() == PlayerSlot)
+						{
+							TimeoutPiece = Candidate;
+							break;
+						}
+					}
+					if (TimeoutPiece)
+					{
+						FVector Direction = -TimeoutPiece->GetActorLocation(); Direction.Z = 0.0f;
+						if (!Direction.Normalize()) Direction = FVector::ForwardVector;
+						LockKickoffShot(TimeoutPiece, Direction, 0.0f, false);
+					}
+				}
+			}
+			if (FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning) ReleaseKickoffShots();
+			ResetShotClock();
+			return;
+		}
 		ExpireCurrentShot();
 	}
 }
@@ -397,7 +433,8 @@ bool AFlickGameMode::CanSelectPiece(const AFlickPiece* Piece) const
 			|| FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning)
 		&& (!CameraPawn || !CameraPawn->IsGameplayViewTransitioning())
 		&& Piece
-		&& (bCanUseEitherTrainingBobStriker || Piece->IsSelectableBy(FlickGameState->CurrentTeam))
+		&& (bCanUseEitherTrainingBobStriker || FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning
+			|| Piece->IsSelectableBy(FlickGameState->CurrentTeam))
 		&& (IsFreePlayTraining() || IsBobMode() || Piece->GetOwningPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot);
 	return bCommonSelectionValid && (!IsBobMode() || Piece->IsBobStriker());
 }
@@ -416,7 +453,9 @@ bool AFlickGameMode::CanSelectPieceForController(
 		|| FrontendScreen != EFlickFrontendScreen::Playing
 		|| (FlickGameState->MatchPhase != EFlickMatchPhase::Aiming
 			&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning)
-		|| (!bCanUseEitherTrainingBobStriker && !Piece->IsSelectableBy(FlickGameState->CurrentTeam))
+		|| (!bCanUseEitherTrainingBobStriker
+			&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning
+			&& !Piece->IsSelectableBy(FlickGameState->CurrentTeam))
 		|| (IsBobMode() && !Piece->IsBobStriker()))
 	{
 		return false;
@@ -429,6 +468,16 @@ bool AFlickGameMode::CanSelectPieceForController(
 	}
 
 	const AFlickPlayerState* FlickPlayerState = RequestingPlayer->GetPlayerState<AFlickPlayerState>();
+	if (FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning)
+	{
+		if (!FlickPlayerState) return false;
+		if (bPrivateMatchActive)
+		{
+			return FlickPlayerState->ControlsPrivateSlot(Piece->GetTeam(), Piece->GetOwningPlayerSlot());
+		}
+		return FlickPlayerState->GetTeam() == Piece->GetTeam()
+			&& FlickPlayerState->GetTeamPlayerSlot() == Piece->GetOwningPlayerSlot();
+	}
 	if (bPrivateMatchActive)
 	{
 		return FlickPlayerState
@@ -601,8 +650,8 @@ bool AFlickGameMode::LockKickoffShot(
 		return false;
 	}
 	const float SafePower = FMath::Clamp(NormalizedPower, 0.0f, 1.0f);
-	const EFlickTeam PlanningTeam = FlickGameState->CurrentTeam;
-	const int32 PlanningPlayerSlot = FlickGameState->CurrentTeamPlayerSlot;
+	const EFlickTeam PlanningTeam = Piece->GetTeam();
+	const int32 PlanningPlayerSlot = Piece->GetOwningPlayerSlot();
 	if (Piece->GetTeam() != PlanningTeam
 		|| Piece->GetOwningPlayerSlot() != PlanningPlayerSlot
 		|| LockedKickoffShots.ContainsByPredicate([PlanningTeam, PlanningPlayerSlot](const FFlickLockedKickoffShot& Shot)
@@ -659,13 +708,8 @@ bool AFlickGameMode::LockKickoffShot(
 		return true;
 	}
 
-	FlickGameState->SetCurrentTeam(GetOpposingTeam(PlanningTeam));
-	ActivateNextPlayerForTeam(FlickGameState->CurrentTeam);
-	SetCameraViewForTeam(FlickGameState->CurrentTeam);
-	if (AudioDirector)
-	{
-		AudioDirector->PlayTurn(FlickGameState->CurrentTeam);
-	}
+	// Do not advance a global turn while planning. Every connected controller
+	// may keep aiming its own assigned kickoff piece until it submits.
 	return true;
 }
 

@@ -1,6 +1,29 @@
 //Lineups, classes, settings
 #include "UI/FlickGameLayerPrivate.h"
 
+EFlickLineupPreset SFlickGameLayer::GetDisplayedLoadoutPreset() const
+{
+	return GameMode.IsValid() ? GameMode->GetLoadoutEditingPreset() : RemoteLoadoutPreset;
+}
+
+EFlickPieceArchetype SFlickGameLayer::GetDisplayedLoadoutPiece(const int32 SlotIndex) const
+{
+	if (GameMode.IsValid()) return GameMode->GetLoadoutPiece(EFlickTeam::Player1, SlotIndex);
+	const UFlickGameInstance* Instance = PlayerController.IsValid()
+		? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr;
+	return Instance ? Instance->GetClassLoadoutPiece(RemoteLoadoutPreset, SlotIndex) : EFlickPieceArchetype::Standard;
+}
+
+void SFlickGameLayer::SetDisplayedLoadoutPiece(const int32 SlotIndex, const EFlickPieceArchetype Archetype)
+{
+	if (GameMode.IsValid()) { GameMode->SetLoadoutPiece(EFlickTeam::Player1, SlotIndex, Archetype); return; }
+	if (UFlickGameInstance* Instance = PlayerController.IsValid()
+		? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr)
+	{
+		Instance->SetClassLoadoutPiece(RemoteLoadoutPreset, SlotIndex, Archetype);
+	}
+}
+
 TSharedRef<SWidget> SFlickGameLayer::BuildModeCard(const EFlickMatchVariant Variant)
 {
 	const FString CountLabel = GetMatchVariantFormatLabel(Variant);
@@ -175,9 +198,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 								SNew(SEditableTextBox)
 								.Text_Lambda([this]()
 								{
-									return FText::FromString(GameMode.IsValid()
-										? GetClassDisplayName(GameMode->GetLoadoutEditingPreset())
-										: TEXT("Balanced"));
+					return FText::FromString(GetClassDisplayName(GetDisplayedLoadoutPreset()));
 								})
 								.HintText(FText::FromString(TEXT("LINEUP NAME")))
 								.SelectAllTextWhenFocused(true)
@@ -189,10 +210,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 								})
 								.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type)
 								{
-									if (GameMode.IsValid())
-									{
-										GameMode->SetClassName(GameMode->GetLoadoutEditingPreset(), Text.ToString());
-									}
+					if (GameMode.IsValid())
+					{
+						GameMode->SetClassName(GameMode->GetLoadoutEditingPreset(), Text.ToString());
+					}
+					else if (UFlickGameInstance* Instance = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr)
+					{
+						Instance->SetClassName(RemoteLoadoutPreset, Text.ToString());
+					}
 								})
 							]
 						]
@@ -209,7 +234,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 					[
 						SNew(SBox).WidthOverride(170.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]()
 						{
-							if (GameMode.IsValid()) GameMode->CloseLoadout();
+							if (GameMode.IsValid()) GameMode->CloseLoadout(); else RemotePartyScreen = EFlickFrontendScreen::MainMenu;
 							return FReply::Handled();
 						}))]
 					]
@@ -220,7 +245,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 						{
 							const int32 Count = GameMode.IsValid() ? GameMode->GetLoadoutEditingPieceCount() : 4;
 							return FText::FromString(FString::Printf(TEXT("%d PUCK LINEUP  /  %s"), Count,
-								GameMode.IsValid() ? *GetClassDisplayName(GameMode->GetLoadoutEditingPreset()) : TEXT("CLASS 1")));
+								*GetClassDisplayName(GetDisplayedLoadoutPreset())));
 						})
 						.Font(UiFont(10, true)).ColorAndOpacity(Muted)
 					]
@@ -233,6 +258,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 								GameMode->PlayMenuSound(true);
 								GameMode->CloseLoadout();
 							}
+							else RemotePartyScreen = EFlickFrontendScreen::MainMenu;
 							return FReply::Handled();
 						}), true, false, 52.0f)]
 					]
@@ -298,7 +324,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLineupRadar()
 				+ SHorizontalBox::Slot().AutoWidth()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this]() { return FText::FromString(GameMode.IsValid() ? GetClassDisplayName(GameMode->GetLoadoutEditingPreset()) : TEXT("CLASS 1")); })
+					.Text_Lambda([this]() { return FText::FromString(GetClassDisplayName(GetDisplayedLoadoutPreset())); })
 					.Font(UiFont(10, true)).ColorAndOpacity(FLinearColor::White)
 				]
 			]
@@ -412,7 +438,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutFormation(const EFlickTeam Team
 						const int32 Slot = GetSelectedLoadoutSlot(Team);
 						return FText::FromString(FString::Printf(TEXT("SLOT %02d  /  %s"),
 							Slot + 1,
-							GameMode.IsValid() ? *GetPieceArchetypeName(GameMode->GetLoadoutPiece(Team, Slot)) : TEXT("STANDARD")));
+							*GetPieceArchetypeName(GetDisplayedLoadoutPiece(Slot))));
 					})
 					.Font(UiFont(10, true))
 					.ColorAndOpacity(GetTeamAccent(Team))
@@ -643,8 +669,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutPresetBar(const EFlickTeam Team
 				{
 					if (Team == EFlickTeam::Player1) Player1HoveredLoadoutArchetype.Reset();
 					else Player2HoveredLoadoutArchetype.Reset();
-					GameMode->SelectLoadoutEditingPreset(Preset);
-				}
+						GameMode->SelectLoadoutEditingPreset(Preset);
+					}
+					else RemoteLoadoutPreset = Preset;
 				return FReply::Handled();
 			})
 			[
@@ -669,7 +696,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutPresetBar(const EFlickTeam Team
 			{
 				const TSharedPtr<SButton> Pinned = WeakButton.Pin();
 				if (Pinned.IsValid() && Pinned->HasKeyboardFocus()) return FLinearColor::White;
-				return GameMode.IsValid() && GameMode->GetLoadoutEditingPreset() == Preset
+				return GetDisplayedLoadoutPreset() == Preset
 					? GetTeamAccent(Team)
 					: Hairline;
 			})
@@ -1184,18 +1211,19 @@ TSharedRef<SWidget> SFlickGameLayer::BuildArchetypeChoice(
 				GameMode->SetLoadoutPiece(Team, GetSelectedLoadoutSlot(Team), Archetype);
 				GameMode->PlayMenuSound(false);
 			}
+			else SetDisplayedLoadoutPiece(GetSelectedLoadoutSlot(Team), Archetype);
 			return FReply::Handled();
 		})
 		[
 			SNew(SFlickAngularBorder)
 			.BackgroundColor_Lambda([this, Team, Archetype, Accent]()
 			{
-				const bool bSelected = GameMode.IsValid() && GameMode->GetLoadoutPiece(Team, GetSelectedLoadoutSlot(Team)) == Archetype;
+				const bool bSelected = GetDisplayedLoadoutPiece(GetSelectedLoadoutSlot(Team)) == Archetype;
 				return bSelected ? FMath::Lerp(PanelRaised, Accent, 0.018f) : Panel;
 			})
 			.AccentColor_Lambda([this, Team, Archetype, Accent]()
 			{
-				const bool bSelected = GameMode.IsValid() && GameMode->GetLoadoutPiece(Team, GetSelectedLoadoutSlot(Team)) == Archetype;
+				const bool bSelected = GetDisplayedLoadoutPiece(GetSelectedLoadoutSlot(Team)) == Archetype;
 				return bSelected ? Accent : Hairline;
 			})
 			.CutSize(8.0f)
@@ -1330,9 +1358,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 18.0f)
 					[
 						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::GameFeel, TEXT("GAME FEEL"))]
-						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Sound, TEXT("SOUND"))]
-						+ SHorizontalBox::Slot().AutoWidth()[MakeSettingsTab(EFlickSettingsTab::Display, TEXT("DISPLAY"))]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::GameFeel, TEXT("GAMEPLAY"))]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Camera, TEXT("CAMERA"))]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Interface, TEXT("INTERFACE"))]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Display, TEXT("VIDEO"))]
+						+ SHorizontalBox::Slot().AutoWidth()[MakeSettingsTab(EFlickSettingsTab::Sound, TEXT("AUDIO"))]
 					]
 					+ SVerticalBox::Slot().FillHeight(1.0f)
 					[
@@ -1343,21 +1373,23 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 							+ SOverlay::Slot()
 							[
 								SNew(SVerticalBox)
-								.Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel ? EVisibility::Visible : EVisibility::Collapsed; })
+								.Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel || SelectedSettingsTab == EFlickSettingsTab::Camera || SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })
 								+ SVerticalBox::Slot().FillHeight(1.0f)
 								[
 									SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
 									[
 										SNew(SVerticalBox)
-										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("01"), TEXT("GAME FEEL"), TEXT("Keep the feedback that helps you read the board."))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("AIM AND CONTACT GUIDE"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsAimGuideEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetAimGuideEnabled(!GameMode->IsAimGuideEnabled()); }))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("WORLD IMPACT EFFECTS"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->AreImpactEffectsEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetImpactEffectsEnabled(!GameMode->AreImpactEffectsEnabled()); }))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("CONTROL OVERVIEW"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsControlOverviewEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetControlOverviewEnabled(!GameMode->IsControlOverviewEnabled()); }))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("CAMERA SHAKE"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetCameraShakeIntensity() : 0.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetCameraShakeIntensity(Value); }))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("GENERAL MOUSE SENSITIVITY"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetShotMouseSensitivity() : 0.5f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetShotMouseSensitivity(Value); }))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("GAMEPLAY CAMERA SENSITIVITY"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetGameplayCameraSensitivity() : 0.35f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetGameplayCameraSensitivity(Value); }))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("FREE CAMERA LOOK"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetFreeCameraLookSensitivity() : 0.33f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetFreeCameraLookSensitivity(Value); }))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("FREE CAMERA MOVEMENT"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetFreeCameraMoveSensitivity() : 0.38f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetFreeCameraMoveSensitivity(Value); }))]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("01"), TEXT("GAMEPLAY"), TEXT("Tune aiming and the physical feedback of every shot."))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("02"), TEXT("CAMERA"), TEXT("Adjust camera motion, orbit response, and free-camera control."))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("03"), TEXT("INTERFACE"), TEXT("Choose the guides and information shown during play."))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeToggleRow(TEXT("AIM AND CONTACT GUIDE"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return Checked(GameMode.IsValid() ? GameMode->IsAimGuideEnabled() : I && I->IsAimGuideEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetAimGuideEnabled(!GameMode->IsAimGuideEnabled()); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetAimGuideEnabled(!I->IsAimGuideEnabled()); }))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel ? EVisibility::Visible : EVisibility::Collapsed; })[MakeToggleRow(TEXT("WORLD IMPACT EFFECTS"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return Checked(GameMode.IsValid() ? GameMode->AreImpactEffectsEnabled() : I && I->AreImpactEffectsEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetImpactEffectsEnabled(!GameMode->AreImpactEffectsEnabled()); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetImpactEffectsEnabled(!I->AreImpactEffectsEnabled()); }))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeToggleRow(TEXT("CONTROL OVERVIEW"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return Checked(GameMode.IsValid() ? GameMode->IsControlOverviewEnabled() : I && I->IsControlOverviewEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetControlOverviewEnabled(!GameMode->IsControlOverviewEnabled()); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetControlOverviewEnabled(!I->IsControlOverviewEnabled()); }))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[MakeSliderRow(TEXT("CAMERA SHAKE"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetCameraShakeIntensity() : 0.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetCameraShakeIntensity(Value); }))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel ? EVisibility::Visible : EVisibility::Collapsed; })[MakeSliderRow(TEXT("SHOT MOUSE SENSITIVITY"), TAttribute<float>::CreateLambda([this]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return GameMode.IsValid() ? GameMode->GetShotMouseSensitivity() : I ? I->GetShotMouseSensitivity() : 0.5f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetShotMouseSensitivity(Value); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetShotMouseSensitivity(Value); }))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[MakeSliderRow(TEXT("GAMEPLAY CAMERA SENSITIVITY"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetGameplayCameraSensitivity() : 0.35f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetGameplayCameraSensitivity(Value); }))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[MakeSliderRow(TEXT("FREE CAMERA LOOK"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetFreeCameraLookSensitivity() : 0.33f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetFreeCameraLookSensitivity(Value); }))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[MakeSliderRow(TEXT("FREE CAMERA MOVEMENT"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetFreeCameraMoveSensitivity() : 0.38f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetFreeCameraMoveSensitivity(Value); }))]]
 									]
 								]
 
@@ -1371,7 +1403,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 									[
 										SNew(SVerticalBox)
 										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("02"), TEXT("SOUND"), TEXT("Set the balance of the arena and the interface."))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("MASTER"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetMasterVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetMasterVolume(Value); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("MASTER"), TAttribute<float>::CreateLambda([this]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return GameMode.IsValid() ? GameMode->GetMasterVolume() : I ? I->GetMasterVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetMasterVolume(Value); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetMasterVolume(Value); }))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("PHYSICS EFFECTS"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetEffectsVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetEffectsVolume(Value); }))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("INTERFACE"), TAttribute<float>::CreateLambda([this]() { return GameMode.IsValid() ? GameMode->GetInterfaceVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetInterfaceVolume(Value); }))]
 									]
@@ -1395,7 +1427,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 					+ SVerticalBox::Slot().AutoHeight()
 					[
 						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(150.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseSettings(); return FReply::Handled(); }), false, false, 52.0f)]]
+						+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(150.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseSettings(); else RemotePartyScreen = EFlickFrontendScreen::MainMenu; return FReply::Handled(); }), false, false, 52.0f)]]
 						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(24.0f, 0.0f)
 						[SNew(STextBlock).Text(FText::FromString(TEXT("Gameplay and audio update immediately."))).Font(UiFont(11)).ColorAndOpacity(Muted)]
 						+ SHorizontalBox::Slot().AutoWidth()
@@ -1409,6 +1441,3 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 			]
 		];
 }
-
-
-

@@ -38,12 +38,15 @@ enum class EFlickProfileTab : uint8
 {
 	Stats,
 	Leaderboards,
-	MatchHistory
+	MatchHistory,
+	Customization
 };
 
 enum class EFlickSettingsTab : uint8
 {
 	GameFeel,
+	Camera,
+	Interface,
 	Sound,
 	Display
 };
@@ -63,6 +66,9 @@ public:
 
 private:
 	TSharedRef<SWidget> BuildMainMenu();
+	EFlickLineupPreset GetDisplayedLoadoutPreset() const;
+	EFlickPieceArchetype GetDisplayedLoadoutPiece(int32 SlotIndex) const;
+	void SetDisplayedLoadoutPiece(int32 SlotIndex, EFlickPieceArchetype Archetype);
 	TSharedRef<SWidget> BuildProfile();
 	TSharedRef<SWidget> BuildProfileStatsPanel();
 	TSharedRef<SWidget> BuildStartupOverlay();
@@ -241,7 +247,14 @@ private:
 	int32 SelectedPlayFormat = 0;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;
 	EFlickProfileTab SelectedProfileTab = EFlickProfileTab::Stats;
+	int32 SelectedBannerStyle = 0;
+	int32 SelectedBannerTag = 0;
+	int32 SelectedAvatarBorder = 0;
 	EFlickSettingsTab SelectedSettingsTab = EFlickSettingsTab::GameFeel;
+	// Remote party members do not own the authoritative GameMode. Their
+	// non-gameplay frontend navigation therefore remains local to their Slate UI.
+	EFlickFrontendScreen RemotePartyScreen = EFlickFrontendScreen::MainMenu;
+	EFlickLineupPreset RemoteLoadoutPreset = EFlickLineupPreset::Balanced;
 	int32 Player1SelectedLoadoutSlot = 0;
 	int32 Player2SelectedLoadoutSlot = 0;
 	TOptional<EFlickPieceArchetype> Player1HoveredLoadoutArchetype;

@@ -64,7 +64,7 @@ void AFlickPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &AFlickPlayerController::HandleTrainingTargetPuckPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::C, IE_Pressed, this, &AFlickPlayerController::HandleTrainingClearPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::Delete, IE_Pressed, this, &AFlickPlayerController::HandleTrainingRemovePressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AFlickPlayerController::HandleFreeCameraTogglePressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AFlickPlayerController::HandleTopDownViewPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationUpPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationDownPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
@@ -462,6 +462,18 @@ void AFlickPlayerController::HandleCameraResetPressed()
 		CameraPawn->ResetGameplayView(
 			ViewTeam == EFlickTeam::Player2 ? 2 : 0,
 			!FlickGameMode->IsTrainingEditMode());
+	}
+}
+
+void AFlickPlayerController::HandleTopDownViewPressed()
+{
+	AFlickGameMode* FlickGameMode = GetFlickGameMode();
+	if (!IsGameplayActive() || (FlickGameMode && (!FlickGameMode->CanChangeCameraView()
+		|| FlickGameMode->IsCinematicReplayActive()))) return;
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
+	{
+		ClearHoveredPiece();
+		CameraPawn->ToggleTopDownView();
 	}
 }
 
@@ -899,16 +911,22 @@ bool AFlickPlayerController::CanSelectPieceLocally(const AFlickPiece* Piece) con
 		&& LocalPlayerState->ControlsPrivateSlot(
 			FlickGameState->CurrentTeam,
 			FlickGameState->CurrentTeamPlayerSlot);
+	const bool bKickoffPlanning = FlickGameState
+		&& FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning;
+	const bool bControlsKickoffPiece = bKickoffPlanning && Piece && LocalPlayerState
+		&& (LocalPlayerState->ControlsPrivateSlot(Piece->GetTeam(), Piece->GetOwningPlayerSlot())
+			|| (LocalPlayerState->GetTeam() == Piece->GetTeam()
+				&& LocalPlayerState->GetTeamPlayerSlot() == Piece->GetOwningPlayerSlot()));
 	return Piece
 		&& FlickGameState
 		&& LocalPlayerState
 		&& FlickGameState->IsGameplayActive()
 		&& (FlickGameState->MatchPhase == EFlickMatchPhase::Aiming
 			|| FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning)
-		&& (bControlsPrivateTurn
+		&& (bControlsKickoffPiece || bControlsPrivateTurn
 			|| (GetLocalTeam() == FlickGameState->CurrentTeam
 				&& LocalPlayerState->GetTeamPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot))
-		&& Piece->IsSelectableBy(GetLocalTeam())
+		&& Piece->IsSelectableBy(bKickoffPlanning ? Piece->GetTeam() : GetLocalTeam())
 		&& (FlickGameState->ActiveMatchVariant == EFlickMatchVariant::Bob
 			|| (bControlsPrivateTurn
 				? Piece->GetOwningPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot

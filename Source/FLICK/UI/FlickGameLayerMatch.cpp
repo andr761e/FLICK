@@ -215,7 +215,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 24.0f, 30.0f, 0.0f)
 		[
-			SNew(STextBlock).Text(FText::FromString(TEXT("ROUND-WINNING SHOT  //  TEST ARENA"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)
+			SNew(STextBlock).Text(FText::FromString(TEXT("ROUND-WINNING SHOT"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(30.0f, 0.0f, 30.0f, 31.0f)
 		[
@@ -1211,4 +1211,3 @@ TSharedRef<SWidget> SFlickGameLayer::BuildEventFeed()
 	}
 	return Feed;
 }
-
