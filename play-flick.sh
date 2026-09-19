@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PROJECT="$ROOT/FLICK.uproject"
-ENGINE_ROOT="${FLICK_UNREAL_ENGINE_ROOT:-/Users/Shared/Epic Games/UE_5.6}"
+ENGINE_ROOT="${FLICK_UNREAL_ENGINE_ROOT:-/Users/Shared/Epic Games/UE_5.8}"
 BUILD="$ENGINE_ROOT/Engine/Build/BatchFiles/Mac/Build.sh"
 EDITOR="$ENGINE_ROOT/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"
 
@@ -16,4 +16,3 @@ if (($#)); then
 else
   "$EDITOR" "$PROJECT" -game -fullscreen -log &
 fi
-
