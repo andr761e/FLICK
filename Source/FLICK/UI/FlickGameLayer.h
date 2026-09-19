@@ -234,7 +234,7 @@ private:
 	bool bSocialFriendsExpanded = true;
 	bool bSocialInGameExpanded = true;
 	bool bSocialOnlineExpanded = true;
-	bool bSocialOfflineExpanded = false;
+	bool bSocialOfflineExpanded = true;
 	bool bSocialRecentExpanded = true;
 	TSharedPtr<SVerticalBox> SocialPlayerList;
 	int32 CachedSocialFriendCount = INDEX_NONE;

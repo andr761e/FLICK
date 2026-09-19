@@ -1,7 +1,30 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Core/FlickPieceArchetypeRules.h"
+#include "Core/FlickModeRules.h"
 #include "Misc/AutomationTest.h"
+
+namespace
+{
+	float CalculateHeadOnTargetSpeed(
+		const FFlickPieceArchetypeRules& Attacker,
+		const FFlickPieceArchetypeRules& Defender)
+	{
+		const FFlickModeRules& Mode = FlickModeRules::Get(EFlickMatchVariant::Classic);
+		// The common base mass cancels from the collision ratio, so archetype
+		// multipliers are sufficient here.
+		const float AttackerMass = Attacker.MassMultiplier;
+		const float DefenderMass = Defender.MassMultiplier;
+		const float AttackerSpeed = Mode.MaxLaunchSpeed * Attacker.LaunchSpeedMultiplier;
+		// Runtime physical materials combine restitution by averaging the two
+		// puck values. This is the corresponding one-dimensional collision result.
+		const float CombinedRestitution = Mode.PieceRestitution
+			* (Attacker.RestitutionMultiplier + Defender.RestitutionMultiplier) * 0.5f;
+		return (1.0f + CombinedRestitution)
+			* AttackerMass / FMath::Max(AttackerMass + DefenderMass, KINDA_SMALL_NUMBER)
+			* AttackerSpeed;
+	}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFlickPieceArchetypeRulesTest,
@@ -80,6 +103,76 @@ bool FFlickPieceArchetypeRulesTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Striker and Bouncer retain distinct signature colors"),
 		!FlickPieceArchetypeRules::GetVisualAccent(EFlickPieceArchetype::Striker, BlueTeam).Equals(
 			FlickPieceArchetypeRules::GetVisualAccent(EFlickPieceArchetype::Bouncer, BlueTeam)));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFlickPieceBalanceMatrixTest,
+	"FLICK.Pieces.BalanceMatrix",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickPieceBalanceMatrixTest::RunTest(const FString& Parameters)
+{
+	const FFlickPieceArchetypeRules& Standard =
+		FlickPieceArchetypeRules::Get(EFlickPieceArchetype::Standard);
+	const float StandardBaseline = CalculateHeadOnTargetSpeed(Standard, Standard);
+	float MinimumTransferRatio = TNumericLimits<float>::Max();
+	float MaximumTransferRatio = 0.0f;
+	FString MinimumMatchup;
+	FString MaximumMatchup;
+
+	for (int32 AttackerIndex = 0; AttackerIndex < FlickPieceArchetypeRules::ArchetypeCount; ++AttackerIndex)
+	{
+		const EFlickPieceArchetype AttackerType = static_cast<EFlickPieceArchetype>(AttackerIndex);
+		const FFlickPieceArchetypeRules& Attacker = FlickPieceArchetypeRules::Get(AttackerType);
+		const float MomentumRatio = Attacker.MassMultiplier * Attacker.LaunchSpeedMultiplier;
+		const float CoastRatio = Attacker.LaunchSpeedMultiplier / FMath::Sqrt(
+			FMath::Max(Attacker.FrictionMultiplier * Attacker.LinearDampingMultiplier, KINDA_SMALL_NUMBER));
+
+		TestTrue(
+			*FString::Printf(TEXT("%s has a bounded launch momentum budget"), *GetPieceArchetypeName(AttackerType)),
+			MomentumRatio >= 0.6f && MomentumRatio <= 1.45f);
+		TestTrue(
+			*FString::Printf(TEXT("%s has a playable footprint"), *GetPieceArchetypeName(AttackerType)),
+			Attacker.RadiusMultiplier >= 0.78f && Attacker.RadiusMultiplier <= 1.2f);
+		TestTrue(
+			*FString::Printf(TEXT("%s has finite travel behavior"), *GetPieceArchetypeName(AttackerType)),
+			FMath::IsFinite(CoastRatio) && CoastRatio > 0.25f && CoastRatio < 2.1f);
+
+		for (int32 DefenderIndex = 0; DefenderIndex < FlickPieceArchetypeRules::ArchetypeCount; ++DefenderIndex)
+		{
+			const EFlickPieceArchetype DefenderType = static_cast<EFlickPieceArchetype>(DefenderIndex);
+			const float TransferRatio = CalculateHeadOnTargetSpeed(
+				Attacker,
+				FlickPieceArchetypeRules::Get(DefenderType)) / StandardBaseline;
+			if (TransferRatio < MinimumTransferRatio)
+			{
+				MinimumTransferRatio = TransferRatio;
+				MinimumMatchup = FString::Printf(
+					TEXT("%s into %s"),
+					*GetPieceArchetypeName(AttackerType),
+					*GetPieceArchetypeName(DefenderType));
+			}
+			if (TransferRatio > MaximumTransferRatio)
+			{
+				MaximumTransferRatio = TransferRatio;
+				MaximumMatchup = FString::Printf(
+					TEXT("%s into %s"),
+					*GetPieceArchetypeName(AttackerType),
+					*GetPieceArchetypeName(DefenderType));
+			}
+		}
+	}
+
+	AddInfo(FString::Printf(
+		TEXT("Balance matrix: weakest transfer %.3fx (%s), strongest transfer %.3fx (%s)"),
+		MinimumTransferRatio,
+		*MinimumMatchup,
+		MaximumTransferRatio,
+		*MaximumMatchup));
+	TestTrue(TEXT("No matchup has negligible direct-impact authority"), MinimumTransferRatio >= 0.45f);
+	TestTrue(TEXT("No matchup has excessive direct-impact authority"), MaximumTransferRatio <= 1.35f);
 
 	return true;
 }

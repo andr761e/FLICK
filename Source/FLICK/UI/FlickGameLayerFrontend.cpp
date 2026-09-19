@@ -270,14 +270,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			]
 		]
 		+ SOverlay::Slot()
+		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Bottom)
-		.Padding(38.0f, 0.0f, 48.0f, 28.0f)
+		.Padding(52.0f, 0.0f, 0.0f, 48.0f)
 		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
+			SNew(SBox).WidthOverride(380.0f).HeightOverride(82.0f)
 			[
-				SNew(SBox).WidthOverride(380.0f).HeightOverride(82.0f)
-				[
 				SNew(SFlickMainMenuPanel)
 				.BackgroundColor_Lambda([this]()
 				{
@@ -298,63 +296,93 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						SNew(SFlickAngularBorder)
 						.BackgroundColor(PanelRaised)
 						.AccentColor_Lambda([this]() { return SelectedAvatarBorder == 2 ? Brand : SelectedAvatarBorder == 1 ? Cyan : Hairline; })
-						.CutSize(8.0f).BorderWidth(1.4f).Padding(FMargin(12.0f, 8.0f))
-						[SNew(SFlickStatusGlobe).Color(Cyan.CopyWithNewOpacity(0.94f))]
+						.CutSize(8.0f).BorderWidth(1.4f).Padding(FMargin(3.0f))
+						[
+							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[
+								SNew(SImage)
+								.Image_Lambda([this]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions ? Sessions->GetLocalAvatarBrush() : nullptr; })
+								.Visibility_Lambda([this]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions && Sessions->GetLocalAvatarBrush() ? EVisibility::Visible : EVisibility::Collapsed; })
+							]
+							+ SOverlay::Slot().Padding(9.0f, 6.0f)
+							[
+								SNew(SFlickStatusGlobe).Color(Cyan.CopyWithNewOpacity(0.94f))
+								.Visibility_Lambda([this]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions && Sessions->GetLocalAvatarBrush() ? EVisibility::Collapsed : EVisibility::Visible; })
+							]
+						]
 						]
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 					[
 						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PLAYER PROFILE"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f)[SNew(STextBlock).Text_Lambda([this]() { const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER")); }).Font(UiFont(15, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda([this]() { static const TCHAR* Tags[] = {TEXT("READY TO FLICK"), TEXT("TABLE TACTICIAN"), TEXT("RIVAL INCOMING")}; return FText::FromString(Tags[SelectedBannerTag % 3]); }).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
-					]
-				]
-				]
-			]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(12.0f, 0.0f, 0.0f, 0.0f)
-			[
-				SNew(SBox).HeightOverride(82.0f)
-				.Visibility_Lambda([this]() { return IsDisplayedPartyActive() ? EVisibility::Visible : EVisibility::Collapsed; })
-				[
-					SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Hairline).CutSize(8.0f).BorderWidth(0.8f).Padding(FMargin(11.0f, 7.0f))
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PARTY ROSTER  //  CLICK FOR CONTROLS"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
-						[
-							SNew(SHorizontalBox)
-							+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(0)]
-							+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f)[BuildMainMenuPartyMember(1)]
-							+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(2)]
-							+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f)[BuildMainMenuPartyMember(3)]
-							+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(4)]
-							+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(5)]
-						]
+						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda([this]() { const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER")); }).Font(UiFont(15, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)[SNew(STextBlock).Text_Lambda([this]() { static const TCHAR* Tags[] = {TEXT("READY TO FLICK"), TEXT("TABLE TACTICIAN"), TEXT("RIVAL INCOMING")}; return FText::FromString(Tags[SelectedBannerTag % 3]); }).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
 					]
 				]
 			]
-			+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
+		]
+		+ SOverlay::Slot()
+		.HAlign(HAlign_Left)
+		.VAlign(VAlign_Bottom)
+		.Padding(430.0f, 0.0f, 0.0f, 48.0f)
+		[
+			SNew(SBox).HeightOverride(82.0f)
+			.Visibility_Lambda([this]() { return IsDisplayedPartyActive() ? EVisibility::Visible : EVisibility::Collapsed; })
 			[
-				SNew(SBox).WidthOverride(330.0f).HeightOverride(58.0f)
+				SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Hairline).CutSize(8.0f).BorderWidth(0.8f).Padding(FMargin(11.0f, 7.0f))
 				[
-					SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(FLinearColor(0.16f, 0.38f, 0.5f, 0.45f)).CutSize(7.0f).BorderWidth(0.8f).Padding(FMargin(15.0f, 8.0f))
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PARTY ROSTER  //  CLICK FOR CONTROLS"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
 					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("CURRENT TABLE"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f)
-						[
-							SNew(STextBlock).Text_Lambda([this]()
-							{
-								const EFlickMatchVariant Variant = GameMode.IsValid() ? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
-								const int32 TeamSize = GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1;
-								return FText::FromString(Variant == EFlickMatchVariant::Bob
-									? TEXT("BOB  //  POCKET YOUR COLOR")
-									: FString::Printf(TEXT("%dV%d KNOCKOUT  //  FIRST TO 3"), TeamSize, TeamSize));
-							}).Font(UiFont(10, true)).ColorAndOpacity(Paper)
-						]
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(0)]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f)[BuildMainMenuPartyMember(1)]
+						+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(2)]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f)[BuildMainMenuPartyMember(3)]
+						+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(4)]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f, 0.0f, 0.0f)[BuildMainMenuPartyMember(5)]
 					]
+				]
+			]
+		]
+		+ SOverlay::Slot()
+		.VAlign(VAlign_Bottom)
+		.Padding(0.0f)
+		[
+			SNew(SBox).HeightOverride(32.0f).Clipping(EWidgetClipping::ClipToBounds)
+			[
+				SNew(SOverlay)
+				+ SOverlay::Slot()
+				[
+					SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 218))).Padding(0.0f)
+				]
+				+ SOverlay::Slot().VAlign(VAlign_Top)
+				[
+					SNew(SBox).HeightOverride(1.0f)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(0.42f))]
+				]
+				+ SOverlay::Slot().VAlign(VAlign_Center)
+				[
+					SNew(SHorizontalBox)
+					.RenderTransform_Lambda([TickerStartTime = FPlatformTime::Seconds()]()
+					{
+						const float ViewportWidth = GEngine && GEngine->GameViewport && GEngine->GameViewport->Viewport
+							? static_cast<float>(GEngine->GameViewport->Viewport->GetSizeXY().X) : 1920.0f;
+						const double TravelDistance = static_cast<double>(ViewportWidth) + 1900.0;
+						const double ElapsedTime = FMath::Max(0.0, FPlatformTime::Seconds() - TickerStartTime);
+						const float Offset = static_cast<float>(FMath::Fmod(ElapsedTime * 55.0, TravelDistance));
+						// Begin just inside the right edge so the ticker is visibly alive on
+						// the very first main-menu frame, rather than waiting off-screen.
+						return FSlateRenderTransform(FVector2D(ViewportWidth - 120.0f - Offset, 0.0f));
+					})
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK NETWORK  "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("  BUILD YOUR LINEUP. MASTER THE ANGLE. OWN THE TABLE.     "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("     COMPETITIVE SEASON PREVIEW COMING SOON     "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("     FLICK NETWORK  //  BUILD YOUR LINEUP. MASTER THE ANGLE. OWN THE TABLE."))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
 				]
 			]
 		]
@@ -1010,6 +1038,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					{
 						bShowingRecentPlayers = Tab == 2;
 						bShowingOnlineFriends = Tab == 1;
+						bSocialInGameExpanded = true;
+						bSocialOnlineExpanded = true;
+						bSocialOfflineExpanded = Tab == 0;
+						RebuildSocialPlayerList();
 						return FReply::Handled();
 					})
 					[
@@ -1610,14 +1642,15 @@ void SFlickGameLayer::RebuildSocialPlayerList()
 	const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
 	CachedSocialFriendCount = Sessions ? Sessions->GetFriends().Num() : 0;
 	CachedSocialRecentCount = Sessions ? Sessions->GetRecentPlayers().Num() : 0;
-	for (int32 FriendIndex = 0; FriendIndex < CachedSocialFriendCount; ++FriendIndex)
+	for (int32 FriendIndex = 0; !bShowingRecentPlayers && FriendIndex < CachedSocialFriendCount; ++FriendIndex)
 	{
+		if (bShowingOnlineFriends && !Sessions->GetFriends()[FriendIndex].bOnline) continue;
 		SocialPlayerList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)
 		[
 			BuildSocialFriendRow(FriendIndex)
 		];
 	}
-	for (int32 RecentIndex = 0; RecentIndex < CachedSocialRecentCount; ++RecentIndex)
+	for (int32 RecentIndex = 0; bShowingRecentPlayers && RecentIndex < CachedSocialRecentCount; ++RecentIndex)
 	{
 		SocialPlayerList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 5.0f, 4.0f)
 		[
@@ -1747,9 +1780,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 							SNew(SFlickAngularBorder)
 							.BackgroundColor(PanelRaised)
 							.AccentColor(Hairline)
-							.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(7.0f))
+							.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(3.0f))
 							[
-								SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Muted)
+								SNew(SOverlay)
+								+ SOverlay::Slot()
+								[
+									SNew(SImage)
+									.Image_Lambda([this, FriendIndex]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions && Sessions->GetFriends().IsValidIndex(FriendIndex) ? Sessions->GetAvatarBrush(Sessions->GetFriends()[FriendIndex].UserId) : nullptr; })
+									.Visibility_Lambda([this, FriendIndex]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions && Sessions->GetFriends().IsValidIndex(FriendIndex) && Sessions->GetAvatarBrush(Sessions->GetFriends()[FriendIndex].UserId) ? EVisibility::Visible : EVisibility::Collapsed; })
+								]
+								+ SOverlay::Slot().Padding(4.0f)
+								[
+									SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Muted)
+									.Visibility_Lambda([this, FriendIndex]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions && Sessions->GetFriends().IsValidIndex(FriendIndex) && Sessions->GetAvatarBrush(Sessions->GetFriends()[FriendIndex].UserId) ? EVisibility::Collapsed : EVisibility::Visible; })
+								]
 							]
 						]
 						+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, -2.0f, -2.0f)
@@ -1861,9 +1905,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 						SNew(SFlickAngularBorder)
 						.BackgroundColor(PanelRaised)
 						.AccentColor(Hairline.CopyWithNewOpacity(0.7f))
-						.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(7.0f))
+						.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(3.0f))
 						[
-							SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Muted)
+							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[
+								SNew(SImage)
+								.Image_Lambda([this, RecentIndex]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions && Sessions->GetRecentPlayers().IsValidIndex(RecentIndex) ? Sessions->GetAvatarBrush(Sessions->GetRecentPlayers()[RecentIndex].UserId) : nullptr; })
+								.Visibility_Lambda([this, RecentIndex]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions && Sessions->GetRecentPlayers().IsValidIndex(RecentIndex) && Sessions->GetAvatarBrush(Sessions->GetRecentPlayers()[RecentIndex].UserId) ? EVisibility::Visible : EVisibility::Collapsed; })
+							]
+							+ SOverlay::Slot().Padding(4.0f)
+							[
+								SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Muted)
+								.Visibility_Lambda([this, RecentIndex]() { UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return Sessions && Sessions->GetRecentPlayers().IsValidIndex(RecentIndex) && Sessions->GetAvatarBrush(Sessions->GetRecentPlayers()[RecentIndex].UserId) ? EVisibility::Collapsed : EVisibility::Visible; })
+							]
 						]
 					]
 				]

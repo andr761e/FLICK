@@ -870,7 +870,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 			else if (bTraining)
 			{
 				AddHint(TEXT("T"), TEXT("EDIT BOARD"), false);
-				AddHint(TEXT("V"), TEXT("FREE CAMERA"), false);
+				AddHint(TEXT("X"), TEXT("FREE CAMERA"), false);
+				AddHint(TEXT("V"), TEXT("TOP VIEW"), false);
 				AddHint(TEXT("R"), TEXT("RESET"), true);
 			}
 			else
@@ -1073,7 +1074,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 					.Text_Lambda([this]()
 					{
 					return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive()
-						? TEXT("FREE CAMERA  /  V OR ESC TO EXIT")
+						? TEXT("FREE CAMERA  /  X OR ESC TO EXIT")
 						: GameMode.IsValid() && GameMode->IsTrainingEditMode()
 							? TEXT("EDIT VIEW  /  VERTICAL ANGLE LOCKED")
 							: TEXT("CAMERA"));

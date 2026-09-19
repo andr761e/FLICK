@@ -9,6 +9,8 @@
 class FOnlineSessionSearch;
 class FOnlineSessionSearchResult;
 class UFlickMatchmakingCoordinatorSubsystem;
+class UTexture2D;
+struct FSlateBrush;
 
 enum class EFlickSessionState : uint8
 {
@@ -126,6 +128,8 @@ public:
 	const TArray<FFlickRecentPlayerEntry>& GetRecentPlayers() const { return RecentPlayers; }
 	FString GetOnlineServiceName() const;
 	FString GetLocalDisplayName() const;
+	const FSlateBrush* GetLocalAvatarBrush();
+	const FSlateBrush* GetAvatarBrush(const FString& UserId);
 
 	FOnFlickSessionsChanged OnSessionsChanged;
 
@@ -164,10 +168,15 @@ private:
 		ENetworkFailure::Type FailureType,
 		const FString& ErrorString);
 	void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
+	void RefreshSteamAvatarCache();
 
 	TSharedPtr<FOnlineSessionSearch> ActiveSearch;
 	TSharedPtr<FOnlineSessionSearchResult> PendingJoinResult;
 	TArray<FFlickSessionBrowserEntry> BrowserEntries;
+
+	UPROPERTY(Transient)
+	TMap<FString, TObjectPtr<UTexture2D>> AvatarTextures;
+	TMap<FString, TSharedPtr<FSlateBrush>> AvatarBrushes;
 	TArray<FFlickSocialPlayerEntry> Friends;
 	TArray<FFlickRecentPlayerEntry> RecentPlayers;
 	EFlickSessionState State = EFlickSessionState::Idle;
@@ -203,6 +212,8 @@ private:
 	int32 PersistentPartySize = 0;
 	bool bPersistentPartyLeader = false;
 	int32 PartyRestoreAttempts = 0;
+	int32 AvatarRefreshAttempts = 0;
+	FTimerHandle AvatarRefreshTimer;
 
 	FDelegateHandle CreateSessionHandle;
 	FDelegateHandle FindSessionsHandle;

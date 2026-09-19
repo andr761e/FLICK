@@ -239,12 +239,19 @@ void AFlickGameMode::ExpireCurrentShot()
 void AFlickGameMode::UpdateTrainingBot(const float DeltaSeconds)
 {
 	AFlickGameState* FlickGameState = GetFlickGameState();
+	const bool bKickoffBotShotAlreadyLocked = FlickGameState
+		&& FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning
+		&& LockedKickoffShots.ContainsByPredicate([](const FFlickLockedKickoffShot& Shot)
+		{
+			return Shot.Team == EFlickTeam::Player2 && Shot.PlayerSlot == 0;
+		});
 	const bool bBotCanPlan = IsTrainingBotMatch()
 		&& FrontendScreen == EFlickFrontendScreen::Playing
 		&& FlickGameState
-		&& FlickGameState->CurrentTeam == EFlickTeam::Player2
-		&& (FlickGameState->MatchPhase == EFlickMatchPhase::Aiming
-			|| FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning);
+		&& ((FlickGameState->MatchPhase == EFlickMatchPhase::Aiming
+				&& FlickGameState->CurrentTeam == EFlickTeam::Player2)
+			|| (FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning
+				&& !bKickoffBotShotAlreadyLocked));
 	if (!bBotCanPlan)
 	{
 		ResetTrainingBotThinking();
@@ -299,9 +306,9 @@ bool AFlickGameMode::TryExecuteTrainingBotShot()
 {
 	AFlickGameState* FlickGameState = GetFlickGameState();
 	if (!IsTrainingBotMatch() || !FlickGameState
-		|| FlickGameState->CurrentTeam != EFlickTeam::Player2
-		|| (FlickGameState->MatchPhase != EFlickMatchPhase::Aiming
-			&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning))
+		|| !((FlickGameState->MatchPhase == EFlickMatchPhase::Aiming
+				&& FlickGameState->CurrentTeam == EFlickTeam::Player2)
+			|| FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning))
 	{
 		return false;
 	}
@@ -419,7 +426,15 @@ bool AFlickGameMode::TryExecuteTrainingBotShot()
 bool AFlickGameMode::CanSelectPiece(const AFlickPiece* Piece) const
 {
 	const AFlickGameState* FlickGameState = GetFlickGameState();
-	if (IsTrainingBotMatch() && FlickGameState && FlickGameState->CurrentTeam == EFlickTeam::Player2)
+	if (IsTrainingBotMatch() && FlickGameState
+		&& FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning
+		&& Piece && Piece->GetTeam() != EFlickTeam::Player1)
+	{
+		return false;
+	}
+	if (IsTrainingBotMatch() && FlickGameState
+		&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning
+		&& FlickGameState->CurrentTeam == EFlickTeam::Player2)
 	{
 		return false;
 	}
@@ -449,7 +464,12 @@ bool AFlickGameMode::CanSelectPieceForController(
 		&& Piece
 		&& Piece->IsBobStriker();
 	if (!RequestingPlayer || !Piece || !FlickGameState
-		|| (IsTrainingBotMatch() && FlickGameState->CurrentTeam == EFlickTeam::Player2)
+		|| (IsTrainingBotMatch()
+			&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning
+			&& FlickGameState->CurrentTeam == EFlickTeam::Player2)
+		|| (IsTrainingBotMatch()
+			&& FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning
+			&& Piece->GetTeam() != EFlickTeam::Player1)
 		|| FrontendScreen != EFlickFrontendScreen::Playing
 		|| (FlickGameState->MatchPhase != EFlickMatchPhase::Aiming
 			&& FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning)

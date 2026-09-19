@@ -219,6 +219,7 @@ private:
 	bool bCinematicReplay = false;
 	bool bFreeCameraEnabled = false;
 	bool bTopDownView = false;
+	float TopDownOrbitAngle = 0.0f;
 	float SavedGameplayOrbitAngle = 0.0f;
 	float SavedGameplayElevationAngle = 0.0f;
 };

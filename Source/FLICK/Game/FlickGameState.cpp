@@ -187,7 +187,10 @@ float AFlickGameState::GetShotClockTimeRemaining() const
 
 float AFlickGameState::GetShotClockFraction(const EFlickTeam Team) const
 {
-	if (!bShotClockActive || Team != CurrentTeam)
+	// Kickoff planning uses one shared deadline for both teams. CurrentTeam only
+	// determines who receives the first normal turn after the simultaneous shot.
+	if (!bShotClockActive
+		|| (MatchPhase != EFlickMatchPhase::KickoffPlanning && Team != CurrentTeam))
 	{
 		return 1.0f;
 	}

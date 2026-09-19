@@ -7,6 +7,7 @@
 #include "Core/FlickRankRules.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Texture2D.h"
 #include "Game/FlickGameMode.h"
 #include "Interfaces/OnlineExternalUIInterface.h"
 #include "Interfaces/OnlineFriendsInterface.h"
@@ -22,6 +23,12 @@
 #include "Player/FlickPlayerState.h"
 #include "Ranking/FlickRankingSubsystem.h"
 #include "TimerManager.h"
+#include "Styling/SlateBrush.h"
+#include "Framework/Application/SlateApplication.h"
+
+#if WITH_FLICK_STEAMWORKS
+#include "steam/steam_api.h"
+#endif
 
 namespace
 {
@@ -166,6 +173,119 @@ FString UFlickSessionSubsystem::GetLocalDisplayName() const
 	const IOnlineIdentityPtr Identity = OnlineSubsystem ? OnlineSubsystem->GetIdentityInterface() : nullptr;
 	const FString Nickname = Identity.IsValid() ? Identity->GetPlayerNickname(0) : FString();
 	return Nickname.IsEmpty() ? TEXT("LOCAL PLAYER") : Nickname;
+}
+
+const FSlateBrush* UFlickSessionSubsystem::GetLocalAvatarBrush()
+{
+#if WITH_FLICK_STEAMWORKS
+	if (SteamUser())
+	{
+		return GetAvatarBrush(FString::Printf(TEXT("%llu"), SteamUser()->GetSteamID().ConvertToUint64()));
+	}
+#endif
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineIdentityPtr Identity = OnlineSubsystem ? OnlineSubsystem->GetIdentityInterface() : nullptr;
+	const FUniqueNetIdPtr UserId = Identity.IsValid() ? Identity->GetUniquePlayerId(0) : nullptr;
+	return UserId.IsValid() ? GetAvatarBrush(UserId->ToString()) : nullptr;
+}
+
+const FSlateBrush* UFlickSessionSubsystem::GetAvatarBrush(const FString& UserId)
+{
+	if (const TSharedPtr<FSlateBrush>* Existing = AvatarBrushes.Find(UserId))
+	{
+		return Existing->Get();
+	}
+
+#if WITH_FLICK_STEAMWORKS
+	if (UserId.IsEmpty() || !SteamFriends() || !SteamUtils())
+	{
+		return nullptr;
+	}
+
+	const uint64 NumericId = FCString::Strtoui64(*UserId, nullptr, 10);
+	if (NumericId == 0)
+	{
+		return nullptr;
+	}
+	const int32 ImageHandle = SteamFriends()->GetLargeFriendAvatar(CSteamID(NumericId));
+	if (ImageHandle <= 0)
+	{
+		// -1 means Steam has started an asynchronous download. Slate asks again on
+		// subsequent paints, so the image appears as soon as Steam caches it.
+		return nullptr;
+	}
+
+	uint32 Width = 0;
+	uint32 Height = 0;
+	if (!SteamUtils()->GetImageSize(ImageHandle, &Width, &Height) || Width == 0 || Height == 0)
+	{
+		return nullptr;
+	}
+	TArray<uint8> Pixels;
+	Pixels.SetNumUninitialized(Width * Height * 4);
+	if (!SteamUtils()->GetImageRGBA(ImageHandle, Pixels.GetData(), Pixels.Num()))
+	{
+		return nullptr;
+	}
+
+	UTexture2D* Texture = UTexture2D::CreateTransient(Width, Height, PF_R8G8B8A8);
+	if (!Texture || !Texture->GetPlatformData() || Texture->GetPlatformData()->Mips.IsEmpty())
+	{
+		return nullptr;
+	}
+	Texture->SRGB = true;
+	void* Destination = Texture->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
+	FMemory::Memcpy(Destination, Pixels.GetData(), Pixels.Num());
+	Texture->GetPlatformData()->Mips[0].BulkData.Unlock();
+	Texture->UpdateResource();
+	AvatarTextures.Add(UserId, Texture);
+
+	TSharedPtr<FSlateBrush> Brush = MakeShared<FSlateBrush>();
+	Brush->SetResourceObject(Texture);
+	Brush->ImageSize = FVector2D(static_cast<float>(Width), static_cast<float>(Height));
+	Brush->DrawAs = ESlateBrushDrawType::Image;
+	AvatarBrushes.Add(UserId, Brush);
+	if (FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().InvalidateAllWidgets(false);
+	}
+	return Brush.Get();
+#else
+	return nullptr;
+#endif
+}
+
+void UFlickSessionSubsystem::RefreshSteamAvatarCache()
+{
+	bool bWaitingForAvatar = GetLocalAvatarBrush() == nullptr;
+	for (const FFlickSocialPlayerEntry& Friend : Friends)
+	{
+		bWaitingForAvatar |= GetAvatarBrush(Friend.UserId) == nullptr;
+	}
+	for (const FFlickRecentPlayerEntry& RecentPlayer : RecentPlayers)
+	{
+		bWaitingForAvatar |= GetAvatarBrush(RecentPlayer.UserId) == nullptr;
+	}
+	OnSessionsChanged.Broadcast();
+	if (FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().InvalidateAllWidgets(false);
+	}
+
+	++AvatarRefreshAttempts;
+	if (bWaitingForAvatar && AvatarRefreshAttempts < 8 && GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimer(
+			AvatarRefreshTimer,
+			this,
+			&UFlickSessionSubsystem::RefreshSteamAvatarCache,
+			0.75f,
+			false);
+	}
+	else
+	{
+		UE_LOG(LogFlick, Log, TEXT("Steam avatars cached: %d/%d after %d attempts"), AvatarBrushes.Num(), Friends.Num() + RecentPlayers.Num() + 1, AvatarRefreshAttempts);
+	}
 }
 
 void UFlickSessionSubsystem::SetPersistentPartyIdentity(
@@ -962,7 +1082,10 @@ void UFlickSessionSubsystem::HandleReadFriendsComplete(
 			FFlickSocialPlayerEntry& Entry = Friends.AddDefaulted_GetRef();
 			Entry.DisplayName = OnlineFriend->GetDisplayName();
 			Entry.UserId = OnlineFriend->GetUserId()->ToString();
-			Entry.bOnline = Presence.bIsOnline;
+			// Steam's aggregate bIsOnline flag has reported stale/optimistic values in
+			// some presence payloads. The explicit state is what the Steam friends UI
+			// uses to distinguish the ALL and ONLINE lists.
+			Entry.bOnline = Presence.Status.State != EOnlinePresenceState::Offline;
 			Entry.bPlayingFlick = Presence.bIsPlayingThisGame;
 			Entry.bJoinable = Presence.bIsJoinable;
 			Entry.Status = Entry.bPlayingFlick
@@ -971,6 +1094,34 @@ void UFlickSessionSubsystem::HandleReadFriendsComplete(
 					? Presence.Status.StatusStr.ToUpper()
 					: Entry.bOnline ? TEXT("ONLINE") : TEXT("OFFLINE");
 		}
+
+#if WITH_FLICK_STEAMWORKS
+		// The generic Steam OSS friends list can omit offline users or expose stale
+		// aggregate presence. Build the visible roster from Steam's immediate-friend
+		// relationship and persona state—the same source used by the Steam client.
+		if (SteamFriends() && SteamUtils())
+		{
+			Friends.Reset();
+			const AppId_t CurrentAppId = SteamUtils()->GetAppID();
+			const int32 FriendCount = SteamFriends()->GetFriendCount(k_EFriendFlagImmediate);
+			for (int32 FriendIndex = 0; FriendIndex < FriendCount; ++FriendIndex)
+			{
+				const CSteamID SteamId = SteamFriends()->GetFriendByIndex(FriendIndex, k_EFriendFlagImmediate);
+				if (!SteamId.IsValid()) continue;
+				const EPersonaState PersonaState = SteamFriends()->GetFriendPersonaState(SteamId);
+				FriendGameInfo_t GameInfo;
+				const bool bHasGame = SteamFriends()->GetFriendGamePlayed(SteamId, &GameInfo);
+				FFlickSocialPlayerEntry& Entry = Friends.AddDefaulted_GetRef();
+				Entry.DisplayName = UTF8_TO_TCHAR(SteamFriends()->GetFriendPersonaName(SteamId));
+				Entry.UserId = FString::Printf(TEXT("%llu"), SteamId.ConvertToUint64());
+				Entry.bOnline = PersonaState != k_EPersonaStateOffline;
+				Entry.bPlayingFlick = bHasGame && GameInfo.m_gameID.AppID() == CurrentAppId;
+				Entry.bJoinable = Entry.bPlayingFlick && GameInfo.m_steamIDLobby.IsValid();
+				Entry.Status = Entry.bPlayingFlick ? TEXT("PLAYING FLICK")
+					: Entry.bOnline ? TEXT("ONLINE") : TEXT("OFFLINE");
+			}
+		}
+#endif
 		Friends.StableSort([](const FFlickSocialPlayerEntry& Left, const FFlickSocialPlayerEntry& Right)
 		{
 			if (Left.bPlayingFlick != Right.bPlayingFlick)
@@ -983,6 +1134,15 @@ void UFlickSessionSubsystem::HandleReadFriendsComplete(
 			}
 			return Left.DisplayName < Right.DisplayName;
 		});
+		int32 OnlineCount = 0;
+		for (const FFlickSocialPlayerEntry& Entry : Friends) OnlineCount += Entry.bOnline ? 1 : 0;
+		int32 bNativeRoster = 0;
+#if WITH_STEAMWORKS
+		bNativeRoster = SteamFriends() != nullptr ? 1 : 0;
+#endif
+		UE_LOG(LogFlick, Log, TEXT("Steam social roster: all=%d online=%d offline=%d native=%d"), Friends.Num(), OnlineCount, Friends.Num() - OnlineCount, bNativeRoster);
+		AvatarRefreshAttempts = 0;
+		RefreshSteamAvatarCache();
 		SetState(
 			HasActiveSession() ? EFlickSessionState::InSession : EFlickSessionState::Idle,
 			FString::Printf(TEXT("%d STEAM FRIENDS AVAILABLE"), Friends.Num()));

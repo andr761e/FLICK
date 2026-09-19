@@ -753,10 +753,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassPlayerRow(
 					[
 						SNew(STextBlock)
 						.Text_Lambda([this, Preset]() { return FText::FromString(GetClassDisplayName(Preset)); })
-						.Font(DisplayFont(16, true))
+						.Font(UiFont(18, true))
 						.Justification(ETextJustify::Center)
 						.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-						.ColorAndOpacity(FLinearColor::White)
+						.ColorAndOpacity(Muted)
 					]
 				]
 			];
@@ -1289,14 +1289,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	const auto Checked = [](const bool bValue) { return bValue ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; };
 	const auto SectionHeading = [](const FString& Number, const FString& Title, const FString& Description) -> TSharedRef<SWidget>
 	{
+		(void)Number;
 		return SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
-				[SNew(STextBlock).Text(FText::FromString(Number)).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
-				+ SHorizontalBox::Slot().FillWidth(1.0f)
-				[SNew(STextBlock).Text(FText::FromString(Title)).Font(DisplayFont(25)).ColorAndOpacity(Paper)]
+				SNew(STextBlock).Text(FText::FromString(Title)).Font(DisplayFont(25)).ColorAndOpacity(Paper)
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 10.0f)
 			[SNew(STextBlock).Text(FText::FromString(Description)).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)];

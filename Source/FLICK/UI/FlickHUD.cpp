@@ -17,7 +17,7 @@
 
 namespace
 {
-	constexpr float TopBarHeight = 205.0f;
+	constexpr float TopBarHeight = 160.0f;
 	const FLinearColor PanelColor(0.008f, 0.012f, 0.02f, 0.93f);
 	const FLinearColor MutedTextColor(0.62f, 0.68f, 0.72f, 1.0f);
 
@@ -446,7 +446,7 @@ void AFlickHUD::ObserveMatchState(const AFlickGameState& GameState, const float 
 
 void AFlickHUD::DrawTopBar(const AFlickGameState& GameState, const float Width, const float Now)
 {
-	const float SideWidth = FMath::Clamp(Width * 0.25f, 300.0f, 400.0f);
+	const float SideWidth = FMath::Clamp(Width * 0.22f, 250.0f, 340.0f);
 	DrawTeamBlock(
 		EFlickTeam::Player1,
 		GameState.Player1ActivePieces,
@@ -454,8 +454,8 @@ void AFlickHUD::DrawTopBar(const AFlickGameState& GameState, const float Width, 
 		GameState.Player1ShotsTaken,
 		GameState.Player1RoundsWon,
 		GameState.RoundsToWin,
-		20.0f,
-		22.0f,
+		16.0f,
+		16.0f,
 		SideWidth,
 		GameState.MatchPhase == EFlickMatchPhase::Aiming && GameState.CurrentTeam == EFlickTeam::Player1);
 	DrawTeamBlock(
@@ -465,8 +465,8 @@ void AFlickHUD::DrawTopBar(const AFlickGameState& GameState, const float Width, 
 		GameState.Player2ShotsTaken,
 		GameState.Player2RoundsWon,
 		GameState.RoundsToWin,
-		Width - SideWidth - 20.0f,
-		22.0f,
+		Width - SideWidth - 16.0f,
+		16.0f,
 		SideWidth,
 		GameState.MatchPhase == EFlickMatchPhase::Aiming && GameState.CurrentTeam == EFlickTeam::Player2);
 
@@ -497,19 +497,19 @@ void AFlickHUD::DrawTopBar(const AFlickGameState& GameState, const float Width, 
 
 	const AFlickGameMode* CurrentGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AFlickGameMode>() : nullptr;
 	const EFlickMatchVariant Variant = CurrentGameMode ? CurrentGameMode->GetSelectedMatchVariant() : GameState.ActiveMatchVariant;
-	const float BannerWidth = FMath::Clamp(Width * 0.45f, 520.0f, 720.0f);
+	const float BannerWidth = FMath::Clamp(Width * 0.38f, 420.0f, 600.0f);
 	const float BannerX = (Width - BannerWidth) * 0.5f;
-	DrawShowcasePanel(BannerX, 12.0f, BannerWidth, 145.0f, PanelColor, FLinearColor(0.0f, 0.76f, 1.0f, 0.72f), 16.0f);
-	DrawCenteredText(Variant == EFlickMatchVariant::Bob ? TEXT("BOB") : TEXT("FLICK"), Width * 0.5f, 37.0f, FLinearColor(0.95f, 0.98f, 1.0f, 1.0f), 1.55f, true);
-	DrawCenteredText(Status, Width * 0.5f, 83.0f, StatusColor, 0.92f, true);
+	DrawShowcasePanel(BannerX, 10.0f, BannerWidth, 112.0f, PanelColor, FLinearColor(0.0f, 0.76f, 1.0f, 0.72f), 12.0f);
+	DrawCenteredText(Variant == EFlickMatchVariant::Bob ? TEXT("BOB") : TEXT("FLICK"), Width * 0.5f, 27.0f, FLinearColor(0.95f, 0.98f, 1.0f, 1.0f), 1.2f, true);
+	DrawCenteredText(Status, Width * 0.5f, 62.0f, StatusColor, 0.76f, true);
 	DrawCenteredText(
 		Variant == EFlickMatchVariant::Bob
 			? FString::Printf(TEXT("STANDARD PUCKS  /  SHOT %d"), GameState.TurnNumber)
 			: FString::Printf(TEXT("ROUND %d  /  SHOT %d"), GameState.RoundNumber, GameState.TurnNumber),
 		Width * 0.5f,
-		116.0f,
+		91.0f,
 		MutedTextColor,
-		0.68f);
+		0.58f);
 }
 
 void AFlickHUD::DrawAimPresentation(const AFlickPlayerController& Controller)
@@ -626,22 +626,22 @@ void AFlickHUD::DrawEventFeed(const float Width, const float Now)
 		const float Duration = FMath::Max(Event.ExpiresAt - Event.CreatedAt, 0.1f);
 		const float Remaining = FMath::Clamp((Event.ExpiresAt - Now) / Duration, 0.0f, 1.0f);
 		const float Fade = FMath::Clamp(Remaining * 3.0f, 0.0f, 1.0f);
-		const float EventWidth = 280.0f;
+		const float EventWidth = 230.0f;
 		const float X = Width - EventWidth - 20.0f;
 		DrawShowcasePanel(
 			X,
 			Y,
 			EventWidth,
-			34.0f,
+			28.0f,
 			FLinearColor(0.01f, 0.015f, 0.02f, 0.76f * Fade),
 			FLinearColor(Event.Color.R, Event.Color.G, Event.Color.B, Fade),
 			6.0f);
-		DrawText(Event.Message, FLinearColor(Event.Color.R, Event.Color.G, Event.Color.B, Fade), X + 14.0f, Y + 8.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f);
+		DrawText(Event.Message, FLinearColor(Event.Color.R, Event.Color.G, Event.Color.B, Fade), X + 11.0f, Y + 6.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f);
 		if (!Event.PointsText.IsEmpty())
 		{
-			DrawText(Event.PointsText, FLinearColor(0.3f, 1.0f, 0.58f, Fade), X + EventWidth - 66.0f, Y + 8.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f);
+			DrawText(Event.PointsText, FLinearColor(0.3f, 1.0f, 0.58f, Fade), X + EventWidth - 55.0f, Y + 6.0f, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f);
 		}
-		Y += 41.0f;
+		Y += 34.0f;
 	}
 }
 
@@ -1027,41 +1027,41 @@ void AFlickHUD::DrawTeamBlock(
 {
 	const FLinearColor TeamColor = GetTeamColor(Team);
 	const bool bBobMode = StartingPieces > 4;
-	DrawShowcasePanel(X, Y, Width, 176.0f, PanelColor, TeamColor.CopyWithNewOpacity(bCurrent ? 0.92f : 0.76f), 14.0f);
+	DrawShowcasePanel(X, Y, Width, 136.0f, PanelColor, TeamColor.CopyWithNewOpacity(bCurrent ? 0.92f : 0.76f), 11.0f);
 
 	DrawText(
 		FString::Printf(TEXT("PLAYER %d"), GetTeamNumber(Team)),
 		TeamColor,
-		X + 62.0f,
-		Y + 45.0f,
+		X + 44.0f,
+		Y + 32.0f,
 		GEngine ? GEngine->GetLargeFont() : nullptr,
-		0.72f);
+		0.61f);
 	DrawText(
 		bBobMode
 			? FString::Printf(TEXT("POCKETED  %d / %d"), StartingPieces - ActivePieces, StartingPieces)
 			: FString::Printf(TEXT("ROUNDS  %d / %d"), RoundsWon, RoundsToWin),
 		MutedTextColor,
-		X + 62.0f,
-		Y + 120.0f,
+		X + 44.0f,
+		Y + 94.0f,
 		GEngine ? GEngine->GetSmallFont() : nullptr,
-		0.62f);
+		0.54f);
 
 	if (!bBobMode)
 	{
 		for (int32 Index = 0; Index < RoundsToWin; ++Index)
 		{
 			DrawCircle(
-				FVector2D(X + 70.0f + Index * 24.0f, Y + 89.0f),
-				8.0f,
+				FVector2D(X + 50.0f + Index * 20.0f, Y + 70.0f),
+				6.0f,
 				Index < RoundsWon ? TeamColor : FLinearColor(TeamColor.R, TeamColor.G, TeamColor.B, 0.48f),
 				24,
 				Index < RoundsWon ? 3.0f : 1.5f);
 		}
 	}
 
-	const float CountCenterX = X + Width - 80.0f;
-	DrawCenteredText(FString::FromInt(ActivePieces), CountCenterX, Y + 51.0f, FLinearColor::White, 1.65f, true);
-	DrawCenteredText(bBobMode ? TEXT("LEFT") : TEXT("ACTIVE"), CountCenterX, Y + 111.0f, MutedTextColor, 0.58f);
+	const float CountCenterX = X + Width - 60.0f;
+	DrawCenteredText(FString::FromInt(ActivePieces), CountCenterX, Y + 37.0f, FLinearColor::White, 1.3f, true);
+	DrawCenteredText(bBobMode ? TEXT("LEFT") : TEXT("ACTIVE"), CountCenterX, Y + 87.0f, MutedTextColor, 0.5f);
 	(void)ShotsTaken;
 }
 

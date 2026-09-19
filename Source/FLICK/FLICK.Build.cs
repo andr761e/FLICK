@@ -12,7 +12,8 @@ public class FLICK : ModuleRules
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "PhysicsCore", "OnlineSubsystem", "OnlineSubsystemUtils", "HTTP", "Json" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "MoviePlayer", "RenderCore" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "MoviePlayer", "RenderCore", "Steamworks" });
+		PublicDefinitions.Add("WITH_FLICK_STEAMWORKS=1");
 		
 	}
 }

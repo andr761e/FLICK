@@ -271,13 +271,14 @@ void AFlickCameraPawn::SetGameplayViewIndex(const int32 InViewIndex, const bool 
 
 void AFlickCameraPawn::RotateGameplayOrbit(const float Direction, const float DeltaSeconds, const float Sensitivity)
 {
-	if (FMath::IsNearlyZero(Direction) || DeltaSeconds <= 0.0f || bMenuPresentation || bTopDownView)
+	if (FMath::IsNearlyZero(Direction) || DeltaSeconds <= 0.0f || bMenuPresentation)
 	{
 		return;
 	}
 
-	GameplayOrbitAngle = FRotator::NormalizeAxis(
-		GameplayOrbitAngle
+	float& OrbitAngle = bTopDownView ? TopDownOrbitAngle : GameplayOrbitAngle;
+	OrbitAngle = FRotator::NormalizeAxis(
+		OrbitAngle
 		+ FMath::Clamp(Direction, -1.0f, 1.0f) * GameplayOrbitDegreesPerSecond
 			* FMath::Lerp(0.35f, 1.5f, FMath::Clamp(Sensitivity, 0.0f, 1.0f)) * DeltaSeconds);
 	bGameplayOrbitManuallyControlled = true;
@@ -303,6 +304,7 @@ void AFlickCameraPawn::ToggleTopDownView()
 	{
 		SavedGameplayOrbitAngle = GameplayOrbitAngle;
 		SavedGameplayElevationAngle = GameplayElevationAngle;
+		TopDownOrbitAngle = GameplayOrbitAngle;
 		bTopDownView = true;
 	}
 	else
@@ -514,7 +516,7 @@ FVector AFlickCameraPawn::GetGameplayTargetLocation() const
 
 FRotator AFlickCameraPawn::GetGameplayTargetRotation() const
 {
-	if (bTopDownView) return FRotator(-90.0f, SavedGameplayOrbitAngle + 90.0f, 0.0f);
+	if (bTopDownView) return FRotator(-90.0f, TopDownOrbitAngle + 90.0f, 0.0f);
 	const FRotator& BaseRotation = bBobGameplayFraming ? BobCameraRotation : CameraRotation;
 	return FRotator(
 		BaseRotation.Pitch - GameplayElevationAngle + (bAimPresentation ? AimPitchOffset : 0.0f),

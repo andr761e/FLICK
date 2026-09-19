@@ -40,6 +40,7 @@
 #include "Widgets/Layout/SUniformGridPanel.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SLeafWidget.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Text/STextBlock.h"
 
 namespace
@@ -2176,4 +2177,3 @@ namespace
 		TAttribute<FLinearColor> AccentColor;
 	};
 }
-
