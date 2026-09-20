@@ -225,6 +225,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 				.Style(&ShotClockBarStyle)
 				.Percent_Lambda([this]()
 				{
+					if (PlayerController.IsValid())
+					{
+						return TOptional<float>(PlayerController->GetCinematicReplayPresentationProgress());
+					}
 					return TOptional<float>(GameMode.IsValid() ? GameMode->GetCinematicReplayProgress() : 0.0f);
 				})
 				.FillColorAndOpacity(Orange)

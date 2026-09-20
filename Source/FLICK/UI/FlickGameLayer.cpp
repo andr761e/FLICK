@@ -95,27 +95,19 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
-		SNew(SOverlay)
-		+ SOverlay::Slot()
-		[
-			SNew(SBox)
-			.Visibility_Lambda([this]() { return GetScreenVisibility(EFlickFrontendScreen::MainMenu); })
-			[
-				// This backdrop uses the real viewport geometry, so ultrawide displays
-				// never expose the edges of the 16:9 reference canvas.
-				SNew(SOverlay)
-				+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility(EVisibility::HitTestInvisible).Opacity(0.9f)]
-				+ SOverlay::Slot()[SNew(SFlickDiagonalPanel).Visibility(EVisibility::HitTestInvisible).PanelColor(Ink).EdgeColor(Hairline)]
-			]
-		]
-		+ SOverlay::Slot()
-		[
-		SNew(SScaleBox)
-		.Stretch(EStretch::ScaleToFit)
-		[
-		SNew(SBox)
-		.WidthOverride(FlickUITheme::ReferenceWidth)
-		.HeightOverride(FlickUITheme::ReferenceHeight)
+		// Keep a stable 1080-unit vertical design grid while allowing the virtual
+		// canvas to become wider with the real viewport. This avoids 16:9
+		// letterboxing on ultrawide displays without stretching text or icons.
+		SNew(SDPIScaler)
+		.DPIScale_Lambda([]()
+		{
+			FVector2D ViewportSize(FlickUITheme::ReferenceWidth, FlickUITheme::ReferenceHeight);
+			if (GEngine && GEngine->GameViewport)
+			{
+				GEngine->GameViewport->GetViewportSize(ViewportSize);
+			}
+			return FMath::Max(0.5f, ViewportSize.Y / FlickUITheme::ReferenceHeight);
+		})
 		[
 		SNew(SOverlay)
 
@@ -223,7 +215,8 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			SNew(SBox)
 			.Visibility_Lambda([this]()
 			{
-				return GameMode.IsValid() && GameMode->IsCinematicReplayActive()
+				return ((GameMode.IsValid() && GameMode->IsCinematicReplayActive())
+					|| (PlayerController.IsValid() && PlayerController->IsCinematicReplayPresentationActive()))
 					? EVisibility::HitTestInvisible
 					: EVisibility::Collapsed;
 			})
@@ -281,13 +274,11 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 				BuildStartupOverlay()
 			]
 		]
-		]
-		]
-		]
 		+ SOverlay::Slot()
 		.VAlign(VAlign_Bottom)
 		[
 			BuildMainMenuFooter()
+		]
 		]
 	];
 

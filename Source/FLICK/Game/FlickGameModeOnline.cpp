@@ -3,6 +3,47 @@
 
 using namespace FlickGameModePrivate;
 
+bool AFlickGameMode::ActivatePartySession()
+{
+	if (!HasAuthority() || !GetWorld() || bNetworkMatchRequested || bNetworkMatchStarted)
+	{
+		return false;
+	}
+	if (bPartyRequested)
+	{
+		return true;
+	}
+
+	bPartyRequested = true;
+	bMatchmakingRequested = false;
+	bPrivateMatchSetupActive = false;
+	FrontendScreen = EFlickFrontendScreen::MainMenu;
+
+	APlayerController* LocalController = GetWorld()->GetFirstPlayerController();
+	AFlickPlayerState* LocalState = LocalController
+		? LocalController->GetPlayerState<AFlickPlayerState>() : nullptr;
+	if (!LocalState)
+	{
+		bPartyRequested = false;
+		return false;
+	}
+
+	UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem();
+	ActivePartyId = Sessions ? Sessions->GetPersistentPartyId() : FString();
+	if (ActivePartyId.IsEmpty())
+	{
+		ActivePartyId = FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphens);
+	}
+	LocalState->SetPartyIdentity(ActivePartyId, true, 0);
+	if (AFlickPlayerController* FlickController = Cast<AFlickPlayerController>(LocalController))
+	{
+		FlickController->SetPersistentPartyIdentityFromServer(ActivePartyId, 0, 1, true);
+	}
+	SynchronizePartyState();
+	SetCameraForFrontend();
+	return true;
+}
+
 void AFlickGameMode::HostLocalNetworkMatch()
 {
 	if (GetNetMode() != NM_Standalone || !GetWorld() || bPartyRequested)
@@ -1278,13 +1319,17 @@ void AFlickGameMode::PreparePartyMigrationToMatch(const FString& TargetSessionId
 		*TargetSessionId);
 }
 
-void AFlickGameMode::RemovePartyMember(const int32 PartySlot)
+void AFlickGameMode::RemovePartyMember(const int32 PartySlot, const AFlickPlayerState* RequestingPlayer)
 {
-	if (!bPartyRequested || PartySlot <= 0)
+	if (!bPartyRequested || PartySlot < 0 || !RequestingPlayer || !RequestingPlayer->IsPartyLeader())
 	{
 		return;
 	}
 	AFlickPlayerState* PartyMember = GetPartyMember(PartySlot);
+	if (!PartyMember || PartyMember == RequestingPlayer)
+	{
+		return;
+	}
 	AFlickPlayerController* PartyController = PartyMember ? Cast<AFlickPlayerController>(PartyMember->GetOwner()) : nullptr;
 	if (PartyController && PartyController->GetNetConnection())
 	{
@@ -1293,12 +1338,12 @@ void AFlickGameMode::RemovePartyMember(const int32 PartySlot)
 	}
 }
 
-void AFlickGameMode::PromotePartyMember(const int32 PartySlot)
+void AFlickGameMode::PromotePartyMember(const int32 PartySlot, const AFlickPlayerState* RequestingPlayer)
 {
-	if (!bPartyRequested || PartySlot <= 0) return;
+	if (!bPartyRequested || PartySlot < 0 || !RequestingPlayer || !RequestingPlayer->IsPartyLeader()) return;
 	AFlickPlayerState* NewLeader = GetPartyMember(PartySlot);
-	AFlickPlayerState* CurrentLeader = GetPartyMember(0);
-	if (!NewLeader || !CurrentLeader || !CurrentLeader->IsPartyLeader()) return;
+	AFlickPlayerState* CurrentLeader = const_cast<AFlickPlayerState*>(RequestingPlayer);
+	if (!NewLeader || NewLeader == CurrentLeader) return;
 	const int32 OldLeaderSlot = CurrentLeader->GetPartySlot();
 	CurrentLeader->SetPartyRole(false, NewLeader->GetPartySlot());
 	NewLeader->SetPartyRole(true, OldLeaderSlot);

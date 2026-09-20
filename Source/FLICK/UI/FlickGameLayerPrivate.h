@@ -35,6 +35,7 @@
 #include "Widgets/Layout/SGridPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Layout/SScaleBox.h"
+#include "Widgets/Layout/SDPIScaler.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Layout/SUniformGridPanel.h"

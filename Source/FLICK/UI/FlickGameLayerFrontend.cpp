@@ -1621,13 +1621,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					SNew(SButton).ButtonStyle(&CompactMenuButtonStyle)
 					.Visibility_Lambda([this, PartySlot]()
 					{
-						const AFlickPlayerState* Host = GameMode.IsValid() ? GameMode->GetPartyMember(0) : nullptr;
-						return PartySlot > 0 && Host && Host->IsPartyLeader() && GameMode->GetPartyMember(PartySlot)
+						const AFlickPlayerState* LocalState = PlayerController.IsValid()
+							? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
+						const AFlickPlayerState* Target = GetDisplayedPartyMember(PartySlot);
+						return LocalState && LocalState->IsPartyLeader() && Target && Target != LocalState
 							? EVisibility::Visible : EVisibility::Collapsed;
 					})
 					.OnClicked_Lambda([this, PartySlot]()
 					{
-						if (GameMode.IsValid()) GameMode->PromotePartyMember(PartySlot);
+						if (PlayerController.IsValid()) PlayerController->RequestPromotePartyMember(PartySlot);
 						return FReply::Handled();
 					})
 					[SNew(STextBlock).Text(FText::FromString(TEXT("PROMOTE"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
@@ -1637,12 +1639,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					SNew(SButton).ButtonStyle(&DangerButtonStyle)
 					.Visibility_Lambda([this, PartySlot]()
 					{
-						return PartySlot > 0 && GameMode.IsValid() && GameMode->IsPartySession() && GameMode->GetPartyMember(PartySlot)
+						const AFlickPlayerState* LocalState = PlayerController.IsValid()
+							? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
+						const AFlickPlayerState* Target = GetDisplayedPartyMember(PartySlot);
+						return LocalState && LocalState->IsPartyLeader() && Target && Target != LocalState
 							? EVisibility::Visible : EVisibility::Collapsed;
 					})
 					.OnClicked_Lambda([this, PartySlot]()
 					{
-						if (GameMode.IsValid()) GameMode->RemovePartyMember(PartySlot);
+						if (PlayerController.IsValid()) PlayerController->RequestRemovePartyMember(PartySlot);
 						return FReply::Handled();
 					})
 					[

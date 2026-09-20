@@ -81,6 +81,7 @@ class FLICK_API UFlickGameInstance : public UGameInstance
 public:
 	virtual void Init() override;
 	void NotifyFrontendReady();
+	void PrepareTravelPresentation(const FString& StatusText);
 	bool ShouldShowStartupPresentation() const { return !bStartupPresentationComplete; }
 	void CompleteStartupPresentation() { bStartupPresentationComplete = true; }
 

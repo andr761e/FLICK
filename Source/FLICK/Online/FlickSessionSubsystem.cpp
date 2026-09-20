@@ -9,6 +9,8 @@
 #include "Engine/GameInstance.h"
 #include "Engine/Texture2D.h"
 #include "Game/FlickGameMode.h"
+#include "Game/FlickGameInstance.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Interfaces/OnlineExternalUIInterface.h"
 #include "Interfaces/OnlineFriendsInterface.h"
 #include "Interfaces/OnlineIdentityInterface.h"
@@ -1332,6 +1334,24 @@ void UFlickSessionSubsystem::HandleCreateSessionComplete(const FName SessionName
 	FString TravelOptions;
 	if (ActivePurpose == EFlickSessionPurpose::Party)
 	{
+		// A party is a social state layered over the frontend. Turn the current
+		// world into a listen host instead of reloading the same map and briefly
+		// exposing its default sky while the arena/UI are reconstructed.
+		FURL ListenUrl(nullptr, *CurrentMap, TRAVEL_Absolute);
+		ListenUrl.AddOption(TEXT("listen"));
+		ListenUrl.AddOption(TEXT("FlickParty"));
+		AFlickGameMode* FlickGameMode = GetWorld()->GetAuthGameMode<AFlickGameMode>();
+		if (GetWorld()->Listen(ListenUrl) && FlickGameMode && FlickGameMode->ActivatePartySession())
+		{
+			SendPendingPartyInvite();
+			SetState(EFlickSessionState::InSession, TEXT("STEAM PARTY READY"));
+			return;
+		}
+		UE_LOG(LogFlick, Warning, TEXT("Could not activate the frontend listen host in place; using masked party travel"));
+		if (UFlickGameInstance* FlickGameInstance = Cast<UFlickGameInstance>(GetGameInstance()))
+		{
+			FlickGameInstance->PrepareTravelPresentation(TEXT("CREATING PARTY"));
+		}
 		TravelOptions = TEXT("listen?FlickParty");
 	}
 	else
@@ -1601,6 +1621,11 @@ void UFlickSessionSubsystem::HandleJoinSessionComplete(
 	}
 
 	SetState(EFlickSessionState::InSession, TEXT("CONNECTED - ENTERING FLICK LOBBY..."));
+	if (UFlickGameInstance* FlickGameInstance = Cast<UFlickGameInstance>(GetGameInstance()))
+	{
+		FlickGameInstance->PrepareTravelPresentation(
+			ActivePurpose == EFlickSessionPurpose::Party ? TEXT("JOINING PARTY") : TEXT("JOINING MATCH"));
+	}
 	if ((ActivePurpose == EFlickSessionPurpose::Matchmaking || ActivePurpose == EFlickSessionPurpose::Party)
 		&& HasPersistentPartyIdentity())
 	{

@@ -160,9 +160,13 @@ void AFlickHUD::DrawHUD()
 	}
 
 	ObserveMatchState(*FlickGameState, Now);
-	if (FlickGameMode && FlickGameMode->IsCinematicReplayActive())
+	if ((FlickGameMode && FlickGameMode->IsCinematicReplayActive())
+		|| (FlickController && FlickController->IsCinematicReplayPresentationActive()))
 	{
-		DrawCinematicReplayPullback(*FlickGameMode);
+		if (FlickGameMode)
+		{
+			DrawCinematicReplayPullback(*FlickGameMode);
+		}
 		return;
 	}
 	if (FlickGameMode && FlickGameMode->HasLockedKickoffShot())

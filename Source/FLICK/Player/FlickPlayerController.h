@@ -48,6 +48,8 @@ public:
 	void RequestConfirmClass();
 	void RequestTogglePrivateMatchSlot(EFlickTeam Team, int32 PlayerSlot);
 	void RequestPrivateMatchSpectate();
+	void RequestPromotePartyMember(int32 PartySlot);
+	void RequestRemovePartyMember(int32 PartySlot);
 	void LeaveNetworkSession();
 	void ReturnToFrontendFromServer(bool bClearPartyIdentity = false);
 	void SetPersistentPartyIdentityFromServer(const FString& PartyId, int32 PartySlot, int32 PartySize, bool bLeader);
@@ -86,6 +88,9 @@ public:
 	void BeginCinematicReplayFromServer(const FVector& InitialFocus, EFlickTeam ShootingTeam);
 	void UpdateCinematicReplayFromServer(const FVector& Focus, float NormalizedProgress, float PullbackAlpha);
 	void EndCinematicReplayFromServer();
+	bool IsCinematicReplayPresentationActive() const { return bCinematicReplayPresentationActive; }
+	float GetCinematicReplayPresentationProgress() const { return CinematicReplayPresentationProgress; }
+	float GetCinematicReplayPresentationPullbackAlpha() const { return CinematicReplayPresentationPullbackAlpha; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Debug")
 	bool bDrawAimDebug = false;
@@ -156,6 +161,12 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerSetPrivateMatchSpectating();
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestPromotePartyMember(int32 PartySlot);
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestRemovePartyMember(int32 PartySlot);
 
 	UFUNCTION(Server, Reliable)
 	void ServerSubmitRankedAuthentication(const FString& SteamAuthTicket);
@@ -268,6 +279,9 @@ private:
 	bool bInitializedNetworkCamera = false;
 	bool bNetworkAutoShotRequested = false;
 	bool bNetworkAutoShotSubmitted = false;
+	bool bCinematicReplayPresentationActive = false;
+	float CinematicReplayPresentationProgress = 0.0f;
+	float CinematicReplayPresentationPullbackAlpha = 0.0f;
 	bool bNetworkAutoReadyRequested = false;
 	bool bNetworkAutoReadySubmitted = false;
 	bool bNetworkAutoStartSubmitted = false;

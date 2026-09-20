@@ -1206,6 +1206,30 @@ void AFlickPlayerController::RequestPrivateMatchSpectate()
 	}
 }
 
+void AFlickPlayerController::RequestPromotePartyMember(const int32 PartySlot)
+{
+	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
+	{
+		FlickGameMode->PromotePartyMember(PartySlot, GetPlayerState<AFlickPlayerState>());
+	}
+	else
+	{
+		ServerRequestPromotePartyMember(PartySlot);
+	}
+}
+
+void AFlickPlayerController::RequestRemovePartyMember(const int32 PartySlot)
+{
+	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
+	{
+		FlickGameMode->RemovePartyMember(PartySlot, GetPlayerState<AFlickPlayerState>());
+	}
+	else
+	{
+		ServerRequestRemovePartyMember(PartySlot);
+	}
+}
+
 void AFlickPlayerController::LeaveNetworkSession()
 {
 	ClearAiming();
@@ -1481,6 +1505,22 @@ void AFlickPlayerController::ServerSetPrivateMatchSpectating_Implementation()
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
 		FlickGameMode->SetPrivateMatchSpectating(this);
+	}
+}
+
+void AFlickPlayerController::ServerRequestPromotePartyMember_Implementation(const int32 PartySlot)
+{
+	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
+	{
+		FlickGameMode->PromotePartyMember(PartySlot, GetPlayerState<AFlickPlayerState>());
+	}
+}
+
+void AFlickPlayerController::ServerRequestRemovePartyMember_Implementation(const int32 PartySlot)
+{
+	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
+	{
+		FlickGameMode->RemovePartyMember(PartySlot, GetPlayerState<AFlickPlayerState>());
 	}
 }
 
@@ -1782,6 +1822,9 @@ void AFlickPlayerController::ClientBeginCinematicReplay_Implementation(
 	const FVector InitialFocus,
 	const EFlickTeam ShootingTeam)
 {
+	bCinematicReplayPresentationActive = true;
+	CinematicReplayPresentationProgress = 0.0f;
+	CinematicReplayPresentationPullbackAlpha = 0.0f;
 	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		Camera->BeginCinematicReplay(InitialFocus, ShootingTeam);
@@ -1793,6 +1836,9 @@ void AFlickPlayerController::ClientUpdateCinematicReplay_Implementation(
 	const float NormalizedProgress,
 	const float PullbackAlpha)
 {
+	bCinematicReplayPresentationActive = true;
+	CinematicReplayPresentationProgress = FMath::Clamp(NormalizedProgress, 0.0f, 1.0f);
+	CinematicReplayPresentationPullbackAlpha = FMath::Clamp(PullbackAlpha, 0.0f, 1.0f);
 	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		Camera->UpdateCinematicReplay(Focus, NormalizedProgress, PullbackAlpha);
@@ -1801,6 +1847,9 @@ void AFlickPlayerController::ClientUpdateCinematicReplay_Implementation(
 
 void AFlickPlayerController::ClientEndCinematicReplay_Implementation()
 {
+	bCinematicReplayPresentationActive = false;
+	CinematicReplayPresentationProgress = 0.0f;
+	CinematicReplayPresentationPullbackAlpha = 0.0f;
 	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		Camera->EndCinematicReplay();

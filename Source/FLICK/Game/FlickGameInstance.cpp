@@ -354,6 +354,46 @@ void UFlickGameInstance::NotifyFrontendReady()
 	bStartupLoadingScreenConfigured = false;
 }
 
+void UFlickGameInstance::PrepareTravelPresentation(const FString& StatusText)
+{
+	if (IsRunningCommandlet() || IsRunningDedicatedServer() || !GetMoviePlayer())
+	{
+		return;
+	}
+	FSlateFontInfo StatusFont = FCoreStyle::GetDefaultFontStyle("Bold", 18);
+	StatusFont.LetterSpacing = 180;
+	FLoadingScreenAttributes LoadingScreen;
+	LoadingScreen.MinimumLoadingScreenDisplayTime = 0.0f;
+	LoadingScreen.bAutoCompleteWhenLoadingCompletes = false;
+	LoadingScreen.bWaitForManualStop = true;
+	LoadingScreen.bMoviesAreSkippable = false;
+	LoadingScreen.WidgetLoadingScreen =
+		SNew(SOverlay)
+		+ SOverlay::Slot()
+		[
+			SNew(SBorder)
+			.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+			.BorderBackgroundColor(FLinearColor(0.0f, 0.002f, 0.006f, 1.0f))
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SThrobber).NumPieces(3).Animate(SThrobber::All)
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(22.0f, 0.0f, 0.0f, 0.0f)
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(StatusText))
+				.Font(StatusFont)
+				.ColorAndOpacity(FLinearColor(0.0f, 0.82f, 1.0f, 1.0f))
+			]
+		];
+	GetMoviePlayer()->SetupLoadingScreen(LoadingScreen);
+	bStartupLoadingScreenConfigured = GetMoviePlayer()->PlayMovie();
+}
+
 EFlickPieceArchetype UFlickGameInstance::GetLoadoutPiece(const EFlickTeam Team, const int32 SlotIndex) const
 {
 	const TArray<EFlickPieceArchetype>* Loadout = Team == EFlickTeam::Player2
