@@ -18,6 +18,7 @@
 #include "Misc/Parse.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Online/FlickSessionSubsystem.h"
+#include "Online/FlickPartySubsystem.h"
 #include "Rendering/DrawElements.h"
 #include "Rendering/RenderingCommon.h"
 #include "Styling/CoreStyle.h"

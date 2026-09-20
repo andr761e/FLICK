@@ -1206,30 +1206,6 @@ void AFlickPlayerController::RequestPrivateMatchSpectate()
 	}
 }
 
-void AFlickPlayerController::RequestPromotePartyMember(const int32 PartySlot)
-{
-	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
-	{
-		FlickGameMode->PromotePartyMember(PartySlot, GetPlayerState<AFlickPlayerState>());
-	}
-	else
-	{
-		ServerRequestPromotePartyMember(PartySlot);
-	}
-}
-
-void AFlickPlayerController::RequestRemovePartyMember(const int32 PartySlot)
-{
-	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
-	{
-		FlickGameMode->RemovePartyMember(PartySlot, GetPlayerState<AFlickPlayerState>());
-	}
-	else
-	{
-		ServerRequestRemovePartyMember(PartySlot);
-	}
-}
-
 void AFlickPlayerController::LeaveNetworkSession()
 {
 	ClearAiming();
@@ -1505,22 +1481,6 @@ void AFlickPlayerController::ServerSetPrivateMatchSpectating_Implementation()
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
 		FlickGameMode->SetPrivateMatchSpectating(this);
-	}
-}
-
-void AFlickPlayerController::ServerRequestPromotePartyMember_Implementation(const int32 PartySlot)
-{
-	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
-	{
-		FlickGameMode->PromotePartyMember(PartySlot, GetPlayerState<AFlickPlayerState>());
-	}
-}
-
-void AFlickPlayerController::ServerRequestRemovePartyMember_Implementation(const int32 PartySlot)
-{
-	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
-	{
-		FlickGameMode->RemovePartyMember(PartySlot, GetPlayerState<AFlickPlayerState>());
 	}
 }
 

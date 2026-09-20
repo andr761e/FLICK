@@ -38,6 +38,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
+#include "Online/FlickPartySubsystem.h"
 #include "Online/FlickSessionSubsystem.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"

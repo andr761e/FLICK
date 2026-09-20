@@ -9,8 +9,10 @@
 class FOnlineSessionSearch;
 class FOnlineSessionSearchResult;
 class UFlickMatchmakingCoordinatorSubsystem;
+class UFlickPartySubsystem;
 class UTexture2D;
 struct FSlateBrush;
+struct FFlickCoordinatorAllocation;
 
 enum class EFlickSessionState : uint8
 {
@@ -105,7 +107,14 @@ public:
 	bool InviteFriendToParty(int32 FriendIndex);
 	bool InviteRecentPlayerToParty(int32 RecentPlayerIndex);
 	bool SendPendingPartyInvite();
+	bool PromotePartyMember(const FString& UserId);
+	bool RemovePartyMember(const FString& UserId);
+	bool DisbandParty();
+	bool LeaveParty();
+	bool BeginPrivateMatchForParty();
+	bool PublishPartyCoordinatorAllocation(const FFlickCoordinatorAllocation& Allocation);
 	void RecordRecentPlayer(const FString& UserId, const FString& DisplayName);
+	UFlickPartySubsystem* GetPartySubsystem() const;
 
 	bool IsSteamAvailable() const;
 	bool HasActiveSession() const;
@@ -162,6 +171,12 @@ private:
 		int32 ControllerId,
 		FUniqueNetIdPtr UserId,
 		const FOnlineSessionSearchResult& InviteResult);
+	void HandleSessionParticipantJoined(FName SessionName, const FUniqueNetId& UserId);
+	void HandleSessionParticipantLeft(FName SessionName, const FUniqueNetId& UserId, EOnSessionParticipantLeftReason Reason);
+	void HandleSessionSettingsUpdated(FName SessionName, const FOnlineSessionSettings& Settings);
+	void RefreshPartyFromSession();
+	void StartPartySynchronization();
+	void StopPartySynchronization();
 	void HandleNetworkFailure(
 		UWorld* World,
 		class UNetDriver* NetDriver,
@@ -214,12 +229,18 @@ private:
 	int32 PartyRestoreAttempts = 0;
 	int32 AvatarRefreshAttempts = 0;
 	FTimerHandle AvatarRefreshTimer;
+	FTimerHandle PartySynchronizationTimer;
+	FTimerHandle PartyCommandTimer;
+	FString LastProcessedPartyCommand;
 
 	FDelegateHandle CreateSessionHandle;
 	FDelegateHandle FindSessionsHandle;
 	FDelegateHandle JoinSessionHandle;
 	FDelegateHandle DestroySessionHandle;
 	FDelegateHandle InviteAcceptedHandle;
+	FDelegateHandle ParticipantJoinedHandle;
+	FDelegateHandle ParticipantLeftHandle;
+	FDelegateHandle SessionSettingsUpdatedHandle;
 	FDelegateHandle NetworkFailureHandle;
 	FDelegateHandle TravelFailureHandle;
 };

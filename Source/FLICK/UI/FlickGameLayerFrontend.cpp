@@ -127,6 +127,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					[
 						MakeMainMenuButton(TEXT("PLAY"), FOnClicked::CreateLambda([this]()
 						{
+							if (IsDisplayedPartyActive() && !IsLocalDisplayedPartyLeader()) return FReply::Handled();
 							if (!GameMode.IsValid()) return FReply::Handled();
 							SelectedPlayPlaylist = EFlickPlayPlaylist::None;
 							SelectedTrainingActivity = EFlickTrainingActivity::None;
@@ -931,7 +932,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 		.HeightOverride(44.0f)
 		.Visibility_Lambda([this, PartySlot]()
 		{
-			return IsDisplayedPartyActive() && GetDisplayedPartyMember(PartySlot)
+			return IsDisplayedPartyActive() && HasDisplayedPartyMember(PartySlot)
 				? EVisibility::Visible : EVisibility::Collapsed;
 		})
 		[
@@ -965,9 +966,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 			.BackgroundColor(FLinearColor::FromSRGBColor(FColor(14, 23, 25, 248)))
 			.AccentColor_Lambda([this, PartySlot]()
 			{
-				const AFlickPlayerState* Member = IsDisplayedPartyActive()
-					? GetDisplayedPartyMember(PartySlot) : nullptr;
-				return Member && Member->IsPartyLeader()
+				return IsDisplayedPartyMemberLeader(PartySlot)
 					? Brand
 					: Cyan.CopyWithNewOpacity(0.5f);
 			})
@@ -999,8 +998,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 						{
 							if (IsDisplayedPartyActive())
 							{
-								const AFlickPlayerState* Member = GetDisplayedPartyMember(PartySlot);
-								return FText::FromString(Member ? Member->GetPlayerName() : FString());
+								return FText::FromString(GetDisplayedPartyMemberName(PartySlot));
 							}
 							const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
 							return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER"));
@@ -1012,9 +1010,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 						SNew(STextBlock)
 						.Text_Lambda([this, PartySlot]()
 						{
-							const AFlickPlayerState* Member = IsDisplayedPartyActive()
-								? GetDisplayedPartyMember(PartySlot) : nullptr;
-							return FText::FromString(Member && Member->IsPartyLeader() ? TEXT("PARTY LEADER") : TEXT("IN PARTY"));
+							return FText::FromString(IsDisplayedPartyMemberLeader(PartySlot) ? TEXT("PARTY LEADER") : TEXT("IN PARTY"));
 						})
 						.Font(UiFont(7, true)).ColorAndOpacity(Cyan.CopyWithNewOpacity(0.82f))
 					]
@@ -1482,11 +1478,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f, 0.0f, 0.0f)
 					[
 						SNew(SBox).WidthOverride(150.0f)
-						.Visibility_Lambda([this]() { return IsDisplayedPartyActive() && !GameMode.IsValid() ? EVisibility::Visible : EVisibility::Collapsed; })
+						.Visibility_Lambda([this]() { return IsDisplayedPartyActive() && !IsLocalDisplayedPartyLeader() ? EVisibility::Visible : EVisibility::Collapsed; })
 						[
 							MakeMenuButton(TEXT("LEAVE PARTY"), FOnClicked::CreateLambda([this]()
 							{
-								if (PlayerController.IsValid()) PlayerController->LeaveNetworkSession();
+								if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) Sessions->LeaveParty();
 								return FReply::Handled();
 							}), false, true, 44.0f)
 						]
@@ -1494,11 +1490,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f, 0.0f, 0.0f)
 					[
 						SNew(SBox).WidthOverride(130.0f)
-						.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->IsPartySession() ? EVisibility::Visible : EVisibility::Collapsed; })
+						.Visibility_Lambda([this]() { return IsDisplayedPartyActive() && IsLocalDisplayedPartyLeader() ? EVisibility::Visible : EVisibility::Collapsed; })
 						[
 							MakeMenuButton(TEXT("DISBAND"), FOnClicked::CreateLambda([this]()
 							{
-								if (GameMode.IsValid()) GameMode->DisbandParty();
+								if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) Sessions->DisbandParty();
 								return FReply::Handled();
 							}), false, true, 44.0f)
 						]
@@ -1519,7 +1515,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 			}
 			if (IsDisplayedPartyActive())
 			{
-				return GetDisplayedPartyMember(PartySlot) ? EVisibility::Visible : EVisibility::Collapsed;
+				return HasDisplayedPartyMember(PartySlot) ? EVisibility::Visible : EVisibility::Collapsed;
 			}
 			return EVisibility::Collapsed;
 		})
@@ -1540,13 +1536,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 						.Color_Lambda([this, PartySlot]()
 						{
 							const bool bOccupied = IsDisplayedPartyActive()
-								? GetDisplayedPartyMember(PartySlot) != nullptr : PartySlot == 0;
+								? HasDisplayedPartyMember(PartySlot) : PartySlot == 0;
 							return bOccupied ? Brand : Muted;
 						})
 						.Filled_Lambda([this, PartySlot]()
 						{
 							return IsDisplayedPartyActive()
-								? GetDisplayedPartyMember(PartySlot) != nullptr : PartySlot == 0;
+								? HasDisplayedPartyMember(PartySlot) : PartySlot == 0;
 						})
 					]
 				]
@@ -1581,8 +1577,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 							{
 								if (IsDisplayedPartyActive())
 								{
-									const AFlickPlayerState* Member = GetDisplayedPartyMember(PartySlot);
-									return FText::FromString(Member ? Member->GetPlayerName() : TEXT("OPEN PARTY SLOT"));
+									return FText::FromString(GetDisplayedPartyMemberName(PartySlot));
 								}
 								if (PartySlot == 0)
 								{
@@ -1600,8 +1595,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 							.ColorAndOpacity(Orange)
 							.Visibility_Lambda([this, PartySlot]()
 							{
-								const AFlickPlayerState* Member = IsDisplayedPartyActive() ? GetDisplayedPartyMember(PartySlot) : nullptr;
-								return (Member && Member->IsPartyLeader()) || (!IsDisplayedPartyActive() && PartySlot == 0)
+								return IsDisplayedPartyMemberLeader(PartySlot) || (!IsDisplayedPartyActive() && PartySlot == 0)
 									? EVisibility::Visible : EVisibility::Collapsed;
 							})
 						]
@@ -1610,9 +1604,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					[
 						SNew(STextBlock).Text_Lambda([this, PartySlot]()
 						{
-							const AFlickPlayerState* Member = IsDisplayedPartyActive() ? GetDisplayedPartyMember(PartySlot) : nullptr;
-							return FText::FromString((Member && Member->IsPartyLeader()) || (!IsDisplayedPartyActive() && PartySlot == 0)
-								? TEXT("PARTY LEADER") : Member ? TEXT("IN PARTY") : TEXT("INVITE A FRIEND"));
+							return FText::FromString(IsDisplayedPartyMemberLeader(PartySlot) || (!IsDisplayedPartyActive() && PartySlot == 0)
+								? TEXT("PARTY LEADER") : HasDisplayedPartyMember(PartySlot) ? TEXT("IN PARTY") : TEXT("INVITE A FRIEND"));
 						}).Font(UiFont(8, true)).ColorAndOpacity(Muted)
 					]
 				]
@@ -1621,15 +1614,16 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					SNew(SButton).ButtonStyle(&CompactMenuButtonStyle)
 					.Visibility_Lambda([this, PartySlot]()
 					{
-						const AFlickPlayerState* LocalState = PlayerController.IsValid()
-							? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
-						const AFlickPlayerState* Target = GetDisplayedPartyMember(PartySlot);
-						return LocalState && LocalState->IsPartyLeader() && Target && Target != LocalState
+						return IsLocalDisplayedPartyLeader() && HasDisplayedPartyMember(PartySlot)
+							&& !IsDisplayedPartyMemberLeader(PartySlot)
 							? EVisibility::Visible : EVisibility::Collapsed;
 					})
 					.OnClicked_Lambda([this, PartySlot]()
 					{
-						if (PlayerController.IsValid()) PlayerController->RequestPromotePartyMember(PartySlot);
+						if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem())
+						{
+							Sessions->PromotePartyMember(GetDisplayedPartyMemberUserId(PartySlot));
+						}
 						return FReply::Handled();
 					})
 					[SNew(STextBlock).Text(FText::FromString(TEXT("PROMOTE"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
@@ -1639,15 +1633,17 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					SNew(SButton).ButtonStyle(&DangerButtonStyle)
 					.Visibility_Lambda([this, PartySlot]()
 					{
-						const AFlickPlayerState* LocalState = PlayerController.IsValid()
-							? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
-						const AFlickPlayerState* Target = GetDisplayedPartyMember(PartySlot);
-						return LocalState && LocalState->IsPartyLeader() && Target && Target != LocalState
+						return IsLocalDisplayedPartyLeader() && HasDisplayedPartyMember(PartySlot)
+							&& !GetDisplayedPartyMemberUserId(PartySlot).IsEmpty()
+							&& !IsDisplayedPartyMemberLeader(PartySlot)
 							? EVisibility::Visible : EVisibility::Collapsed;
 					})
 					.OnClicked_Lambda([this, PartySlot]()
 					{
-						if (PlayerController.IsValid()) PlayerController->RequestRemovePartyMember(PartySlot);
+						if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem())
+						{
+							Sessions->RemovePartyMember(GetDisplayedPartyMemberUserId(PartySlot));
+						}
 						return FReply::Handled();
 					})
 					[

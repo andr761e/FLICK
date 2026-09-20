@@ -3,45 +3,34 @@
 
 using namespace FlickGameModePrivate;
 
-bool AFlickGameMode::ActivatePartySession()
+bool AFlickGameMode::HostPrivateMatchForPersistentParty(const FString& PartyId, const int32 PartySize)
 {
-	if (!HasAuthority() || !GetWorld() || bNetworkMatchRequested || bNetworkMatchStarted)
+	if (!HasAuthority() || !GetWorld() || PartyId.IsEmpty() || bNetworkMatchStarted)
 	{
 		return false;
 	}
-	if (bPartyRequested)
-	{
-		return true;
-	}
-
 	bPartyRequested = true;
 	bMatchmakingRequested = false;
-	bPrivateMatchSetupActive = false;
-	FrontendScreen = EFlickFrontendScreen::MainMenu;
-
+	ActivePartyId = PartyId;
 	APlayerController* LocalController = GetWorld()->GetFirstPlayerController();
 	AFlickPlayerState* LocalState = LocalController
 		? LocalController->GetPlayerState<AFlickPlayerState>() : nullptr;
 	if (!LocalState)
 	{
-		bPartyRequested = false;
 		return false;
 	}
-
-	UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem();
-	ActivePartyId = Sessions ? Sessions->GetPersistentPartyId() : FString();
-	if (ActivePartyId.IsEmpty())
-	{
-		ActivePartyId = FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphens);
-	}
-	LocalState->SetPartyIdentity(ActivePartyId, true, 0);
+	LocalState->SetPartyIdentity(PartyId, true, 0);
 	if (AFlickPlayerController* FlickController = Cast<AFlickPlayerController>(LocalController))
 	{
-		FlickController->SetPersistentPartyIdentityFromServer(ActivePartyId, 0, 1, true);
+		FlickController->SetPersistentPartyIdentityFromServer(
+			PartyId,
+			0,
+			FMath::Clamp(PartySize, 1, FlickMaximumPartyMembers),
+			true);
 	}
 	SynchronizePartyState();
-	SetCameraForFrontend();
-	return true;
+	OpenPrivateMatchSetup();
+	return bPrivateMatchSetupActive;
 }
 
 void AFlickGameMode::HostLocalNetworkMatch()
@@ -130,6 +119,18 @@ void AFlickGameMode::StartSelectedMatchmaking()
 	bClassSelectionStartsTrainingBotMatch = false;
 	bTestArenaMode = false;
 	ResetTrainingBotThinking();
+	const UFlickPartySubsystem* PersistentParty = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UFlickPartySubsystem>() : nullptr;
+	if (PersistentParty && PersistentParty->IsActive())
+	{
+		if (!PersistentParty->IsLocalLeader())
+		{
+			UE_LOG(LogFlick, Warning, TEXT("Only the party leader can start matchmaking"));
+			return;
+		}
+		QueuePartyForMatchmaking(MatchmakingPlayersPerTeam);
+		return;
+	}
 	if (bPartyRequested)
 	{
 		QueuePartyForMatchmaking(MatchmakingPlayersPerTeam);
@@ -197,6 +198,58 @@ bool AFlickGameMode::BeginCoordinatorQueue(const int32 PlayersPerTeam)
 	}
 	if (Coordinator->IsQueueActive() || !GetWorld())
 	{
+		return true;
+	}
+
+	const UFlickPartySubsystem* PersistentParty = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UFlickPartySubsystem>() : nullptr;
+	if (PersistentParty && PersistentParty->IsActive())
+	{
+		const int32 TeamSize = FlickTeamRules::ClampPlayersPerTeam(PlayersPerTeam);
+		if (!PersistentParty->IsLocalLeader()
+			|| !FlickMatchmakingRules::IsPartySizeValid(PersistentParty->GetMemberCount(), TeamSize))
+		{
+			UE_LOG(LogFlick, Warning, TEXT("Coordinator queue rejected: persistent party does not fit %dv%d"), TeamSize, TeamSize);
+			return true;
+		}
+		if (Coordinator->RequiresSteamTickets() && PersistentParty->GetMemberCount() > 1)
+		{
+			UE_LOG(LogFlick, Error,
+				TEXT("Authenticated party matchmaking requires per-member coordinator tickets; queue was not submitted"));
+			return true;
+		}
+
+		FFlickCoordinatorQueueRequest Request;
+		Request.PartyId = PersistentParty->GetPartyId();
+		Request.Variant = SelectedMatchVariant;
+		Request.PlayersPerTeam = TeamSize;
+		Request.bRanked = bRankedQueueSelected;
+		Request.Region = TEXT("auto");
+		for (const FFlickPartyMember& PartyMember : PersistentParty->GetMembers())
+		{
+			FFlickCoordinatorPartyMember& Member = Request.Members.AddDefaulted_GetRef();
+			Member.AccountId = PartyMember.UserId;
+			Member.DisplayName = PartyMember.DisplayName;
+			Member.PartySlot = PartyMember.Slot;
+			Member.Rating = RankedQueueRating;
+		}
+		if (CoordinatorAllocatedHandle.IsValid())
+		{
+			Coordinator->OnAllocated.Remove(CoordinatorAllocatedHandle);
+		}
+		CoordinatorAllocatedHandle = Coordinator->OnAllocated.AddUObject(this, &AFlickGameMode::HandleCoordinatorAllocation);
+		if (AFlickGameState* State = GetFlickGameState())
+		{
+			State->SetMatchmakingState(true, false, bRankedQueueSelected, RankedQueueRating, 0);
+		}
+		Coordinator->QueueParty(Request,
+			[](const bool bAccepted, const FString& Error)
+			{
+				if (!bAccepted)
+				{
+					UE_LOG(LogFlick, Error, TEXT("COORDINATOR_PARTY_QUEUE_REJECTED: %s"), *Error);
+				}
+			});
 		return true;
 	}
 
@@ -372,6 +425,16 @@ void AFlickGameMode::HandleCoordinatorAllocation(const FFlickCoordinatorAllocati
 {
 	if (!GetWorld() || Allocation.MatchId.IsEmpty())
 	{
+		return;
+	}
+	if (const UFlickPartySubsystem* Party = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UFlickPartySubsystem>() : nullptr;
+		Party && Party->IsActive())
+	{
+		if (UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem())
+		{
+			Sessions->PublishPartyCoordinatorAllocation(Allocation);
+		}
 		return;
 	}
 	int32 TravellingPlayers = 0;
@@ -1180,6 +1243,13 @@ AFlickPlayerState* AFlickGameMode::GetPartyMember(const int32 PartySlot) const
 bool AFlickGameMode::CanQueuePartyForMatchmaking(const int32 PlayersPerTeam) const
 {
 	const int32 TeamSize = FlickTeamRules::ClampPlayersPerTeam(PlayersPerTeam);
+	if (const UFlickPartySubsystem* Party = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UFlickPartySubsystem>() : nullptr;
+		Party && Party->IsActive())
+	{
+		return Party->IsLocalLeader()
+			&& FlickMatchmakingRules::IsPartySizeValid(Party->GetMemberCount(), TeamSize);
+	}
 	const int32 PartySize = GetPartyMemberCount();
 	if (!bPartyRequested || !FlickMatchmakingRules::IsPartySizeValid(PartySize, TeamSize))
 	{
@@ -1205,7 +1275,10 @@ void AFlickGameMode::QueuePartyForMatchmaking(const int32 PlayersPerTeam)
 		return;
 	}
 	const int32 TeamSize = FlickTeamRules::ClampPlayersPerTeam(PlayersPerTeam);
-	const int32 PartySize = GetPartyMemberCount();
+	const UFlickPartySubsystem* PersistentParty = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UFlickPartySubsystem>() : nullptr;
+	const int32 PartySize = PersistentParty && PersistentParty->IsActive()
+		? PersistentParty->GetMemberCount() : GetPartyMemberCount();
 	RankedQueueRating = FlickRankRules::DefaultRating;
 	if (bRankedQueueSelected)
 	{
@@ -1216,6 +1289,11 @@ void AFlickGameMode::QueuePartyForMatchmaking(const int32 PlayersPerTeam)
 	}
 	if (BeginCoordinatorQueue(TeamSize))
 	{
+		return;
+	}
+	if (PersistentParty && PersistentParty->IsActive())
+	{
+		UE_LOG(LogFlick, Error, TEXT("Persistent parties require the matchmaking coordinator"));
 		return;
 	}
 	UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem();
@@ -1317,62 +1395,6 @@ void AFlickGameMode::PreparePartyMigrationToMatch(const FString& TargetSessionId
 		TEXT("PARTY_MATCH_HANDOFF: moving %d member(s) into Steam session %s"),
 		MigratingMembers,
 		*TargetSessionId);
-}
-
-void AFlickGameMode::RemovePartyMember(const int32 PartySlot, const AFlickPlayerState* RequestingPlayer)
-{
-	if (!bPartyRequested || PartySlot < 0 || !RequestingPlayer || !RequestingPlayer->IsPartyLeader())
-	{
-		return;
-	}
-	AFlickPlayerState* PartyMember = GetPartyMember(PartySlot);
-	if (!PartyMember || PartyMember == RequestingPlayer)
-	{
-		return;
-	}
-	AFlickPlayerController* PartyController = PartyMember ? Cast<AFlickPlayerController>(PartyMember->GetOwner()) : nullptr;
-	if (PartyController && PartyController->GetNetConnection())
-	{
-		UE_LOG(LogFlick, Log, TEXT("Removing %s from the party"), *PartyMember->GetPlayerName());
-		PartyController->ReturnToFrontendFromServer(true);
-	}
-}
-
-void AFlickGameMode::PromotePartyMember(const int32 PartySlot, const AFlickPlayerState* RequestingPlayer)
-{
-	if (!bPartyRequested || PartySlot < 0 || !RequestingPlayer || !RequestingPlayer->IsPartyLeader()) return;
-	AFlickPlayerState* NewLeader = GetPartyMember(PartySlot);
-	AFlickPlayerState* CurrentLeader = const_cast<AFlickPlayerState*>(RequestingPlayer);
-	if (!NewLeader || NewLeader == CurrentLeader) return;
-	const int32 OldLeaderSlot = CurrentLeader->GetPartySlot();
-	CurrentLeader->SetPartyRole(false, NewLeader->GetPartySlot());
-	NewLeader->SetPartyRole(true, OldLeaderSlot);
-	SynchronizePartyState();
-	UE_LOG(LogFlick, Log, TEXT("Promoted %s to party leader"), *NewLeader->GetPlayerName());
-}
-
-void AFlickGameMode::DisbandParty()
-{
-	if (!bPartyRequested || !GetWorld())
-	{
-		return;
-	}
-	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-	{
-		AFlickPlayerController* PartyController = Cast<AFlickPlayerController>(It->Get());
-		if (PartyController && PartyController->GetNetConnection())
-		{
-			PartyController->ReturnToFrontendFromServer(true);
-		}
-	}
-	FTimerHandle DisbandTimer;
-	GetWorldTimerManager().SetTimer(DisbandTimer, [this]()
-	{
-		if (UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem())
-		{
-			Sessions->LeaveSession(true);
-		}
-	}, 0.25f, false);
 }
 
 bool AFlickGameMode::CanStartNetworkMatch() const

@@ -147,8 +147,7 @@ public:
 	bool IsNetworkLobby() const { return bNetworkMatchRequested && !bNetworkMatchStarted; }
 	bool IsNetworkSession() const { return bNetworkMatchRequested; }
 	bool IsPartySession() const { return bPartyRequested; }
-	/** Turns the already-loaded frontend world into the party listen host. */
-	bool ActivatePartySession();
+	bool HostPrivateMatchForPersistentParty(const FString& PartyId, int32 PartySize);
 	bool IsMatchmakingSession() const { return bMatchmakingRequested; }
 	bool IsRankedMatch() const { return bRankedRequested; }
 	bool IsTrainingMode() const { return bTrainingMode; }
@@ -298,9 +297,6 @@ public:
 	void SetRankedQueueSelected(bool bRanked);
 	void StartSelectedMatchmaking();
 	void CancelUnrankedMatchmaking();
-	void RemovePartyMember(int32 PartySlot, const AFlickPlayerState* RequestingPlayer = nullptr);
-	void PromotePartyMember(int32 PartySlot, const AFlickPlayerState* RequestingPlayer = nullptr);
-	void DisbandParty();
 	void HostLocalNetworkMatch();
 	void JoinLocalNetworkMatch(const FString& Address = TEXT("127.0.0.1"));
 	void SetLobbyReady(APlayerController* RequestingPlayer, bool bReady);

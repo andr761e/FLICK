@@ -1,16 +1,18 @@
 #include "Online/FlickSessionSubsystem.h"
 
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
+#include "Online/FlickPartySubsystem.h"
 
 #include "Core/FlickLog.h"
 #include "Core/FlickMatchmakingRules.h"
 #include "Core/FlickRankRules.h"
+#include "Core/FlickTeamRules.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/Texture2D.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameInstance.h"
-#include "Engine/EngineBaseTypes.h"
 #include "Interfaces/OnlineExternalUIInterface.h"
 #include "Interfaces/OnlineFriendsInterface.h"
 #include "Interfaces/OnlineIdentityInterface.h"
@@ -27,6 +29,7 @@
 #include "TimerManager.h"
 #include "Styling/SlateBrush.h"
 #include "Framework/Application/SlateApplication.h"
+#include "GenericPlatform/GenericPlatformHttp.h"
 
 #if WITH_FLICK_STEAMWORKS
 #include "steam/steam_api.h"
@@ -41,6 +44,15 @@ namespace
 	const FName FlickAcceptingPlayersKey(TEXT("FLICK_ACCEPTING_PLAYERS"));
 	const FName FlickPartyIdKey(TEXT("FLICK_PARTY_ID"));
 	const FName FlickPartySizeKey(TEXT("FLICK_PARTY_SIZE"));
+	const FName FlickPartyCommandKey(TEXT("FLICK_PARTY_COMMAND"));
+	const FName FlickPartyMatchIdKey(TEXT("FLICK_PARTY_MATCH_ID"));
+	const FName FlickPartyServerIdKey(TEXT("FLICK_PARTY_SERVER_ID"));
+	const FName FlickPartyAddressKey(TEXT("FLICK_PARTY_ADDRESS"));
+	const FName FlickPartyMatchVariantKey(TEXT("FLICK_PARTY_MATCH_VARIANT"));
+	const FName FlickPartyMatchTeamSizeKey(TEXT("FLICK_PARTY_MATCH_TEAM_SIZE"));
+	const FName FlickPartyMatchRankedKey(TEXT("FLICK_PARTY_MATCH_RANKED"));
+	const FName FlickPartyMatchExpiryKey(TEXT("FLICK_PARTY_MATCH_EXPIRY"));
+	const FName FlickPartyReservationsKey(TEXT("FLICK_PARTY_RESERVATIONS"));
 	const FName FlickRankedKey(TEXT("FLICK_RANKED"));
 	const FName FlickMmrKey(TEXT("FLICK_MMR"));
 	const FString FlickGameValue(TEXT("FLICK_V1"));
@@ -78,6 +90,11 @@ void UFlickSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UFlickSessionSubsystem::Deinitialize()
 {
+	StopPartySynchronization();
+	if (UFlickPartySubsystem* Party = GetPartySubsystem())
+	{
+		Party->Clear();
+	}
 	ClearOnlineDelegates();
 	if (GEngine)
 	{
@@ -113,6 +130,12 @@ bool UFlickSessionSubsystem::RegisterOnlineDelegates()
 			FOnDestroySessionCompleteDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleDestroySessionComplete));
 		InviteAcceptedHandle = Sessions->AddOnSessionUserInviteAcceptedDelegate_Handle(
 			FOnSessionUserInviteAcceptedDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleInviteAccepted));
+		ParticipantJoinedHandle = Sessions->AddOnSessionParticipantJoinedDelegate_Handle(
+			FOnSessionParticipantJoinedDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleSessionParticipantJoined));
+		ParticipantLeftHandle = Sessions->AddOnSessionParticipantLeftDelegate_Handle(
+			FOnSessionParticipantLeftDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleSessionParticipantLeft));
+		SessionSettingsUpdatedHandle = Sessions->AddOnSessionSettingsUpdatedDelegate_Handle(
+			FOnSessionSettingsUpdatedDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleSessionSettingsUpdated));
 	}
 	return true;
 }
@@ -128,12 +151,23 @@ void UFlickSessionSubsystem::ClearOnlineDelegates()
 		Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionHandle);
 		Sessions->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionHandle);
 		Sessions->ClearOnSessionUserInviteAcceptedDelegate_Handle(InviteAcceptedHandle);
+		Sessions->ClearOnSessionParticipantJoinedDelegate_Handle(ParticipantJoinedHandle);
+		Sessions->ClearOnSessionParticipantLeftDelegate_Handle(ParticipantLeftHandle);
+		Sessions->ClearOnSessionSettingsUpdatedDelegate_Handle(SessionSettingsUpdatedHandle);
 	}
 	CreateSessionHandle.Reset();
 	FindSessionsHandle.Reset();
 	JoinSessionHandle.Reset();
 	DestroySessionHandle.Reset();
 	InviteAcceptedHandle.Reset();
+	ParticipantJoinedHandle.Reset();
+	ParticipantLeftHandle.Reset();
+	SessionSettingsUpdatedHandle.Reset();
+}
+
+UFlickPartySubsystem* UFlickSessionSubsystem::GetPartySubsystem() const
+{
+	return GetGameInstance() ? GetGameInstance()->GetSubsystem<UFlickPartySubsystem>() : nullptr;
 }
 
 bool UFlickSessionSubsystem::IsSteamAvailable() const
@@ -993,12 +1027,18 @@ bool UFlickSessionSubsystem::JoinSearchResult(const FOnlineSessionSearchResult& 
 
 bool UFlickSessionSubsystem::LeaveSession(const bool bReturnToFrontend)
 {
+	const bool bLeavingParty = ActivePurpose == EFlickSessionPurpose::Party;
 	if (bReturnToFrontend && ActivePurpose == EFlickSessionPurpose::Matchmaking && HasPersistentPartyIdentity())
 	{
 		return RestorePersistentParty(bPersistentPartyLeader);
 	}
-	if (bReturnToFrontend && ActivePurpose == EFlickSessionPurpose::Party)
+	if (bLeavingParty)
 	{
+		StopPartySynchronization();
+		if (UFlickPartySubsystem* Party = GetPartySubsystem())
+		{
+			Party->Clear();
+		}
 		ClearPersistentPartyIdentity();
 	}
 	bHostAfterDestroy = false;
@@ -1007,13 +1047,13 @@ bool UFlickSessionSubsystem::LeaveSession(const bool bReturnToFrontend)
 	if (!HasActiveSession())
 	{
 		SetState(EFlickSessionState::Idle, TEXT("SESSION CLOSED"));
-		if (bReturnToFrontend)
+		if (bReturnToFrontend && !bLeavingParty)
 		{
 			TravelToFrontend();
 		}
 		return true;
 	}
-	BeginDestroySession(bReturnToFrontend);
+	BeginDestroySession(bReturnToFrontend && !bLeavingParty);
 	return true;
 }
 
@@ -1028,7 +1068,7 @@ void UFlickSessionSubsystem::BeginDestroySession(const bool bReturnToFrontend)
 		const bool bShouldReturn = bReturnAfterDestroy;
 		bReturnAfterDestroy = false;
 		SetState(EFlickSessionState::Error, TEXT("STEAM COULD NOT CLEANLY CLOSE THE LOBBY"));
-		if (bShouldReturn)
+		if (bShouldReturn && ActivePurpose != EFlickSessionPurpose::Party)
 		{
 			TravelToFrontend();
 		}
@@ -1238,6 +1278,215 @@ bool UFlickSessionSubsystem::SendPartyInvite(const FString& FriendUserId, const 
 	return true;
 }
 
+bool UFlickSessionSubsystem::PromotePartyMember(const FString& UserId)
+{
+	UFlickPartySubsystem* Party = GetPartySubsystem();
+	if (!Party || !Party->IsLocalLeader() || UserId.IsEmpty() || UserId == Party->GetLocalUserId())
+	{
+		SetState(EFlickSessionState::Error, TEXT("ONLY THE PARTY LEADER CAN PROMOTE ANOTHER MEMBER"));
+		return false;
+	}
+#if WITH_FLICK_STEAMWORKS
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	const FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
+	const uint64 LobbyId = NamedSession ? FCString::Strtoui64(*NamedSession->GetSessionIdStr(), nullptr, 10) : 0;
+	const uint64 TargetId = FCString::Strtoui64(*UserId, nullptr, 10);
+	if (LobbyId != 0 && TargetId != 0 && SteamMatchmaking()
+		&& SteamMatchmaking()->SetLobbyOwner(CSteamID(LobbyId), CSteamID(TargetId)))
+	{
+		SetState(EFlickSessionState::InSession, TEXT("TRANSFERRING PARTY LEADERSHIP..."));
+		RefreshPartyFromSession();
+		return true;
+	}
+#endif
+	SetState(EFlickSessionState::Error, TEXT("STEAM COULD NOT TRANSFER PARTY LEADERSHIP"));
+	return false;
+}
+
+bool UFlickSessionSubsystem::RemovePartyMember(const FString& UserId)
+{
+	UFlickPartySubsystem* Party = GetPartySubsystem();
+	if (!Party || !Party->IsLocalLeader() || UserId.IsEmpty() || UserId == Party->GetLocalUserId())
+	{
+		return false;
+	}
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
+	if (!NamedSession)
+	{
+		return false;
+	}
+	FOnlineSessionSettings Settings = NamedSession->SessionSettings;
+	Settings.Set(FlickPartyCommandKey,
+		FString::Printf(TEXT("KICK:%s:%s"), *UserId, *FGuid::NewGuid().ToString(EGuidFormats::Digits)),
+		EOnlineDataAdvertisementType::ViaOnlineService);
+	if (!Sessions->UpdateSession(NAME_GameSession, Settings, true))
+	{
+		SetState(EFlickSessionState::Error, TEXT("STEAM COULD NOT REMOVE THAT PARTY MEMBER"));
+		return false;
+	}
+	SetState(EFlickSessionState::InSession, TEXT("REMOVING PARTY MEMBER..."));
+	return true;
+}
+
+bool UFlickSessionSubsystem::DisbandParty()
+{
+	UFlickPartySubsystem* Party = GetPartySubsystem();
+	if (!Party || !Party->IsLocalLeader())
+	{
+		return false;
+	}
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
+	if (!NamedSession)
+	{
+		return LeaveParty();
+	}
+	FOnlineSessionSettings Settings = NamedSession->SessionSettings;
+	Settings.Set(FlickPartyCommandKey,
+		FString::Printf(TEXT("DISBAND:%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)),
+		EOnlineDataAdvertisementType::ViaOnlineService);
+	Sessions->UpdateSession(NAME_GameSession, Settings, true);
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimer(PartyCommandTimer, [this]() { LeaveParty(); }, 0.5f, false);
+		return true;
+	}
+	return LeaveParty();
+}
+
+bool UFlickSessionSubsystem::LeaveParty()
+{
+	if (ActivePurpose != EFlickSessionPurpose::Party)
+	{
+		return false;
+	}
+	return LeaveSession(false);
+}
+
+bool UFlickSessionSubsystem::BeginPrivateMatchForParty()
+{
+	UFlickPartySubsystem* Party = GetPartySubsystem();
+	UWorld* World = GetWorld();
+	AFlickGameMode* GameMode = World ? World->GetAuthGameMode<AFlickGameMode>() : nullptr;
+	if (!Party || !Party->IsActive() || !Party->IsLocalLeader() || !World || !GameMode)
+	{
+		SetState(EFlickSessionState::Error, TEXT("ONLY THE PARTY LEADER CAN START A PRIVATE MATCH"));
+		return false;
+	}
+
+	const FString CurrentMap = World->GetOutermost()->GetName();
+	FURL ListenUrl(nullptr, *CurrentMap, TRAVEL_Absolute);
+	ListenUrl.AddOption(TEXT("listen"));
+	ListenUrl.AddOption(TEXT("FlickParty"));
+	if (!World->GetNetDriver() && !World->Listen(ListenUrl))
+	{
+		SetState(EFlickSessionState::Error, TEXT("THE PRIVATE MATCH HOST COULD NOT START"));
+		return false;
+	}
+	if (!GameMode->HostPrivateMatchForPersistentParty(Party->GetPartyId(), Party->GetMemberCount()))
+	{
+		SetState(EFlickSessionState::Error, TEXT("THE PRIVATE MATCH LOBBY COULD NOT OPEN"));
+		return false;
+	}
+
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
+	if (!NamedSession)
+	{
+		return false;
+	}
+	FOnlineSessionSettings Settings = NamedSession->SessionSettings;
+	Settings.Set(FlickPartyCommandKey,
+		FString::Printf(TEXT("PRIVATE:%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)),
+		EOnlineDataAdvertisementType::ViaOnlineService);
+	if (!Sessions->UpdateSession(NAME_GameSession, Settings, true))
+	{
+		SetState(EFlickSessionState::Error, TEXT("STEAM COULD NOT SIGNAL THE PRIVATE MATCH"));
+		return false;
+	}
+	SetState(EFlickSessionState::InSession, TEXT("PRIVATE MATCH LOBBY OPEN"));
+	return true;
+}
+
+bool UFlickSessionSubsystem::PublishPartyCoordinatorAllocation(const FFlickCoordinatorAllocation& Allocation)
+{
+	UFlickPartySubsystem* Party = GetPartySubsystem();
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
+	if (!Party || !Party->IsActive() || !Party->IsLocalLeader() || !NamedSession
+		|| Allocation.MatchId.IsEmpty() || Allocation.Address.IsEmpty())
+	{
+		SetState(EFlickSessionState::Error, TEXT("THE PARTY MATCH ALLOCATION WAS INCOMPLETE"));
+		return false;
+	}
+
+	TArray<FString> EncodedReservations;
+	for (const FFlickCoordinatorReservation& Reservation : Allocation.Reservations)
+	{
+		EncodedReservations.Add(FString::Printf(
+			TEXT("%s|%s|%d|%d"),
+			*FGenericPlatformHttp::UrlEncode(Reservation.AccountId),
+			*FGenericPlatformHttp::UrlEncode(Reservation.Token),
+			static_cast<int32>(Reservation.Team),
+			Reservation.PlayerSlot));
+	}
+	const FString Command = FString::Printf(
+		TEXT("MATCH:%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits));
+	FOnlineSessionSettings Settings = NamedSession->SessionSettings;
+	Settings.Set(FlickPartyMatchIdKey, Allocation.MatchId, EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(FlickPartyServerIdKey, Allocation.ServerId, EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(FlickPartyAddressKey, Allocation.Address, EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(FlickPartyMatchVariantKey, static_cast<int32>(Allocation.Variant), EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(FlickPartyMatchTeamSizeKey, Allocation.PlayersPerTeam, EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(FlickPartyMatchRankedKey, Allocation.bRanked ? 1 : 0, EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(FlickPartyMatchExpiryKey, LexToString(Allocation.ExpiresUnixTime), EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(FlickPartyReservationsKey, FString::Join(EncodedReservations, TEXT(";")), EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(FlickPartyCommandKey, Command, EOnlineDataAdvertisementType::ViaOnlineService);
+	LastProcessedPartyCommand = Command;
+	if (!Sessions->UpdateSession(NAME_GameSession, Settings, true))
+	{
+		LastProcessedPartyCommand.Reset();
+		SetState(EFlickSessionState::Error, TEXT("STEAM COULD NOT SIGNAL THE FOUND MATCH TO THE PARTY"));
+		return false;
+	}
+
+	const FFlickCoordinatorReservation* LocalReservation = Allocation.Reservations.FindByPredicate(
+		[Party](const FFlickCoordinatorReservation& Reservation)
+		{
+			return Reservation.AccountId == Party->GetLocalUserId();
+		});
+	UFlickMatchmakingCoordinatorSubsystem* Coordinator = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UFlickMatchmakingCoordinatorSubsystem>() : nullptr;
+	const FFlickPartyMember* LocalMember = Party->GetMemberByUserId(Party->GetLocalUserId());
+	APlayerController* LocalController = GetGameInstance()
+		? GetGameInstance()->GetFirstLocalPlayerController() : nullptr;
+	if (!LocalReservation || !Coordinator || !LocalController)
+	{
+		SetState(EFlickSessionState::Error, TEXT("THE FOUND MATCH DID NOT RESERVE A PARTY LEADER SLOT"));
+		return false;
+	}
+	Coordinator->AdoptLocalReservation(
+		Allocation,
+		*LocalReservation,
+		Party->GetPartyId(),
+		LocalMember ? LocalMember->Slot : 0,
+		Party->GetMemberCount(),
+		true);
+	if (UFlickGameInstance* FlickGameInstance = Cast<UFlickGameInstance>(GetGameInstance()))
+	{
+		FlickGameInstance->PrepareTravelPresentation(TEXT("MATCH FOUND"));
+	}
+	StopPartySynchronization();
+	SetState(EFlickSessionState::InSession, TEXT("MATCH FOUND - JOINING DEDICATED SERVER"));
+	return Coordinator->TravelToAllocatedMatch(LocalController);
+}
+
 void UFlickSessionSubsystem::RecordRecentPlayer(const FString& UserId, const FString& DisplayName)
 {
 	if (UserId.IsEmpty() || DisplayName.IsEmpty())
@@ -1324,7 +1573,7 @@ void UFlickSessionSubsystem::HandleCreateSessionComplete(const FName SessionName
 	SetState(
 		ActivePurpose == EFlickSessionPurpose::Matchmaking ? EFlickSessionState::Queued : EFlickSessionState::InSession,
 		ActivePurpose == EFlickSessionPurpose::Party
-			? TEXT("STEAM PARTY CREATED - OPENING PARTY FRONTEND...")
+			? TEXT("STEAM PARTY CREATED")
 			: ActivePurpose == EFlickSessionPurpose::Matchmaking
 				? FString::Printf(
 					TEXT("%s QUEUE OPEN - WAITING FOR COMPATIBLE PLAYERS..."),
@@ -1334,25 +1583,12 @@ void UFlickSessionSubsystem::HandleCreateSessionComplete(const FName SessionName
 	FString TravelOptions;
 	if (ActivePurpose == EFlickSessionPurpose::Party)
 	{
-		// A party is a social state layered over the frontend. Turn the current
-		// world into a listen host instead of reloading the same map and briefly
-		// exposing its default sky while the arena/UI are reconstructed.
-		FURL ListenUrl(nullptr, *CurrentMap, TRAVEL_Absolute);
-		ListenUrl.AddOption(TEXT("listen"));
-		ListenUrl.AddOption(TEXT("FlickParty"));
-		AFlickGameMode* FlickGameMode = GetWorld()->GetAuthGameMode<AFlickGameMode>();
-		if (GetWorld()->Listen(ListenUrl) && FlickGameMode && FlickGameMode->ActivatePartySession())
-		{
-			SendPendingPartyInvite();
-			SetState(EFlickSessionState::InSession, TEXT("STEAM PARTY READY"));
-			return;
-		}
-		UE_LOG(LogFlick, Warning, TEXT("Could not activate the frontend listen host in place; using masked party travel"));
-		if (UFlickGameInstance* FlickGameInstance = Cast<UFlickGameInstance>(GetGameInstance()))
-		{
-			FlickGameInstance->PrepareTravelPresentation(TEXT("CREATING PARTY"));
-		}
-		TravelOptions = TEXT("listen?FlickParty");
+		// Party membership is a Steam lobby concern, not a gameplay connection.
+		// Keep the current frontend world and HUD alive on every member's machine.
+		StartPartySynchronization();
+		SendPendingPartyInvite();
+		SetState(EFlickSessionState::InSession, TEXT("STEAM PARTY READY"));
+		return;
 	}
 	else
 	{
@@ -1602,6 +1838,17 @@ void UFlickSessionSubsystem::HandleJoinSessionComplete(
 
 	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
 	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	if (ActivePurpose == EFlickSessionPurpose::Party)
+	{
+		if (!Sessions.IsValid() || !Sessions->GetNamedSession(NAME_GameSession))
+		{
+			SetState(EFlickSessionState::Error, TEXT("STEAM JOINED THE PARTY WITHOUT LOBBY STATE"));
+			return;
+		}
+		StartPartySynchronization();
+		SetState(EFlickSessionState::InSession, TEXT("JOINED STEAM PARTY"));
+		return;
+	}
 	FString ConnectString;
 	if (!Sessions.IsValid() || !Sessions->GetResolvedConnectString(NAME_GameSession, ConnectString) || ConnectString.IsEmpty())
 	{
@@ -1623,10 +1870,9 @@ void UFlickSessionSubsystem::HandleJoinSessionComplete(
 	SetState(EFlickSessionState::InSession, TEXT("CONNECTED - ENTERING FLICK LOBBY..."));
 	if (UFlickGameInstance* FlickGameInstance = Cast<UFlickGameInstance>(GetGameInstance()))
 	{
-		FlickGameInstance->PrepareTravelPresentation(
-			ActivePurpose == EFlickSessionPurpose::Party ? TEXT("JOINING PARTY") : TEXT("JOINING MATCH"));
+		FlickGameInstance->PrepareTravelPresentation(TEXT("JOINING MATCH"));
 	}
-	if ((ActivePurpose == EFlickSessionPurpose::Matchmaking || ActivePurpose == EFlickSessionPurpose::Party)
+	if (ActivePurpose == EFlickSessionPurpose::Matchmaking
 		&& HasPersistentPartyIdentity())
 	{
 		ConnectString += FString::Printf(
@@ -1752,12 +1998,263 @@ void UFlickSessionSubsystem::HandleInviteAccepted(
 	UE_LOG(LogFlick, Log, TEXT("Steam lobby invite accepted by local controller %d"), ControllerId);
 	if (HasActiveSession())
 	{
+		if (ActivePurpose == EFlickSessionPurpose::Party)
+		{
+			StopPartySynchronization();
+			if (UFlickPartySubsystem* Party = GetPartySubsystem())
+			{
+				Party->Clear();
+			}
+			ClearPersistentPartyIdentity();
+		}
 		PendingJoinResult = MakeShared<FOnlineSessionSearchResult>(InviteResult);
 		bJoinAfterDestroy = true;
 		BeginDestroySession(false);
 		return;
 	}
 	JoinSearchResult(InviteResult);
+}
+
+void UFlickSessionSubsystem::HandleSessionParticipantJoined(
+	const FName SessionName,
+	const FUniqueNetId& UserId)
+{
+	if (SessionName == NAME_GameSession && ActivePurpose == EFlickSessionPurpose::Party)
+	{
+		UE_LOG(LogFlick, Log, TEXT("Steam party member joined: %s"), *UserId.ToString());
+		RefreshPartyFromSession();
+	}
+}
+
+void UFlickSessionSubsystem::HandleSessionParticipantLeft(
+	const FName SessionName,
+	const FUniqueNetId& UserId,
+	const EOnSessionParticipantLeftReason Reason)
+{
+	if (SessionName == NAME_GameSession && ActivePurpose == EFlickSessionPurpose::Party)
+	{
+		UE_LOG(LogFlick, Log, TEXT("Steam party member left: %s (%s)"), *UserId.ToString(), ToLogString(Reason));
+		RefreshPartyFromSession();
+	}
+}
+
+void UFlickSessionSubsystem::HandleSessionSettingsUpdated(
+	const FName SessionName,
+	const FOnlineSessionSettings& Settings)
+{
+	if (SessionName == NAME_GameSession && ActivePurpose == EFlickSessionPurpose::Party)
+	{
+		RefreshPartyFromSession();
+	}
+}
+
+void UFlickSessionSubsystem::StartPartySynchronization()
+{
+	StopPartySynchronization();
+	RefreshPartyFromSession();
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimer(
+			PartySynchronizationTimer,
+			this,
+			&UFlickSessionSubsystem::RefreshPartyFromSession,
+			0.5f,
+			true);
+	}
+}
+
+void UFlickSessionSubsystem::StopPartySynchronization()
+{
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(PartySynchronizationTimer);
+		GetWorld()->GetTimerManager().ClearTimer(PartyCommandTimer);
+	}
+}
+
+void UFlickSessionSubsystem::RefreshPartyFromSession()
+{
+	if (ActivePurpose != EFlickSessionPurpose::Party)
+	{
+		return;
+	}
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	const IOnlineIdentityPtr Identity = OnlineSubsystem ? OnlineSubsystem->GetIdentityInterface() : nullptr;
+	FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
+	UFlickPartySubsystem* Party = GetPartySubsystem();
+	if (!NamedSession || !Party)
+	{
+		return;
+	}
+
+	FString PartyId;
+	NamedSession->SessionSettings.Get(FlickPartyIdKey, PartyId);
+	if (PartyId.IsEmpty())
+	{
+		PartyId = NamedSession->GetSessionIdStr();
+	}
+	const FString LeaderId = NamedSession->OwningUserId.IsValid()
+		? NamedSession->OwningUserId->ToString() : FString();
+	const FUniqueNetIdPtr LocalNetId = Identity.IsValid() ? Identity->GetUniquePlayerId(0) : nullptr;
+	const FString LocalId = LocalNetId.IsValid() ? LocalNetId->ToString() : FString();
+
+	TArray<FUniqueNetIdRef> ParticipantIds = NamedSession->RegisteredPlayers;
+	if (NamedSession->OwningUserId.IsValid()
+		&& !ParticipantIds.ContainsByPredicate([&NamedSession](const FUniqueNetIdRef& Id)
+		{
+			return Id->ToString() == NamedSession->OwningUserId->ToString();
+		}))
+	{
+		ParticipantIds.Insert(NamedSession->OwningUserId.ToSharedRef(), 0);
+	}
+	if (LocalNetId.IsValid()
+		&& !ParticipantIds.ContainsByPredicate([&LocalId](const FUniqueNetIdRef& Id) { return Id->ToString() == LocalId; }))
+	{
+		ParticipantIds.Add(LocalNetId.ToSharedRef());
+	}
+
+	TArray<TPair<FString, FString>> Members;
+	for (const FUniqueNetIdRef& ParticipantId : ParticipantIds)
+	{
+		const FString UserId = ParticipantId->ToString();
+		FString DisplayName = Identity.IsValid() ? Identity->GetPlayerNickname(*ParticipantId) : FString();
+		if (DisplayName.IsEmpty())
+		{
+			if (const FFlickSocialPlayerEntry* Friend = Friends.FindByPredicate(
+				[&UserId](const FFlickSocialPlayerEntry& Entry) { return Entry.UserId == UserId; }))
+			{
+				DisplayName = Friend->DisplayName;
+			}
+		}
+		if (DisplayName.IsEmpty() && UserId == LocalId)
+		{
+			DisplayName = GetLocalDisplayName();
+		}
+		Members.Emplace(UserId, DisplayName);
+	}
+	Party->Synchronize(PartyId, LeaderId, Members, LocalId);
+	PersistentPartyId = PartyId;
+	PersistentPartySize = Party->GetMemberCount();
+	bPersistentPartyLeader = Party->IsLocalLeader();
+	if (const FFlickPartyMember* LocalMember = Party->GetMemberByUserId(LocalId))
+	{
+		PersistentPartySlot = LocalMember->Slot;
+	}
+
+	FString PartyCommand;
+	NamedSession->SessionSettings.Get(FlickPartyCommandKey, PartyCommand);
+	if (!PartyCommand.IsEmpty() && PartyCommand != LastProcessedPartyCommand)
+	{
+		LastProcessedPartyCommand = PartyCommand;
+		if (PartyCommand.StartsWith(TEXT("MATCH:")))
+		{
+			FFlickCoordinatorAllocation Allocation;
+			int32 VariantValue = static_cast<int32>(EFlickMatchVariant::Classic);
+			int32 RankedValue = 0;
+			FString ExpiryValue;
+			FString EncodedReservations;
+			NamedSession->SessionSettings.Get(FlickPartyMatchIdKey, Allocation.MatchId);
+			NamedSession->SessionSettings.Get(FlickPartyServerIdKey, Allocation.ServerId);
+			NamedSession->SessionSettings.Get(FlickPartyAddressKey, Allocation.Address);
+			NamedSession->SessionSettings.Get(FlickPartyMatchVariantKey, VariantValue);
+			NamedSession->SessionSettings.Get(FlickPartyMatchTeamSizeKey, Allocation.PlayersPerTeam);
+			NamedSession->SessionSettings.Get(FlickPartyMatchRankedKey, RankedValue);
+			NamedSession->SessionSettings.Get(FlickPartyMatchExpiryKey, ExpiryValue);
+			NamedSession->SessionSettings.Get(FlickPartyReservationsKey, EncodedReservations);
+			Allocation.Variant = NormalizeMatchVariant(static_cast<EFlickMatchVariant>(VariantValue));
+			Allocation.PlayersPerTeam = FlickTeamRules::ClampPlayersPerTeam(Allocation.PlayersPerTeam);
+			Allocation.bRanked = RankedValue != 0;
+			Allocation.ExpiresUnixTime = FCString::Atoi64(*ExpiryValue);
+			TArray<FString> ReservationRows;
+			EncodedReservations.ParseIntoArray(ReservationRows, TEXT(";"), true);
+			for (const FString& Row : ReservationRows)
+			{
+				TArray<FString> Fields;
+				Row.ParseIntoArray(Fields, TEXT("|"), false);
+				if (Fields.Num() != 4)
+				{
+					continue;
+				}
+				FFlickCoordinatorReservation& Reservation = Allocation.Reservations.AddDefaulted_GetRef();
+				Reservation.AccountId = FGenericPlatformHttp::UrlDecode(Fields[0]);
+				Reservation.Token = FGenericPlatformHttp::UrlDecode(Fields[1]);
+				Reservation.Team = static_cast<EFlickTeam>(FMath::Clamp(FCString::Atoi(*Fields[2]), 0, 2));
+				Reservation.PlayerSlot = FCString::Atoi(*Fields[3]);
+			}
+			const FFlickCoordinatorReservation* LocalReservation = Allocation.Reservations.FindByPredicate(
+				[&LocalId](const FFlickCoordinatorReservation& Reservation)
+				{
+					return Reservation.AccountId == LocalId;
+				});
+			UFlickMatchmakingCoordinatorSubsystem* Coordinator = GetGameInstance()
+				? GetGameInstance()->GetSubsystem<UFlickMatchmakingCoordinatorSubsystem>() : nullptr;
+			APlayerController* LocalController = GetGameInstance()
+				? GetGameInstance()->GetFirstLocalPlayerController() : nullptr;
+			if (!LocalReservation || !Coordinator || !LocalController
+				|| Allocation.MatchId.IsEmpty() || Allocation.Address.IsEmpty())
+			{
+				SetState(EFlickSessionState::Error, TEXT("THE FOUND MATCH DID NOT CONTAIN YOUR RESERVATION"));
+				return;
+			}
+			const FFlickPartyMember* LocalMember = Party->GetMemberByUserId(LocalId);
+			Coordinator->AdoptLocalReservation(
+				Allocation,
+				*LocalReservation,
+				Party->GetPartyId(),
+				LocalMember ? LocalMember->Slot : 0,
+				Party->GetMemberCount(),
+				Party->IsLocalLeader());
+			if (UFlickGameInstance* FlickGameInstance = Cast<UFlickGameInstance>(GetGameInstance()))
+			{
+				FlickGameInstance->PrepareTravelPresentation(TEXT("MATCH FOUND"));
+			}
+			StopPartySynchronization();
+			SetState(EFlickSessionState::InSession, TEXT("MATCH FOUND - JOINING DEDICATED SERVER"));
+			Coordinator->TravelToAllocatedMatch(LocalController);
+			return;
+		}
+		if (PartyCommand.StartsWith(TEXT("PRIVATE:")) && !Party->IsLocalLeader())
+		{
+			FString ConnectString;
+			if (!Sessions->GetResolvedConnectString(NAME_GameSession, ConnectString) || ConnectString.IsEmpty())
+			{
+				SetState(EFlickSessionState::Error, TEXT("STEAM COULD NOT RESOLVE THE PRIVATE MATCH HOST"));
+				return;
+			}
+			const FFlickPartyMember* LocalMember = Party->GetMemberByUserId(LocalId);
+			ConnectString += FString::Printf(
+				TEXT("?FlickParty?FlickPartyId=%s?FlickPartySlot=%d?FlickPartySize=%d?FlickPartyLeader=0"),
+				*Party->GetPartyId(),
+				LocalMember ? LocalMember->Slot : 1,
+				Party->GetMemberCount());
+			if (UFlickGameInstance* FlickGameInstance = Cast<UFlickGameInstance>(GetGameInstance()))
+			{
+				FlickGameInstance->PrepareTravelPresentation(TEXT("JOINING PRIVATE MATCH"));
+			}
+			StopPartySynchronization();
+			if (APlayerController* LocalController = GetGameInstance()
+				? GetGameInstance()->GetFirstLocalPlayerController() : nullptr)
+			{
+				LocalController->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
+			}
+			return;
+		}
+		const bool bDisbandCommand = PartyCommand.StartsWith(TEXT("DISBAND:"));
+		const bool bKickCommand = PartyCommand.StartsWith(FString::Printf(TEXT("KICK:%s:"), *LocalId));
+		if ((bDisbandCommand && !Party->IsLocalLeader()) || bKickCommand)
+		{
+			SetState(EFlickSessionState::InSession,
+				bDisbandCommand ? TEXT("PARTY DISBANDED") : TEXT("REMOVED FROM PARTY"));
+			LeaveParty();
+			return;
+		}
+	}
+	OnSessionsChanged.Broadcast();
+	if (FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().InvalidateAllWidgets(false);
+	}
 }
 
 void UFlickSessionSubsystem::HandleNetworkFailure(
@@ -1785,7 +2282,7 @@ void UFlickSessionSubsystem::HandleNetworkFailure(
 	}
 	UE_LOG(LogFlick, Warning, TEXT("Online network failure (%d): %s"), static_cast<int32>(FailureType), *ErrorString);
 	SetState(EFlickSessionState::Error, FString::Printf(TEXT("CONNECTION LOST: %s"), *ErrorString.ToUpper()));
-	if ((ActivePurpose == EFlickSessionPurpose::Matchmaking || ActivePurpose == EFlickSessionPurpose::Party)
+	if (ActivePurpose == EFlickSessionPurpose::Matchmaking
 		&& HasPersistentPartyIdentity())
 	{
 		RestorePersistentParty(ShouldLeadPartyRestorationAfterFailure());
@@ -1812,7 +2309,7 @@ void UFlickSessionSubsystem::HandleTravelFailure(
 		}
 	}
 	SetState(EFlickSessionState::Error, FString::Printf(TEXT("COULD NOT ENTER LOBBY: %s"), *ErrorString.ToUpper()));
-	if ((ActivePurpose == EFlickSessionPurpose::Matchmaking || ActivePurpose == EFlickSessionPurpose::Party)
+	if (ActivePurpose == EFlickSessionPurpose::Matchmaking
 		&& HasPersistentPartyIdentity())
 	{
 		RestorePersistentParty(ShouldLeadPartyRestorationAfterFailure());

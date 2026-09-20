@@ -609,12 +609,95 @@ UFlickSessionSubsystem* SFlickGameLayer::GetDisplayedSessionSubsystem() const
 
 bool SFlickGameLayer::IsDisplayedPartyActive() const
 {
+	if (PlayerController.IsValid() && PlayerController->GetGameInstance())
+	{
+		if (const UFlickPartySubsystem* Party = PlayerController->GetGameInstance()->GetSubsystem<UFlickPartySubsystem>();
+			Party && Party->IsActive())
+		{
+			return true;
+		}
+	}
 	if (GameMode.IsValid())
 	{
 		return GameMode->IsPartySession();
 	}
 	const AFlickGameState* State = GetScoreboardGameState();
 	return State && State->bPartyActive;
+}
+
+bool SFlickGameLayer::HasDisplayedPartyMember(const int32 PartySlot) const
+{
+	if (PlayerController.IsValid() && PlayerController->GetGameInstance())
+	{
+		if (const UFlickPartySubsystem* Party = PlayerController->GetGameInstance()->GetSubsystem<UFlickPartySubsystem>();
+			Party && Party->IsActive())
+		{
+			return Party->GetMemberBySlot(PartySlot) != nullptr;
+		}
+	}
+	return GetDisplayedPartyMember(PartySlot) != nullptr;
+}
+
+FString SFlickGameLayer::GetDisplayedPartyMemberName(const int32 PartySlot) const
+{
+	if (PlayerController.IsValid() && PlayerController->GetGameInstance())
+	{
+		if (const UFlickPartySubsystem* Party = PlayerController->GetGameInstance()->GetSubsystem<UFlickPartySubsystem>(); Party)
+		{
+			if (const FFlickPartyMember* Member = Party->GetMemberBySlot(PartySlot))
+			{
+				return Member->DisplayName;
+			}
+		}
+	}
+	const AFlickPlayerState* Member = GetDisplayedPartyMember(PartySlot);
+	return Member ? Member->GetPlayerName() : FString();
+}
+
+FString SFlickGameLayer::GetDisplayedPartyMemberUserId(const int32 PartySlot) const
+{
+	if (PlayerController.IsValid() && PlayerController->GetGameInstance())
+	{
+		if (const UFlickPartySubsystem* Party = PlayerController->GetGameInstance()->GetSubsystem<UFlickPartySubsystem>(); Party)
+		{
+			if (const FFlickPartyMember* Member = Party->GetMemberBySlot(PartySlot))
+			{
+				return Member->UserId;
+			}
+		}
+	}
+	return FString();
+}
+
+bool SFlickGameLayer::IsDisplayedPartyMemberLeader(const int32 PartySlot) const
+{
+	if (PlayerController.IsValid() && PlayerController->GetGameInstance())
+	{
+		if (const UFlickPartySubsystem* Party = PlayerController->GetGameInstance()->GetSubsystem<UFlickPartySubsystem>(); Party)
+		{
+			if (const FFlickPartyMember* Member = Party->GetMemberBySlot(PartySlot))
+			{
+				return Member->bLeader;
+			}
+		}
+	}
+	const AFlickPlayerState* Member = GetDisplayedPartyMember(PartySlot);
+	return Member && Member->IsPartyLeader();
+}
+
+bool SFlickGameLayer::IsLocalDisplayedPartyLeader() const
+{
+	if (PlayerController.IsValid() && PlayerController->GetGameInstance())
+	{
+		if (const UFlickPartySubsystem* Party = PlayerController->GetGameInstance()->GetSubsystem<UFlickPartySubsystem>();
+			Party && Party->IsActive())
+		{
+			return Party->IsLocalLeader();
+		}
+	}
+	const AFlickPlayerState* LocalState = PlayerController.IsValid()
+		? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
+	return LocalState && LocalState->IsPartyLeader();
 }
 
 AFlickPlayerState* SFlickGameLayer::GetDisplayedPartyMember(const int32 PartySlot) const
@@ -641,6 +724,14 @@ AFlickPlayerState* SFlickGameLayer::GetDisplayedPartyMember(const int32 PartySlo
 
 int32 SFlickGameLayer::GetDisplayedPartyMemberCount() const
 {
+	if (PlayerController.IsValid() && PlayerController->GetGameInstance())
+	{
+		if (const UFlickPartySubsystem* Party = PlayerController->GetGameInstance()->GetSubsystem<UFlickPartySubsystem>();
+			Party && Party->IsActive())
+		{
+			return Party->GetMemberCount();
+		}
+	}
 	if (GameMode.IsValid())
 	{
 		return GameMode->GetPartyMemberCount();

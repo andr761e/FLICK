@@ -628,12 +628,23 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayPlaylistCard(
 	TSharedRef<SButton> CardButton = SNew(SButton)
 		.ButtonStyle(&TransparentButtonStyle)
 		.ContentPadding(0.0f)
+		.IsEnabled_Lambda([this]() { return !IsDisplayedPartyActive() || IsLocalDisplayedPartyLeader(); })
 		.Cursor(EMouseCursor::Hand)
 		.OnClicked_Lambda([this, Playlist]()
 		{
 			if (Playlist == EFlickPlayPlaylist::PrivateMatch)
 			{
-				if (GameMode.IsValid()) GameMode->OpenPrivateMatchSetup();
+				if (IsDisplayedPartyActive())
+				{
+					if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem())
+					{
+						Sessions->BeginPrivateMatchForParty();
+					}
+				}
+				else if (GameMode.IsValid())
+				{
+					GameMode->OpenPrivateMatchSetup();
+				}
 				return FReply::Handled();
 			}
 			SelectedPlayPlaylist = Playlist;

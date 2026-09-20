@@ -1061,6 +1061,11 @@ void AFlickGameMode::PostLogin(APlayerController* NewPlayer)
 		{
 			UE_LOG(LogFlick, Log, TEXT("Party member %s joined"), *PlayerName);
 			SynchronizePartyState();
+			if (bPrivateMatchSetupActive)
+			{
+				AutoAssignPrivateMatchSlots();
+				PushPrivateMatchState();
+			}
 		}
 		else
 		{

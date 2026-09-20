@@ -201,6 +201,11 @@ private:
 	UFlickSessionSubsystem* GetDisplayedSessionSubsystem() const;
 	bool IsDisplayedPartyActive() const;
 	AFlickPlayerState* GetDisplayedPartyMember(int32 PartySlot) const;
+	bool HasDisplayedPartyMember(int32 PartySlot) const;
+	FString GetDisplayedPartyMemberName(int32 PartySlot) const;
+	FString GetDisplayedPartyMemberUserId(int32 PartySlot) const;
+	bool IsDisplayedPartyMemberLeader(int32 PartySlot) const;
+	bool IsLocalDisplayedPartyLeader() const;
 	int32 GetDisplayedPartyMemberCount() const;
 	EFlickTeam GetClassSelectionTeam() const;
 	int32 GetClassSelectionPlayerSlot() const;
