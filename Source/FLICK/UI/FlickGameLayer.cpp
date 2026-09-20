@@ -284,6 +284,11 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		]
 		]
 		]
+		+ SOverlay::Slot()
+		.VAlign(VAlign_Bottom)
+		[
+			BuildMainMenuFooter()
+		]
 	];
 
 }
@@ -399,6 +404,7 @@ void SFlickGameLayer::Tick(
 	const float InDeltaTime)
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+	LayerLocalSize = AllottedGeometry.GetLocalSize();
 	if (bStartupOverlayVisible)
 	{
 		StartupOverlayElapsed += InDeltaTime;

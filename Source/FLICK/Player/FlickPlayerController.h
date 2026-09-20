@@ -20,6 +20,8 @@ public:
 	AFlickPlayerController();
 
 	virtual void BeginPlay() override;
+	virtual void BeginPlayingState() override;
+	virtual void PostSeamlessTravel() override;
 	virtual void SetupInputComponent() override;
 	virtual void PlayerTick(float DeltaTime) override;
 
@@ -106,6 +108,7 @@ private:
 	void HandleTrainingRemovePressed();
 	void HandleFreeCameraTogglePressed();
 	void HandleTopDownViewPressed();
+	void ApplyFrontendInputMode();
 	void SetFreeCameraInputMode(bool bEnabled);
 	bool UpdateFreeCamera(float DeltaSeconds);
 	void UpdateAimFromCursor();

@@ -66,6 +66,7 @@ public:
 
 private:
 	TSharedRef<SWidget> BuildMainMenu();
+	TSharedRef<SWidget> BuildMainMenuFooter();
 	EFlickLineupPreset GetDisplayedLoadoutPreset() const;
 	EFlickPieceArchetype GetDisplayedLoadoutPiece(int32 SlotIndex) const;
 	void SetDisplayedLoadoutPiece(int32 SlotIndex, EFlickPieceArchetype Archetype);
@@ -243,6 +244,7 @@ private:
 	float StartupOverlayElapsed = 0.0f;
 	float StartupOverlayHoldDuration = 0.0f;
 	float StartupOverlayFadeDuration = 0.35f;
+	FVector2D LayerLocalSize = FVector2D(1920.0f, 1080.0f);
 	EFlickPlayPlaylist SelectedPlayPlaylist = EFlickPlayPlaylist::None;
 	int32 SelectedPlayFormat = 0;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;

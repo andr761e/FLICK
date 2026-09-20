@@ -365,45 +365,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			]
 		]
 		+ SOverlay::Slot()
-		.VAlign(VAlign_Bottom)
-		.Padding(0.0f)
-		[
-			SNew(SBox).HeightOverride(32.0f).Clipping(EWidgetClipping::ClipToBounds)
-			[
-				SNew(SOverlay)
-				+ SOverlay::Slot()
-				[
-					SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 218))).Padding(0.0f)
-				]
-				+ SOverlay::Slot().VAlign(VAlign_Top)
-				[
-					SNew(SBox).HeightOverride(1.0f)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(0.42f))]
-				]
-				+ SOverlay::Slot().VAlign(VAlign_Center)
-				[
-					SNew(SHorizontalBox)
-					.RenderTransform_Lambda([TickerStartTime = FPlatformTime::Seconds()]()
-					{
-						const float ViewportWidth = GEngine && GEngine->GameViewport && GEngine->GameViewport->Viewport
-							? static_cast<float>(GEngine->GameViewport->Viewport->GetSizeXY().X) : 1920.0f;
-						const double TravelDistance = static_cast<double>(ViewportWidth) + 1900.0;
-						const double ElapsedTime = FMath::Max(0.0, FPlatformTime::Seconds() - TickerStartTime);
-						const float Offset = static_cast<float>(FMath::Fmod(ElapsedTime * 55.0, TravelDistance));
-						// Begin just inside the right edge so the ticker is visibly alive on
-						// the very first main-menu frame, rather than waiting off-screen.
-						return FSlateRenderTransform(FVector2D(ViewportWidth - 120.0f - Offset, 0.0f));
-					})
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK NETWORK  "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("  BUILD YOUR LINEUP. MASTER THE ANGLE. OWN THE TABLE.     "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("     COMPETITIVE SEASON PREVIEW COMING SOON     "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("     FLICK NETWORK  //  BUILD YOUR LINEUP. MASTER THE ANGLE. OWN THE TABLE."))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
-				]
-			]
-		]
-		+ SOverlay::Slot()
 		.HAlign(HAlign_Right)
 		.VAlign(VAlign_Top)
 		.Padding(0.0f, 28.0f, 270.0f, 0.0f)
@@ -545,6 +506,49 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 				BuildSocialPanel()
 			]
 		]
+		];
+}
+
+TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuFooter()
+{
+	return SNew(SBox)
+		.HeightOverride(32.0f)
+		.Clipping(EWidgetClipping::ClipToBounds)
+		.Visibility_Lambda([this]()
+		{
+			return GetScreenVisibility(EFlickFrontendScreen::MainMenu) == EVisibility::Collapsed
+				? EVisibility::Collapsed
+				: EVisibility::HitTestInvisible;
+		})
+		[
+			SNew(SOverlay)
+			+ SOverlay::Slot()
+			[
+				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 218))).Padding(0.0f)
+			]
+			+ SOverlay::Slot().VAlign(VAlign_Top)
+			[
+				SNew(SBox).HeightOverride(1.0f)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(0.42f))]
+			]
+			+ SOverlay::Slot().VAlign(VAlign_Center)
+			[
+				SNew(SHorizontalBox)
+				.RenderTransform_Lambda([this, TickerStartTime = FPlatformTime::Seconds()]()
+				{
+					const float ViewportWidth = FMath::Max(LayerLocalSize.X, 1.0f);
+					const double TravelDistance = static_cast<double>(ViewportWidth) + 1900.0;
+					const double ElapsedTime = FMath::Max(0.0, FPlatformTime::Seconds() - TickerStartTime);
+					const float Offset = static_cast<float>(FMath::Fmod(ElapsedTime * 55.0, TravelDistance));
+					return FSlateRenderTransform(FVector2D(ViewportWidth - 120.0f - Offset, 0.0f));
+				})
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK NETWORK  "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("  BUILD YOUR LINEUP. MASTER THE ANGLE. OWN THE TABLE.     "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("     COMPETITIVE SEASON PREVIEW COMING SOON     "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("     FLICK NETWORK  //  BUILD YOUR LINEUP. MASTER THE ANGLE. OWN THE TABLE."))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+			]
 		];
 }
 

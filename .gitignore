@@ -25,11 +25,15 @@ Builds/
 *.log
 *.obj
 *.pdb
+Build/Mac/*.PackageVersionCounter
+Build/Mac/FileOpenOrder/
 __pycache__/
 *.pyc
 *.blend1
 
 # Local OS noise
+.DS_Store
+**/.DS_Store
 Thumbs.db
 Desktop.ini
 

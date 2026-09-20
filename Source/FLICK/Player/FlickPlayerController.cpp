@@ -80,6 +80,34 @@ void AFlickPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ApplyFrontendInputMode();
+	bNetworkAutoShotRequested = FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkAutoShot"));
+	bNetworkAutoReadyRequested = FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkAutoReady"));
+
+}
+
+void AFlickPlayerController::BeginPlayingState()
+{
+	Super::BeginPlayingState();
+
+	if (!IsGameplayActive())
+	{
+		ApplyFrontendInputMode();
+	}
+}
+
+void AFlickPlayerController::PostSeamlessTravel()
+{
+	Super::PostSeamlessTravel();
+
+	if (!IsGameplayActive())
+	{
+		ApplyFrontendInputMode();
+	}
+}
+
+void AFlickPlayerController::ApplyFrontendInputMode()
+{
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
@@ -88,9 +116,6 @@ void AFlickPlayerController::BeginPlay()
 	InputMode.SetHideCursorDuringCapture(false);
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(InputMode);
-	bNetworkAutoShotRequested = FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkAutoShot"));
-	bNetworkAutoReadyRequested = FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkAutoReady"));
-
 }
 
 void AFlickPlayerController::SetupInputComponent()
