@@ -325,16 +325,33 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Bottom)
-		.Padding(430.0f, 0.0f, 0.0f, 48.0f)
+		.Padding(450.0f, 0.0f, 0.0f, 44.0f)
 		[
-			SNew(SBox).HeightOverride(82.0f)
+			SNew(SBox).HeightOverride(72.0f)
 			.Visibility_Lambda([this]() { return IsDisplayedPartyActive() ? EVisibility::Visible : EVisibility::Collapsed; })
 			[
-				SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Hairline).CutSize(8.0f).BorderWidth(0.8f).Padding(FMargin(11.0f, 7.0f))
+				SNew(SFlickAngularBorder)
+				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 246)))
+				.AccentColor(Cyan.CopyWithNewOpacity(0.58f))
+				.CutSize(10.0f)
+				.BorderWidth(1.0f)
+				.Padding(FMargin(9.0f, 6.0f))
 				[
 					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PARTY ROSTER  //  CLICK FOR CONTROLS"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(SBox).WidthOverride(20.0f).HeightOverride(2.0f)
+							[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Brand)]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(7.0f, 0.0f, 0.0f, 0.0f)
+						[
+							SNew(STextBlock).Text(FText::FromString(TEXT("PARTY  //  SELECT A MEMBER FOR CONTROLS"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
 					[
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth()[BuildMainMenuPartyMember(0)]
@@ -906,8 +923,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartySlot)
 {
 	return SNew(SBox)
-		.WidthOverride(118.0f)
-		.HeightOverride(42.0f)
+		.WidthOverride(128.0f)
+		.HeightOverride(44.0f)
 		.Visibility_Lambda([this, PartySlot]()
 		{
 			return IsDisplayedPartyActive() && GetDisplayedPartyMember(PartySlot)
@@ -941,18 +958,18 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 			})
 			[
 			SNew(SFlickMainMenuPanel)
-			.BackgroundColor(FLinearColor::FromSRGBColor(FColor(14, 23, 25, 238)))
+			.BackgroundColor(FLinearColor::FromSRGBColor(FColor(14, 23, 25, 248)))
 			.AccentColor_Lambda([this, PartySlot]()
 			{
 				const AFlickPlayerState* Member = IsDisplayedPartyActive()
 					? GetDisplayedPartyMember(PartySlot) : nullptr;
 				return Member && Member->IsPartyLeader()
 					? Brand
-					: Hairline;
+					: Cyan.CopyWithNewOpacity(0.5f);
 			})
 			.CutSize(7.0f)
 			.BorderWidth(1.0f)
-			.Padding(FMargin(9.0f, 5.0f))
+			.Padding(FMargin(8.0f, 5.0f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Fill).Padding(0.0f, 2.0f, 8.0f, 2.0f)

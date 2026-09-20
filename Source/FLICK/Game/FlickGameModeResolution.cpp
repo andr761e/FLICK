@@ -297,9 +297,12 @@ void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 	const EFlickTeam ReplayTeam = ResolutionShootingTeam != EFlickTeam::None
 		? ResolutionShootingTeam
 		: Outcome == EFlickMatchOutcome::Player1Wins ? EFlickTeam::Player1 : EFlickTeam::Player2;
-	if (CameraPawn)
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		CameraPawn->BeginCinematicReplay(InitialFocus, ReplayTeam);
+		if (AFlickPlayerController* Controller = Cast<AFlickPlayerController>(It->Get()))
+		{
+			Controller->BeginCinematicReplayFromServer(InitialFocus, ReplayTeam);
+		}
 	}
 	if (AudioDirector)
 	{
@@ -479,12 +482,15 @@ void AFlickGameMode::ApplyCinematicReplayTime(const float SourceTime)
 	{
 		TestArenaActor->ApplyReplayDividerState(LowerFrame.RaisedDividerMask);
 	}
-	if (CameraPawn)
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		CameraPawn->UpdateCinematicReplay(
-			ReplayFocus,
-			GetCinematicReplayProgress(),
-			GetCinematicReplayPullbackAlpha());
+		if (AFlickPlayerController* Controller = Cast<AFlickPlayerController>(It->Get()))
+		{
+			Controller->UpdateCinematicReplayFromServer(
+				ReplayFocus,
+				GetCinematicReplayProgress(),
+				GetCinematicReplayPullbackAlpha());
+		}
 	}
 }
 
@@ -507,9 +513,12 @@ void AFlickGameMode::FinishCinematicRoundReplay(const bool bCompleteRound)
 	{
 		TestArenaActor->EndReplayPresentation();
 	}
-	if (CameraPawn)
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		CameraPawn->EndCinematicReplay();
+		if (AFlickPlayerController* Controller = Cast<AFlickPlayerController>(It->Get()))
+		{
+			Controller->EndCinematicReplayFromServer();
+		}
 	}
 	if (AudioDirector)
 	{
@@ -1139,7 +1148,11 @@ void AFlickGameMode::CheckWinOrAdvanceTurn()
 		break;
 	}
 
-	FlickGameState->SetCurrentTeam(GetOpposingTeam(FlickGameState->CurrentTeam));
+	// A kickoff is neutral: after both shots resolve, the round's designated
+	// starting team takes the first normal turn (blue in odd rounds, orange in even).
+	FlickGameState->SetCurrentTeam(bCompletedKickoff
+		? FlickGameState->RoundStartingTeam
+		: GetOpposingTeam(FlickGameState->CurrentTeam));
 	ActivateNextPlayerForTeam(FlickGameState->CurrentTeam);
 	FlickGameState->AdvanceTurn();
 	FlickGameState->SetMatchPhase(EFlickMatchPhase::Aiming);

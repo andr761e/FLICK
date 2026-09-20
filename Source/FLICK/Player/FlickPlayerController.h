@@ -80,6 +80,10 @@ public:
 		int32 PlayersPerTeam,
 		const FFlickRankProgress& Progress);
 	void ApplyTrustedRankedUpdateFromServer(const FFlickRatingUpdate& Update);
+	void SetGameplayCameraTeamFromServer(EFlickTeam Team, bool bSnap);
+	void BeginCinematicReplayFromServer(const FVector& InitialFocus, EFlickTeam ShootingTeam);
+	void UpdateCinematicReplayFromServer(const FVector& Focus, float NormalizedProgress, float PullbackAlpha);
+	void EndCinematicReplayFromServer();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Debug")
 	bool bDrawAimDebug = false;
@@ -225,6 +229,18 @@ private:
 		int32 OldDivision,
 		int32 NewDivision,
 		bool bForfeit);
+
+	UFUNCTION(Client, Reliable)
+	void ClientSetGameplayCameraTeam(EFlickTeam Team, bool bSnap);
+
+	UFUNCTION(Client, Reliable)
+	void ClientBeginCinematicReplay(FVector InitialFocus, EFlickTeam ShootingTeam);
+
+	UFUNCTION(Client, Unreliable)
+	void ClientUpdateCinematicReplay(FVector Focus, float NormalizedProgress, float PullbackAlpha);
+
+	UFUNCTION(Client, Reliable)
+	void ClientEndCinematicReplay();
 
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> SelectedPiece;

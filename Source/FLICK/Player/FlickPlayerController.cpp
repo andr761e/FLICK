@@ -33,6 +33,49 @@ AFlickPlayerController::AFlickPlayerController()
 	bShouldPerformFullTickWhenPaused = true;
 }
 
+void AFlickPlayerController::SetGameplayCameraTeamFromServer(const EFlickTeam Team, const bool bSnap)
+{
+	if (IsLocalController())
+	{
+		ClientSetGameplayCameraTeam_Implementation(Team, bSnap);
+		return;
+	}
+	ClientSetGameplayCameraTeam(Team, bSnap);
+}
+
+void AFlickPlayerController::BeginCinematicReplayFromServer(const FVector& InitialFocus, const EFlickTeam ShootingTeam)
+{
+	if (IsLocalController())
+	{
+		ClientBeginCinematicReplay_Implementation(InitialFocus, ShootingTeam);
+		return;
+	}
+	ClientBeginCinematicReplay(InitialFocus, ShootingTeam);
+}
+
+void AFlickPlayerController::UpdateCinematicReplayFromServer(
+	const FVector& Focus,
+	const float NormalizedProgress,
+	const float PullbackAlpha)
+{
+	if (IsLocalController())
+	{
+		ClientUpdateCinematicReplay_Implementation(Focus, NormalizedProgress, PullbackAlpha);
+		return;
+	}
+	ClientUpdateCinematicReplay(Focus, NormalizedProgress, PullbackAlpha);
+}
+
+void AFlickPlayerController::EndCinematicReplayFromServer()
+{
+	if (IsLocalController())
+	{
+		ClientEndCinematicReplay_Implementation();
+		return;
+	}
+	ClientEndCinematicReplay();
+}
+
 void AFlickPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -1697,6 +1740,45 @@ void AFlickPlayerController::ClientApplyTrustedRankedUpdate_Implementation(
 			Update.bAccepted = true;
 			Ranking->ApplyTrustedUpdate(Update);
 		}
+	}
+}
+
+void AFlickPlayerController::ClientSetGameplayCameraTeam_Implementation(
+	const EFlickTeam Team,
+	const bool bSnap)
+{
+	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()); Camera && Team != EFlickTeam::None)
+	{
+		Camera->SetGameplayViewIndex(Team == EFlickTeam::Player2 ? 2 : 0, bSnap);
+	}
+}
+
+void AFlickPlayerController::ClientBeginCinematicReplay_Implementation(
+	const FVector InitialFocus,
+	const EFlickTeam ShootingTeam)
+{
+	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
+	{
+		Camera->BeginCinematicReplay(InitialFocus, ShootingTeam);
+	}
+}
+
+void AFlickPlayerController::ClientUpdateCinematicReplay_Implementation(
+	const FVector Focus,
+	const float NormalizedProgress,
+	const float PullbackAlpha)
+{
+	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
+	{
+		Camera->UpdateCinematicReplay(Focus, NormalizedProgress, PullbackAlpha);
+	}
+}
+
+void AFlickPlayerController::ClientEndCinematicReplay_Implementation()
+{
+	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
+	{
+		Camera->EndCinematicReplay();
 	}
 }
 

@@ -726,7 +726,8 @@ EVisibility SFlickGameLayer::GetPowerVisibility() const
 
 EVisibility SFlickGameLayer::GetLoadoutRowVisibility(const int32 SlotIndex) const
 {
-	return GameMode.IsValid() && SlotIndex < GameMode->GetLoadoutEditingPieceCount() ? EVisibility::Visible : EVisibility::Collapsed;
+	const int32 PieceCount = GameMode.IsValid() ? GameMode->GetLoadoutEditingPieceCount() : 4;
+	return SlotIndex >= 0 && SlotIndex < PieceCount ? EVisibility::Visible : EVisibility::Collapsed;
 }
 
 EVisibility SFlickGameLayer::GetEventVisibility(const int32 IndexFromNewest) const
@@ -1311,7 +1312,17 @@ FLinearColor SFlickGameLayer::GetTeamAccent(const EFlickTeam Team) const
 
 FString SFlickGameLayer::GetClassDisplayName(const EFlickLineupPreset Preset) const
 {
-	return GameMode.IsValid() ? GameMode->GetClassName(Preset) : GetLineupPresetName(Preset);
+	if (GameMode.IsValid())
+	{
+		return GameMode->GetClassName(Preset);
+	}
+	if (const UFlickGameInstance* Instance = PlayerController.IsValid()
+		? Cast<UFlickGameInstance>(PlayerController->GetGameInstance())
+		: nullptr)
+	{
+		return Instance->GetClassName(Preset);
+	}
+	return GetLineupPresetName(Preset);
 }
 
 EFlickTeam SFlickGameLayer::GetClassSelectionTeam() const
@@ -1357,11 +1368,30 @@ EFlickLineupPreset SFlickGameLayer::GetSelectedClassDraft() const
 
 EFlickPieceArchetype SFlickGameLayer::GetSelectedClassPiece(const int32 PieceSlot) const
 {
-	return GameMode.IsValid()
-		? GameMode->GetClassLoadoutPiece(GetSelectedClassDraft(), PieceSlot)
-		: FlickPieceArchetypeRules::GetPreset(GetSelectedClassDraft()).IsValidIndex(PieceSlot)
-			? FlickPieceArchetypeRules::GetPreset(GetSelectedClassDraft())[PieceSlot]
-			: EFlickPieceArchetype::Standard;
+	if (GameMode.IsValid())
+	{
+		return GameMode->GetClassLoadoutPiece(GetSelectedClassDraft(), PieceSlot);
+	}
+
+	const AFlickGameState* State = GetScoreboardGameState();
+	const AFlickPlayerState* LocalPlayerState = PlayerController.IsValid()
+		? PlayerController->GetPlayerState<AFlickPlayerState>()
+		: nullptr;
+	if (State && State->bNetworkClassSelectionActive && LocalPlayerState
+		&& LocalPlayerState->GetNetworkSelectedLineup().IsValidIndex(PieceSlot))
+	{
+		return LocalPlayerState->GetNetworkSelectedLineup()[PieceSlot];
+	}
+
+	if (const UFlickGameInstance* Instance = PlayerController.IsValid()
+		? Cast<UFlickGameInstance>(PlayerController->GetGameInstance())
+		: nullptr)
+	{
+		return Instance->GetClassLoadoutPiece(GetSelectedClassDraft(), PieceSlot);
+	}
+
+	const TArray<EFlickPieceArchetype>& Preset = FlickPieceArchetypeRules::GetPreset(GetSelectedClassDraft());
+	return Preset.IsValidIndex(PieceSlot) ? Preset[PieceSlot] : EFlickPieceArchetype::Standard;
 }
 
 float SFlickGameLayer::GetSelectedClassStatValue(const int32 StatIndex) const

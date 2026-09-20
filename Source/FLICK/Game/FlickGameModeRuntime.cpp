@@ -1373,11 +1373,33 @@ void AFlickGameMode::SetCameraForFrontend()
 
 void AFlickGameMode::SetCameraViewForTeam(const EFlickTeam Team, const bool bSnap)
 {
-	if (!CameraPawn || Team == EFlickTeam::None)
+	if (Team == EFlickTeam::None)
 	{
 		return;
 	}
 
+	// Network players keep the camera on their own side. Turn ownership must not
+	// move one player's viewpoint to the opponent's end of the table.
+	if (GetNetMode() != NM_Standalone)
+	{
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			AFlickPlayerController* Controller = Cast<AFlickPlayerController>(It->Get());
+			const AFlickPlayerState* PlayerState = Controller
+				? Controller->GetPlayerState<AFlickPlayerState>()
+				: nullptr;
+			if (Controller && PlayerState && PlayerState->GetTeam() != EFlickTeam::None)
+			{
+				Controller->SetGameplayCameraTeamFromServer(PlayerState->GetTeam(), bSnap);
+			}
+		}
+		return;
+	}
+
+	if (!CameraPawn)
+	{
+		return;
+	}
 	const EFlickTeam CameraTeam = IsTrainingBotMatch() ? EFlickTeam::Player1 : Team;
 	CameraPawn->SetGameplayViewIndex(CameraTeam == EFlickTeam::Player2 ? 2 : 0, bSnap);
 }

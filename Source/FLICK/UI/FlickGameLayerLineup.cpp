@@ -453,9 +453,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildFormationPuck(const EFlickTeam Team, c
 		.ContentPadding(0.0f)
 		.ToolTipText_Lambda([this, Team, SlotIndex]()
 		{
-			return FText::FromString(GameMode.IsValid()
-				? FString::Printf(TEXT("SLOT %02d  /  %s"), SlotIndex + 1, *GetPieceArchetypeName(GameMode->GetLoadoutPiece(Team, SlotIndex)))
-				: TEXT("SELECT PUCK"));
+			return FText::FromString(FString::Printf(
+				TEXT("SLOT %02d  /  %s"),
+				SlotIndex + 1,
+				*GetPieceArchetypeName(GetDisplayedLoadoutPiece(SlotIndex))));
 		})
 		.OnClicked_Lambda([this, Team, SlotIndex]()
 		{
@@ -468,24 +469,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildFormationPuck(const EFlickTeam Team, c
 			[
 				SNew(SFlickPuckDisc)
 				.TeamColor(GetTeamAccent(Team))
-				.Archetype_Lambda([this, Team, SlotIndex]()
+				.Archetype_Lambda([this, SlotIndex]()
 				{
-					return GameMode.IsValid()
-						? GameMode->GetLoadoutPiece(Team, SlotIndex)
-						: EFlickPieceArchetype::Standard;
+					return GetDisplayedLoadoutPiece(SlotIndex);
 				})
 				.AccentColor_Lambda([this, Team, SlotIndex]()
 				{
-					return GameMode.IsValid()
-						? FlickPieceArchetypeRules::GetVisualAccent(GameMode->GetLoadoutPiece(Team, SlotIndex), GetTeamAccent(Team))
-						: FLinearColor::White;
+					return FlickPieceArchetypeRules::GetVisualAccent(
+						GetDisplayedLoadoutPiece(SlotIndex),
+						GetTeamAccent(Team));
 				})
 				.Selected_Lambda([this, Team, SlotIndex]() { return GetSelectedLoadoutSlot(Team) == SlotIndex; })
-				.RadiusScale_Lambda([this, Team, SlotIndex]()
+				.RadiusScale_Lambda([this, SlotIndex]()
 				{
-					return GameMode.IsValid()
-						? FlickPieceArchetypeRules::Get(GameMode->GetLoadoutPiece(Team, SlotIndex)).RadiusMultiplier
-						: 1.0f;
+					return FlickPieceArchetypeRules::Get(GetDisplayedLoadoutPiece(SlotIndex)).RadiusMultiplier;
 				})
 			]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(3.0f)
