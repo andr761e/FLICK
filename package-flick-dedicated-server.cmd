@@ -5,7 +5,7 @@ set "PROJECT_ROOT=%~dp0"
 set "PROJECT=%PROJECT_ROOT%FLICK.uproject"
 set "ENGINE_ROOT=%FLICK_UNREAL_ENGINE_ROOT%"
 if not "%~1"=="" set "ENGINE_ROOT=%~1"
-if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.6"
+if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.8"
 set "RUN_UAT=%ENGINE_ROOT%\Engine\Build\BatchFiles\RunUAT.bat"
 set "OUTPUT=%PROJECT_ROOT%Builds\DedicatedServer"
 
@@ -36,7 +36,7 @@ if errorlevel 1 (
     echo.
     echo Dedicated-server packaging failed.
     echo Epic Launcher engine installs commonly omit dedicated-server target libraries.
-    echo Set FLICK_UNREAL_ENGINE_ROOT to a source-built Unreal Engine 5.6 checkout,
+    echo Set FLICK_UNREAL_ENGINE_ROOT to a source-built Unreal Engine 5.8 checkout,
     echo or pass the engine root as the first argument.
     exit /b 1
 )

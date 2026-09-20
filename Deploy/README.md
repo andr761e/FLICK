@@ -4,7 +4,7 @@ This deployment runs one coordinator and its allocated Windows dedicated-server 
 
 ## Build
 
-1. Build Unreal Engine 5.6 from Epic's source distribution with Win64 server support.
+1. Build Unreal Engine 5.8 from Epic's source distribution with Win64 server support.
 2. Set `FLICK_UNREAL_ENGINE_ROOT` to that engine root.
 3. Run `package-flick-online-stack.cmd`.
 4. Transfer the complete `Builds\OnlineStack` directory to a Windows host with the .NET 8 runtime.

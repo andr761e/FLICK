@@ -202,7 +202,7 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 		if (PlayerMarker)
 		{
 			TestEqual(TEXT("Orange BOB striker is marked P2"), PlayerMarker->Text.ToString(), FString(TEXT("P2")));
-			TestTrue(TEXT("BOB player marker remains visible over premium art"), PlayerMarker->IsVisible());
+			TestFalse(TEXT("BOB premium art uses its integrated identity instead of a floating marker"), PlayerMarker->IsVisible());
 		}
 		BobStriker->Destroy();
 	}

@@ -1239,7 +1239,7 @@ sealed class CoordinatorSettings
             ProjectPath = Environment.GetEnvironmentVariable("FLICK_PROJECT_PATH")
                 ?? Path.Combine(repositoryRoot, "FLICK.uproject"),
             UnrealEditorCommandPath = Environment.GetEnvironmentVariable("FLICK_UNREAL_EDITOR_CMD")
-                ?? @"C:\Program Files\Epic Games\UE_5.6\Engine\Binaries\Win64\UnrealEditor-Cmd.exe",
+                ?? @"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe",
             ServerExecutablePath = Environment.GetEnvironmentVariable("FLICK_SERVER_EXECUTABLE") ?? string.Empty,
             ServerPublicHost = Environment.GetEnvironmentVariable("FLICK_SERVER_PUBLIC_HOST") ?? "127.0.0.1",
             PublicBaseUrl = Environment.GetEnvironmentVariable("FLICK_COORDINATOR_PUBLIC_URL")

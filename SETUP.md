@@ -1,10 +1,10 @@
 # FLICK Setup
 
-FLICK is currently a code-first Unreal Engine 5.6 prototype. The vertical slice spawns its camera, light, arena, pucks, HUD, and match state from C++ at runtime.
+FLICK is currently a code-first Unreal Engine 5.8 prototype. The vertical slice spawns its camera, light, arena, pucks, HUD, and match state from C++ at runtime.
 
 ## Requirements
 
-- Unreal Engine 5.6
+- Unreal Engine 5.8
 - Visual Studio 2022 or Visual Studio Build Tools with the MSVC C++ toolchain
 - VS Code is optional but supported by the generated `FLICK.code-workspace`
 - Steam installed and running for online sessions
@@ -15,7 +15,7 @@ FLICK is currently a code-first Unreal Engine 5.6 prototype. The vertical slice 
 From the project root:
 
 ```powershell
-& 'C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat' FLICKEditor Win64 Development 'C:\Users\andre\Desktop\FLICK\FLICK.uproject' -waitmutex -NoHotReload
+& 'C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat' FLICKEditor Win64 Development 'C:\Users\andre\Desktop\FLICK\FLICK.uproject' -waitmutex -NoHotReload
 ```
 
 Or in VS Code, run the generated `FLICKEditor Win64 Development Build` task if available.
@@ -85,7 +85,7 @@ Run `play-flick-coordinator-local.cmd [1|2|3] [casual|ranked] [variant]` to exer
 
 The coordinator is enabled locally by `-FlickCoordinatorUrl=http://127.0.0.1:8090`; without that option, existing Steam lobby matchmaking remains unchanged. Shipping builds require the remote HTTPS path. Allocated clients retain their reservation for three reconnect attempts, and the authority waits the configured 45-second grace period before recording a disconnect forfeit. Servers heartbeat while active and report normal or forfeited completion once. The full protocol and production security requirements are in `Docs/MatchmakingCoordinatorApi.md`.
 
-For a deployable single-host online stack, install a source-built Unreal Engine 5.6 checkout and run:
+For a deployable single-host online stack, install a source-built Unreal Engine 5.8 checkout and run:
 
 ```powershell
 $env:FLICK_UNREAL_ENGINE_ROOT = 'D:\UnrealEngine-5.6'
@@ -229,4 +229,4 @@ The service must validate Steam tickets with Steamworks publisher credentials, d
 
 Run `build-flick-dedicated-server.cmd` to compile `FLICKServer Win64 Development`. Then run `play-flick-ranked-dedicated-local.cmd 1`, `2`, or `3` to launch a headless authority and the matching number of local clients. `run-flick-dedicated-server-local.cmd [team-size]` starts only the server, and `package-flick-dedicated-server.cmd` creates a deployable server archive. Set `FLICK_UNREAL_ENGINE_ROOT` or pass the source-engine root as the first packaging-command argument.
 
-Epic Launcher engine installations commonly omit the libraries needed to compile/package `TargetType.Server`. If the dedicated target reports that server targets are unsupported, use a source-built Unreal Engine 5.6 installation. Listen-server development remains available, but shipping ranked mode intentionally refuses it.
+Epic Launcher engine installations commonly omit the libraries needed to compile/package `TargetType.Server`. If the dedicated target reports that server targets are unsupported, use a source-built Unreal Engine 5.8 installation. Listen-server development remains available, but shipping ranked mode intentionally refuses it.

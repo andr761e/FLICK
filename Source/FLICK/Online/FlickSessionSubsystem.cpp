@@ -1137,7 +1137,7 @@ void UFlickSessionSubsystem::HandleReadFriendsComplete(
 		int32 OnlineCount = 0;
 		for (const FFlickSocialPlayerEntry& Entry : Friends) OnlineCount += Entry.bOnline ? 1 : 0;
 		int32 bNativeRoster = 0;
-#if WITH_STEAMWORKS
+#if WITH_FLICK_STEAMWORKS
 		bNativeRoster = SteamFriends() != nullptr ? 1 : 0;
 #endif
 		UE_LOG(LogFlick, Log, TEXT("Steam social roster: all=%d online=%d offline=%d native=%d"), Friends.Num(), OnlineCount, Friends.Num() - OnlineCount, bNativeRoster);

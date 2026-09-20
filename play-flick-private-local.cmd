@@ -2,7 +2,9 @@
 setlocal EnableExtensions
 
 set "PROJECT=%~dp0FLICK.uproject"
-set "UNREAL_EDITOR=C:\Program Files\Epic Games\UE_5.6\Engine\Binaries\Win64\UnrealEditor.exe"
+set "ENGINE_ROOT=%FLICK_UNREAL_ENGINE_ROOT%"
+if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.8"
+set "UNREAL_EDITOR=%ENGINE_ROOT%\Engine\Binaries\Win64\UnrealEditor.exe"
 set "MAP=/Engine/Maps/Templates/OpenWorld"
 set "PARTY_ID=FLICK-LOCAL-PRIVATE-PARTY"
 

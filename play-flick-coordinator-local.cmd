@@ -17,7 +17,9 @@ if /I "%QUEUE_TYPE%"=="ranked" set "RANKED_ARG=-FlickRanked"
 set /a TOTAL_PLAYERS=TEAM_SIZE*2
 set "PROJECT_ROOT=%~dp0"
 set "PROJECT=%PROJECT_ROOT%FLICK.uproject"
-set "UNREAL_EDITOR=C:\Program Files\Epic Games\UE_5.6\Engine\Binaries\Win64\UnrealEditor.exe"
+set "ENGINE_ROOT=%FLICK_UNREAL_ENGINE_ROOT%"
+if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.8"
+set "UNREAL_EDITOR=%ENGINE_ROOT%\Engine\Binaries\Win64\UnrealEditor.exe"
 set "COORDINATOR_URL=http://127.0.0.1:8090"
 
 if not exist "%UNREAL_EDITOR%" (
@@ -40,4 +42,3 @@ for /L %%I in (1,1,%TOTAL_PLAYERS%) do (
 echo.
 echo Each client queues independently. The coordinator forms two teams, launches a
 echo headless authority, issues reservations, and moves the clients into its lobby.
-

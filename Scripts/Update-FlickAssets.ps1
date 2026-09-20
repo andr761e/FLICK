@@ -9,7 +9,7 @@ $projectFile = Join-Path $projectRoot 'FLICK.uproject'
 $importScript = Join-Path $projectRoot 'Tools\Update-FlickAssets.py'
 
 if (-not $UnrealEditor) {
-    $defaultEditor = 'C:\Program Files\Epic Games\UE_5.6\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+    $defaultEditor = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
     if (Test-Path -LiteralPath $defaultEditor) {
         $UnrealEditor = $defaultEditor
     }
@@ -18,7 +18,7 @@ if (-not $UnrealEditor) {
 if (-not $UnrealEditor -or -not (Test-Path -LiteralPath $UnrealEditor)) {
     throw @'
 UnrealEditor-Cmd.exe was not found. Set FLICK_UNREAL_EDITOR to its full path, for example:
-  $env:FLICK_UNREAL_EDITOR = 'C:\Program Files\Epic Games\UE_5.6\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+  $env:FLICK_UNREAL_EDITOR = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 '@
 }
 

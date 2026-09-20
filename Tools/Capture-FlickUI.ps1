@@ -25,7 +25,7 @@ param(
     [int]$PlayersPerTeam = 1,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
-    [string]$EngineRoot = $(if ($env:FLICK_UNREAL_ENGINE_ROOT) { $env:FLICK_UNREAL_ENGINE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.6' })
+    [string]$EngineRoot = $(if ($env:FLICK_UNREAL_ENGINE_ROOT) { $env:FLICK_UNREAL_ENGINE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.8' })
 )
 
 $ErrorActionPreference = 'Stop'

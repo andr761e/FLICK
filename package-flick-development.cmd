@@ -3,7 +3,9 @@ setlocal
 
 set "PROJECT_ROOT=%~dp0"
 set "PROJECT=%PROJECT_ROOT%FLICK.uproject"
-set "RUN_UAT=C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\RunUAT.bat"
+set "ENGINE_ROOT=%FLICK_UNREAL_ENGINE_ROOT%"
+if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.8"
+set "RUN_UAT=%ENGINE_ROOT%\Engine\Build\BatchFiles\RunUAT.bat"
 set "OUTPUT=%PROJECT_ROOT%Builds\Development"
 set "STEAM_APP_ID=%PROJECT_ROOT%Build\Steam\steam_appid.txt"
 

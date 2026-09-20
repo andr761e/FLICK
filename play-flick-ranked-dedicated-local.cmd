@@ -12,7 +12,9 @@ set /a TOTAL_PLAYERS=TEAM_SIZE*2
 set "PROJECT_ROOT=%~dp0"
 set "PROJECT=%PROJECT_ROOT%FLICK.uproject"
 set "SERVER=%PROJECT_ROOT%Binaries\Win64\FLICKServer.exe"
-set "UNREAL_EDITOR=C:\Program Files\Epic Games\UE_5.6\Engine\Binaries\Win64\UnrealEditor.exe"
+set "ENGINE_ROOT=%FLICK_UNREAL_ENGINE_ROOT%"
+if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.8"
+set "UNREAL_EDITOR=%ENGINE_ROOT%\Engine\Binaries\Win64\UnrealEditor.exe"
 set "MAP=/Engine/Maps/Templates/OpenWorld?FlickNetworkMatch?FlickMatchmaking?FlickRanked?FlickPlayersPerTeam=%TEAM_SIZE%"
 
 if not exist "%SERVER%" (
@@ -40,4 +42,3 @@ for /L %%I in (1,1,%TOTAL_PLAYERS%) do (
 echo.
 echo The server verifies local identities, registers one authoritative match,
 echo and settles both teams through the server-owned development backend.
-
