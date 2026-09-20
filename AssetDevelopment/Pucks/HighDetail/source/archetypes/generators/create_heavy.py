@@ -675,7 +675,7 @@ def output_directory():
     except NameError:
         pass
 
-    # Reliable Windows/macOS/Linux fallback.
+    # Reliable local user-directory fallback.
     home = Path.home()
     preferred = home / "Documents" / "Blue_Team_Puck_Output"
     try:
