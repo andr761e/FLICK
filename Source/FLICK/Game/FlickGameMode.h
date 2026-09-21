@@ -197,24 +197,6 @@ public:
 	int32 GetLobbyPlayerCount(EFlickTeam Team) const;
 	AFlickPlayerState* GetPrivateSlotOwner(EFlickTeam Team, int32 PlayerSlot) const;
 	bool CanStartPrivateMatch() const;
-	float GetMenuPreviewAlpha() const
-	{
-		return MenuPreviewDuration > KINDA_SMALL_NUMBER
-			? FMath::Clamp(MenuPreviewElapsed / MenuPreviewDuration, 0.0f, 1.0f)
-			: 0.0f;
-	}
-	float GetMenuPreviewTransitionOpacity() const
-	{
-		if (!bMenuPreviewTransitionActive || MenuPreviewTransitionDuration <= KINDA_SMALL_NUMBER)
-		{
-			return 0.0f;
-		}
-		const float Alpha = FMath::Clamp(
-			MenuPreviewTransitionElapsed / MenuPreviewTransitionDuration,
-			0.0f,
-			1.0f);
-		return FMath::Sin(Alpha * PI) * 0.78f;
-	}
 	EFlickPieceArchetype GetLoadoutPiece(EFlickTeam Team, int32 SlotIndex) const;
 	EFlickLineupPreset GetLoadoutPreset(EFlickTeam Team) const;
 	EFlickPieceArchetype GetClassLoadoutPiece(EFlickLineupPreset Preset, int32 SlotIndex) const;
@@ -535,12 +517,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Debug")
 	bool bLogPhysicsResolution = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation", meta = (ClampMin = "2.0"))
-	float MenuPreviewDuration = 6.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation", meta = (ClampMin = "0.35", ClampMax = "2.0"))
-	float MenuPreviewTransitionDuration = 0.9f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Replay", meta = (ClampMin = "12.0", ClampMax = "60.0"))
 	float ReplayCaptureRate = 30.0f;
 
@@ -585,7 +561,7 @@ private:
 	void UpdateInitialClassSelectionTimer(float DeltaSeconds);
 	void UpdateNetworkClassSelectionTimer();
 	void UpdateRoundAdvanceTimer();
-	bool TryExecuteTrainingBotShot();
+	bool TryExecuteTrainingBotShot(EFlickTeam BotTeam, int32 BotPlayerSlot);
 	void ResetTrainingBotThinking();
 	const FFlickBotDifficultySettings& GetTrainingBotDifficultySettings() const;
 	void ResetShotClock();
@@ -601,7 +577,6 @@ private:
 	TArray<AFlickPlayerState*> GetPrivateMatchParticipants() const;
 	void AutoAssignPrivateMatchSlots();
 	void RefreshPrivatePrimaryAssignments();
-	void ResetPrivateMatchReadiness();
 	void SynchronizePartyState();
 	void PushPrivateMatchState();
 	EFlickPieceArchetype GetPlayerClassPiece(EFlickTeam Team, int32 PlayerSlot, int32 PieceSlot) const;
@@ -664,9 +639,8 @@ private:
 	void AwardFlawlessRound(EFlickMatchOutcome Outcome);
 	void ApplySelectedMatchConfiguration();
 	void ApplyMatchConfiguration(EFlickMatchVariant Variant, int32 PlayersPerTeam);
-	void UpdateMainMenuPreview(float DeltaSeconds);
+	void UpdateMainMenuPresentation();
 	void ShowModePreview(EFlickMatchVariant Variant, int32 PlayersPerTeam);
-	void CommitModePreview(EFlickMatchVariant Variant, int32 PlayersPerTeam);
 	void SetCameraForFrontend();
 	void SetCameraViewForTeam(EFlickTeam Team, bool bSnap = false);
 	void ClearControllerAiming() const;
@@ -811,10 +785,8 @@ private:
 	EFlickMatchVariant ActiveMatchVariant = EFlickMatchVariant::Classic;
 	EFlickMatchVariant LoadoutEditingVariant = EFlickMatchVariant::Classic;
 	EFlickLineupPreset LoadoutEditingPreset = EFlickLineupPreset::Balanced;
-	EFlickMatchVariant MenuPreviewVariant = EFlickMatchVariant::Classic;
-	EFlickMatchVariant PendingMenuPreviewVariant = EFlickMatchVariant::Classic;
-	int32 MenuPreviewPlayersPerTeam = 1;
-	int32 PendingMenuPreviewPlayersPerTeam = 1;
+	FString MenuPartyRosterKey;
+	bool bMenuPartyDisplayInitialized = false;
 	int32 CurrentStartingPiecesPerTeam = 4;
 	int32 CurrentRoundsToWin = 3;
 	int32 CurrentPlayersPerTeam = 1;
@@ -868,12 +840,8 @@ private:
 
 	float ResolutionElapsed = 0.0f;
 	float SettledElapsed = 0.0f;
-	float MenuPreviewElapsed = 0.0f;
-	float MenuPreviewTransitionElapsed = 0.0f;
 	float LastImpactFeedbackTime = -100.0f;
 	float LastStrongImpactEventTime = -100.0f;
-	bool bMenuPreviewTransitionActive = false;
-	bool bMenuPreviewSwapApplied = false;
 	bool bNetworkMatchRequested = false;
 	bool bNetworkMatchStarted = false;
 	bool bPartyRequested = false;

@@ -64,16 +64,22 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	}
 
 	ShakeTime += DeltaSeconds;
-	const float MenuDrift = bMenuPresentation ? FMath::Sin(ShakeTime * 0.2f) * 30.0f : 0.0f;
-	const float MenuDepthDrift = bMenuPresentation ? FMath::Sin(ShakeTime * 0.15f + 1.1f) * 13.0f : 0.0f;
-	const float MenuLift = bMenuPresentation ? FMath::Sin(ShakeTime * 0.18f + 2.0f) * 9.0f : 0.0f;
-	const FVector ScaledMenuLocation = MenuCameraLocation * ArenaFramingScale;
-	FVector TargetLocation = (bMenuPresentation ? ScaledMenuLocation : GetGameplayTargetLocation())
-		+ FVector(MenuDrift, MenuDepthDrift, MenuLift);
-	FRotator TargetRotation = (bMenuPresentation ? MenuCameraRotation : GetGameplayTargetRotation())
-		+ (bMenuPresentation
-			? FRotator(FMath::Sin(ShakeTime * 0.17f) * 0.18f, FMath::Sin(ShakeTime * 0.2f + 0.8f) * 0.48f, 0.0f)
-			: FRotator::ZeroRotator);
+	FVector MenuTargetLocation = MenuCameraLocation * ArenaFramingScale;
+	FRotator MenuTargetRotation = MenuCameraRotation;
+	if (bMenuPresentation && bMenuOrbitEnabled)
+	{
+		if (!bMenuOrbitInitialized)
+		{
+			MenuOrbitAngle = FMath::Atan2(MenuCameraLocation.Y, MenuCameraLocation.X);
+			bMenuOrbitInitialized = true;
+		}
+		MenuOrbitAngle = FMath::Fmod(MenuOrbitAngle + FMath::DegreesToRadians(MenuOrbitDegreesPerSecond) * DeltaSeconds, 2.0f * PI);
+		const float Radius = FVector2D(MenuCameraLocation.X, MenuCameraLocation.Y).Size() * ArenaFramingScale * MenuOrbitRadiusScale;
+		MenuTargetLocation = FVector(Radius * FMath::Cos(MenuOrbitAngle), Radius * FMath::Sin(MenuOrbitAngle), MenuCameraLocation.Z * ArenaFramingScale * MenuOrbitHeightScale);
+		MenuTargetRotation = UKismetMathLibrary::FindLookAtRotation(MenuTargetLocation, FVector(0.0f, 0.0f, 100.0f));
+	}
+	FVector TargetLocation = bMenuPresentation ? MenuTargetLocation : GetGameplayTargetLocation();
+	FRotator TargetRotation = bMenuPresentation ? MenuTargetRotation : GetGameplayTargetRotation();
 	float TargetFieldOfView = bMenuPresentation
 		? MenuFieldOfView
 		: bAimPresentation && bTestArenaPresentation

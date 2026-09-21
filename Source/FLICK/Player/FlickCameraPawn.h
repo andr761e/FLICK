@@ -21,6 +21,7 @@ public:
 	void ApplyCameraSettings();
 	void AddCameraImpulse(float Strength);
 	void SetMenuPresentation(bool bInMenuPresentation);
+	void SetMenuOrbitEnabled(bool bEnabled) { bMenuOrbitEnabled = bEnabled; }
 	void SetBobGameplayFraming(bool bInBobGameplayFraming);
 	void SetTestArenaPresentation(bool bInTestArenaPresentation);
 	void SetAimPresentation(bool bEnabled, const FVector& FocusPoint = FVector::ZeroVector);
@@ -93,6 +94,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera")
 	float MenuFieldOfView = 47.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.0", ClampMax = "8.0"))
+	float MenuOrbitDegreesPerSecond = 1.4f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.6", ClampMax = "1.0"))
+	float MenuOrbitRadiusScale = 0.84f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.6", ClampMax = "1.0"))
+	float MenuOrbitHeightScale = 0.78f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "2.0"))
 	float ClassicBloomIntensity = 0.28f;
@@ -212,6 +222,9 @@ private:
 	bool bGameplayOrbitManuallyControlled = false;
 	bool bGameplayElevationLocked = false;
 	bool bMenuPresentation = false;
+	bool bMenuOrbitEnabled = false;
+	bool bMenuOrbitInitialized = false;
+	float MenuOrbitAngle = 0.0f;
 	bool bBobGameplayFraming = false;
 	bool bTestArenaPresentation = false;
 	bool bAimPresentation = false;

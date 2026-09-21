@@ -75,6 +75,7 @@ void AFlickGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AFlickGameState, PartyLeaderUserId);
 	DOREPLIFETIME(AFlickGameState, PartyMaximumMembers);
 	DOREPLIFETIME(AFlickGameState, bPrivateMatchLobbyActive);
+	DOREPLIFETIME(AFlickGameState, bPrivateMatchActive);
 	DOREPLIFETIME(AFlickGameState, PrivateMatchSettings);
 	DOREPLIFETIME(AFlickGameState, ArenaSurfaceZ);
 	DOREPLIFETIME(AFlickGameState, MaxDragDistance);

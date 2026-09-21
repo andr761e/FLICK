@@ -321,7 +321,7 @@ void AFlickGameMode::SetNetworkPlayerClass(
 	AFlickPlayerState* PlayerState = RequestingPlayer
 		? RequestingPlayer->GetPlayerState<AFlickPlayerState>()
 		: nullptr;
-	if (!FlickGameState || !FlickGameState->bNetworkClassSelectionActive
+	if (!FlickGameState || (!FlickGameState->bNetworkClassSelectionActive && !bPrivateMatchActive)
 		|| !PlayerState || PlayerState->GetTeam() == EFlickTeam::None
 		|| Preset == EFlickLineupPreset::Custom)
 	{
@@ -512,7 +512,6 @@ void AFlickGameMode::CloseLoadout()
 		FrontendScreen = LoadoutReturnScreen == EFlickFrontendScreen::ModeSelect
 			? EFlickFrontendScreen::ModeSelect
 			: EFlickFrontendScreen::MainMenu;
-		MenuPreviewElapsed = 0.0f;
 		SetCameraForFrontend();
 	}
 }
@@ -544,7 +543,6 @@ void AFlickGameMode::CloseItemShop()
 	if (FrontendScreen == EFlickFrontendScreen::ItemShop)
 	{
 		FrontendScreen = EFlickFrontendScreen::MainMenu;
-		MenuPreviewElapsed = 0.0f;
 		SetCameraForFrontend();
 	}
 }
@@ -565,7 +563,6 @@ void AFlickGameMode::CloseProfile()
 	if (FrontendScreen == EFlickFrontendScreen::Profile)
 	{
 		FrontendScreen = EFlickFrontendScreen::MainMenu;
-		MenuPreviewElapsed = 0.0f;
 		SetCameraForFrontend();
 		PlayMenuSound(false);
 	}
@@ -693,9 +690,6 @@ void AFlickGameMode::BeginSelectedMatch()
 	CurrentPlayersPerTeam = SelectedMatchVariant == EFlickMatchVariant::Bob
 		? 1
 		: FlickTeamRules::ClampPlayersPerTeam(MatchmakingPlayersPerTeam);
-	MenuPreviewElapsed = 0.0f;
-	MenuPreviewVariant = SelectedMatchVariant;
-	MenuPreviewPlayersPerTeam = CurrentPlayersPerTeam;
 	SetCameraForFrontend();
 	ApplySelectedMatchConfiguration();
 	RebuildMatch();
@@ -837,9 +831,6 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 	CurrentPlayersPerTeam = SelectedMatchVariant == EFlickMatchVariant::Bob
 		? 1
 		: FlickTeamRules::ClampPlayersPerTeam(MatchmakingPlayersPerTeam);
-	MenuPreviewElapsed = 0.0f;
-	MenuPreviewVariant = SelectedMatchVariant;
-	MenuPreviewPlayersPerTeam = CurrentPlayersPerTeam;
 	SetCameraForFrontend();
 	ApplySelectedMatchConfiguration();
 	RebuildMatch();

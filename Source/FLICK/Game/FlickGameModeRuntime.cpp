@@ -141,9 +141,6 @@ void AFlickGameMode::ReturnToMainMenu()
 	Player1PendingClasses.Reset();
 	Player2PendingClasses.Reset();
 	ClearControllerAiming();
-	MenuPreviewElapsed = 0.0f;
-	MenuPreviewVariant = SelectedMatchVariant;
-	MenuPreviewPlayersPerTeam = CurrentPlayersPerTeam;
 	ApplySelectedMatchConfiguration();
 	RebuildMatch();
 	FrontendScreen = EFlickFrontendScreen::MainMenu;
@@ -453,7 +450,7 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			* SkyMultiplier);
 	}
 
-	const auto SpawnAccentLight = [this, bClassicArenaLighting, bBobArenaLighting](
+	const auto SpawnAccentLight = [this, bClassicArenaLighting, bBobArenaLighting, bFrontendShowcase](
 		TObjectPtr<APointLight>& LightActor,
 		const FVector& Location,
 		const FLinearColor& Color)
@@ -468,18 +465,18 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 			UPointLightComponent* Light = LightActor->PointLightComponent;
 			Light->SetMobility(EComponentMobility::Movable);
 			LightActor->SetActorLocation(Location);
-			// Classic formations sit directly below these fixtures. Keep them as a
-			// soft neutral wash so their highlights cannot bleach the puck markings.
+			// Preserve the neutral gameplay wash, but let the main-menu orbit show
+			// the arena's team colors and material highlights without a screen tint.
 			Light->SetLightColor(FMath::Lerp(
 				Color, FLinearColor::White,
-				bTestArenaMode ? 0.38f : bClassicArenaLighting ? 0.88f : 0.72f));
-			Light->SetIntensity(bTestArenaMode ? 190.0f : bClassicArenaLighting ? 52.0f : bBobArenaLighting ? 205.0f : 165.0f);
+				bTestArenaMode ? 0.38f : bClassicArenaLighting ? (bFrontendShowcase ? 0.52f : 0.88f) : 0.72f));
+			Light->SetIntensity(bTestArenaMode ? 190.0f : bClassicArenaLighting ? (bFrontendShowcase ? 90.0f : 52.0f) : bBobArenaLighting ? 205.0f : 165.0f);
 			Light->SetAttenuationRadius(
 				(bTestArenaMode ? 700.0f : bClassicArenaLighting ? 720.0f : bBobArenaLighting ? 1500.0f : 820.0f)
 					* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
 			Light->SetSourceRadius((bTestArenaMode ? 100.0f : bClassicArenaLighting ? 260.0f : 120.0f)
 				* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
-			Light->SetSpecularScale(bTestArenaMode ? 0.52f : bClassicArenaLighting ? 0.04f : 0.48f);
+			Light->SetSpecularScale(bTestArenaMode ? 0.52f : bClassicArenaLighting ? (bFrontendShowcase ? 0.24f : 0.04f) : 0.48f);
 			Light->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.15f : 0.42f);
 			Light->SetCastShadows(false);
 		}
@@ -780,6 +777,8 @@ void AFlickGameMode::SpawnBobPieces()
 
 void AFlickGameMode::DestroyPieces()
 {
+	bMenuPartyDisplayInitialized = false;
+	MenuPartyRosterKey.Reset();
 	if (bCinematicReplayActive)
 	{
 		FinishCinematicRoundReplay(false);
@@ -1225,7 +1224,6 @@ void AFlickGameMode::ApplyMatchConfiguration(
 {
 	ActiveMatchVariant = NormalizeMatchVariant(Variant);
 	const FFlickModeRules& Rules = FlickModeRules::Get(ActiveMatchVariant);
-	// Keep the menu showcase and every route into a match on the same arena family.
 	// Bob has its own arena; all Knockout team sizes use Switchyard.
 	bTestArenaMode = Rules.bUseSwitchyardArena;
 	CurrentPlayersPerTeam = ActiveMatchVariant == EFlickMatchVariant::Bob
@@ -1262,81 +1260,76 @@ void AFlickGameMode::ApplyMatchConfiguration(
 	}
 }
 
-void AFlickGameMode::UpdateMainMenuPreview(const float DeltaSeconds)
+void AFlickGameMode::UpdateMainMenuPresentation()
 {
-	if (FrontendScreen != EFlickFrontendScreen::MainMenu || MenuPreviewDuration <= 0.0f)
+	if (FrontendScreen != EFlickFrontendScreen::MainMenu || bNetworkMatchRequested)
 	{
-		bMenuPreviewTransitionActive = false;
-		bMenuPreviewSwapApplied = false;
-		MenuPreviewTransitionElapsed = 0.0f;
 		return;
 	}
-
-	if (bMenuPreviewTransitionActive)
+	// The frontend always returns to one stable arena. Play-mode selection can
+	// still preview its arena, but the main menu no longer cycles or rebuilds it.
+	if (ActiveMatchVariant != EFlickMatchVariant::Classic || CurrentPlayersPerTeam != 1)
 	{
-		MenuPreviewTransitionElapsed += DeltaSeconds;
-		const float HalfDuration = MenuPreviewTransitionDuration * 0.5f;
-		if (!bMenuPreviewSwapApplied && MenuPreviewTransitionElapsed >= HalfDuration)
+		ApplyMatchConfiguration(EFlickMatchVariant::Classic, 1);
+		RebuildMatch();
+		SetCameraForFrontend();
+	}
+	const UFlickPartySubsystem* Party = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UFlickPartySubsystem>() : nullptr;
+	const UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem();
+	FString RosterKey;
+	TArray<EFlickPieceArchetype> DisplayArchetypes;
+	if (Party && Party->IsActive())
+	{
+		for (const FFlickPartyMember& Member : Party->GetMembers())
 		{
-			bMenuPreviewSwapApplied = true;
-			CommitModePreview(PendingMenuPreviewVariant, PendingMenuPreviewPlayersPerTeam);
+			if (DisplayArchetypes.Num() >= 6) break;
+			DisplayArchetypes.Add(Member.ShowcaseArchetype);
+			RosterKey += FString::Printf(TEXT("%s:%d|"), *Member.UserId,
+				static_cast<int32>(Member.ShowcaseArchetype));
 		}
-		if (MenuPreviewTransitionElapsed >= MenuPreviewTransitionDuration)
-		{
-			bMenuPreviewTransitionActive = false;
-			bMenuPreviewSwapApplied = false;
-			MenuPreviewTransitionElapsed = 0.0f;
-		}
-		return;
-	}
-
-	MenuPreviewElapsed += DeltaSeconds;
-	if (MenuPreviewElapsed < MenuPreviewDuration)
-	{
-		return;
-	}
-
-	EFlickMatchVariant NextVariant = EFlickMatchVariant::Classic;
-	int32 NextPlayersPerTeam = 1;
-	if (MenuPreviewVariant == EFlickMatchVariant::Classic && MenuPreviewPlayersPerTeam < 3)
-	{
-		NextPlayersPerTeam = MenuPreviewPlayersPerTeam + 1;
-	}
-	else if (MenuPreviewVariant == EFlickMatchVariant::Classic)
-	{
-		NextVariant = EFlickMatchVariant::Bob;
 	}
 	else
 	{
-		NextVariant = EFlickMatchVariant::Classic;
+		const EFlickPieceArchetype LocalArchetype = Sessions
+			? Sessions->GetShowcaseArchetype() : EFlickPieceArchetype::Standard;
+		DisplayArchetypes.Add(LocalArchetype);
+		RosterKey = FString::Printf(TEXT("SOLO:%d"), static_cast<int32>(LocalArchetype));
 	}
-	PendingMenuPreviewVariant = NextVariant;
-	PendingMenuPreviewPlayersPerTeam = NextPlayersPerTeam;
-	bMenuPreviewTransitionActive = true;
-	bMenuPreviewSwapApplied = false;
-	MenuPreviewTransitionElapsed = 0.0f;
+	if (bMenuPartyDisplayInitialized && MenuPartyRosterKey == RosterKey)
+	{
+		return;
+	}
+	DestroyPieces();
+	const int32 DisplayCount = DisplayArchetypes.Num();
+	for (int32 Index = 0; Index < DisplayCount; ++Index)
+	{
+		const EFlickPieceArchetype Archetype = DisplayArchetypes[Index];
+		const FFlickPieceArchetypeRules& Rules = FlickPieceArchetypeRules::Get(Archetype);
+		const float Angle = 2.0f * PI * static_cast<float>(Index) / static_cast<float>(DisplayCount) - PI * 0.5f;
+		const float Radius = DisplayCount == 1 ? 0.0f : 175.0f;
+		const FVector Location(Radius * FMath::Cos(Angle), Radius * FMath::Sin(Angle),
+			ArenaSurfaceZ + PieceThickness * Rules.ThicknessMultiplier * 0.5f + 3.0f);
+		AFlickPiece* Piece = SpawnPiece(Index % 2 == 0 ? EFlickTeam::Player1 : EFlickTeam::Player2,
+			Index + 1, Location, Archetype);
+		if (Piece)
+		{
+			Piece->BeginReplayPresentation();
+		}
+	}
+	MenuPartyRosterKey = MoveTemp(RosterKey);
+	bMenuPartyDisplayInitialized = true;
 }
 
 void AFlickGameMode::ShowModePreview(
 	const EFlickMatchVariant Variant,
 	const int32 PlayersPerTeam)
 {
-	bMenuPreviewTransitionActive = false;
-	bMenuPreviewSwapApplied = false;
-	MenuPreviewTransitionElapsed = 0.0f;
-	CommitModePreview(Variant, PlayersPerTeam);
-}
-
-void AFlickGameMode::CommitModePreview(
-	const EFlickMatchVariant Variant,
-	const int32 PlayersPerTeam)
-{
-	MenuPreviewVariant = NormalizeMatchVariant(Variant);
-	MenuPreviewPlayersPerTeam = MenuPreviewVariant == EFlickMatchVariant::Bob
+	const EFlickMatchVariant PreviewVariant = NormalizeMatchVariant(Variant);
+	const int32 PreviewPlayersPerTeam = PreviewVariant == EFlickMatchVariant::Bob
 		? 1
 		: FlickTeamRules::ClampPlayersPerTeam(PlayersPerTeam);
-	MenuPreviewElapsed = 0.0f;
-	ApplyMatchConfiguration(MenuPreviewVariant, MenuPreviewPlayersPerTeam);
+	ApplyMatchConfiguration(PreviewVariant, PreviewPlayersPerTeam);
 	RebuildMatch();
 	if (AFlickGameState* FlickGameState = GetFlickGameState())
 	{
@@ -1346,10 +1339,10 @@ void AFlickGameMode::CommitModePreview(
 	UE_LOG(
 		LogFlick,
 		Log,
-		TEXT("Main menu preview changed to %s %dv%d"),
-		*GetMatchVariantName(MenuPreviewVariant),
-		MenuPreviewPlayersPerTeam,
-		MenuPreviewPlayersPerTeam);
+		TEXT("Frontend preview changed to %s %dv%d"),
+		*GetMatchVariantName(PreviewVariant),
+		PreviewPlayersPerTeam,
+		PreviewPlayersPerTeam);
 }
 
 void AFlickGameMode::SetCameraForFrontend()
@@ -1364,6 +1357,7 @@ void AFlickGameMode::SetCameraForFrontend()
 			&& FrontendScreen != EFlickFrontendScreen::Paused
 			&& !bSettingsOverMatch
 			&& !bClassSelectionOverMatch);
+		CameraPawn->SetMenuOrbitEnabled(FrontendScreen == EFlickFrontendScreen::MainMenu);
 	}
 	// Existing light actors are reused across frontend and gameplay. Retune them
 	// whenever presentation state changes so showcase exposure cannot leak into

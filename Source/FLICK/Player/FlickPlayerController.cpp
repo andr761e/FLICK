@@ -145,6 +145,14 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
 	const AFlickGameState* NetworkState = GetFlickGameState();
+	const bool bPrivateMatchNowActive = NetworkState && NetworkState->bPrivateMatchActive;
+	if (bPrivateMatchNowActive && !bObservedPrivateMatchActive)
+	{
+		bPrivateSpectateChosen = false;
+		bPrivateTeamMenuOpen = false;
+		bInitializedNetworkCamera = false;
+	}
+	bObservedPrivateMatchActive = bPrivateMatchNowActive;
 	UpdateCareerStatsTracking(NetworkState);
 	if (bNetworkAutoReadyRequested && NetworkState && NetworkState->bNetworkLobbyActive)
 	{
@@ -255,7 +263,8 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 	{
 		const EFlickTeam LocalTeam = GetLocalTeam();
 		if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
-			CameraPawn && LocalTeam != EFlickTeam::None)
+			CameraPawn && (LocalTeam != EFlickTeam::None
+				|| (NetworkState && NetworkState->bPrivateMatchActive)))
 		{
 			CameraPawn->SetMenuPresentation(false);
 			CameraPawn->SetGameplayViewIndex(LocalTeam == EFlickTeam::Player2 ? 2 : 0, true);
@@ -738,6 +747,18 @@ void AFlickPlayerController::HandleTrainingRemovePressed()
 
 void AFlickPlayerController::HandleFreeCameraTogglePressed()
 {
+	if (const AFlickGameState* State = GetFlickGameState();
+		State && State->bPrivateMatchActive && GetLocalTeam() == EFlickTeam::None)
+	{
+		TogglePrivateSpectatorFreeCamera();
+		return;
+	}
+	if (const AFlickGameState* State = GetFlickGameState(); State && State->bPrivateMatchActive)
+	{
+		ClearAiming();
+		bPrivateTeamMenuOpen = !bPrivateTeamMenuOpen;
+		return;
+	}
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
 	AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
 	if (!FlickGameMode || !CameraPawn || !IsGameplayActive()
@@ -1133,7 +1154,7 @@ void AFlickPlayerController::RequestStartNetworkMatch()
 void AFlickPlayerController::RequestSelectClass(const EFlickLineupPreset Preset)
 {
 	const AFlickGameState* FlickGameState = GetFlickGameState();
-	if (FlickGameState && FlickGameState->bNetworkClassSelectionActive)
+	if (FlickGameState && (FlickGameState->bNetworkClassSelectionActive || FlickGameState->bPrivateMatchActive))
 	{
 		TArray<EFlickPieceArchetype> Lineup;
 		if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
@@ -1184,6 +1205,8 @@ void AFlickPlayerController::RequestTogglePrivateMatchSlot(
 	const EFlickTeam Team,
 	const int32 PlayerSlot)
 {
+	bPrivateTeamMenuOpen = true;
+	bPrivateSpectateChosen = false;
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
 		FlickGameMode->TogglePrivateMatchSlot(this, Team, PlayerSlot);
@@ -1196,6 +1219,8 @@ void AFlickPlayerController::RequestTogglePrivateMatchSlot(
 
 void AFlickPlayerController::RequestPrivateMatchSpectate()
 {
+	bPrivateTeamMenuOpen = false;
+	bPrivateSpectateChosen = true;
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
 		FlickGameMode->SetPrivateMatchSpectating(this);
@@ -1203,6 +1228,42 @@ void AFlickPlayerController::RequestPrivateMatchSpectate()
 	else
 	{
 		ServerSetPrivateMatchSpectating();
+	}
+}
+
+bool AFlickPlayerController::ShouldShowPrivateTeamMenu() const
+{
+	const AFlickGameState* State = GetFlickGameState();
+	if (!State || !State->bPrivateMatchActive) return false;
+	const AFlickPlayerState* LocalState = GetPlayerState<AFlickPlayerState>();
+	return bPrivateTeamMenuOpen || (LocalState && LocalState->GetTeam() == EFlickTeam::None && !bPrivateSpectateChosen);
+}
+
+void AFlickPlayerController::SetPrivateSpectatorView(const EFlickTeam Team)
+{
+	const AFlickGameState* State = GetFlickGameState();
+	if (!State || !State->bPrivateMatchActive || GetLocalTeam() != EFlickTeam::None) return;
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
+	{
+		bPrivateSpectateChosen = true;
+		CameraPawn->SetFreeCameraEnabled(false);
+		SetFreeCameraInputMode(false);
+		CameraPawn->ResetGameplayView(Team == EFlickTeam::Player2 ? 2 : 0, true);
+		bPrivateTeamMenuOpen = false;
+	}
+}
+
+void AFlickPlayerController::TogglePrivateSpectatorFreeCamera()
+{
+	const AFlickGameState* State = GetFlickGameState();
+	if (!State || !State->bPrivateMatchActive || GetLocalTeam() != EFlickTeam::None) return;
+	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
+	{
+		bPrivateSpectateChosen = true;
+		const bool bEnable = !CameraPawn->IsFreeCameraEnabled();
+		CameraPawn->SetFreeCameraEnabled(bEnable);
+		SetFreeCameraInputMode(bEnable);
+		bPrivateTeamMenuOpen = false;
 	}
 }
 

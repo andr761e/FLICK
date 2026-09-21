@@ -6,7 +6,8 @@ void UFlickPartySubsystem::Synchronize(
 	const FString& InPartyId,
 	const FString& InLeaderUserId,
 	const TArray<TPair<FString, FString>>& InMembers,
-	const FString& InLocalUserId)
+	const FString& InLocalUserId,
+	const TMap<FString, EFlickPieceArchetype>& InShowcaseArchetypes)
 {
 	TMap<FString, int32> ExistingSlots;
 	for (const FFlickPartyMember& Member : Members)
@@ -27,6 +28,7 @@ void UFlickPartySubsystem::Synchronize(
 		Member.UserId = Source.Key;
 		Member.DisplayName = Source.Value.IsEmpty() ? TEXT("STEAM PLAYER") : Source.Value;
 		Member.bLeader = Source.Key == InLeaderUserId;
+		Member.ShowcaseArchetype = InShowcaseArchetypes.FindRef(Source.Key);
 		if (const int32* ExistingSlot = ExistingSlots.Find(Source.Key))
 		{
 			Member.Slot = *ExistingSlot;
@@ -64,7 +66,8 @@ void UFlickPartySubsystem::Synchronize(
 			return Left.UserId == Right.UserId
 				&& Left.DisplayName == Right.DisplayName
 				&& Left.Slot == Right.Slot
-				&& Left.bLeader == Right.bLeader;
+				&& Left.bLeader == Right.bLeader
+				&& Left.ShowcaseArchetype == Right.ShowcaseArchetype;
 		});
 
 	PartyId = InPartyId;

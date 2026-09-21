@@ -165,7 +165,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 		[
 			SNew(SScaleBox)
 			.Stretch(EStretch::ScaleToFit)
-			.StretchDirection(EStretchDirection::Both)
+			.StretchDirection(EStretchDirection::DownOnly)
 			[
 				SNew(SBox).WidthOverride(1720.0f).HeightOverride(900.0f)
 				[

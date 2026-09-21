@@ -106,7 +106,11 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			{
 				GEngine->GameViewport->GetViewportSize(ViewportSize);
 			}
-			return FMath::Max(0.5f, ViewportSize.Y / FlickUITheme::ReferenceHeight);
+			// Never make the virtual canvas narrower than the reference layout.
+			// Height-only scaling clips fixed-width menus on 4:3 and portrait views.
+			return FMath::Max(0.5f, FMath::Min(
+				ViewportSize.Y / FlickUITheme::ReferenceHeight,
+				ViewportSize.X / FlickUITheme::ReferenceWidth));
 		})
 		[
 		SNew(SOverlay)
@@ -249,6 +253,19 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			.Visibility_Lambda([this]() { return GetScreenVisibility(EFlickFrontendScreen::Paused); })
 			[
 				BuildPauseOverlay()
+			]
+		]
+
+		+ SOverlay::Slot()
+		[
+			SNew(SBox)
+			.Visibility_Lambda([this]()
+			{
+				return PlayerController.IsValid() && PlayerController->ShouldShowPrivateTeamMenu()
+					? EVisibility::Visible : EVisibility::Collapsed;
+			})
+			[
+				BuildPrivateMatchTeamPicker()
 			]
 		]
 

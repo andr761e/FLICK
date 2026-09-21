@@ -239,19 +239,45 @@ void AFlickGameMode::ExpireCurrentShot()
 void AFlickGameMode::UpdateTrainingBot(const float DeltaSeconds)
 {
 	AFlickGameState* FlickGameState = GetFlickGameState();
-	const bool bKickoffBotShotAlreadyLocked = FlickGameState
-		&& FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning
-		&& LockedKickoffShots.ContainsByPredicate([](const FFlickLockedKickoffShot& Shot)
+	EFlickTeam BotTeam = EFlickTeam::None;
+	int32 BotPlayerSlot = INDEX_NONE;
+	if (FlickGameState && FrontendScreen == EFlickFrontendScreen::Playing)
+	{
+		const auto NeedsBot = [this, FlickGameState](const EFlickTeam Team, const int32 Slot)
 		{
-			return Shot.Team == EFlickTeam::Player2 && Shot.PlayerSlot == 0;
-		});
-	const bool bBotCanPlan = IsTrainingBotMatch()
-		&& FrontendScreen == EFlickFrontendScreen::Playing
-		&& FlickGameState
-		&& ((FlickGameState->MatchPhase == EFlickMatchPhase::Aiming
-				&& FlickGameState->CurrentTeam == EFlickTeam::Player2)
-			|| (FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning
-				&& !bKickoffBotShotAlreadyLocked));
+			const bool bBotSeat = IsTrainingBotMatch()
+				? Team == EFlickTeam::Player2 && Slot == 0
+				: bPrivateMatchActive && !GetPrivateSlotOwner(Team, Slot);
+			return bBotSeat && (FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning
+				|| !LockedKickoffShots.ContainsByPredicate([Team, Slot](const FFlickLockedKickoffShot& Shot)
+			{
+				return Shot.Team == Team && Shot.PlayerSlot == Slot;
+			}));
+		};
+		if (FlickGameState->MatchPhase == EFlickMatchPhase::Aiming)
+		{
+			BotTeam = FlickGameState->CurrentTeam;
+			BotPlayerSlot = FlickGameState->CurrentTeamPlayerSlot;
+			if (!NeedsBot(BotTeam, BotPlayerSlot)) BotTeam = EFlickTeam::None;
+		}
+		else if (FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning)
+		{
+			for (const EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+			{
+				for (int32 Slot = 0; Slot < CurrentPlayersPerTeam; ++Slot)
+				{
+					if (NeedsBot(Team, Slot))
+					{
+						BotTeam = Team;
+						BotPlayerSlot = Slot;
+						break;
+					}
+				}
+				if (BotTeam != EFlickTeam::None) break;
+			}
+		}
+	}
+	const bool bBotCanPlan = BotTeam != EFlickTeam::None;
 	if (!bBotCanPlan)
 	{
 		ResetTrainingBotThinking();
@@ -264,7 +290,7 @@ void AFlickGameMode::UpdateTrainingBot(const float DeltaSeconds)
 		const float ThinkDelay = GetTrainingBotDifficultySettings().ThinkDelay;
 		PushHudEvent(
 			FString::Printf(TEXT("%s BOT IS LINING UP A SHOT"), *GetBotDifficultyLabel()),
-			GetTeamColor(EFlickTeam::Player2),
+			GetTeamColor(BotTeam),
 			ThinkDelay);
 	}
 	const float ThinkDelay = GetTrainingBotDifficultySettings().ThinkDelay;
@@ -274,7 +300,7 @@ void AFlickGameMode::UpdateTrainingBot(const float DeltaSeconds)
 		return;
 	}
 
-	if (TryExecuteTrainingBotShot())
+	if (TryExecuteTrainingBotShot(BotTeam, BotPlayerSlot))
 	{
 		ResetTrainingBotThinking();
 	}
@@ -302,12 +328,13 @@ const FFlickBotDifficultySettings& AFlickGameMode::GetTrainingBotDifficultySetti
 	}
 }
 
-bool AFlickGameMode::TryExecuteTrainingBotShot()
+bool AFlickGameMode::TryExecuteTrainingBotShot(const EFlickTeam BotTeam, const int32 BotPlayerSlot)
 {
 	AFlickGameState* FlickGameState = GetFlickGameState();
-	if (!IsTrainingBotMatch() || !FlickGameState
+	if ((!IsTrainingBotMatch() && !bPrivateMatchActive) || !FlickGameState
 		|| !((FlickGameState->MatchPhase == EFlickMatchPhase::Aiming
-				&& FlickGameState->CurrentTeam == EFlickTeam::Player2)
+				&& FlickGameState->CurrentTeam == BotTeam
+				&& FlickGameState->CurrentTeamPlayerSlot == BotPlayerSlot)
 			|| FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning))
 	{
 		return false;
@@ -317,7 +344,8 @@ bool AFlickGameMode::TryExecuteTrainingBotShot()
 	BotPieces.Reserve(Pieces.Num());
 	for (const AFlickPiece* Piece : Pieces)
 	{
-		if (!Piece || !IsValid(Piece) || !Piece->IsActive())
+		if (!Piece || !IsValid(Piece) || !Piece->IsActive()
+			|| (Piece->GetTeam() == BotTeam && Piece->GetOwningPlayerSlot() != BotPlayerSlot))
 		{
 			continue;
 		}
@@ -358,7 +386,7 @@ bool AFlickGameMode::TryExecuteTrainingBotShot()
 	FFlickBotShotPlan Plan;
 	if (IsBobMode())
 	{
-		AFlickPiece* BobStriker = GetBobStriker(EFlickTeam::Player2);
+		AFlickPiece* BobStriker = GetBobStriker(BotTeam);
 		TArray<FVector2D> PocketPositions;
 		if (BobArenaActor)
 		{
@@ -372,7 +400,7 @@ bool AFlickGameMode::TryExecuteTrainingBotShot()
 		}
 		Plan = FlickBotShotPlanner::PlanBobShot(
 			BotPieces,
-			EFlickTeam::Player2,
+			BotTeam,
 			BobStriker ? BobStriker->GetPieceId() : INDEX_NONE,
 			PocketPositions,
 			BotTuning,
@@ -382,7 +410,7 @@ bool AFlickGameMode::TryExecuteTrainingBotShot()
 	{
 		Plan = FlickBotShotPlanner::PlanShot(
 			BotPieces,
-			EFlickTeam::Player2,
+			BotTeam,
 			BotTuning,
 			TrainingBotRandom);
 	}
@@ -397,7 +425,8 @@ bool AFlickGameMode::TryExecuteTrainingBotShot()
 	{
 		if (Piece && IsValid(Piece) && Piece->IsActive()
 			&& Piece->GetPieceId() == Plan.ShooterPieceId
-			&& Piece->IsSelectableBy(EFlickTeam::Player2))
+			&& Piece->IsSelectableBy(BotTeam)
+			&& Piece->GetOwningPlayerSlot() == BotPlayerSlot)
 		{
 			Shooter = Piece;
 			break;
@@ -987,9 +1016,6 @@ void AFlickGameMode::RestartMatch()
 	UGameplayStatics::SetGamePaused(this, false);
 	FrontendScreen = EFlickFrontendScreen::Playing;
 	ApplyPendingPlayerClasses();
-	MenuPreviewElapsed = 0.0f;
-	MenuPreviewVariant = SelectedMatchVariant;
-	MenuPreviewPlayersPerTeam = CurrentPlayersPerTeam;
 	SetCameraForFrontend();
 	ApplySelectedMatchConfiguration();
 	RebuildMatch();
@@ -1019,9 +1045,6 @@ void AFlickGameMode::OpenModeSelect()
 		{
 			ShowModePreview(SelectedMatchVariant, MatchmakingPlayersPerTeam);
 		}
-		MenuPreviewElapsed = 0.0f;
-		MenuPreviewVariant = SelectedMatchVariant;
-		MenuPreviewPlayersPerTeam = MatchmakingPlayersPerTeam;
 		SetCameraForFrontend();
 	}
 }
@@ -1031,7 +1054,6 @@ void AFlickGameMode::CloseModeSelect()
 	if (FrontendScreen == EFlickFrontendScreen::ModeSelect)
 	{
 		FrontendScreen = EFlickFrontendScreen::MainMenu;
-		MenuPreviewElapsed = 0.0f;
 		SetCameraForFrontend();
 	}
 }

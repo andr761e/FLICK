@@ -1,6 +1,110 @@
 // pause/results, shared controls and dynamic match text
 #include "UI/FlickGameLayerPrivate.h"
 
+TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchTeamPicker()
+{
+	const auto FirstOpenSlot = [this](const EFlickTeam Team) -> int32
+	{
+		const AFlickGameState* State = GetScoreboardGameState();
+		if (!State || !State->bPrivateMatchActive) return INDEX_NONE;
+		for (int32 Slot = 0; Slot < State->PrivateMatchSettings.PlayersPerTeam; ++Slot)
+		{
+			bool bOccupied = false;
+			for (const APlayerState* BasePlayer : State->PlayerArray)
+			{
+				const AFlickPlayerState* Player = Cast<AFlickPlayerState>(BasePlayer);
+				bOccupied |= Player && Player->ControlsPrivateSlot(Team, Slot);
+			}
+			if (!bOccupied) return Slot;
+		}
+		return INDEX_NONE;
+	};
+	const auto JoinButton = [this, FirstOpenSlot](const EFlickTeam Team, const FString& Label)
+	{
+		return SNew(SBox).HeightOverride(52.0f)
+			.IsEnabled_Lambda([FirstOpenSlot, Team]() { return FirstOpenSlot(Team) != INDEX_NONE; })
+			[
+				MakeMenuButton(Label, FOnClicked::CreateLambda([this, FirstOpenSlot, Team]()
+				{
+					if (PlayerController.IsValid())
+					{
+						const int32 Slot = FirstOpenSlot(Team);
+						if (Slot != INDEX_NONE) PlayerController->RequestTogglePrivateMatchSlot(Team, Slot);
+					}
+					return FReply::Handled();
+				}), false, false, 52.0f)
+			];
+	};
+	const auto ClassButton = [this](const EFlickLineupPreset Preset)
+	{
+		return MakeMenuButton(GetClassDisplayName(Preset), FOnClicked::CreateLambda([this, Preset]()
+		{
+			if (PlayerController.IsValid()) PlayerController->RequestSelectClass(Preset);
+			return FReply::Handled();
+		}), false, false, 42.0f);
+	};
+	return SNew(SOverlay)
+		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.0f, 0.004f, 0.009f, 0.72f))]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SNew(SBox).WidthOverride(520.0f)
+			[
+				SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(Cyan).CutSize(12.0f).BorderWidth(1.0f).Padding(FMargin(28.0f))
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PRIVATE MATCH  //  YOUR ROLE"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 7.0f, 0.0f, 18.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("CHOOSE YOUR SIDE"))).Font(DisplayFont(31)).ColorAndOpacity(Paper)]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 9.0f)[JoinButton(EFlickTeam::Player1, TEXT("JOIN BLUE"))]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 9.0f)[JoinButton(EFlickTeam::Player2, TEXT("JOIN ORANGE"))]
+					+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).HeightOverride(52.0f)[MakeMenuButton(TEXT("SPECTATE"), FOnClicked::CreateLambda([this]() { if (PlayerController.IsValid()) PlayerController->RequestPrivateMatchSpectate(); return FReply::Handled(); }), false, false, 52.0f)]]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 15.0f, 0.0f, 0.0f)
+					[
+						SNew(SBox).Visibility_Lambda([this]()
+						{
+							const AFlickGameState* State = GetScoreboardGameState();
+							const AFlickPlayerState* Local = PlayerController.IsValid() ? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
+							return State && State->ActiveMatchVariant == EFlickMatchVariant::Classic
+								&& Local && Local->GetTeam() != EFlickTeam::None ? EVisibility::Visible : EVisibility::Collapsed;
+						})
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 7.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR CLASS  //  APPLIES NEXT ROUND"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)]
+							+ SVerticalBox::Slot().AutoHeight()
+							[
+								SNew(SHorizontalBox)
+								+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 5.0f, 0.0f)[ClassButton(EFlickLineupPreset::Balanced)]
+								+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(5.0f, 0.0f, 0.0f, 0.0f)[ClassButton(EFlickLineupPreset::Power)]
+							]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
+							[
+								SNew(SHorizontalBox)
+								+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 5.0f, 0.0f)[ClassButton(EFlickLineupPreset::Speed)]
+								+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(5.0f, 0.0f, 0.0f, 0.0f)[ClassButton(EFlickLineupPreset::Control)]
+							]
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 20.0f, 0.0f, 9.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("SPECTATOR CAMERAS"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeMenuButton(TEXT("VIEW BLUE"), FOnClicked::CreateLambda([this]() { if (PlayerController.IsValid()) PlayerController->SetPrivateSpectatorView(EFlickTeam::Player1); return FReply::Handled(); }), false, false, 43.0f)]
+						+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(6.0f, 0.0f, 0.0f, 0.0f)[MakeMenuButton(TEXT("VIEW ORANGE"), FOnClicked::CreateLambda([this]() { if (PlayerController.IsValid()) PlayerController->SetPrivateSpectatorView(EFlickTeam::Player2); return FReply::Handled(); }), false, false, 43.0f)]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 9.0f, 0.0f, 0.0f)[MakeMenuButton(TEXT("FREE CAMERA  [X]"), FOnClicked::CreateLambda([this]() { if (PlayerController.IsValid()) PlayerController->TogglePrivateSpectatorFreeCamera(); return FReply::Handled(); }), false, false, 43.0f)]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 16.0f, 0.0f, 0.0f)
+					[
+						SNew(SBox).Visibility_Lambda([this]()
+						{
+							const AFlickPlayerState* Local = PlayerController.IsValid() ? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
+							return Local && Local->GetTeam() != EFlickTeam::None ? EVisibility::Visible : EVisibility::Collapsed;
+						})
+						[MakeMenuButton(TEXT("RESUME"), FOnClicked::CreateLambda([this]() { if (PlayerController.IsValid()) PlayerController->ClosePrivateTeamMenu(); return FReply::Handled(); }), true, false, 43.0f)]
+					]
+				]
+			]
+		];
+}
+
 TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 {
 	auto MakePauseButton = [this](
@@ -569,7 +673,11 @@ EVisibility SFlickGameLayer::GetScreenVisibility(const EFlickFrontendScreen Scre
 		{
 			return EVisibility::Collapsed;
 		}
-		if (State->bPartyActive && !State->bPrivateMatchLobbyActive && !State->bNetworkLobbyActive)
+		if (State->bPrivateMatchActive)
+		{
+			return EVisibility::Collapsed;
+		}
+		if (State->bPartyActive && !State->bNetworkLobbyActive)
 		{
 			return Screen == RemotePartyScreen ? EVisibility::Visible : EVisibility::Collapsed;
 		}
@@ -761,7 +869,7 @@ EVisibility SFlickGameLayer::GetMatchHudVisibility() const
 	return State && State->IsGameplayActive()
 		&& !State->bNetworkLobbyActive
 		&& !State->bPrivateMatchLobbyActive
-		&& !State->bPartyActive
+		&& (!State->bPartyActive || State->bPrivateMatchActive)
 		? EVisibility::SelfHitTestInvisible
 		: EVisibility::Collapsed;
 }

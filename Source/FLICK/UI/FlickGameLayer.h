@@ -83,7 +83,7 @@ private:
 	TSharedRef<SWidget> BuildShopItemCard(const FString& Name, const FString& Type, const FString& Mark, const FLinearColor& Accent);
 	TSharedRef<SWidget> BuildModeSelect();
 	TSharedRef<SWidget> BuildPrivateMatchSetup();
-	TSharedRef<SWidget> BuildPrivateMatchSlot(EFlickTeam Team, int32 PlayerSlot);
+	TSharedRef<SWidget> BuildPrivateMatchTeamPicker();
 	TSharedRef<SWidget> BuildOnlineBrowser();
 	TSharedRef<SWidget> BuildOnlineSessionRow(int32 ResultIndex);
 	TSharedRef<SWidget> BuildMatchmakingStatusBar();
@@ -197,7 +197,6 @@ private:
 	FLinearColor GetCurrentModeAccent() const;
 	FLinearColor GetTeamAccent(EFlickTeam Team) const;
 	const FFlickPrivateMatchSettings& GetDisplayedPrivateMatchSettings() const;
-	AFlickPlayerState* GetDisplayedPrivateSlotOwner(EFlickTeam Team, int32 PlayerSlot) const;
 	UFlickSessionSubsystem* GetDisplayedSessionSubsystem() const;
 	bool IsDisplayedPartyActive() const;
 	AFlickPlayerState* GetDisplayedPartyMember(int32 PartySlot) const;

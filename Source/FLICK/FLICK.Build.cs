@@ -13,6 +13,7 @@ public class FLICK : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "PhysicsCore", "OnlineSubsystem", "OnlineSubsystemUtils", "HTTP", "Json" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "MoviePlayer", "RenderCore", "Steamworks" });
+		RuntimeDependencies.Add("$(ProjectDir)/Content/UI/FlickKnockoutWordmark.svg", StagedFileType.UFS);
 		PublicDefinitions.Add("WITH_FLICK_STEAMWORKS=1");
 		
 	}

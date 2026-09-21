@@ -708,17 +708,6 @@ void AFlickGameMode::RefreshPrivatePrimaryAssignments()
 	}
 }
 
-void AFlickGameMode::ResetPrivateMatchReadiness()
-{
-	for (AFlickPlayerState* Player : GetPrivateMatchParticipants())
-	{
-		if (Player)
-		{
-			Player->SetLobbyReady(false);
-		}
-	}
-}
-
 void AFlickGameMode::SynchronizePartyState()
 {
 	if (!bPartyRequested || !GetWorld())
@@ -782,40 +771,16 @@ void AFlickGameMode::SynchronizePartyState()
 
 void AFlickGameMode::AutoAssignPrivateMatchSlots()
 {
-	TArray<AFlickPlayerState*> Participants = GetPrivateMatchParticipants();
-	for (AFlickPlayerState* Player : Participants)
+	// Private-match seats are claimed in the arena. Empty seats are controlled
+	// by the server bot, never silently assigned to a party member.
+	for (AFlickPlayerState* Player : GetPrivateMatchParticipants())
 	{
 		if (Player)
 		{
 			Player->ClearPrivateControlledSlots();
 		}
 	}
-	if (Participants.IsEmpty())
-	{
-		return;
-	}
-
-	const int32 TeamSize = FlickTeamRules::ClampPlayersPerTeam(PrivateMatchSettings.PlayersPerTeam);
-	const int32 ActiveParticipantCount = FMath::Min(Participants.Num(), TeamSize * 2);
-	const int32 BlueParticipantCount = FMath::Clamp((ActiveParticipantCount + 1) / 2, 1, TeamSize);
-	const int32 OrangeParticipantCount = FMath::Max(1, ActiveParticipantCount - BlueParticipantCount);
-	const int32 OrangeParticipantStart = ActiveParticipantCount > BlueParticipantCount
-		? BlueParticipantCount
-		: 0;
-	for (int32 PlayerSlot = 0; PlayerSlot < TeamSize; ++PlayerSlot)
-	{
-		AFlickPlayerState* BlueOwner = Participants[PlayerSlot % BlueParticipantCount];
-		AFlickPlayerState* OrangeOwner = Participants[OrangeParticipantStart
-			+ (PlayerSlot % OrangeParticipantCount)];
-		TArray<int32> BlueSlots = BlueOwner->GetPrivateControlledSlots();
-		BlueSlots.Add(EncodePrivatePlayerSlot(EFlickTeam::Player1, PlayerSlot));
-		BlueOwner->SetPrivateControlledSlots(BlueSlots);
-		TArray<int32> OrangeSlots = OrangeOwner->GetPrivateControlledSlots();
-		OrangeSlots.Add(EncodePrivatePlayerSlot(EFlickTeam::Player2, PlayerSlot));
-		OrangeOwner->SetPrivateControlledSlots(OrangeSlots);
-	}
 	RefreshPrivatePrimaryAssignments();
-	ResetPrivateMatchReadiness();
 }
 
 void AFlickGameMode::PushPrivateMatchState()
@@ -976,7 +941,6 @@ void AFlickGameMode::CyclePrivateMatchSetting(
 	default:
 		break;
 	}
-	ResetPrivateMatchReadiness();
 	PushPrivateMatchState();
 	PlayMenuSound(false);
 }
@@ -989,7 +953,7 @@ void AFlickGameMode::TogglePrivateMatchSlot(
 	AFlickPlayerState* RequestingState = RequestingPlayer
 		? RequestingPlayer->GetPlayerState<AFlickPlayerState>()
 		: nullptr;
-	if (!bPrivateMatchSetupActive || !RequestingState || Team == EFlickTeam::None
+	if ((!bPrivateMatchSetupActive && !bPrivateMatchActive) || !RequestingState || Team == EFlickTeam::None
 		|| PlayerSlot < 0 || PlayerSlot >= PrivateMatchSettings.PlayersPerTeam)
 	{
 		return;
@@ -1001,24 +965,12 @@ void AFlickGameMode::TogglePrivateMatchSlot(
 		UE_LOG(LogFlick, Verbose, TEXT("Rejected attempt to claim another private-match player's slot"));
 		return;
 	}
-	const bool bReleaseSlot = RequestingState->GetPrivateControlledSlots().Contains(EncodedSlot);
-	for (AFlickPlayerState* Player : GetPrivateMatchParticipants())
-	{
-		if (!Player)
-		{
-			continue;
-		}
-		TArray<int32> Slots = Player->GetPrivateControlledSlots();
-		Slots.Remove(EncodedSlot);
-		if (Player == RequestingState && !bReleaseSlot)
-		{
-			Slots.Add(EncodedSlot);
-		}
-		Player->SetPrivateControlledSlots(Slots);
-	}
+	// A human owns one seat only. Switching teams releases the old seat for a
+	// bot; occupied seats cannot be stolen from another player.
+	RequestingState->ClearPrivateControlledSlots();
+	RequestingState->SetPrivateControlledSlots({EncodedSlot});
 	RefreshPrivatePrimaryAssignments();
-	ResetPrivateMatchReadiness();
-	PushPrivateMatchState();
+	if (bPrivateMatchSetupActive) PushPrivateMatchState();
 }
 
 void AFlickGameMode::SetPrivateMatchSpectating(APlayerController* RequestingPlayer)
@@ -1026,14 +978,13 @@ void AFlickGameMode::SetPrivateMatchSpectating(APlayerController* RequestingPlay
 	AFlickPlayerState* RequestingState = RequestingPlayer
 		? RequestingPlayer->GetPlayerState<AFlickPlayerState>()
 		: nullptr;
-	if (!bPrivateMatchSetupActive || !RequestingState)
+	if ((!bPrivateMatchSetupActive && !bPrivateMatchActive) || !RequestingState)
 	{
 		return;
 	}
 	RequestingState->ClearPrivateControlledSlots();
 	RefreshPrivatePrimaryAssignments();
-	ResetPrivateMatchReadiness();
-	PushPrivateMatchState();
+	if (bPrivateMatchSetupActive) PushPrivateMatchState();
 }
 
 bool AFlickGameMode::CanStartPrivateMatch() const
@@ -1042,18 +993,7 @@ bool AFlickGameMode::CanStartPrivateMatch() const
 	{
 		return false;
 	}
-	for (const EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
-	{
-		for (int32 PlayerSlot = 0; PlayerSlot < PrivateMatchSettings.PlayersPerTeam; ++PlayerSlot)
-		{
-			const AFlickPlayerState* SlotOwner = GetPrivateSlotOwner(Team, PlayerSlot);
-			if (!SlotOwner || !SlotOwner->IsLobbyReady())
-			{
-				return false;
-			}
-		}
-	}
-	return true;
+	return GetPrivateMatchParticipants().Num() > 0;
 }
 
 void AFlickGameMode::StartPrivateMatch(APlayerController* RequestingPlayer)
@@ -1073,6 +1013,11 @@ void AFlickGameMode::StartPrivateMatch(APlayerController* RequestingPlayer)
 	bRankedRequested = false;
 	SelectedMatchVariant = NormalizeMatchVariant(PrivateMatchSettings.Variant);
 	MatchmakingPlayersPerTeam = PrivateMatchSettings.PlayersPerTeam;
+	if (bPartyRequested)
+	{
+		UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem();
+		if (!Sessions || !Sessions->LaunchPrivateMatchForParty()) return;
+	}
 	CompleteNetworkMatchStart(FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphens));
 }
 
@@ -1441,8 +1386,7 @@ void AFlickGameMode::SetLobbyReady(APlayerController* RequestingPlayer, const bo
 	}
 	if (AFlickPlayerState* FlickPlayerState = RequestingPlayer->GetPlayerState<AFlickPlayerState>())
 	{
-		if (FlickPlayerState->GetTeam() != EFlickTeam::None
-			|| (bPrivateMatchSetupActive && !FlickPlayerState->GetPrivateControlledSlots().IsEmpty()))
+		if (!bPrivateMatchSetupActive && FlickPlayerState->GetTeam() != EFlickTeam::None)
 		{
 			FlickPlayerState->SetLobbyReady(bReady);
 			UE_LOG(LogFlick, Log, TEXT("%s is %s in the network lobby"), *FlickPlayerState->GetPlayerName(), bReady ? TEXT("ready") : TEXT("not ready"));
@@ -1651,12 +1595,17 @@ void AFlickGameMode::CompleteNetworkMatchStart(const FString& MatchId)
 	}
 	if (AFlickGameState* FlickGameState = GetFlickGameState())
 	{
+		FlickGameState->bPrivateMatchActive = bStartingPrivateMatch;
 		FlickGameState->SetNetworkLobbyState(false, SelectedMatchVariant);
 		FlickGameState->SetPrivateMatchLobbyState(false, PrivateMatchSettings);
 		FlickGameState->SetPartyState(false, FString(), FlickMaximumPartyMembers);
 		FlickGameState->BeginAuthoritativeMatch(MatchId);
 	}
-	if (SelectedMatchVariant == EFlickMatchVariant::Classic)
+	if (bStartingPrivateMatch)
+	{
+		BeginSelectedMatch();
+	}
+	else if (SelectedMatchVariant == EFlickMatchVariant::Classic)
 	{
 		BeginNetworkClassSelection();
 	}
@@ -1745,20 +1694,15 @@ void AFlickGameMode::ReturnToNetworkLobby()
 	{
 		bNetworkMatchStarted = false;
 		bPrivateMatchActive = false;
+		if (AFlickGameState* State = GetFlickGameState()) State->bPrivateMatchActive = false;
 		bPrivateMatchSetupActive = true;
 		bPartyRequested = GetPartyMemberCount() > 0;
 		FrontendScreen = EFlickFrontendScreen::PrivateMatch;
-		ResetPrivateMatchReadiness();
-		SetCameraForFrontend();
-		SelectedMatchVariant = NormalizeMatchVariant(PrivateMatchSettings.Variant);
 		DisconnectedPrivateControlledSlots.Reset();
-		ApplyMatchConfiguration(SelectedMatchVariant, PrivateMatchSettings.PlayersPerTeam);
-		RebuildMatch();
-		PushPrivateMatchState();
-		if (CameraPawn)
-		{
-			CameraPawn->ApplyCameraSettings();
-		}
+		// A private match returns everyone to the persistent party frontend.
+		// Only the leader reopens configuration for the next game.
+		ClosePrivateMatchSetup();
+		SynchronizePartyState();
 		return;
 	}
 	bNetworkMatchStarted = false;

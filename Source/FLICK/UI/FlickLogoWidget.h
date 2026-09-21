@@ -13,11 +13,14 @@ public:
 		: _Opacity(1.0f)
 		, _CropToArtwork(false)
 		, _TexturePath(TEXT("/Game/UI/FlickLogo.FlickLogo"))
+		, _VectorPath(TEXT(""))
 		, _DesiredSize(FVector2D::ZeroVector)
 	{}
 		SLATE_ATTRIBUTE(float, Opacity)
 		SLATE_ARGUMENT(bool, CropToArtwork)
 		SLATE_ARGUMENT(FString, TexturePath)
+		// Path relative to the project's Content directory.
+		SLATE_ARGUMENT(FString, VectorPath)
 		SLATE_ARGUMENT(FVector2D, DesiredSize)
 	SLATE_END_ARGS()
 
@@ -40,5 +43,6 @@ private:
 	bool bCropToArtwork = false;
 	FVector2D DesiredSize = FVector2D::ZeroVector;
 	TStrongObjectPtr<UTexture2D> LogoTexture;
+	bool bUsingVector = false;
 	FSlateBrush LogoBrush;
 };

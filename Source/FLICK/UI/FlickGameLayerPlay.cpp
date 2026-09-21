@@ -16,30 +16,6 @@ const FFlickPrivateMatchSettings& SFlickGameLayer::GetDisplayedPrivateMatchSetti
 	return Defaults;
 }
 
-AFlickPlayerState* SFlickGameLayer::GetDisplayedPrivateSlotOwner(
-	const EFlickTeam Team,
-	const int32 PlayerSlot) const
-{
-	if (GameMode.IsValid())
-	{
-		return GameMode->GetPrivateSlotOwner(Team, PlayerSlot);
-	}
-	const AFlickGameState* State = GetScoreboardGameState();
-	if (!State)
-	{
-		return nullptr;
-	}
-	for (APlayerState* PlayerState : State->PlayerArray)
-	{
-		AFlickPlayerState* Player = Cast<AFlickPlayerState>(PlayerState);
-		if (Player && Player->ControlsPrivateSlot(Team, PlayerSlot))
-		{
-			return Player;
-		}
-	}
-	return nullptr;
-}
-
 TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 {
 	TSharedRef<SButton> BackButton = SNew(SButton)
@@ -122,6 +98,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							.StretchDirection(EStretchDirection::DownOnly)
 							[
 								SNew(SFlickLogoWidget)
+								.VectorPath(TEXT("UI/FlickKnockoutWordmark.svg"))
 								.TexturePath(TEXT("/Game/UI/FlickKnockoutWordmark.FlickKnockoutWordmark"))
 								.DesiredSize(FVector2D(2048.0f, 683.0f))
 							]
@@ -408,86 +385,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 		];
 }
 
-TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSlot(
-	const EFlickTeam Team,
-	const int32 PlayerSlot)
-{
-	const FLinearColor Accent = GetTeamAccent(Team);
-	return SNew(SBox)
-		.HeightOverride(82.0f)
-		.Visibility_Lambda([this, PlayerSlot]()
-		{
-			return PlayerSlot < GetDisplayedPrivateMatchSettings().PlayersPerTeam
-				? EVisibility::Visible
-				: EVisibility::Collapsed;
-		})
-		[
-			SNew(SFlickPlaylistCardPanel)
-			.Selected_Lambda([this, Team, PlayerSlot]()
-			{
-				const AFlickPlayerState* Owner = GetDisplayedPrivateSlotOwner(Team, PlayerSlot);
-				const AFlickPlayerState* Local = PlayerController.IsValid()
-					? PlayerController->GetPlayerState<AFlickPlayerState>()
-					: nullptr;
-				return Owner && Owner == Local;
-			})
-			.Padding(1.0f)
-			[
-				SNew(SButton)
-				.ButtonStyle(&TransparentButtonStyle)
-				.Cursor(EMouseCursor::Hand)
-				.OnClicked_Lambda([this, Team, PlayerSlot]()
-				{
-					if (PlayerController.IsValid())
-					{
-						PlayerController->RequestTogglePrivateMatchSlot(Team, PlayerSlot);
-					}
-					return FReply::Handled();
-				})
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(20.0f, 10.0f)
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()
-						[
-							SNew(STextBlock)
-							.Text(FText::FromString(FString::Printf(TEXT("%s PLAYER %d"), Team == EFlickTeam::Player1 ? TEXT("BLUE") : TEXT("ORANGE"), PlayerSlot + 1)))
-							.Font(UiFont(9, true))
-							.ColorAndOpacity(Accent)
-						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
-						[
-							SNew(STextBlock)
-							.Text_Lambda([this, Team, PlayerSlot]()
-							{
-								const AFlickPlayerState* Owner = GetDisplayedPrivateSlotOwner(Team, PlayerSlot);
-								return FText::FromString(Owner ? Owner->GetPlayerName() : TEXT("OPEN SLOT"));
-							})
-							.Font(UiFont(16, true))
-							.ColorAndOpacity(FLinearColor::White)
-						]
-					]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.0f, 0.0f, 18.0f, 0.0f)
-					[
-						SNew(STextBlock)
-						.Text_Lambda([this, Team, PlayerSlot]()
-						{
-							const AFlickPlayerState* Owner = GetDisplayedPrivateSlotOwner(Team, PlayerSlot);
-							return FText::FromString(!Owner ? TEXT("CLAIM") : Owner->IsLobbyReady() ? TEXT("READY") : TEXT("NOT READY"));
-						})
-						.Font(UiFont(9, true))
-						.ColorAndOpacity_Lambda([this, Team, PlayerSlot, Accent]()
-						{
-							const AFlickPlayerState* Owner = GetDisplayedPrivateSlotOwner(Team, PlayerSlot);
-							return FSlateColor(Owner && Owner->IsLobbyReady() ? Accent : Muted);
-						})
-					]
-				]
-			]
-		];
-}
-
 TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSetup()
 {
 	auto CycleSetting = [this](const FString& Label, const EFlickPrivateMatchSetting Setting, const TAttribute<FText>& Value)
@@ -519,7 +416,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSetup()
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("PRIVATE MATCH"))).Font(DisplayFont(38)).ColorAndOpacity(FLinearColor::White)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("CUSTOM RULES  /  FLEXIBLE PLAYER OWNERSHIP  /  SPECTATORS"))).Font(UiFont(10, true)).ColorAndOpacity(Cyan)]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("SET THE RULES  /  LAUNCH THE ARENA  /  CHOOSE TEAMS IN GAME"))).Font(UiFont(10, true)).ColorAndOpacity(Cyan)]
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
 				[
@@ -555,22 +452,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSetup()
 				]
 				+ SHorizontalBox::Slot().FillWidth(0.68f).Padding(12.0f, 0.0f, 0.0f, 0.0f)
 				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 7.0f, 0.0f)
+					SNew(SFlickAngularBorder)
+					.BackgroundColor(Panel).AccentColor(Hairline).CutSize(12.0f).BorderWidth(1.0f).Padding(FMargin(28.0f))
 					[
 						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight().Padding(4.0f, 0.0f, 0.0f, 10.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("BLUE TEAM"))).Font(UiFont(14, true)).ColorAndOpacity(Cyan)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[BuildPrivateMatchSlot(EFlickTeam::Player1, 0)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[BuildPrivateMatchSlot(EFlickTeam::Player1, 1)]
-						+ SVerticalBox::Slot().AutoHeight()[BuildPrivateMatchSlot(EFlickTeam::Player1, 2)]
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(7.0f, 0.0f, 0.0f, 0.0f)
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight().Padding(4.0f, 0.0f, 0.0f, 10.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("ORANGE TEAM"))).Font(UiFont(14, true)).ColorAndOpacity(Orange)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[BuildPrivateMatchSlot(EFlickTeam::Player2, 0)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[BuildPrivateMatchSlot(EFlickTeam::Player2, 1)]
-						+ SVerticalBox::Slot().AutoHeight()[BuildPrivateMatchSlot(EFlickTeam::Player2, 2)]
+						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("THE ARENA IS READY WHEN YOU ARE"))).Font(DisplayFont(25)).ColorAndOpacity(Paper)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 16.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("Your party stays in the main menu while you configure this match. Starting invites everyone into the arena. Players choose Blue, Orange, or Spectate there; empty seats are bots."))).Font(UiFont(13)).ColorAndOpacity(Muted).AutoWrapText(true)]
 					]
 				]
 			]
@@ -583,16 +470,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSetup()
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(180.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->ClosePrivateMatchSetup(); return FReply::Handled(); }), false, false, 54.0f)]]
-					+ SHorizontalBox::Slot().AutoWidth().Padding(12.0f, 0.0f)[SNew(SBox).WidthOverride(190.0f)[MakeMenuButton(TEXT("SPECTATE"), FOnClicked::CreateLambda([this]() { if (PlayerController.IsValid()) PlayerController->RequestPrivateMatchSpectate(); return FReply::Handled(); }), false, false, 54.0f)]]
 					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-					+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 12.0f, 0.0f)
-					[
-						SNew(SBox).WidthOverride(210.0f)
-						.IsEnabled_Lambda([this]() { const AFlickPlayerState* Local = PlayerController.IsValid() ? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr; return Local && !Local->GetPrivateControlledSlots().IsEmpty(); })
-						[
-							MakeMenuButton(TEXT("READY UP"), FOnClicked::CreateLambda([this]() { if (PlayerController.IsValid()) PlayerController->ToggleLobbyReady(); return FReply::Handled(); }), false, false, 54.0f)
-						]
-					]
 					+ SHorizontalBox::Slot().AutoWidth()
 					[
 						SNew(SBox).WidthOverride(250.0f).IsEnabled_Lambda([this]() { return GameMode.IsValid() && GameMode->CanStartPrivateMatch(); })

@@ -48,6 +48,11 @@ public:
 	void RequestConfirmClass();
 	void RequestTogglePrivateMatchSlot(EFlickTeam Team, int32 PlayerSlot);
 	void RequestPrivateMatchSpectate();
+	bool IsPrivateTeamMenuOpen() const { return bPrivateTeamMenuOpen; }
+	bool ShouldShowPrivateTeamMenu() const;
+	void ClosePrivateTeamMenu() { bPrivateTeamMenuOpen = false; }
+	void SetPrivateSpectatorView(EFlickTeam Team);
+	void TogglePrivateSpectatorFreeCamera();
 	void LeaveNetworkSession();
 	void ReturnToFrontendFromServer(bool bClearPartyIdentity = false);
 	void SetPersistentPartyIdentityFromServer(const FString& PartyId, int32 PartySlot, int32 PartySize, bool bLeader);
@@ -279,6 +284,9 @@ private:
 	bool bNetworkAutoStartSubmitted = false;
 	bool bNetworkAutoClassSubmitted = false;
 	bool bNetworkClassLineupSubmitted = false;
+	bool bPrivateTeamMenuOpen = false;
+	bool bPrivateSpectateChosen = false;
+	bool bObservedPrivateMatchActive = false;
 	bool bCareerStatsRecordedForCurrentSeries = false;
 	float NetworkGameplayElapsed = 0.0f;
 };

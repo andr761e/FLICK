@@ -315,6 +315,9 @@ public:
 	bool bPrivateMatchLobbyActive = false;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match")
+	bool bPrivateMatchActive = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match")
 	FFlickPrivateMatchSettings PrivateMatchSettings;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Tuning")

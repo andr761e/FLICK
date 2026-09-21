@@ -9,6 +9,7 @@
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameInstance.h"
 #include "Game/FlickGameState.h"
+#include "Online/FlickSessionSubsystem.h"
 #include "Pieces/FlickPiece.h"
 #include "Player/FlickPlayerController.h"
 #include "Player/FlickPlayerState.h"
@@ -143,11 +144,6 @@ void AFlickHUD::DrawHUD()
 	{
 		return;
 	}
-	if (!FlickGameMode && !GameLayer.IsValid() && FlickGameState->bPrivateMatchLobbyActive && FlickController)
-	{
-		DrawPrivateMatchFrontend(*FlickGameState, *FlickController, Width, Height);
-		return;
-	}
 	if (!FlickGameMode && FlickGameState->bNetworkLobbyActive && FlickController)
 	{
 		DrawNetworkLobby(*FlickGameState, *FlickController, Width, Height);
@@ -254,6 +250,10 @@ void AFlickHUD::DrawCinematicReplayPullback(const AFlickGameMode& GameMode)
 		DrawCircle(PieceScreen, 25.0f + PullbackAlpha * 7.0f,
 			FLinearColor(TeamColor.R, TeamColor.G, TeamColor.B, 0.38f), 42, 2.0f);
 		DrawTechnicalAimArrow(PieceScreen, GuideScreen, TeamColor);
+	}
+	if (UFlickSessionSubsystem* Sessions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UFlickSessionSubsystem>() : nullptr)
+	{
+		Sessions->ResumePartySynchronizationAfterTravel();
 	}
 }
 
@@ -911,100 +911,6 @@ void AFlickHUD::DrawPartyFrontend(
 	DrawCenteredText(TEXT("THE PARTY LEADER IS PREPARING THE NEXT MATCH"), Width * 0.5f, ButtonY + 82.0f, MutedTextColor, 0.64f);
 }
 
-void AFlickHUD::DrawPrivateMatchFrontend(
-	const AFlickGameState& GameState,
-	const AFlickPlayerController& Controller,
-	const float Width,
-	const float Height)
-{
-	DrawPanel(0.0f, 0.0f, Width, Height, FLinearColor(0.002f, 0.006f, 0.012f, 0.92f));
-	DrawCenteredText(TEXT("PRIVATE MATCH"), Width * 0.5f, Height * 0.06f, FLinearColor::White, 1.7f, true);
-	DrawCenteredText(
-		FString::Printf(
-			TEXT("%dV%d  /  FIRST TO %d  /  ARENA %.0f%%  /  FRICTION %.0f%%  /  POWER %.0f%%"),
-			GameState.PrivateMatchSettings.PlayersPerTeam,
-			GameState.PrivateMatchSettings.PlayersPerTeam,
-			GameState.PrivateMatchSettings.RoundsToWin,
-			GameState.PrivateMatchSettings.ArenaScale * 100.0f,
-			GameState.PrivateMatchSettings.FrictionScale * 100.0f,
-			GameState.PrivateMatchSettings.LaunchSpeedScale * 100.0f),
-		Width * 0.5f,
-		Height * 0.13f,
-		FLinearColor(0.0f, 0.76f, 1.0f, 1.0f),
-		0.68f);
-	DrawCenteredText(TEXT("CLAIM ANY NUMBER OF PLAYER SLOTS, OR SPECTATE"), Width * 0.5f, Height * 0.18f, MutedTextColor, 0.62f);
-
-	const AFlickPlayerState* LocalState = Controller.GetPlayerState<AFlickPlayerState>();
-	auto FindOwner = [&GameState](const EFlickTeam Team, const int32 PlayerSlot) -> const AFlickPlayerState*
-	{
-		for (const APlayerState* PlayerState : GameState.PlayerArray)
-		{
-			const AFlickPlayerState* Player = Cast<AFlickPlayerState>(PlayerState);
-			if (Player && Player->ControlsPrivateSlot(Team, PlayerSlot))
-			{
-				return Player;
-			}
-		}
-		return nullptr;
-	};
-
-	const float SlotWidth = FMath::Min(410.0f, Width * 0.4f);
-	const float SlotHeight = 82.0f;
-	const float SlotStartY = Height * 0.25f;
-	for (const EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
-	{
-		const bool bBlue = Team == EFlickTeam::Player1;
-		const float SlotX = bBlue ? Width * 0.5f - SlotWidth - 14.0f : Width * 0.5f + 14.0f;
-		const FLinearColor Accent = GetTeamColor(Team);
-		for (int32 PlayerSlot = 0; PlayerSlot < GameState.PrivateMatchSettings.PlayersPerTeam; ++PlayerSlot)
-		{
-			const float SlotY = SlotStartY + PlayerSlot * (SlotHeight + 10.0f);
-			const AFlickPlayerState* SlotOwner = FindOwner(Team, PlayerSlot);
-			const bool bLocalOwner = SlotOwner && SlotOwner == LocalState;
-			const FBox2D Bounds(FVector2D(SlotX, SlotY), FVector2D(SlotX + SlotWidth, SlotY + SlotHeight));
-			DrawShowcasePanel(
-				SlotX,
-				SlotY,
-				SlotWidth,
-				SlotHeight,
-				bLocalOwner ? Accent.CopyWithNewOpacity(0.2f) : FLinearColor(0.006f, 0.016f, 0.028f, 0.94f),
-				Accent,
-				10.0f);
-			DrawText(
-				FString::Printf(TEXT("%s PLAYER %d"), bBlue ? TEXT("BLUE") : TEXT("ORANGE"), PlayerSlot + 1),
-				Accent,
-				SlotX + 20.0f,
-				SlotY + 12.0f,
-				GEngine ? GEngine->GetSmallFont() : nullptr,
-				0.68f);
-			DrawText(
-				SlotOwner ? SlotOwner->GetPlayerName() : TEXT("OPEN - CLICK TO CLAIM"),
-				SlotOwner ? FLinearColor::White : MutedTextColor,
-				SlotX + 20.0f,
-				SlotY + 39.0f,
-				GEngine ? GEngine->GetLargeFont() : nullptr,
-				0.66f);
-			AddMenuHitRegion(EFlickMenuAction::TogglePrivateSlot, Bounds, EFlickMatchVariant::Classic, Team, PlayerSlot);
-		}
-	}
-
-	const bool bOwnsSlot = LocalState && !LocalState->GetPrivateControlledSlots().IsEmpty();
-	const bool bReady = LocalState && LocalState->IsLobbyReady();
-	const float ButtonY = Height * 0.72f;
-	const float ButtonWidth = FMath::Min(235.0f, Width * 0.25f);
-	DrawMenuButton(EFlickMenuAction::PrivateSpectate, TEXT("SPECTATE"), Width * 0.5f - ButtonWidth * 1.55f, ButtonY, ButtonWidth, 54.0f, MutedTextColor);
-	if (bOwnsSlot)
-	{
-		DrawMenuButton(EFlickMenuAction::ToggleLobbyReady, bReady ? TEXT("SET NOT READY") : TEXT("READY UP"), Width * 0.5f - ButtonWidth * 0.5f, ButtonY, ButtonWidth, 54.0f, FLinearColor(0.0f, 0.76f, 1.0f, 1.0f), true);
-	}
-	DrawMenuButton(EFlickMenuAction::LeaveLobby, TEXT("LEAVE PARTY"), Width * 0.5f + ButtonWidth * 0.55f, ButtonY, ButtonWidth, 54.0f, FLinearColor(0.65f, 0.24f, 0.12f, 1.0f));
-	DrawCenteredText(
-		bOwnsSlot ? TEXT("READY UP AFTER YOUR SLOT SELECTION IS FINAL") : TEXT("YOU ARE SPECTATING - CLAIM A SLOT TO PLAY"),
-		Width * 0.5f,
-		ButtonY + 76.0f,
-		MutedTextColor,
-		0.62f);
-}
 
 void AFlickHUD::DrawControls(const float Height)
 {
@@ -1206,9 +1112,7 @@ bool AFlickHUD::HandleMenuClick(const FVector2D& ScreenPosition)
 			&& Region.Action != EFlickMenuAction::NextRound
 			&& Region.Action != EFlickMenuAction::MainMenu
 			&& Region.Action != EFlickMenuAction::ToggleLobbyReady
-			&& Region.Action != EFlickMenuAction::LeaveLobby
-			&& Region.Action != EFlickMenuAction::TogglePrivateSlot
-			&& Region.Action != EFlickMenuAction::PrivateSpectate)
+			&& Region.Action != EFlickMenuAction::LeaveLobby)
 		{
 			return false;
 		}
@@ -1265,12 +1169,6 @@ bool AFlickHUD::HandleMenuClick(const FVector2D& ScreenPosition)
 			break;
 		case EFlickMenuAction::LeaveLobby:
 			if (FlickController) FlickController->LeaveNetworkSession();
-			break;
-		case EFlickMenuAction::TogglePrivateSlot:
-			if (FlickController) FlickController->RequestTogglePrivateMatchSlot(Region.Team, Region.PieceSlot);
-			break;
-		case EFlickMenuAction::PrivateSpectate:
-			if (FlickController) FlickController->RequestPrivateMatchSpectate();
 			break;
 		case EFlickMenuAction::Back:
 			if (FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::Loadout)

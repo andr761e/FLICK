@@ -2,6 +2,8 @@
 
 #include "Rendering/DrawElements.h"
 #include "RenderingThread.h"
+#include "Brushes/SlateImageBrush.h"
+#include "Misc/Paths.h"
 
 UTexture2D* SFlickLogoWidget::LoadPreparedTexture(const FString& TexturePath)
 {
@@ -41,22 +43,32 @@ void SFlickLogoWidget::Construct(const FArguments& InArgs)
 	Opacity = InArgs._Opacity;
 	bCropToArtwork = InArgs._CropToArtwork;
 	DesiredSize = InArgs._DesiredSize;
-	LogoTexture.Reset(LoadPreparedTexture(InArgs._TexturePath));
-	LogoBrush.SetResourceObject(LogoTexture.Get());
-	if (bCropToArtwork)
+	const FString VectorFilename = InArgs._VectorPath.IsEmpty()
+		? FString() : FPaths::ProjectContentDir() / InArgs._VectorPath;
+	bUsingVector = !VectorFilename.IsEmpty() && FPaths::FileExists(VectorFilename);
+	if (bUsingVector)
 	{
-		// The source logo deliberately has generous transparent space for the splash screen.
-		// Crop that space when the same texture is used as a compact main-menu wordmark.
-		LogoBrush.SetUVRegion(FBox2f(FVector2f(0.02f, 0.25f), FVector2f(0.99f, 0.72f)));
-		LogoBrush.ImageSize = FVector2D(1490.0f, 481.0f);
+		LogoBrush = FSlateVectorImageBrush(VectorFilename,
+			!DesiredSize.IsNearlyZero() ? DesiredSize : FVector2D(2048.0f, 682.0f));
 	}
 	else
 	{
-		LogoBrush.ImageSize = !DesiredSize.IsNearlyZero()
-			? DesiredSize
-			: LogoTexture.IsValid()
-			? FVector2D(LogoTexture->GetSizeX(), LogoTexture->GetSizeY())
-			: FVector2D(1536.0f, 1024.0f);
+		LogoTexture.Reset(LoadPreparedTexture(InArgs._TexturePath));
+		LogoBrush.SetResourceObject(LogoTexture.Get());
+		if (bCropToArtwork)
+		{
+			// The raster fallback retains its original transparent margins.
+			LogoBrush.SetUVRegion(FBox2f(FVector2f(0.02f, 0.25f), FVector2f(0.99f, 0.72f)));
+			LogoBrush.ImageSize = FVector2D(1490.0f, 481.0f);
+		}
+		else
+		{
+			LogoBrush.ImageSize = !DesiredSize.IsNearlyZero()
+				? DesiredSize
+				: LogoTexture.IsValid()
+				? FVector2D(LogoTexture->GetSizeX(), LogoTexture->GetSizeY())
+				: FVector2D(1536.0f, 1024.0f);
+		}
 	}
 	LogoBrush.DrawAs = ESlateBrushDrawType::Image;
 	SetCanTick(false);
@@ -76,7 +88,7 @@ int32 SFlickLogoWidget::OnPaint(
 	const FWidgetStyle& InWidgetStyle,
 	const bool bParentEnabled) const
 {
-	if (LogoTexture.IsValid())
+	if (bUsingVector || LogoTexture.IsValid())
 	{
 		FSlateDrawElement::MakeBox(
 			OutDrawElements,

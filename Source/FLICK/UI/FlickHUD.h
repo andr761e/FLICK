@@ -49,9 +49,7 @@ enum class EFlickMenuAction : uint8
 	PreviousLoadoutPiece,
 	NextLoadoutPiece,
 	ToggleLobbyReady,
-	LeaveLobby,
-	TogglePrivateSlot,
-	PrivateSpectate
+	LeaveLobby
 };
 
 struct FFlickMenuHitRegion
@@ -93,7 +91,6 @@ private:
 	void DrawTurnBanner(const AFlickGameState& GameState, float Width, float Height, float Now);
 	void DrawRoundOver(const AFlickGameState& GameState, float Width, float Height);
 	void DrawNetworkLobby(const AFlickGameState& GameState, const AFlickPlayerController& Controller, float Width, float Height);
-	void DrawPrivateMatchFrontend(const AFlickGameState& GameState, const AFlickPlayerController& Controller, float Width, float Height);
 	void DrawPartyFrontend(const AFlickGameState& GameState, const AFlickPlayerController& Controller, float Width, float Height);
 	void DrawControls(float Height);
 	void DrawTeamBlock(EFlickTeam Team, int32 ActivePieces, int32 StartingPieces, int32 ShotsTaken, int32 RoundsWon, int32 RoundsToWin, float X, float Y, float Width, bool bCurrent);

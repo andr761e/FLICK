@@ -183,8 +183,6 @@ void AFlickGameMode::BeginPlay()
 			SelectedMatchVariant = NormalizeMatchVariant(FlickGameInstance->GetSelectedMatchVariant());
 		}
 	}
-	MenuPreviewVariant = SelectedMatchVariant;
-	MenuPreviewPlayersPerTeam = CurrentPlayersPerTeam;
 	ApplySelectedMatchConfiguration();
 	StartMatch();
 	FrontendScreen = bNetworkMatchRequested
@@ -224,10 +222,6 @@ void AFlickGameMode::BeginPlay()
 	}
 
 #if !UE_BUILD_SHIPPING
-	if (FParse::Param(FCommandLine::Get(), TEXT("FlickMenuCyclePreview")))
-	{
-		MenuPreviewDuration = 0.8f;
-	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCoordinatorAutoQueue"))
 		&& !bCoordinatorAutoQueueConsumed
 		&& !bNetworkMatchRequested)
@@ -1292,7 +1286,7 @@ void AFlickGameMode::Logout(AController* Exiting)
 void AFlickGameMode::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	UpdateMainMenuPreview(DeltaSeconds);
+	UpdateMainMenuPresentation();
 
 	AFlickGameState* FlickGameState = GetFlickGameState();
 	if (FrontendScreen == EFlickFrontendScreen::NetworkLobby

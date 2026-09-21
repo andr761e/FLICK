@@ -112,6 +112,8 @@ public:
 	bool DisbandParty();
 	bool LeaveParty();
 	bool BeginPrivateMatchForParty();
+	bool LaunchPrivateMatchForParty();
+	void ResumePartySynchronizationAfterTravel();
 	bool PublishPartyCoordinatorAllocation(const FFlickCoordinatorAllocation& Allocation);
 	void RecordRecentPlayer(const FString& UserId, const FString& DisplayName);
 	UFlickPartySubsystem* GetPartySubsystem() const;
@@ -137,6 +139,8 @@ public:
 	const TArray<FFlickRecentPlayerEntry>& GetRecentPlayers() const { return RecentPlayers; }
 	FString GetOnlineServiceName() const;
 	FString GetLocalDisplayName() const;
+	EFlickPieceArchetype GetShowcaseArchetype() const { return LocalShowcaseArchetype; }
+	void CycleShowcaseArchetype(int32 Direction);
 	const FSlateBrush* GetLocalAvatarBrush();
 	const FSlateBrush* GetAvatarBrush(const FString& UserId);
 
@@ -156,6 +160,7 @@ private:
 	bool SendPartyInvite(const FString& FriendUserId, const FString& FriendDisplayName);
 	void LoadRecentPlayers();
 	void SaveRecentPlayers() const;
+	void PublishShowcaseArchetypeToParty() const;
 	void BeginDestroySession(bool bReturnToFrontend);
 	void TravelToFrontend();
 	void SetState(EFlickSessionState NewState, const FString& Message);
@@ -178,6 +183,7 @@ private:
 	void StartPartySynchronization();
 	void StopPartySynchronization();
 	void HandlePartyJoinTimeout();
+	void HandlePrivateMatchJoinTimeout();
 	void HandleNetworkFailure(
 		UWorld* World,
 		class UNetDriver* NetDriver,
@@ -195,6 +201,7 @@ private:
 	TMap<FString, TSharedPtr<FSlateBrush>> AvatarBrushes;
 	TArray<FFlickSocialPlayerEntry> Friends;
 	TArray<FFlickRecentPlayerEntry> RecentPlayers;
+	EFlickPieceArchetype LocalShowcaseArchetype = EFlickPieceArchetype::Standard;
 	EFlickSessionState State = EFlickSessionState::Idle;
 	FString StatusMessage = TEXT("STEAM SESSION SERVICE READY");
 	EFlickMatchVariant PendingHostVariant = EFlickMatchVariant::Classic;
@@ -233,6 +240,8 @@ private:
 	FTimerHandle PartySynchronizationTimer;
 	FTimerHandle PartyCommandTimer;
 	FTimerHandle PartyJoinTimeoutTimer;
+	FTimerHandle PrivateMatchJoinTimeoutTimer;
+	bool bAwaitingPrivateMatchTravel = false;
 	bool bPartyJoinTimedOut = false;
 	FString LastProcessedPartyCommand;
 

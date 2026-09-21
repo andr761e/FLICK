@@ -95,6 +95,21 @@ namespace
 		}
 	}
 
+	// The left-hand menu is designed for 16:9. On wider monitors its fixed
+	// 450-unit cards otherwise dominate the diagonal panel; scale the whole
+	// left column together so the wordmark, actions and profile stay related.
+	float GetMainMenuColumnScale()
+	{
+		FVector2D ViewportSize(ReferenceWidth, ReferenceHeight);
+		if (GEngine && GEngine->GameViewport)
+		{
+			GEngine->GameViewport->GetViewportSize(ViewportSize);
+		}
+		if (ViewportSize.Y <= 0.0f) return 1.0f;
+		const float Aspect = ViewportSize.X / ViewportSize.Y;
+		return FMath::Clamp((16.0f / 9.0f) / Aspect, 0.78f, 1.0f);
+	}
+
 	float GetDisplayStatValue(const FFlickPieceDisplayStats& Stats, const int32 StatIndex)
 	{
 		switch (StatIndex)
@@ -171,7 +186,13 @@ namespace
 
 			const float TopEdgeX = LocalSize.X * 0.345f;
 			const float BottomEdgeX = LocalSize.X * 0.395f;
-			const float EdgeWidth = FMath::Clamp(LocalSize.X * 0.00065f, 1.1f, 1.2f);
+			// The old one-pixel diagonal was rasterized as a hard triangle edge.
+			// Feather both the panel silhouette and its accent over a few screen
+			// pixels so the cut stays smooth at different viewport/DPI scales.
+			const float PixelScale = FMath::Max(AllottedGeometry.Scale, 0.01f);
+			const float InnerInset = 1.25f / PixelScale;
+			const float FeatherWidth = 3.0f / PixelScale;
+			const float EdgeWidth = 1.5f / PixelScale;
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			const FLinearColor LeftPanelColor = PanelColor.Get() * InWidgetStyle.GetColorAndOpacityTint();
 			FLinearColor RightPanelColor = LeftPanelColor;
@@ -181,23 +202,32 @@ namespace
 			const FColor EdgeTint = (EdgeColor.Get() * InWidgetStyle.GetColorAndOpacityTint()).ToFColor(true);
 
 			TArray<FSlateVertex> Vertices;
-			Vertices.Reserve(8);
+			Vertices.Reserve(12);
 			const auto AddVertex = [&Vertices, &Transform](const FVector2f Position, const FVector2f Uv, const FColor Color)
 			{
 				Vertices.Add(FSlateVertex::Make(Transform, Position, Uv, Color));
 			};
 			AddVertex(FVector2f(0.0f, 0.0f), FVector2f(0.0f, 0.0f), LeftPanelTint);
-			AddVertex(FVector2f(TopEdgeX, 0.0f), FVector2f(1.0f, 0.0f), RightPanelTint);
-			AddVertex(FVector2f(BottomEdgeX, LocalSize.Y), FVector2f(1.0f, 1.0f), RightPanelTint);
+			AddVertex(FVector2f(TopEdgeX - InnerInset, 0.0f), FVector2f(1.0f, 0.0f), RightPanelTint);
+			AddVertex(FVector2f(BottomEdgeX - InnerInset, LocalSize.Y), FVector2f(1.0f, 1.0f), RightPanelTint);
 			AddVertex(FVector2f(0.0f, LocalSize.Y), FVector2f(0.0f, 1.0f), LeftPanelTint);
+			FColor TransparentPanelTint = RightPanelTint;
+			TransparentPanelTint.A = 0;
+			AddVertex(FVector2f(TopEdgeX - InnerInset, 0.0f), FVector2f(0.0f, 0.0f), RightPanelTint);
+			AddVertex(FVector2f(TopEdgeX + FeatherWidth, 0.0f), FVector2f(1.0f, 0.0f), TransparentPanelTint);
+			AddVertex(FVector2f(BottomEdgeX + FeatherWidth, LocalSize.Y), FVector2f(1.0f, 1.0f), TransparentPanelTint);
+			AddVertex(FVector2f(BottomEdgeX - InnerInset, LocalSize.Y), FVector2f(0.0f, 1.0f), RightPanelTint);
+			FColor TransparentEdgeTint = EdgeTint;
+			TransparentEdgeTint.A = 0;
 			AddVertex(FVector2f(TopEdgeX - EdgeWidth, 0.0f), FVector2f(0.0f, 0.0f), EdgeTint);
-			AddVertex(FVector2f(TopEdgeX, 0.0f), FVector2f(1.0f, 0.0f), EdgeTint);
-			AddVertex(FVector2f(BottomEdgeX, LocalSize.Y), FVector2f(1.0f, 1.0f), EdgeTint);
+			AddVertex(FVector2f(TopEdgeX + FeatherWidth, 0.0f), FVector2f(1.0f, 0.0f), TransparentEdgeTint);
+			AddVertex(FVector2f(BottomEdgeX + FeatherWidth, LocalSize.Y), FVector2f(1.0f, 1.0f), TransparentEdgeTint);
 			AddVertex(FVector2f(BottomEdgeX - EdgeWidth, LocalSize.Y), FVector2f(0.0f, 1.0f), EdgeTint);
 
 			const TArray<SlateIndex> Indices = {
 				0, 1, 2, 0, 2, 3,
-				4, 5, 6, 4, 6, 7};
+				4, 5, 6, 4, 6, 7,
+				8, 9, 10, 8, 10, 11};
 			FSlateDrawElement::MakeCustomVerts(
 				OutDrawElements,
 				LayerId,
@@ -1361,16 +1391,12 @@ namespace
 			, _AccentColor(Brand)
 			, _CutSize(12.0f)
 			, _BorderWidth(1.15f)
-			, _ShowPuckWatermark(false)
-			, _RichShowcaseBorder(false)
 			, _Padding(FMargin(0.0f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, BackgroundColor)
 			SLATE_ATTRIBUTE(FLinearColor, AccentColor)
 			SLATE_ARGUMENT(float, CutSize)
 			SLATE_ARGUMENT(float, BorderWidth)
-			SLATE_ARGUMENT(bool, ShowPuckWatermark)
-			SLATE_ARGUMENT(bool, RichShowcaseBorder)
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
@@ -1381,8 +1407,6 @@ namespace
 			AccentColor = InArgs._AccentColor;
 			CutSize = InArgs._CutSize;
 			BorderWidth = InArgs._BorderWidth;
-			bShowPuckWatermark = InArgs._ShowPuckWatermark;
-			bRichShowcaseBorder = InArgs._RichShowcaseBorder;
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
 		}
 
@@ -1421,376 +1445,6 @@ namespace
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
 				TArray<FVector2D>{{Size.X * 0.72f, 1.0f}, {Size.X * 0.9f, Size.Y - 1.0f}},
 				Effect, FLinearColor::FromSRGBColor(FColor(9, 17, 19, 38)) * Tint, true, 26.0f);
-			if (bShowPuckWatermark)
-			{
-				const auto DrawWatermarkRing = [&](const FVector2D Center, const FVector2D Radii, const float Thickness)
-				{
-					TArray<FVector2D> Ring;
-					for (int32 Index = 0; Index <= 32; ++Index)
-					{
-						const float Angle = 2.0f * PI * static_cast<float>(Index) / 32.0f;
-						Ring.Add(Center + FVector2D(FMath::Cos(Angle) * Radii.X, FMath::Sin(Angle) * Radii.Y));
-					}
-					FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
-						Ring, Effect, FLinearColor(0.43f, 0.53f, 0.57f, 0.11f) * Tint, true, Thickness);
-				};
-				const FVector2D RearPuck(Size.X - 53.0f, Size.Y - 76.0f);
-				const FVector2D FrontPuck(Size.X - 74.0f, Size.Y - 29.0f);
-				DrawWatermarkRing(RearPuck + FVector2D(0.0f, 7.0f), FVector2D(42.0f, 17.0f), 6.0f);
-				DrawWatermarkRing(RearPuck, FVector2D(42.0f, 17.0f), 4.0f);
-				DrawWatermarkRing(RearPuck, FVector2D(23.0f, 9.0f), 1.5f);
-				DrawWatermarkRing(FrontPuck + FVector2D(0.0f, 7.0f), FVector2D(46.0f, 19.0f), 7.0f);
-				DrawWatermarkRing(FrontPuck, FVector2D(46.0f, 19.0f), 4.0f);
-				DrawWatermarkRing(FrontPuck, FVector2D(25.0f, 10.0f), 1.5f);
-			}
-			if (bRichShowcaseBorder)
-			{
-				TArray<FVector2D> Outline = Points;
-				Outline.Add(Points[0]);
-
-				// ---------------------------------------------------------------------
-				// COLORS
-				// ---------------------------------------------------------------------
-
-				// Main structural outline: cold blue/steel instead of neutral grey.
-				const FLinearColor BaseEdge =
-					FLinearColor::FromSRGBColor(FColor(55, 76, 82, 220)) * Tint;
-
-				// Brighter "technical" cyan rail.
-				const FLinearColor CyanEdge =
-					FLinearColor::FromSRGBColor(FColor(15, 170, 195, 220)) * Tint;
-
-				// Very subdued cyan used for secondary rails.
-				const FLinearColor CyanSoft =
-					FLinearColor::FromSRGBColor(FColor(15, 150, 175, 90)) * Tint;
-
-				// Existing brand lime.
-				const FLinearColor Lime = Accent;
-
-				const FLinearColor LimeSoft =
-					Lime.CopyWithNewOpacity(0.42f);
-
-				const FLinearColor LimeGlow =
-					Lime.CopyWithNewOpacity(0.11f);
-
-				const FLinearColor CyanGlow =
-					CyanEdge.CopyWithNewOpacity(0.085f);
-
-				// ---------------------------------------------------------------------
-				// THICKNESS
-				// ---------------------------------------------------------------------
-
-				const float BaseWidth = FMath::Max(1.0f, BorderWidth);
-				const float CyanWidth = 1.65f;
-				const float LimeWidth = 2.35f;
-
-				// ---------------------------------------------------------------------
-				// HELPERS
-				// ---------------------------------------------------------------------
-
-				const auto DrawPath =
-					[&](const TArray<FVector2D>& Path,
-						const FLinearColor& Color,
-						const float Width,
-						const int32 LayerOffset)
-					{
-						if (Path.Num() < 2)
-						{
-							return;
-						}
-
-						FSlateDrawElement::MakeLines(
-							OutDrawElements,
-							LayerId + LayerOffset,
-							AllottedGeometry.ToPaintGeometry(),
-							Path,
-							Effect,
-							Color,
-							true,
-							Width);
-					};
-
-				const auto DrawLine =
-					[&](const FVector2D& A,
-						const FVector2D& B,
-						const FLinearColor& Color,
-						const float Width,
-						const int32 LayerOffset)
-					{
-						DrawPath(
-							TArray<FVector2D>{ A, B },
-							Color,
-							Width,
-							LayerOffset);
-					};
-
-				const auto DrawGlowLine =
-					[&](const FVector2D& A,
-						const FVector2D& B,
-						const FLinearColor& GlowColor,
-						const float Width)
-					{
-						DrawLine(
-							A,
-							B,
-							GlowColor,
-							Width,
-							4);
-					};
-
-				// =====================================================================
-				// 1. STRUCTURAL OUTLINE
-				// =====================================================================
-
-				// Thin outline around the entire panel.
-				DrawPath(
-					Outline,
-					BaseEdge,
-					BaseWidth,
-					3);
-
-				// =====================================================================
-				// 2. TOP-LEFT CORNER
-				//
-				// Strong lime anchor, then cyan takes over.
-				// =====================================================================
-
-				const float TopLeftLimeEnd = Cut + 32.0f;
-
-				const TArray<FVector2D> TopLeftLime =
-				{
-					FVector2D(0.0f, Cut),
-					FVector2D(Cut, 0.0f),
-					FVector2D(TopLeftLimeEnd, 0.0f)
-				};
-
-				// Glow beneath lime.
-				DrawPath(
-					TopLeftLime,
-					LimeGlow,
-					6.0f,
-					4);
-
-				// Sharp lime on top.
-				DrawPath(
-					TopLeftLime,
-					Lime,
-					LimeWidth,
-					6);
-
-				// Cyan continuation after lime.
-				const float TopCyanStart = TopLeftLimeEnd + 5.0f;
-				const float TopCyanEnd = Size.X * 0.245f;
-
-				DrawGlowLine(
-					FVector2D(TopCyanStart, 0.0f),
-					FVector2D(TopCyanEnd, 0.0f),
-					CyanGlow,
-					5.0f);
-
-				DrawLine(
-					FVector2D(TopCyanStart, 0.0f),
-					FVector2D(TopCyanEnd, 0.0f),
-					CyanEdge,
-					CyanWidth,
-					6);
-
-				// Tiny secondary rail underneath the main top rail.
-				DrawLine(
-					FVector2D(TopCyanStart + 22.0f, 3.0f),
-					FVector2D(Size.X * 0.185f, 3.0f),
-					CyanSoft,
-					1.0f,
-					5);
-
-				// =====================================================================
-				// 3. TOP MID SECTION
-				//
-				// Broken segments instead of one continuous highlight.
-				// =====================================================================
-
-				DrawLine(
-					FVector2D(Size.X * 0.36f, 0.0f),
-					FVector2D(Size.X * 0.49f, 0.0f),
-					BaseEdge.CopyWithNewOpacity(0.85f),
-					1.5f,
-					5);
-
-				// Very subtle lime "energy" hit.
-				DrawGlowLine(
-					FVector2D(Size.X * 0.57f, 0.0f),
-					FVector2D(Size.X * 0.675f, 0.0f),
-					LimeGlow,
-					4.5f);
-
-				DrawLine(
-					FVector2D(Size.X * 0.585f, 0.0f),
-					FVector2D(Size.X * 0.665f, 0.0f),
-					LimeSoft,
-					1.35f,
-					6);
-
-				// Small break after this intentionally.
-				DrawLine(
-					FVector2D(Size.X * 0.72f, 0.0f),
-					FVector2D(Size.X - Cut - 18.0f, 0.0f),
-					CyanSoft,
-					1.0f,
-					5);
-
-				// =====================================================================
-				// 4. LEFT EDGE
-				//
-				// Reference has a subtle cyan presence down the left side.
-				// =====================================================================
-
-				DrawGlowLine(
-					FVector2D(0.0f, Cut + 14.0f),
-					FVector2D(0.0f, Size.Y * 0.40f),
-					CyanGlow,
-					4.5f);
-
-				DrawLine(
-					FVector2D(0.0f, Cut + 14.0f),
-					FVector2D(0.0f, Size.Y * 0.40f),
-					CyanEdge.CopyWithNewOpacity(0.66f),
-					1.35f,
-					5);
-
-				// Very small lime fragment directly underneath the corner.
-				DrawLine(
-					FVector2D(0.0f, Cut + 4.0f),
-					FVector2D(0.0f, Cut + 17.0f),
-					LimeSoft,
-					1.65f,
-					6);
-
-				// =====================================================================
-				// 5. BOTTOM LEFT + MID
-				//
-				// Multiple separate cyan rails with gaps.
-				// =====================================================================
-
-				const float BottomY = Size.Y;
-
-				DrawGlowLine(
-					FVector2D(Cut + 8.0f, BottomY),
-					FVector2D(Size.X * 0.27f, BottomY),
-					CyanGlow,
-					4.0f);
-
-				DrawLine(
-					FVector2D(Cut + 8.0f, BottomY),
-					FVector2D(Size.X * 0.27f, BottomY),
-					CyanEdge.CopyWithNewOpacity(0.72f),
-					1.5f,
-					6);
-
-				// Gap.
-
-				DrawLine(
-					FVector2D(Size.X * 0.34f, BottomY),
-					FVector2D(Size.X * 0.61f, BottomY),
-					CyanSoft,
-					1.25f,
-					5);
-
-				// Secondary inner rail.
-				DrawLine(
-					FVector2D(Size.X * 0.40f, BottomY - 3.0f),
-					FVector2D(Size.X * 0.55f, BottomY - 3.0f),
-					CyanSoft.CopyWithNewOpacity(0.26f),
-					1.0f,
-					5);
-
-				// =====================================================================
-				// 6. BOTTOM-RIGHT ENERGY SECTION
-				//
-				// This should be the strongest part after the top-left corner.
-				// =====================================================================
-
-				const float BottomLimeStart = Size.X * 0.79f;
-
-				// A subdued cyan lead-in before lime takes over.
-				DrawLine(
-					FVector2D(Size.X * 0.66f, BottomY),
-					FVector2D(BottomLimeStart - 7.0f, BottomY),
-					CyanEdge.CopyWithNewOpacity(0.48f),
-					1.35f,
-					5);
-
-				const TArray<FVector2D> BottomRightLime =
-				{
-					FVector2D(BottomLimeStart, BottomY),
-					FVector2D(Size.X - Cut, BottomY),
-					FVector2D(Size.X, BottomY - Cut),
-					FVector2D(Size.X, BottomY - Cut - 18.0f)
-				};
-
-				// Larger glow.
-				DrawPath(
-					BottomRightLime,
-					LimeGlow,
-					6.5f,
-					4);
-
-				// Crisp rail.
-				DrawPath(
-					BottomRightLime,
-					Lime,
-					LimeWidth,
-					6);
-
-				// Short parallel lime rail just inside the bottom border.
-				DrawLine(
-					FVector2D(Size.X * 0.845f, BottomY - 3.5f),
-					FVector2D(Size.X - Cut - 12.0f, BottomY - 3.5f),
-					Lime.CopyWithNewOpacity(0.32f),
-					1.0f,
-					5);
-
-				// =====================================================================
-				// 7. RIGHT EDGE
-				//
-				// Keep this subdued. We don't want symmetry.
-				// =====================================================================
-
-				DrawLine(
-					FVector2D(Size.X, Size.Y * 0.50f),
-					FVector2D(Size.X, Size.Y * 0.70f),
-					CyanSoft,
-					1.0f,
-					5);
-
-				// =====================================================================
-				// 8. SMALL TECHNICAL TICKS
-				//
-				// These tiny interruptions add a surprising amount of "designed" feel.
-				// =====================================================================
-
-				DrawLine(
-					FVector2D(Size.X * 0.315f, 0.0f),
-					FVector2D(Size.X * 0.315f, 4.0f),
-					CyanEdge.CopyWithNewOpacity(0.38f),
-					1.0f,
-					6);
-
-				DrawLine(
-					FVector2D(Size.X * 0.685f, BottomY),
-					FVector2D(Size.X * 0.685f, BottomY - 4.0f),
-					CyanEdge.CopyWithNewOpacity(0.38f),
-					1.0f,
-					6);
-
-				return SCompoundWidget::OnPaint(
-					Args,
-					AllottedGeometry,
-					MyCullingRect,
-					OutDrawElements,
-					LayerId + 7,
-					InWidgetStyle,
-					bParentEnabled);
-			}
 			TArray<FVector2D> Outline = Points;
 			Outline.Add(Points[0]);
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
@@ -1812,8 +1466,6 @@ namespace
 		TAttribute<FLinearColor> AccentColor;
 		float CutSize = 12.0f;
 		float BorderWidth = 1.15f;
-		bool bShowPuckWatermark = false;
-		bool bRichShowcaseBorder = false;
 	};
 
 	class SFlickPlayHeaderPanel final : public SCompoundWidget
@@ -2026,64 +1678,6 @@ namespace
 		}
 	};
 
-	class SFlickShowcaseProgress final : public SLeafWidget
-	{
-	public:
-		SLATE_BEGIN_ARGS(SFlickShowcaseProgress)
-			: _AccentColor(Cyan)
-		{}
-			SLATE_ATTRIBUTE(float, Percent)
-			SLATE_ATTRIBUTE(FLinearColor, AccentColor)
-		SLATE_END_ARGS()
-
-		void Construct(const FArguments& InArgs)
-		{
-			Percent = InArgs._Percent;
-			AccentColor = InArgs._AccentColor;
-			SetCanTick(false);
-		}
-
-		virtual FVector2D ComputeDesiredSize(const float LayoutScaleMultiplier) const override
-		{
-			return FVector2D(1.0f, 18.0f);
-		}
-
-		virtual int32 OnPaint(
-			const FPaintArgs& Args,
-			const FGeometry& AllottedGeometry,
-			const FSlateRect& MyCullingRect,
-			FSlateWindowElementList& OutDrawElements,
-			const int32 LayerId,
-			const FWidgetStyle& InWidgetStyle,
-			const bool bParentEnabled) const override
-		{
-			const FVector2D Size = AllottedGeometry.GetLocalSize();
-			FSlateDrawElement::MakeBox(
-				OutDrawElements,
-				LayerId,
-				AllottedGeometry.ToPaintGeometry(),
-				WhiteBrush(),
-				ESlateDrawEffect::None,
-				FLinearColor(0.055f, 0.055f, 0.05f, 0.92f));
-
-			const float FillWidth = Size.X * FMath::Clamp(Percent.Get(), 0.0f, 1.0f);
-			if (FillWidth > 0.5f)
-			{
-				FSlateDrawElement::MakeBox(
-					OutDrawElements,
-					LayerId + 1,
-					AllottedGeometry.ToPaintGeometry(FVector2D(FillWidth, Size.Y), FSlateLayoutTransform()),
-					WhiteBrush(),
-					ESlateDrawEffect::None,
-					AccentColor.Get());
-			}
-			return LayerId + 1;
-		}
-
-	private:
-		TAttribute<float> Percent;
-		TAttribute<FLinearColor> AccentColor;
-	};
 
 	class SFlickRadarChart final : public SLeafWidget
 	{
