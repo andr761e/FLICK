@@ -177,6 +177,7 @@ private:
 	void RefreshPartyFromSession();
 	void StartPartySynchronization();
 	void StopPartySynchronization();
+	void HandlePartyJoinTimeout();
 	void HandleNetworkFailure(
 		UWorld* World,
 		class UNetDriver* NetDriver,
@@ -231,6 +232,8 @@ private:
 	FTimerHandle AvatarRefreshTimer;
 	FTimerHandle PartySynchronizationTimer;
 	FTimerHandle PartyCommandTimer;
+	FTimerHandle PartyJoinTimeoutTimer;
+	bool bPartyJoinTimedOut = false;
 	FString LastProcessedPartyCommand;
 
 	FDelegateHandle CreateSessionHandle;

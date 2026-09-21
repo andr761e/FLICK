@@ -67,6 +67,20 @@ namespace
 	{
 		return Context ? Online::GetSubsystem(Context->GetWorld()) : nullptr;
 	}
+
+#if WITH_FLICK_STEAMWORKS
+	uint64 GetSteamLobbyId(const FString& SessionId)
+	{
+		// OSS Steam formats lobby sessions as "Lobby[0x...]", not a decimal id.
+		FString Number = SessionId;
+		if (Number.StartsWith(TEXT("Lobby[0x")) && Number.EndsWith(TEXT("]")))
+		{
+			Number = Number.Mid(8, Number.Len() - 9);
+			return FCString::Strtoui64(*Number, nullptr, 16);
+		}
+		return FCString::Strtoui64(*Number, nullptr, 10);
+	}
+#endif
 }
 
 void UFlickSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -91,6 +105,10 @@ void UFlickSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UFlickSessionSubsystem::Deinitialize()
 {
 	StopPartySynchronization();
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(PartyJoinTimeoutTimer);
+	}
 	if (UFlickPartySubsystem* Party = GetPartySubsystem())
 	{
 		Party->Clear();
@@ -1022,7 +1040,32 @@ bool UFlickSessionSubsystem::JoinSearchResult(const FOnlineSessionSearchResult& 
 		SetState(EFlickSessionState::Error, TEXT("STEAM REJECTED THE JOIN REQUEST"));
 		return false;
 	}
+	if (ActivePurpose == EFlickSessionPurpose::Party && GetWorld())
+	{
+		bPartyJoinTimedOut = false;
+		GetWorld()->GetTimerManager().SetTimer(
+			PartyJoinTimeoutTimer, this, &UFlickSessionSubsystem::HandlePartyJoinTimeout, 15.0f, false);
+	}
 	return true;
+}
+
+void UFlickSessionSubsystem::HandlePartyJoinTimeout()
+{
+	if (ActivePurpose != EFlickSessionPurpose::Party || State != EFlickSessionState::Joining)
+	{
+		return;
+	}
+	UE_LOG(LogFlick, Error, TEXT("Steam party JoinSession callback timed out after 15 seconds"));
+	bPartyJoinTimedOut = true;
+	if (HasActiveSession())
+	{
+		BeginDestroySession(false);
+	}
+	else
+	{
+		ActivePurpose = EFlickSessionPurpose::Match;
+		SetState(EFlickSessionState::Error, TEXT("STEAM PARTY JOIN TIMED OUT - TRY THE INVITE AGAIN"));
+	}
 }
 
 bool UFlickSessionSubsystem::LeaveSession(const bool bReturnToFrontend)
@@ -1290,7 +1333,7 @@ bool UFlickSessionSubsystem::PromotePartyMember(const FString& UserId)
 	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
 	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
 	const FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
-	const uint64 LobbyId = NamedSession ? FCString::Strtoui64(*NamedSession->GetSessionIdStr(), nullptr, 10) : 0;
+	const uint64 LobbyId = NamedSession ? GetSteamLobbyId(NamedSession->GetSessionIdStr()) : 0;
 	const uint64 TargetId = FCString::Strtoui64(*UserId, nullptr, 10);
 	if (LobbyId != 0 && TargetId != 0 && SteamMatchmaking()
 		&& SteamMatchmaking()->SetLobbyOwner(CSteamID(LobbyId), CSteamID(TargetId)))
@@ -1824,6 +1867,14 @@ void UFlickSessionSubsystem::HandleJoinSessionComplete(
 	const FName SessionName,
 	const EOnJoinSessionCompleteResult::Type Result)
 {
+	if (SessionName == NAME_GameSession && GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(PartyJoinTimeoutTimer);
+	}
+	if (bPartyJoinTimedOut)
+	{
+		return;
+	}
 	if (SessionName != NAME_GameSession || Result != EOnJoinSessionCompleteResult::Success)
 	{
 		bMatchmakingActive = false;
@@ -1895,6 +1946,13 @@ void UFlickSessionSubsystem::HandleDestroySessionComplete(const FName SessionNam
 {
 	if (SessionName != NAME_GameSession)
 	{
+		return;
+	}
+	if (bPartyJoinTimedOut)
+	{
+		bPartyJoinTimedOut = false;
+		ActivePurpose = EFlickSessionPurpose::Match;
+		SetState(EFlickSessionState::Error, TEXT("STEAM PARTY JOIN TIMED OUT - TRY THE INVITE AGAIN"));
 		return;
 	}
 	const bool bShouldHost = bHostAfterDestroy;
@@ -2094,31 +2152,21 @@ void UFlickSessionSubsystem::RefreshPartyFromSession()
 	{
 		PartyId = NamedSession->GetSessionIdStr();
 	}
-	const FString LeaderId = NamedSession->OwningUserId.IsValid()
+	FString LeaderId = NamedSession->OwningUserId.IsValid()
 		? NamedSession->OwningUserId->ToString() : FString();
 	const FUniqueNetIdPtr LocalNetId = Identity.IsValid() ? Identity->GetUniquePlayerId(0) : nullptr;
 	const FString LocalId = LocalNetId.IsValid() ? LocalNetId->ToString() : FString();
 
-	TArray<FUniqueNetIdRef> ParticipantIds = NamedSession->RegisteredPlayers;
-	if (NamedSession->OwningUserId.IsValid()
-		&& !ParticipantIds.ContainsByPredicate([&NamedSession](const FUniqueNetIdRef& Id)
-		{
-			return Id->ToString() == NamedSession->OwningUserId->ToString();
-		}))
-	{
-		ParticipantIds.Insert(NamedSession->OwningUserId.ToSharedRef(), 0);
-	}
-	if (LocalNetId.IsValid()
-		&& !ParticipantIds.ContainsByPredicate([&LocalId](const FUniqueNetIdRef& Id) { return Id->ToString() == LocalId; }))
-	{
-		ParticipantIds.Add(LocalNetId.ToSharedRef());
-	}
-
 	TArray<TPair<FString, FString>> Members;
-	for (const FUniqueNetIdRef& ParticipantId : ParticipantIds)
+	const auto AddMember = [this, &Members, &Identity, &LocalId](const FString& UserId, const FUniqueNetId* ParticipantId)
 	{
-		const FString UserId = ParticipantId->ToString();
-		FString DisplayName = Identity.IsValid() ? Identity->GetPlayerNickname(*ParticipantId) : FString();
+		if (UserId.IsEmpty() || Members.ContainsByPredicate(
+			[&UserId](const TPair<FString, FString>& Entry) { return Entry.Key == UserId; }))
+		{
+			return;
+		}
+		FString DisplayName = Identity.IsValid() && ParticipantId
+			? Identity->GetPlayerNickname(*ParticipantId) : FString();
 		if (DisplayName.IsEmpty())
 		{
 			if (const FFlickSocialPlayerEntry* Friend = Friends.FindByPredicate(
@@ -2132,6 +2180,52 @@ void UFlickSessionSubsystem::RefreshPartyFromSession()
 			DisplayName = GetLocalDisplayName();
 		}
 		Members.Emplace(UserId, DisplayName);
+	};
+
+#if WITH_FLICK_STEAMWORKS
+	const uint64 SteamLobbyId = GetSteamLobbyId(NamedSession->GetSessionIdStr());
+	if (SteamLobbyId != 0 && SteamMatchmaking())
+	{
+		const CSteamID Lobby(SteamLobbyId);
+		const CSteamID Owner = SteamMatchmaking()->GetLobbyOwner(Lobby);
+		if (Owner.IsValid())
+		{
+			LeaderId = LexToString(Owner.ConvertToUint64());
+		}
+		const int32 MemberCount = SteamMatchmaking()->GetNumLobbyMembers(Lobby);
+		for (int32 Index = 0; Index < MemberCount; ++Index)
+		{
+			const CSteamID Member = SteamMatchmaking()->GetLobbyMemberByIndex(Lobby, Index);
+			if (!Member.IsValid())
+			{
+				continue;
+			}
+			const FString UserId = LexToString(Member.ConvertToUint64());
+			FString DisplayName;
+			if (SteamFriends())
+			{
+				DisplayName = UTF8_TO_TCHAR(SteamFriends()->GetFriendPersonaName(Member));
+			}
+			Members.Emplace(UserId, DisplayName);
+		}
+	}
+#endif
+	if (Members.IsEmpty())
+	{
+		// Non-Steam development fallback. Steam lobbies do not reliably populate
+		// RegisteredPlayers, so the live lobby roster above is authoritative.
+		for (const FUniqueNetIdRef& ParticipantId : NamedSession->RegisteredPlayers)
+		{
+			AddMember(ParticipantId->ToString(), &ParticipantId.Get());
+		}
+		if (NamedSession->OwningUserId.IsValid())
+		{
+			AddMember(NamedSession->OwningUserId->ToString(), NamedSession->OwningUserId.Get());
+		}
+		if (LocalNetId.IsValid())
+		{
+			AddMember(LocalId, LocalNetId.Get());
+		}
 	}
 	Party->Synchronize(PartyId, LeaderId, Members, LocalId);
 	PersistentPartyId = PartyId;
