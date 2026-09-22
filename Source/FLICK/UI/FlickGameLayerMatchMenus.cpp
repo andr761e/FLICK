@@ -990,25 +990,69 @@ FText SFlickGameLayer::GetScoreboardPlayerName(
 			return FText::FromString(TEXT("YOU"));
 		}
 	}
-	if (const AFlickGameState* State = GetScoreboardGameState())
+	if (const AFlickPlayerState* PlayerState = FindScoreboardPlayerState(Team, PlayerSlot))
 	{
-		for (const APlayerState* BasePlayerState : State->PlayerArray)
-		{
-			const AFlickPlayerState* FlickPlayerState = Cast<AFlickPlayerState>(BasePlayerState);
-			if (FlickPlayerState
-				&& ((FlickPlayerState->GetTeam() == Team
-						&& FlickPlayerState->GetTeamPlayerSlot() == PlayerSlot)
-					|| FlickPlayerState->ControlsPrivateSlot(Team, PlayerSlot))
-				&& !FlickPlayerState->GetPlayerName().IsEmpty())
-			{
-				return FText::FromString(FlickPlayerState->GetPlayerName());
-			}
-		}
+		if (!PlayerState->GetPlayerName().IsEmpty()) return FText::FromString(PlayerState->GetPlayerName());
 	}
 
-	return FText::FromString(Team == EFlickTeam::Player1
-		? FString::Printf(TEXT("BLUE PLAYER %d"), PlayerSlot + 1)
-		: FString::Printf(TEXT("ORANGE PLAYER %d"), PlayerSlot + 1));
+	const bool bBotSeat = GameMode.IsValid() && GameMode->IsTrainingBotMatch()
+		|| (GetScoreboardGameState() && GetScoreboardGameState()->bPrivateMatchActive);
+	return FText::FromString(FString::Printf(
+		TEXT("%s %s %d"),
+		Team == EFlickTeam::Player1 ? TEXT("BLUE") : TEXT("ORANGE"),
+		bBotSeat ? TEXT("BOT") : TEXT("PLAYER"),
+		PlayerSlot + 1));
+}
+
+const AFlickPlayerState* SFlickGameLayer::FindScoreboardPlayerState(
+	const EFlickTeam Team,
+	const int32 PlayerSlot) const
+{
+	const AFlickGameState* State = GetScoreboardGameState();
+	if (!State) return nullptr;
+	for (const APlayerState* BasePlayerState : State->PlayerArray)
+	{
+		const AFlickPlayerState* PlayerState = Cast<AFlickPlayerState>(BasePlayerState);
+		if (PlayerState && ((PlayerState->GetTeam() == Team && PlayerState->GetTeamPlayerSlot() == PlayerSlot)
+			|| PlayerState->ControlsPrivateSlot(Team, PlayerSlot)))
+		{
+			return PlayerState;
+		}
+	}
+	return nullptr;
+}
+
+FText SFlickGameLayer::GetScoreboardPingText(const EFlickTeam Team, const int32 PlayerSlot) const
+{
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickScoreboardPreview")))
+	{
+		return FText::AsNumber(28 + PlayerSlot * 27 + (Team == EFlickTeam::Player2 ? 19 : 0));
+	}
+	const AFlickGameState* State = GetScoreboardGameState();
+	const AFlickPlayerState* PlayerState = FindScoreboardPlayerState(Team, PlayerSlot);
+	if (!State || State->GetNetMode() == NM_Standalone || !PlayerState || PlayerState->IsABot())
+	{
+		return FText::FromString(TEXT("—"));
+	}
+	return FText::AsNumber(FMath::Clamp(FMath::RoundToInt(PlayerState->GetPingInMilliseconds()), 0, 999));
+}
+
+FLinearColor SFlickGameLayer::GetScoreboardPingColor(const EFlickTeam Team, const int32 PlayerSlot) const
+{
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickScoreboardPreview")))
+	{
+		return FLinearColor(0.68f, 0.98f, 0.29f, 1.0f);
+	}
+	const AFlickGameState* State = GetScoreboardGameState();
+	const AFlickPlayerState* PlayerState = FindScoreboardPlayerState(Team, PlayerSlot);
+	if (!State || State->GetNetMode() == NM_Standalone || !PlayerState || PlayerState->IsABot())
+	{
+		return FLinearColor(0.46f, 0.54f, 0.58f, 1.0f);
+	}
+	const float Ping = PlayerState->GetPingInMilliseconds();
+	return Ping < 80.0f ? FLinearColor(0.68f, 0.98f, 0.29f, 1.0f)
+		: Ping < 150.0f ? FLinearColor(1.0f, 0.78f, 0.28f, 1.0f)
+		: FLinearColor(1.0f, 0.39f, 0.28f, 1.0f);
 }
 
 FText SFlickGameLayer::GetScoreboardStatText(

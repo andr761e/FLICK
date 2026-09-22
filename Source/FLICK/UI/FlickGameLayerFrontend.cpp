@@ -183,7 +183,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 				]
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(MainMenuStackMetrics::GetRowLeft(5), 0.0f, 0.0f, 0.0f)
 				[
-					SNew(SBox).WidthOverride(MainMenuStackMetrics::GetRowWidth(5))
+					SAssignNew(MainMenuQuitCard, SBox).WidthOverride(MainMenuStackMetrics::GetRowWidth(5))
 					[
 						MakeMainMenuButton(TEXT("QUIT"), FOnClicked::CreateLambda([this]()
 						{
@@ -205,7 +205,28 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
+				SAssignNew(MainMenuPuckAnchor, SBox).WidthOverride(380.0f).HeightOverride(32.0f)
+				[
 				SNew(SBox).WidthOverride(380.0f).HeightOverride(32.0f)
+				.RenderTransform_Lambda([this]()
+				{
+					if (!MainMenuQuitCard.IsValid() || !MainMenuProfileCard.IsValid() || !MainMenuPuckAnchor.IsValid())
+					{
+						return FSlateRenderTransform();
+					}
+					const FSlateRect QuitBounds = MainMenuQuitCard->GetCachedGeometry().GetRenderBoundingRect();
+					const FSlateRect ProfileBounds = MainMenuProfileCard->GetCachedGeometry().GetRenderBoundingRect();
+					const FGeometry AnchorGeometry = MainMenuPuckAnchor->GetCachedGeometry();
+					if (QuitBounds.GetSize().Y <= 0.0f || ProfileBounds.GetSize().Y <= 0.0f
+						|| AnchorGeometry.GetLocalSize().Y <= 0.0f)
+					{
+						return FSlateRenderTransform();
+					}
+					const float MidpointY = (QuitBounds.Bottom + ProfileBounds.Top) * 0.5f;
+					const FVector2D MidpointAbsolute(AnchorGeometry.GetAbsolutePosition().X, MidpointY);
+					const float MidpointLocalY = AnchorGeometry.AbsoluteToLocal(MidpointAbsolute).Y;
+					return FSlateRenderTransform(FVector2D(0.0f, MidpointLocalY - AnchorGeometry.GetLocalSize().Y * 0.5f));
+				})
 				[
 					SNew(SFlickMainMenuPanel)
 					.BackgroundColor(FLinearColor::FromSRGBColor(FColor(10, 20, 23, 238)))
@@ -240,10 +261,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						]
 					]
 				]
+				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
 			[
-			SNew(SBox).WidthOverride(380.0f).HeightOverride(82.0f)
+			SAssignNew(MainMenuProfileCard, SBox).WidthOverride(380.0f).HeightOverride(82.0f)
 			[
 				SNew(SFlickMainMenuPanel)
 				.BackgroundColor_Lambda([this]()

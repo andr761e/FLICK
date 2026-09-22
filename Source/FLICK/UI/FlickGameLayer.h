@@ -177,7 +177,10 @@ private:
 	FSlateColor GetNextTurnColor() const;
 	EVisibility GetNextTurnVisibility() const;
 	FText GetScoreboardPlayerName(EFlickTeam Team, int32 PlayerSlot) const;
+	const AFlickPlayerState* FindScoreboardPlayerState(EFlickTeam Team, int32 PlayerSlot) const;
 	FText GetScoreboardStatText(EFlickTeam Team, int32 PlayerSlot, int32 StatIndex) const;
+	FText GetScoreboardPingText(EFlickTeam Team, int32 PlayerSlot) const;
+	FLinearColor GetScoreboardPingColor(EFlickTeam Team, int32 PlayerSlot) const;
 	FText GetScoreboardTeamSummary(EFlickTeam Team) const;
 	FText GetScoreboardMatchSummary() const;
 	FText GetRoundResultText() const;
@@ -229,6 +232,9 @@ private:
 	FSliderStyle SliderStyle;
 	FProgressBarStyle ShotClockBarStyle;
 	TSharedPtr<SWidget> StartupOverlayWidget;
+	TSharedPtr<SBox> MainMenuQuitCard;
+	TSharedPtr<SBox> MainMenuProfileCard;
+	TSharedPtr<SBox> MainMenuPuckAnchor;
 	EFlickFrontendScreen LastFocusedScreen = EFlickFrontendScreen::Playing;
 	bool bLastRoundOverVisible = false;
 	bool bHasAppliedInitialFocus = false;
