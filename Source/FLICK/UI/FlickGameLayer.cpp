@@ -413,6 +413,16 @@ void SFlickGameLayer::Tick(
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 	LayerLocalSize = AllottedGeometry.GetLocalSize();
+	const bool bFooterVisible = GetScreenVisibility(EFlickFrontendScreen::MainMenu) != EVisibility::Collapsed;
+	if (bFooterVisible)
+	{
+		// Restart at the right edge when returning from another menu instead of
+		// advancing the ticker while it is hidden.
+		FooterTickerElapsed = bFooterTickerWasVisible
+			? FooterTickerElapsed + FMath::Max(0.0f, InDeltaTime)
+			: 0.0;
+	}
+	bFooterTickerWasVisible = bFooterVisible;
 	if (bStartupOverlayVisible)
 	{
 		StartupOverlayElapsed += InDeltaTime;

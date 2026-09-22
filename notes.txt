@@ -17,4 +17,4 @@ Til OH;
 
 Things to implement;
 - Diagonal cut overlay in the main menu is low quality and very pixalated along the right side
-- There is a "joining private match" screen for the 
+- Entering the play menu and going back to the main menu disables the running text in the footer.

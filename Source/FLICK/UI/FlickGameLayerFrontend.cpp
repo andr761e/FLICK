@@ -504,12 +504,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuFooter()
 			+ SOverlay::Slot().VAlign(VAlign_Center)
 			[
 				SNew(SHorizontalBox)
-				.RenderTransform_Lambda([this, TickerStartTime = FPlatformTime::Seconds()]()
+				.RenderTransform_Lambda([this]()
 				{
 					const float ViewportWidth = FMath::Max(LayerLocalSize.X, 1.0f);
 					const double TravelDistance = static_cast<double>(ViewportWidth) + 1900.0;
-					const double ElapsedTime = FMath::Max(0.0, FPlatformTime::Seconds() - TickerStartTime);
-					const float Offset = static_cast<float>(FMath::Fmod(ElapsedTime * 55.0, TravelDistance));
+					const float Offset = static_cast<float>(FMath::Fmod(FooterTickerElapsed * 55.0, TravelDistance));
 					return FSlateRenderTransform(FVector2D(ViewportWidth - 120.0f - Offset, 0.0f));
 				})
 				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK NETWORK  "))).Font(UiFont(8, true)).ColorAndOpacity(Muted)]

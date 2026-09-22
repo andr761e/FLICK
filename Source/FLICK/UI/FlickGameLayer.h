@@ -249,6 +249,8 @@ private:
 	float StartupOverlayHoldDuration = 0.0f;
 	float StartupOverlayFadeDuration = 0.35f;
 	FVector2D LayerLocalSize = FVector2D(1920.0f, 1080.0f);
+	double FooterTickerElapsed = 0.0;
+	bool bFooterTickerWasVisible = false;
 	EFlickPlayPlaylist SelectedPlayPlaylist = EFlickPlayPlaylist::None;
 	int32 SelectedPlayFormat = 0;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;

@@ -186,48 +186,54 @@ namespace
 
 			const float TopEdgeX = LocalSize.X * 0.345f;
 			const float BottomEdgeX = LocalSize.X * 0.395f;
-			// The old one-pixel diagonal was rasterized as a hard triangle edge.
-			// Feather both the panel silhouette and its accent over a few screen
-			// pixels so the cut stays smooth at different viewport/DPI scales.
+			// Slate custom vertices are not MSAA'd. Evaluate the diagonal's
+			// signed-distance coverage in screen pixels instead of ending a pair of
+			// triangles at an opaque, stair-stepped edge. Multiple narrow bands
+			// approximate smoothstep, while the technical line uses Slate's AA path.
 			const float PixelScale = FMath::Max(AllottedGeometry.Scale, 0.01f);
-			const float InnerInset = 1.25f / PixelScale;
-			const float FeatherWidth = 3.0f / PixelScale;
-			const float EdgeWidth = 1.5f / PixelScale;
+			constexpr float CoverageOffsets[] = {-3.0f, -2.0f, -1.0f, 0.0f, 1.0f, 2.0f, 3.0f};
+			constexpr float CoverageAlpha[] = {1.0f, 1.0f, 0.90f, 0.5f, 0.10f, 0.0f, 0.0f};
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			const FLinearColor LeftPanelColor = PanelColor.Get() * InWidgetStyle.GetColorAndOpacityTint();
 			FLinearColor RightPanelColor = LeftPanelColor;
 			RightPanelColor.A *= 0.93f;
 			const FColor LeftPanelTint = LeftPanelColor.ToFColor(true);
-			const FColor RightPanelTint = RightPanelColor.ToFColor(true);
-			const FColor EdgeTint = (EdgeColor.Get() * InWidgetStyle.GetColorAndOpacityTint()).ToFColor(true);
 
 			TArray<FSlateVertex> Vertices;
-			Vertices.Reserve(12);
+			constexpr int32 Columns = 1 + UE_ARRAY_COUNT(CoverageOffsets);
+			Vertices.Reserve(Columns * 2);
 			const auto AddVertex = [&Vertices, &Transform](const FVector2f Position, const FVector2f Uv, const FColor Color)
 			{
 				Vertices.Add(FSlateVertex::Make(Transform, Position, Uv, Color));
 			};
-			AddVertex(FVector2f(0.0f, 0.0f), FVector2f(0.0f, 0.0f), LeftPanelTint);
-			AddVertex(FVector2f(TopEdgeX - InnerInset, 0.0f), FVector2f(1.0f, 0.0f), RightPanelTint);
-			AddVertex(FVector2f(BottomEdgeX - InnerInset, LocalSize.Y), FVector2f(1.0f, 1.0f), RightPanelTint);
-			AddVertex(FVector2f(0.0f, LocalSize.Y), FVector2f(0.0f, 1.0f), LeftPanelTint);
-			FColor TransparentPanelTint = RightPanelTint;
-			TransparentPanelTint.A = 0;
-			AddVertex(FVector2f(TopEdgeX - InnerInset, 0.0f), FVector2f(0.0f, 0.0f), RightPanelTint);
-			AddVertex(FVector2f(TopEdgeX + FeatherWidth, 0.0f), FVector2f(1.0f, 0.0f), TransparentPanelTint);
-			AddVertex(FVector2f(BottomEdgeX + FeatherWidth, LocalSize.Y), FVector2f(1.0f, 1.0f), TransparentPanelTint);
-			AddVertex(FVector2f(BottomEdgeX - InnerInset, LocalSize.Y), FVector2f(0.0f, 1.0f), RightPanelTint);
-			FColor TransparentEdgeTint = EdgeTint;
-			TransparentEdgeTint.A = 0;
-			AddVertex(FVector2f(TopEdgeX - EdgeWidth, 0.0f), FVector2f(0.0f, 0.0f), EdgeTint);
-			AddVertex(FVector2f(TopEdgeX + FeatherWidth, 0.0f), FVector2f(1.0f, 0.0f), TransparentEdgeTint);
-			AddVertex(FVector2f(BottomEdgeX + FeatherWidth, LocalSize.Y), FVector2f(1.0f, 1.0f), TransparentEdgeTint);
-			AddVertex(FVector2f(BottomEdgeX - EdgeWidth, LocalSize.Y), FVector2f(0.0f, 1.0f), EdgeTint);
-
-			const TArray<SlateIndex> Indices = {
-				0, 1, 2, 0, 2, 3,
-				4, 5, 6, 4, 6, 7,
-				8, 9, 10, 8, 10, 11};
+			TArray<SlateIndex> Indices;
+			Indices.Reserve((Columns - 1) * 6);
+			for (int32 Row = 0; Row < 2; ++Row)
+			{
+				const float Y = Row == 0 ? 0.0f : LocalSize.Y;
+				const float EdgeX = Row == 0 ? TopEdgeX : BottomEdgeX;
+				AddVertex(FVector2f(0.0f, Y), FVector2f(0.0f, static_cast<float>(Row)), LeftPanelTint);
+				for (int32 Band = 0; Band < UE_ARRAY_COUNT(CoverageOffsets); ++Band)
+				{
+					FLinearColor BandColor = RightPanelColor;
+					BandColor.A *= CoverageAlpha[Band];
+					AddVertex(
+						FVector2f(EdgeX + CoverageOffsets[Band] / PixelScale, Y),
+						FVector2f(1.0f, static_cast<float>(Row)),
+						BandColor.ToFColor(true));
+				}
+			}
+			for (int32 Column = 0; Column < Columns - 1; ++Column)
+			{
+				const SlateIndex TopLeft = static_cast<SlateIndex>(Column);
+				const SlateIndex BottomLeft = static_cast<SlateIndex>(Column + Columns);
+				Indices.Add(TopLeft);
+				Indices.Add(TopLeft + 1);
+				Indices.Add(BottomLeft + 1);
+				Indices.Add(TopLeft);
+				Indices.Add(BottomLeft + 1);
+				Indices.Add(BottomLeft);
+			}
 			FSlateDrawElement::MakeCustomVerts(
 				OutDrawElements,
 				LayerId,
@@ -237,7 +243,13 @@ namespace
 				nullptr,
 				0,
 				0);
-			return LayerId;
+			FSlateDrawElement::MakeLines(
+				OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
+				{FVector2D(TopEdgeX, 0.0f), FVector2D(BottomEdgeX, LocalSize.Y)},
+				ESlateDrawEffect::None,
+				EdgeColor.Get() * InWidgetStyle.GetColorAndOpacityTint(),
+				true, 1.0f / PixelScale);
+			return LayerId + 1;
 		}
 
 	private:
