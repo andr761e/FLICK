@@ -72,6 +72,16 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("BannerStyle"), SelectedBannerStyle, GGameUserSettingsIni);
 	GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("BannerTag"), SelectedBannerTag, GGameUserSettingsIni);
 	GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), TEXT("AvatarBorder"), SelectedAvatarBorder, GGameUserSettingsIni);
+	SelectedBannerStyle = FMath::Clamp(SelectedBannerStyle, 0, FlickCosmeticCatalog::GetItems(0).Num() - 1);
+	SelectedBannerTag = FMath::Clamp(SelectedBannerTag, 0, FlickCosmeticCatalog::GetItems(1).Num() - 1);
+	SelectedAvatarBorder = FMath::Clamp(SelectedAvatarBorder, 0, FlickCosmeticCatalog::GetItems(2).Num() - 1);
+	SelectedPuckSkins.SetNumZeroed(FlickPieceArchetypeRules::ArchetypeCount);
+	for (int32 Category = FlickCosmeticCatalog::PuckCategoryStart; Category < FlickCosmeticCatalog::CategoryCount; ++Category)
+	{
+		int32& Skin = SelectedPuckSkins[Category - FlickCosmeticCatalog::PuckCategoryStart];
+		GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), *FlickCosmeticCatalog::GetConfigKey(Category), Skin, GGameUserSettingsIni);
+		Skin = FMath::Clamp(Skin, 0, FlickCosmeticCatalog::GetItems(Category).Num() - 1);
+	}
 	if (const UFlickGameInstance* FlickGameInstance = PlayerController.IsValid()
 		? Cast<UFlickGameInstance>(PlayerController->GetGameInstance())
 		: nullptr)
@@ -83,6 +93,15 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 #if !UE_BUILD_SHIPPING
 	bSocialPanelOpen = FParse::Param(FCommandLine::Get(), TEXT("FlickSocialPreview"));
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickProfileCustomizePreview")))
+	{
+		SelectedProfileTab = EFlickProfileTab::Customization;
+		int32 PreviewCategory = 0;
+		if (FParse::Value(FCommandLine::Get(), TEXT("FlickLockerCategory="), PreviewCategory))
+		{
+			SelectedLockerCategory = FMath::Clamp(PreviewCategory, 0, FlickCosmeticCatalog::CategoryCount - 1);
+		}
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickPlayFormatPreview")))
 	{
 		SelectedPlayPlaylist = EFlickPlayPlaylist::Casual;
@@ -99,15 +118,19 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		// canvas to become wider with the real viewport. This avoids 16:9
 		// letterboxing on ultrawide displays without stretching text or icons.
 		SNew(SDPIScaler)
-		.DPIScale_Lambda([]()
+		.DPIScale_Lambda([this]()
 		{
-			FVector2D ViewportSize(FlickUITheme::ReferenceWidth, FlickUITheme::ReferenceHeight);
+			// Slate has already converted physical pixels to local units using the
+			// viewport's UI DPI. Scaling from raw pixels applied that factor twice
+			// on high-resolution displays and made the main-menu cards overlap.
+			FVector2D ViewportSize = LayerLocalSize;
 			if (GEngine && GEngine->GameViewport)
 			{
-				GEngine->GameViewport->GetViewportSize(ViewportSize);
+				FVector2D PhysicalSize;
+				GEngine->GameViewport->GetViewportSize(PhysicalSize);
+				ViewportSize.X = FMath::Min(ViewportSize.X, PhysicalSize.X);
+				ViewportSize.Y = FMath::Min(ViewportSize.Y, PhysicalSize.Y);
 			}
-			// Never make the virtual canvas narrower than the reference layout.
-			// Height-only scaling clips fixed-width menus on 4:3 and portrait views.
 			return FMath::Max(0.5f, FMath::Min(
 				ViewportSize.Y / FlickUITheme::ReferenceHeight,
 				ViewportSize.X / FlickUITheme::ReferenceWidth));

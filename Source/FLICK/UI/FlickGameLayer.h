@@ -266,6 +266,8 @@ private:
 	int32 SelectedBannerStyle = 0;
 	int32 SelectedBannerTag = 0;
 	int32 SelectedAvatarBorder = 0;
+	int32 SelectedLockerCategory = 0;
+	TArray<int32> SelectedPuckSkins;
 	EFlickSettingsTab SelectedSettingsTab = EFlickSettingsTab::GameFeel;
 	// Remote party members do not own the authoritative GameMode. Their
 	// non-gameplay frontend navigation therefore remains local to their Slate UI.

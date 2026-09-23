@@ -1,27 +1,33 @@
 # FLICK Playtest Checklist
 
-Use this after each meaningful physics tuning pass.
+Use this after each meaningful gameplay or UI pass. For repeatable UI captures,
+run `Tools/Test-FlickUISmoke.ps1` and inspect its PNGs for clipping and overlap.
 
 - Does startup show the main menu without accepting accidental board input?
 - Does the translucent menu panel cover roughly the left third, keep the arena visible, and slope from its narrower top edge to its wider bottom edge at common aspect ratios?
-- Does the main-menu background rotate through 4v4, 3v3, and BOB while `Next Match` remains the player's selected mode?
+- Does the main-menu arena orbit remain smooth with the selected display puck visible?
 - Does each automatic arena change ease through its transition without a visible one-frame rebuild or input interruption?
-- Are 3v3 Knockout, 4v4 Knockout, and BOB the only selectable modes?
+- Are 1v1, 2v2, 3v3 Knockout, and BOB available in the appropriate playlists?
 - Do all Knockout cards and result screens consistently say first to three round wins?
 - Does a Knockout match continue at two round wins and end exactly on the third?
 - Does Knockout rematch reset the series to 0-0 and restart behavior preserve the selected format?
 - Can Player 1 configure every active lineup slot before starting without an unnecessary mirrored editor?
-- Does 4v4 show four selectable pucks in formation and 3v3 show exactly three in a readable triangle?
+- Does every Knockout player have four selectable pucks in their saved class?
 - Does clicking a formation puck move the selection ring and update the equipped detail panel?
 - Does hovering each puck class preview its strengths, weaknesses, six ratings, and signed deltas without changing the saved lineup?
 - Does clicking the hovered class equip it only in the selected slot and update the formation puck's size, mark, and accent?
-- Can Player 1 apply Class 1, Class 2, Class 3, or Class 4 in one action, then make an individual change that clearly becomes Custom?
+- Can a player select any of their four named classes and then edit each class independently?
 - Is the active slot visually obvious, and does choosing any of the nine class tiles update that slot directly?
 - Do lineups persist after returning to the menu and relaunching the project?
 - When Lineups is opened from Mode Select, does Back return to Mode Select rather than Home?
 - Does the Item Shop open from Home, show three non-purchasable cosmetic placeholders, and return cleanly with Back or Escape?
 - Do Main Menu, Mode Select, Lineup, Settings, Item Shop, match HUDs, and Pause share the same angular panel language and cyan/orange team accents?
-- Do all nine puck-type cards, the formation, radar, comparison panel, Class 1-4 controls, Back, and Save fit without clipping at 1280x720 and 1920x1080?
+- Do all nine puck-type cards, the formation, radar, class controls, Back, and Save fit without clipping at 1280x720, 1920x1080, and 3440x1440?
+- Can the locker switch between banner, banner tag, avatar border, and all nine puck types without losing scroll or focus?
+- Does each locker category show its owned items as a grid, highlight the equipped item, and preserve the choice after relaunch?
+- Does each puck category show its Original appearance without changing the main-menu display-puck choice?
+- Does the private-match rules panel stay compact while all seven controls and the start action remain reachable?
+- Do the profile, customization, private-match, and main-menu screens avoid overlapping controls at ultrawide and high-DPI resolutions?
 - Does hovering a puck type update both the selected-slot deltas and aggregate radar without moving the surrounding layout?
 - Are Settings toggles, sliders, selectors, Back, and Apply Changes fully readable without text clipping?
 - Is each puck role identifiable by shape, accent, and top mark during play?
@@ -118,7 +124,7 @@ Use this after each meaningful physics tuning pass.
 - Are the turn banner and top score bar readable for both players?
 - Does the interface still fit at 1280x720 and 1920x1080?
 - Does each Player 1 turn begin from the Player 1 home side and each Player 2 turn from the opposite home side?
-- Before aiming, can Q/E and middle mouse reach all four board sides in 3v3, 4v4, and BOB?
+- Before aiming, can Q/E and middle mouse reach all four board sides in 1v1, 2v2, 3v3, and BOB?
 - On controller, can D-pad up/down reach all four sides without changing the focused puck?
 - Does the four-segment camera indicator highlight the active side with the current player's color?
 - Is puck selection temporarily unavailable during a camera blend and restored as soon as the view settles?

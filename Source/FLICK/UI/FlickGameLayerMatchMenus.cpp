@@ -867,6 +867,10 @@ int32 SFlickGameLayer::GetDisplayedPartyMemberCount() const
 
 EVisibility SFlickGameLayer::GetMatchHudVisibility() const
 {
+	if (PlayerController.IsValid() && PlayerController->IsCinematicReplayPresentationActive())
+	{
+		return EVisibility::Collapsed;
+	}
 	if (GameMode.IsValid())
 	{
 		if (GameMode->IsCinematicReplayActive())

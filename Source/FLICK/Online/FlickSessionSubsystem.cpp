@@ -113,6 +113,7 @@ void UFlickSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UFlickSessionSubsystem::Deinitialize()
 {
+	TransferPartyLeadershipBeforeLeaving();
 	StopPartySynchronization();
 	if (GetWorld())
 	{
@@ -1137,6 +1138,7 @@ bool UFlickSessionSubsystem::LeaveSession(const bool bReturnToFrontend)
 	PendingJoinResult.Reset();
 	if (!HasActiveSession())
 	{
+		bDisbandingParty = false;
 		SetState(EFlickSessionState::Idle, TEXT("SESSION CLOSED"));
 		if (bReturnToFrontend && !bLeavingParty)
 		{
@@ -1429,6 +1431,7 @@ bool UFlickSessionSubsystem::DisbandParty()
 	{
 		return false;
 	}
+	bDisbandingParty = true;
 	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
 	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
 	FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
@@ -1455,7 +1458,53 @@ bool UFlickSessionSubsystem::LeaveParty()
 	{
 		return false;
 	}
+	TransferPartyLeadershipBeforeLeaving();
 	return LeaveSession(false);
+}
+
+void UFlickSessionSubsystem::TransferPartyLeadershipBeforeLeaving()
+{
+#if WITH_FLICK_STEAMWORKS
+	const UFlickPartySubsystem* Party = GetPartySubsystem();
+	if (ActivePurpose != EFlickSessionPurpose::Party || bDisbandingParty || !Party || !Party->IsLocalLeader()
+		|| Party->GetMemberCount() < 2 || !SteamMatchmaking())
+	{
+		return;
+	}
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	const FNamedOnlineSession* NamedSession = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
+	const uint64 LobbyId = NamedSession ? GetSteamLobbyId(NamedSession->GetSessionIdStr()) : 0;
+	if (LobbyId == 0)
+	{
+		return;
+	}
+	const CSteamID Lobby(LobbyId);
+	const int32 LobbyMemberCount = SteamMatchmaking()->GetNumLobbyMembers(Lobby);
+	for (const FFlickPartyMember& Member : Party->GetMembers())
+	{
+		if (Member.UserId == Party->GetLocalUserId())
+		{
+			continue;
+		}
+		const uint64 MemberId = FCString::Strtoui64(*Member.UserId, nullptr, 10);
+		for (int32 Index = 0; MemberId != 0 && Index < LobbyMemberCount; ++Index)
+		{
+			if (SteamMatchmaking()->GetLobbyMemberByIndex(Lobby, Index).ConvertToUint64() == MemberId)
+			{
+				if (SteamMatchmaking()->SetLobbyOwner(Lobby, CSteamID(MemberId)))
+				{
+					UE_LOG(LogFlick, Log, TEXT("Transferred Steam party leadership to %s before leaving"), *Member.UserId);
+				}
+				else
+				{
+					UE_LOG(LogFlick, Warning, TEXT("Steam could not transfer party leadership before departure"));
+				}
+				return;
+			}
+		}
+	}
+#endif
 }
 
 bool UFlickSessionSubsystem::BeginPrivateMatchForParty()
@@ -2098,6 +2147,7 @@ void UFlickSessionSubsystem::HandleDestroySessionComplete(const FName SessionNam
 		bWasSuccessful ? TEXT("STEAM LOBBY CLOSED") : TEXT("STEAM REPORTED A LOBBY CLEANUP ERROR"));
 	if (bWasSuccessful)
 	{
+		bDisbandingParty = false;
 		ActivePurpose = EFlickSessionPurpose::Match;
 		bMatchmakingActive = false;
 		bMatchmakingSearch = false;

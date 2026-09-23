@@ -180,6 +180,7 @@ private:
 	void HandleSessionParticipantLeft(FName SessionName, const FUniqueNetId& UserId, EOnSessionParticipantLeftReason Reason);
 	void HandleSessionSettingsUpdated(FName SessionName, const FOnlineSessionSettings& Settings);
 	void RefreshPartyFromSession();
+	void TransferPartyLeadershipBeforeLeaving();
 	void StartPartySynchronization();
 	void StopPartySynchronization();
 	void HandlePartyJoinTimeout();
@@ -242,6 +243,7 @@ private:
 	FTimerHandle PartyJoinTimeoutTimer;
 	FTimerHandle PrivateMatchJoinTimeoutTimer;
 	bool bAwaitingPrivateMatchTravel = false;
+	bool bDisbandingParty = false;
 	bool bPartyJoinTimedOut = false;
 	FString LastProcessedPartyCommand;
 

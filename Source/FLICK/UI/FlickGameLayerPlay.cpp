@@ -431,16 +431,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSetup()
 					.Font(UiFont(11, true)).ColorAndOpacity(Muted)
 				]
 			]
-			+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 22.0f, 0.0f, 0.0f)
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, 22.0f, 0.0f, 0.0f)
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().FillWidth(0.32f).Padding(0.0f, 0.0f, 12.0f, 0.0f)
+				SNew(SBox).WidthOverride(780.0f)
 				[
 					SNew(SFlickAngularBorder)
-					.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.017f, 0.96f)).AccentColor(Hairline).CutSize(12.0f).BorderWidth(1.0f).Padding(FMargin(14.0f, 10.0f))
+					.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.017f, 0.96f)).AccentColor(Hairline).CutSize(12.0f).BorderWidth(1.0f).Padding(FMargin(22.0f, 16.0f))
 					[
 						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight().Padding(4.0f, 0.0f, 0.0f, 8.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("MATCH RULES"))).Font(UiFont(13, true)).ColorAndOpacity(FLinearColor::White)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(4.0f, 0.0f, 0.0f, 8.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("MATCH RULES  //  HOST SETTINGS"))).Font(UiFont(13, true)).ColorAndOpacity(FLinearColor::White)]
 						+ SVerticalBox::Slot().AutoHeight()[CycleSetting(TEXT("MODE"), EFlickPrivateMatchSetting::Mode, TAttribute<FText>::CreateLambda([this]() { const FFlickPrivateMatchSettings& Settings = GetDisplayedPrivateMatchSettings(); return FText::FromString(Settings.Variant == EFlickMatchVariant::Bob ? TEXT("BOB") : FString::Printf(TEXT("%dV%d"), Settings.PlayersPerTeam, Settings.PlayersPerTeam)); }))]
 						+ SVerticalBox::Slot().AutoHeight()[CycleSetting(TEXT("ROUNDS TO WIN"), EFlickPrivateMatchSetting::RoundsToWin, TAttribute<FText>::CreateLambda([this]() { return FText::AsNumber(GetDisplayedPrivateMatchSettings().RoundsToWin); }))]
 						+ SVerticalBox::Slot().AutoHeight()[CycleSetting(TEXT("ARENA SIZE"), EFlickPrivateMatchSetting::ArenaScale, TAttribute<FText>::CreateLambda([this]() { return FText::FromString(FString::Printf(TEXT("%.0f%%"), GetDisplayedPrivateMatchSettings().ArenaScale * 100.0f)); }))]
@@ -448,16 +447,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSetup()
 						+ SVerticalBox::Slot().AutoHeight()[CycleSetting(TEXT("LAUNCH POWER"), EFlickPrivateMatchSetting::LaunchSpeedScale, TAttribute<FText>::CreateLambda([this]() { return FText::FromString(FString::Printf(TEXT("%.0f%%"), GetDisplayedPrivateMatchSettings().LaunchSpeedScale * 100.0f)); }))]
 						+ SVerticalBox::Slot().AutoHeight()[CycleSetting(TEXT("BOUNCE"), EFlickPrivateMatchSetting::RestitutionScale, TAttribute<FText>::CreateLambda([this]() { return FText::FromString(FString::Printf(TEXT("%.0f%%"), GetDisplayedPrivateMatchSettings().RestitutionScale * 100.0f)); }))]
 						+ SVerticalBox::Slot().AutoHeight()[CycleSetting(TEXT("KICKOFF"), EFlickPrivateMatchSetting::SimultaneousKickoff, TAttribute<FText>::CreateLambda([this]() { return FText::FromString(GetDisplayedPrivateMatchSettings().bSimultaneousKickoff ? TEXT("SIMULTANEOUS") : TEXT("ALTERNATING")); }))]
-					]
-				]
-				+ SHorizontalBox::Slot().FillWidth(0.68f).Padding(12.0f, 0.0f, 0.0f, 0.0f)
-				[
-					SNew(SFlickAngularBorder)
-					.BackgroundColor(Panel).AccentColor(Hairline).CutSize(12.0f).BorderWidth(1.0f).Padding(FMargin(28.0f))
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("THE ARENA IS READY WHEN YOU ARE"))).Font(DisplayFont(25)).ColorAndOpacity(Paper)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 16.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("Your party stays in the main menu while you configure this match. Starting invites everyone into the arena. Players choose Blue, Orange, or Spectate there; empty seats are bots."))).Font(UiFont(13)).ColorAndOpacity(Muted).AutoWrapText(true)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(4.0f, 14.0f, 4.0f, 0.0f)
+						[
+							SNew(STextBlock)
+							.Text(FText::FromString(TEXT("Starting brings the party into the arena. Choose Blue, Orange, or Spectate there; empty seats are bots.")))
+							.Font(UiFont(10)).ColorAndOpacity(Muted).AutoWrapText(true)
+						]
 					]
 				]
 			]

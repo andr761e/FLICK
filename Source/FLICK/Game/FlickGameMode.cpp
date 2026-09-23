@@ -343,6 +343,10 @@ void AFlickGameMode::BeginPlay()
 	{
 		OpenProfile();
 	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickPrivateMatchPreview")))
+	{
+		OpenPrivateMatchSetup();
+	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickItemShopPreview")))
 	{
 		OpenItemShop();

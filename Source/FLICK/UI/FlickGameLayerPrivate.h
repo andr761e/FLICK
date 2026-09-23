@@ -5,6 +5,7 @@
 #include "UI/FlickUITheme.h"
 
 #include "Core/FlickPieceArchetypeRules.h"
+#include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickRankRules.h"
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameInstance.h"

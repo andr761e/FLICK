@@ -93,4 +93,39 @@ bool FFlickPrivateMatchSlotEncodingTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFlickPrivateMatchSettingsTest,
+	"FLICK.PrivateMatch.Settings",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickPrivateMatchSettingsTest::RunTest(const FString& Parameters)
+{
+	FFlickPrivateMatchSettings Settings;
+	Settings.Variant = EFlickMatchVariant::Classic;
+	Settings.PlayersPerTeam = 99;
+	Settings.RoundsToWin = 0;
+	Settings.ArenaScale = 5.0f;
+	Settings.FrictionScale = 0.0f;
+	Settings.LaunchSpeedScale = 9.0f;
+	Settings.RestitutionScale = 0.0f;
+	FlickPrivateMatchRules::Normalize(Settings);
+	TestEqual(TEXT("Classic team size is capped at three"), Settings.PlayersPerTeam, 3);
+	TestEqual(TEXT("Round target cannot fall below one"), Settings.RoundsToWin, 1);
+	TestEqual(TEXT("Arena size is clamped"), Settings.ArenaScale, 1.3f);
+	TestEqual(TEXT("Friction is clamped"), Settings.FrictionScale, 0.5f);
+	TestEqual(TEXT("Launch power is clamped"), Settings.LaunchSpeedScale, 1.5f);
+	TestEqual(TEXT("Bounce is clamped"), Settings.RestitutionScale, 0.5f);
+	TestEqual(TEXT("Three-versus-three requires six playing slots"), FlickPrivateMatchRules::GetRequiredPlayingSlots(Settings), 6);
+
+	Settings.Variant = EFlickMatchVariant::Bob;
+	Settings.PlayersPerTeam = 3;
+	FlickPrivateMatchRules::Normalize(Settings);
+	TestEqual(TEXT("BOB always uses one player per side"), Settings.PlayersPerTeam, 1);
+	TestEqual(TEXT("BOB needs two playing slots"), FlickPrivateMatchRules::GetRequiredPlayingSlots(Settings), 2);
+	FlickPrivateMatchRules::CycleMode(Settings, 1);
+	TestEqual(TEXT("Cycling forward from BOB wraps to classic"), Settings.Variant, EFlickMatchVariant::Classic);
+	TestEqual(TEXT("Wrapped mode begins at 1v1"), Settings.PlayersPerTeam, 1);
+	return true;
+}
+
 #endif

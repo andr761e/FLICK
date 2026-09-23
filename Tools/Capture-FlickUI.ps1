@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Play', 'Format', 'Profile', 'Settings', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings')]
+    [ValidateSet('Home', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Settings', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -23,6 +23,8 @@ param(
     [int]$CameraView = 0,
     [ValidateRange(1, 3)]
     [int]$PlayersPerTeam = 1,
+    [ValidateRange(0, 11)]
+    [int]$LockerCategory = 0,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
     [string]$EngineRoot = $(if ($env:FLICK_UNREAL_ENGINE_ROOT) { $env:FLICK_UNREAL_ENGINE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.8' })
@@ -47,6 +49,9 @@ $previewFlags = @{
     Play = @('-FlickModeSelectPreview')
     Format = @('-FlickModeSelectPreview', '-FlickPlayFormatPreview')
     Profile = @('-FlickProfilePreview')
+    Customize = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
+    CustomizePuck = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
+    PrivateMatch = @('-FlickPrivateMatchPreview')
     Settings = @('-FlickSettingsPreview')
     Lineup = @('-Flick4v4LoadoutPreview')
     Class = @('-FlickClassSelectPreview')
@@ -64,6 +69,7 @@ New-Item -ItemType Directory -Path $captureRoot -Force | Out-Null
 $captures = @()
 
 foreach ($screenName in $Screen) {
+    $selectedLockerCategory = if ($screenName -eq 'CustomizePuck') { 3 } else { $LockerCategory }
     $captureName = '{0}-{1}x{2}' -f $screenName.ToLowerInvariant(), $Width, $Height
     $userDir = Join-Path $captureRoot $captureName
     New-Item -ItemType Directory -Path $userDir -Force | Out-Null
@@ -77,7 +83,7 @@ foreach ($screenName in $Screen) {
         '-ddc=InstalledNoZenLocalFallback',
         '-nosound', '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame',
-        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", '-FlickTestArenaSeed=1337',
+        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", '-FlickTestArenaSeed=1337',
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),
         ('-abslog="{0}"' -f $logPath)
