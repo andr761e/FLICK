@@ -16,6 +16,5 @@ Til OH;
 - Make red ring in BOB Arena smaller so it encloses the pucks
 
 Til André;
-- Lots of issues with the private match. The game starts immidiatley before you even have to chance to choose a team or a class. Spectators should be able to switch between the view of different players. So they are specifically spectating a players view or just free camera. Also, you should be able to change team in game.
--
+- 
 -

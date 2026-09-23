@@ -175,6 +175,10 @@ void AFlickGameMode::RandomizeOtherLocalPlayerClasses(const int32 PlayersPerTeam
 
 void AFlickGameMode::PrepareClassSelection(const bool bForNextRound)
 {
+	if (!bForNextRound)
+	{
+		DestroyPieces();
+	}
 	bClassSelectionForNextRound = bForNextRound;
 	bInitialClassSelectionTimerActive = !bForNextRound;
 	InitialClassSelectionTimeRemaining = FMath::Max(3.0f, InitialClassSelectionTimeLimit);
@@ -281,6 +285,7 @@ void AFlickGameMode::BeginNetworkClassSelection()
 	{
 		return;
 	}
+	PreparePregameArena();
 
 	EnsureActivePlayerClasses(CurrentPlayersPerTeam);
 	bPlayerClassesActiveForMatch = true;
@@ -341,13 +346,24 @@ void AFlickGameMode::ConfirmNetworkPlayerClass(APlayerController* RequestingPlay
 	AFlickPlayerState* PlayerState = RequestingPlayer
 		? RequestingPlayer->GetPlayerState<AFlickPlayerState>()
 		: nullptr;
-	if (!FlickGameState || !FlickGameState->bNetworkClassSelectionActive
+	const bool bPrivateAssignment = FlickGameState
+		&& FlickGameState->bPrivateMatchAssignmentActive;
+	if (!FlickGameState || (!FlickGameState->bNetworkClassSelectionActive && !bPrivateAssignment)
 		|| !PlayerState || PlayerState->GetTeam() == EFlickTeam::None
 		|| !FlickLineupRules::IsValid(PlayerState->GetNetworkSelectedLineup()))
 	{
 		return;
 	}
 	PlayerState->SetNetworkClassConfirmed(true);
+	if (bPregamePreviewActive && SelectedMatchVariant == EFlickMatchVariant::Classic)
+	{
+		SpawnPiecesForPlayer(PlayerState->GetTeam(), PlayerState->GetTeamPlayerSlot());
+	}
+	if (bPrivateAssignment)
+	{
+		EvaluatePrivateMatchAssignment();
+		return;
+	}
 	if (AreNetworkClassesConfirmed())
 	{
 		FinalizeNetworkClassSelection();
@@ -692,7 +708,15 @@ void AFlickGameMode::BeginSelectedMatch()
 		: FlickTeamRules::ClampPlayersPerTeam(MatchmakingPlayersPerTeam);
 	SetCameraForFrontend();
 	ApplySelectedMatchConfiguration();
-	RebuildMatch();
+	if (bPregamePreviewActive)
+	{
+		bPregamePreviewActive = false;
+		StartMatch(true);
+	}
+	else
+	{
+		RebuildMatch();
+	}
 	if (AudioDirector && GetFlickGameState())
 	{
 		AudioDirector->PlayTurn(GetFlickGameState()->CurrentTeam);
@@ -704,6 +728,100 @@ void AFlickGameMode::StartTrainingMode()
 {
 	bTutorialMode = false;
 	BeginTrainingActivity(false);
+}
+
+void AFlickGameMode::PreparePrivatePlayerClass(AFlickPlayerState* PlayerState)
+{
+	if (!PlayerState || PlayerState->GetTeam() == EFlickTeam::None
+		|| !PlayerState->GetNetworkSelectedLineup().IsEmpty())
+	{
+		return;
+	}
+	const EFlickLineupPreset ExistingClass = GetPlayerClass(
+		PlayerState->GetTeam(), PlayerState->GetTeamPlayerSlot());
+	PlayerState->ResetNetworkClassSelection(ExistingClass);
+	TArray<EFlickPieceArchetype> DefaultLineup;
+	for (int32 PieceSlot = 0; PieceSlot < FlickLineupRules::PiecesPerLineup; ++PieceSlot)
+	{
+		DefaultLineup.Add(GetClassLoadoutPiece(ExistingClass, PieceSlot));
+	}
+	PlayerState->SetNetworkSelectedLineup(DefaultLineup);
+}
+
+void AFlickGameMode::BeginPrivateMatchAssignment()
+{
+	AFlickGameState* State = GetFlickGameState();
+	if (!State) return;
+	PreparePregameArena();
+	AutoAssignPrivateMatchSlots();
+	for (AFlickPlayerState* Player : GetPrivateMatchParticipants())
+	{
+		if (!Player) continue;
+		Player->SetPrivateRoleChosen(false);
+		Player->ResetNetworkClassSelection(EFlickLineupPreset::Balanced);
+	}
+	FrontendScreen = EFlickFrontendScreen::Playing;
+	State->SetMatchPhase(EFlickMatchPhase::WaitingToStart);
+	State->SetPrivateMatchAssignmentState(true, false, PrivateMatchAssignmentTimeLimit);
+	SetCameraForFrontend();
+	UE_LOG(LogFlick, Log, TEXT("PRIVATE_MATCH_ASSIGNMENT_STARTED: waiting for first role choice"));
+}
+
+void AFlickGameMode::EvaluatePrivateMatchAssignment()
+{
+	AFlickGameState* State = GetFlickGameState();
+	if (!State || !State->bPrivateMatchAssignmentActive) return;
+	const TArray<AFlickPlayerState*> Participants = GetPrivateMatchParticipants();
+	bool bAnyChosen = false;
+	bool bEveryoneReady = !Participants.IsEmpty();
+	for (const AFlickPlayerState* Player : Participants)
+	{
+		if (!Player) continue;
+		bAnyChosen |= Player->HasChosenPrivateRole();
+		bEveryoneReady &= Player->HasChosenPrivateRole()
+			&& (Player->GetTeam() == EFlickTeam::None || Player->IsNetworkClassConfirmed());
+	}
+	if (bAnyChosen && !State->bPrivateMatchAssignmentCountdownActive)
+	{
+		State->SetPrivateMatchAssignmentState(true, true, PrivateMatchAssignmentTimeLimit);
+	}
+	if (bEveryoneReady)
+	{
+		FinalizePrivateMatchAssignment();
+	}
+}
+
+void AFlickGameMode::UpdatePrivateMatchAssignment()
+{
+	AFlickGameState* State = GetFlickGameState();
+	if (State && State->bPrivateMatchAssignmentActive
+		&& State->bPrivateMatchAssignmentCountdownActive
+		&& State->GetPrivateMatchAssignmentTimeRemaining() <= 0.0f)
+	{
+		FinalizePrivateMatchAssignment();
+	}
+}
+
+void AFlickGameMode::FinalizePrivateMatchAssignment()
+{
+	AFlickGameState* State = GetFlickGameState();
+	if (!State || !State->bPrivateMatchAssignmentActive) return;
+	EnsureActivePlayerClasses(CurrentPlayersPerTeam);
+	for (AFlickPlayerState* Player : GetPrivateMatchParticipants())
+	{
+		if (!Player || Player->GetTeam() == EFlickTeam::None) continue;
+		PreparePrivatePlayerClass(Player);
+		TArray<EFlickLineupPreset>& TeamClasses = Player->GetTeam() == EFlickTeam::Player1
+			? Player1ActiveClasses : Player2ActiveClasses;
+		if (TeamClasses.IsValidIndex(Player->GetTeamPlayerSlot()))
+		{
+			TeamClasses[Player->GetTeamPlayerSlot()] = Player->GetNetworkSelectedClass();
+		}
+		Player->SetNetworkClassConfirmed(true);
+	}
+	State->SetPrivateMatchAssignmentState(false, false, PrivateMatchAssignmentTimeLimit);
+	BeginSelectedMatch();
+	UE_LOG(LogFlick, Log, TEXT("PRIVATE_MATCH_ASSIGNMENT_COMPLETE: starting match"));
 }
 
 float AFlickGameMode::GetFreeCameraLookSensitivity() const

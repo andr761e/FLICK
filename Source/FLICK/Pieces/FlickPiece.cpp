@@ -1,6 +1,7 @@
 #include "Pieces/FlickPiece.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Core/FlickLog.h"
@@ -9,6 +10,7 @@
 #include "Engine/Font.h"
 #include "Engine/StaticMesh.h"
 #include "Game/FlickGameMode.h"
+#include "Game/FlickGameState.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
@@ -30,8 +32,10 @@ AFlickPiece::AFlickPiece()
 	PieceMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PieceMesh"));
 	SetRootComponent(PieceMesh);
 	PieceMesh->SetIsReplicated(true);
+	VisualRoot = CreateDefaultSubobject<USceneComponent>(TEXT("VisualRoot"));
+	VisualRoot->SetupAttachment(PieceMesh);
 	WorkshopMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorkshopMesh"));
-	WorkshopMesh->SetupAttachment(PieceMesh);
+	WorkshopMesh->SetupAttachment(VisualRoot);
 	WorkshopMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	WorkshopMesh->SetGenerateOverlapEvents(false);
 	WorkshopMesh->SetCanEverAffectNavigation(false);
@@ -44,35 +48,35 @@ AFlickPiece::AFlickPiece()
 	}
 
 	TopDisc = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TopDisc"));
-	TopDisc->SetupAttachment(PieceMesh);
+	TopDisc->SetupAttachment(VisualRoot);
 	OuterTrim = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("OuterTrim"));
-	OuterTrim->SetupAttachment(PieceMesh);
+	OuterTrim->SetupAttachment(VisualRoot);
 	SideBand = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SideBand"));
-	SideBand->SetupAttachment(PieceMesh);
+	SideBand->SetupAttachment(VisualRoot);
 	Underglow = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Underglow"));
-	Underglow->SetupAttachment(PieceMesh);
+	Underglow->SetupAttachment(VisualRoot);
 	SelectionHalo = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SelectionHalo"));
-	SelectionHalo->SetupAttachment(PieceMesh);
+	SelectionHalo->SetupAttachment(VisualRoot);
 	CenterPip = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CenterPip"));
-	CenterPip->SetupAttachment(PieceMesh);
+	CenterPip->SetupAttachment(VisualRoot);
 	InnerRing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("InnerRing"));
-	InnerRing->SetupAttachment(PieceMesh);
+	InnerRing->SetupAttachment(VisualRoot);
 	CorePlate = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CorePlate"));
-	CorePlate->SetupAttachment(PieceMesh);
+	CorePlate->SetupAttachment(VisualRoot);
 	LowerTrim = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LowerTrim"));
-	LowerTrim->SetupAttachment(PieceMesh);
+	LowerTrim->SetupAttachment(VisualRoot);
 	UpperShoulder = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("UpperShoulder"));
-	UpperShoulder->SetupAttachment(PieceMesh);
+	UpperShoulder->SetupAttachment(VisualRoot);
 	LowerShoulder = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LowerShoulder"));
-	LowerShoulder->SetupAttachment(PieceMesh);
+	LowerShoulder->SetupAttachment(VisualRoot);
 	TopBezel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TopBezel"));
-	TopBezel->SetupAttachment(PieceMesh);
+	TopBezel->SetupAttachment(VisualRoot);
 	CoreBezel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CoreBezel"));
-	CoreBezel->SetupAttachment(PieceMesh);
+	CoreBezel->SetupAttachment(VisualRoot);
 	SignatureRing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SignatureRing"));
-	SignatureRing->SetupAttachment(PieceMesh);
+	SignatureRing->SetupAttachment(VisualRoot);
 	SignatureInset = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SignatureInset"));
-	SignatureInset->SetupAttachment(PieceMesh);
+	SignatureInset->SetupAttachment(VisualRoot);
 	if (CylinderMesh.Succeeded())
 	{
 		TopDisc->SetStaticMesh(CylinderMesh.Object);
@@ -153,9 +157,9 @@ AFlickPiece::AFlickPiece()
 	for (int32 Index = 0; Index < DetailCount; ++Index)
 	{
 		UStaticMeshComponent* TopTick = CreateDefaultSubobject<UStaticMeshComponent>(*FString::Printf(TEXT("TopTick_%02d"), Index));
-		TopTick->SetupAttachment(PieceMesh);
+		TopTick->SetupAttachment(VisualRoot);
 		UStaticMeshComponent* SideLug = CreateDefaultSubobject<UStaticMeshComponent>(*FString::Printf(TEXT("SideLug_%02d"), Index));
-		SideLug->SetupAttachment(PieceMesh);
+		SideLug->SetupAttachment(VisualRoot);
 		for (UStaticMeshComponent* Detail : {TopTick, SideLug})
 		{
 			if (CubeMesh.Succeeded())
@@ -184,7 +188,7 @@ AFlickPiece::AFlickPiece()
 	{
 		UStaticMeshComponent* EmblemPart = CreateDefaultSubobject<UStaticMeshComponent>(
 			*FString::Printf(TEXT("EmblemPart_%02d"), Index));
-		EmblemPart->SetupAttachment(PieceMesh);
+		EmblemPart->SetupAttachment(VisualRoot);
 		if (CubeMesh.Succeeded())
 		{
 			EmblemPart->SetStaticMesh(CubeMesh.Object);
@@ -202,7 +206,7 @@ AFlickPiece::AFlickPiece()
 	}
 
 	AccentLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("AccentLight"));
-	AccentLight->SetupAttachment(PieceMesh);
+	AccentLight->SetupAttachment(VisualRoot);
 	AccentLight->SetCastShadows(false);
 	AccentLight->SetAttenuationRadius(145.0f);
 	AccentLight->SetIntensity(0.0f);
@@ -224,7 +228,7 @@ AFlickPiece::AFlickPiece()
 	PieceMesh->OnComponentHit.AddDynamic(this, &AFlickPiece::HandleMeshHit);
 
 	Label = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label"));
-	Label->SetupAttachment(PieceMesh);
+	Label->SetupAttachment(VisualRoot);
 	Label->SetHorizontalAlignment(EHTA_Center);
 	Label->SetVerticalAlignment(EVRTA_TextCenter);
 	Label->SetWorldSize(28.0f);
@@ -235,7 +239,7 @@ AFlickPiece::AFlickPiece()
 	Label->SetAbsolute(false, false, true);
 	Label->SetVisibility(false);
 	PlayerLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerLabel"));
-	PlayerLabel->SetupAttachment(PieceMesh);
+	PlayerLabel->SetupAttachment(VisualRoot);
 	PlayerLabel->SetHorizontalAlignment(EHTA_Center);
 	PlayerLabel->SetVerticalAlignment(EVRTA_TextCenter);
 	PlayerLabel->SetWorldSize(24.0f);
@@ -265,6 +269,10 @@ void AFlickPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AFlickPiece, bKickoffLocked);
 	DOREPLIFETIME(AFlickPiece, bBobStriker);
 	DOREPLIFETIME(AFlickPiece, bHighDetailVisualsEnabled);
+	DOREPLIFETIME(AFlickPiece, bPregamePreview);
+	DOREPLIFETIME(AFlickPiece, bArrivalActive);
+	DOREPLIFETIME(AFlickPiece, ArrivalStartServerTime);
+	DOREPLIFETIME(AFlickPiece, ArrivalDuration);
 	DOREPLIFETIME(AFlickPiece, PieceRadius);
 	DOREPLIFETIME(AFlickPiece, PieceThickness);
 	DOREPLIFETIME(AFlickPiece, PieceMassKg);
@@ -285,11 +293,14 @@ void AFlickPiece::BeginPlay()
 	Super::BeginPlay();
 	ApplyPhysicsSettings();
 	ApplyVisuals();
+	ApplyPregamePreview();
+	UpdateArrivalVisuals();
 }
 
 void AFlickPiece::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	UpdateArrivalVisuals();
 
 	VisualTime += DeltaSeconds;
 	const bool bWasFlashing = HitFlashRemaining > 0.0f;
@@ -302,6 +313,57 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 	{
 		HitFlashStrength = 0.0f;
 	}
+}
+
+void AFlickPiece::UpdateArrivalVisuals()
+{
+	if (!VisualRoot) return;
+	const AFlickGameState* State = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
+	const float Progress = bArrivalActive && State
+		? FMath::Clamp((State->GetServerWorldTimeSeconds() - ArrivalStartServerTime)
+			/ FMath::Max(0.1f, ArrivalDuration), 0.0f, 1.0f)
+		: 1.0f;
+	const float Remaining = 1.0f - Progress;
+	const float Height = 72.0f * Remaining * Remaining;
+	const float ParentZScale = FMath::Max(0.01f, PieceThickness / 100.0f);
+	VisualRoot->SetRelativeLocation(FVector(0.0f, 0.0f, Height / ParentZScale));
+}
+
+void AFlickPiece::SetPregamePreview(const bool bInPreview)
+{
+	if (!HasAuthority()) return;
+	bPregamePreview = bInPreview;
+	ApplyPregamePreview();
+	ForceNetUpdate();
+}
+
+void AFlickPiece::OnRep_PregamePreview()
+{
+	ApplyPregamePreview();
+}
+
+void AFlickPiece::ApplyPregamePreview()
+{
+	if (!PieceMesh) return;
+	PieceMesh->SetSimulatePhysics(!bPregamePreview);
+	PieceMesh->SetCollisionEnabled(bPregamePreview
+		? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+	if (!bPregamePreview)
+	{
+		PieceMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+		PieceMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+	}
+}
+
+void AFlickPiece::BeginArrival(const float Duration)
+{
+	if (!HasAuthority()) return;
+	const AFlickGameState* State = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
+	bArrivalActive = true;
+	ArrivalStartServerTime = State ? State->GetServerWorldTimeSeconds() : 0.0f;
+	ArrivalDuration = FMath::Max(0.1f, Duration);
+	UpdateArrivalVisuals();
+	ForceNetUpdate();
 }
 
 void AFlickPiece::InitializePiece(
@@ -340,6 +402,8 @@ void AFlickPiece::InitializePiece(
 
 	ApplyPhysicsSettings();
 	ApplyVisuals();
+	ApplyPregamePreview();
+	UpdateArrivalVisuals();
 }
 
 void AFlickPiece::ApplyPhysicsSettings()
@@ -1287,7 +1351,7 @@ void AFlickPiece::UpdateTestArenaVisuals()
 {
 	if (!HasTestArenaVisuals()) return;
 	PieceMesh->SetVisibility(false);
-	for (USceneComponent* Child : PieceMesh->GetAttachChildren())
+	for (USceneComponent* Child : VisualRoot->GetAttachChildren())
 	{
 		if (Child != WorkshopMesh && Child != SelectionHalo && Child != PlayerLabel && Child != AccentLight)
 		{

@@ -1405,6 +1405,7 @@ void AFlickGameMode::CompleteRoundForOutcome(const EFlickMatchOutcome Outcome)
 	}
 	ResetShotClock();
 	FlickGameState->CompleteRound(Outcome);
+	SetCameraViewForTeam(EFlickTeam::Player1, true);
 	FlickGameState->SetRoundAdvanceTimerState(
 		!FlickGameState->bSeriesComplete,
 		RoundAdvanceTimeLimit);
@@ -1683,6 +1684,15 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 	if (bTestArenaMode || IsBobMode())
 	{
 		Piece->EnableTestArenaVisuals();
+	}
+	const AFlickGameState* State = GetFlickGameState();
+	if (bPregamePreviewActive && !(State && State->bPuckArrivalActive))
+	{
+		Piece->SetPregamePreview(true);
+	}
+	if (bPregamePreviewActive || (State && State->bPuckArrivalActive))
+	{
+		Piece->BeginArrival(PuckArrivalDuration);
 	}
 	Pieces.Add(Piece);
 	return Piece;

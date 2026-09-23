@@ -338,6 +338,14 @@ void AFlickCameraPawn::ResetGameplayView(const int32 InViewIndex, const bool bRe
 	bGameplayViewTransitioning = !bMenuPresentation;
 }
 
+void AFlickCameraPawn::ResetRoundView(const int32 InViewIndex)
+{
+	if (bFreeCameraEnabled) SetFreeCameraEnabled(false);
+	bTopDownView = false;
+	bGameplayOrbitManuallyControlled = false;
+	ResetGameplayView(InViewIndex, true);
+}
+
 void AFlickCameraPawn::AdjustGameplayElevation(const int32 StepDirection)
 {
 	if (StepDirection == 0 || bMenuPresentation || bGameplayElevationLocked)

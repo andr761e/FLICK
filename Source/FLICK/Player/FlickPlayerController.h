@@ -51,7 +51,9 @@ public:
 	bool IsPrivateTeamMenuOpen() const { return bPrivateTeamMenuOpen; }
 	bool ShouldShowPrivateTeamMenu() const;
 	void ClosePrivateTeamMenu() { bPrivateTeamMenuOpen = false; }
-	void SetPrivateSpectatorView(EFlickTeam Team);
+	void OpenPrivateTeamMenu() { bPrivateTeamMenuOpen = true; }
+	void CyclePrivateSpectatorPlayer(int32 Direction);
+	FString GetPrivateSpectatorTargetName() const;
 	void TogglePrivateSpectatorFreeCamera();
 	void LeaveNetworkSession();
 	void ReturnToFrontendFromServer(bool bClearPartyIdentity = false);
@@ -286,6 +288,7 @@ private:
 	bool bNetworkClassLineupSubmitted = false;
 	bool bPrivateTeamMenuOpen = false;
 	bool bPrivateSpectateChosen = false;
+	int32 PrivateSpectatorTargetPlayerId = INDEX_NONE;
 	bool bObservedPrivateMatchActive = false;
 	bool bCareerStatsRecordedForCurrentSeries = false;
 	float NetworkGameplayElapsed = 0.0f;

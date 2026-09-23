@@ -48,6 +48,13 @@ void AFlickGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AFlickGameState, bNetworkClassSelectionActive);
 	DOREPLIFETIME(AFlickGameState, NetworkClassSelectionDuration);
 	DOREPLIFETIME(AFlickGameState, NetworkClassSelectionEndServerTime);
+	DOREPLIFETIME(AFlickGameState, bPrivateMatchAssignmentActive);
+	DOREPLIFETIME(AFlickGameState, bPrivateMatchAssignmentCountdownActive);
+	DOREPLIFETIME(AFlickGameState, PrivateMatchAssignmentDuration);
+	DOREPLIFETIME(AFlickGameState, PrivateMatchAssignmentEndServerTime);
+	DOREPLIFETIME(AFlickGameState, bPuckArrivalActive);
+	DOREPLIFETIME(AFlickGameState, PuckArrivalStartServerTime);
+	DOREPLIFETIME(AFlickGameState, PuckArrivalDuration);
 	DOREPLIFETIME(AFlickGameState, Player1ShotsTaken);
 	DOREPLIFETIME(AFlickGameState, Player2ShotsTaken);
 	DOREPLIFETIME(AFlickGameState, LastShotTeam);
@@ -235,6 +242,43 @@ float AFlickGameState::GetNetworkClassSelectionTimeRemaining() const
 	return bNetworkClassSelectionActive
 		? FMath::Max(0.0f, NetworkClassSelectionEndServerTime - GetServerWorldTimeSeconds())
 		: 0.0f;
+}
+
+void AFlickGameState::SetPrivateMatchAssignmentState(
+	const bool bInActive,
+	const bool bInCountdownActive,
+	const float InDuration)
+{
+	PrivateMatchAssignmentDuration = FMath::Max(0.1f, InDuration);
+	bPrivateMatchAssignmentActive = bInActive;
+	bPrivateMatchAssignmentCountdownActive = bInActive && bInCountdownActive;
+	PrivateMatchAssignmentEndServerTime = bPrivateMatchAssignmentCountdownActive
+		? GetServerWorldTimeSeconds() + PrivateMatchAssignmentDuration
+		: 0.0f;
+	ForceNetUpdate();
+}
+
+float AFlickGameState::GetPrivateMatchAssignmentTimeRemaining() const
+{
+	return bPrivateMatchAssignmentCountdownActive
+		? FMath::Max(0.0f, PrivateMatchAssignmentEndServerTime - GetServerWorldTimeSeconds())
+		: 0.0f;
+}
+
+void AFlickGameState::SetPuckArrivalState(const bool bInActive, const float InDuration)
+{
+	bPuckArrivalActive = bInActive;
+	PuckArrivalDuration = FMath::Max(0.1f, InDuration);
+	PuckArrivalStartServerTime = bInActive ? GetServerWorldTimeSeconds() : 0.0f;
+	ForceNetUpdate();
+}
+
+float AFlickGameState::GetPuckArrivalProgress() const
+{
+	return bPuckArrivalActive
+		? FMath::Clamp((GetServerWorldTimeSeconds() - PuckArrivalStartServerTime)
+			/ FMath::Max(0.1f, PuckArrivalDuration), 0.0f, 1.0f)
+		: 1.0f;
 }
 
 void AFlickGameState::SetTeamFormat(const int32 InPlayersPerTeam)

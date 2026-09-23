@@ -27,6 +27,7 @@ void AFlickGameMode::StartNextRound()
 	}
 
 	DestroyPieces();
+	FlickGameState->SetPuckArrivalState(true, PuckArrivalDuration);
 	SpawnPieces();
 	ResolutionElapsed = 0.0f;
 	SettledElapsed = 0.0f;
@@ -34,7 +35,9 @@ void AFlickGameMode::StartNextRound()
 	LastStrongImpactEventTime = -100.0f;
 	FlickGameState->SetStartingPiecesPerTeam(CurrentStartingPiecesPerTeam);
 	UpdateGameStateCounts();
-	BeginOpeningPhase();
+	SetCameraViewForTeam(EFlickTeam::Player1, true);
+	// The opening phase begins after every puck has visibly settled into its
+	// starting position. Both teams, including bot seats, arrive together.
 	PushHudEvent(
 		FString::Printf(TEXT("ROUND %d KICKOFF"), FlickGameState->RoundNumber),
 		GetTeamColor(FlickGameState->CurrentTeam),
@@ -668,6 +671,19 @@ void AFlickGameMode::SpawnPieces()
 		SpawnBobPieces();
 		return;
 	}
+	for (const EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+	{
+		for (int32 PlayerSlot = 0; PlayerSlot < CurrentPlayersPerTeam; ++PlayerSlot)
+		{
+			SpawnPiecesForPlayer(Team, PlayerSlot);
+		}
+	}
+}
+
+void AFlickGameMode::SpawnPiecesForPlayer(const EFlickTeam Team, const int32 PlayerSlot)
+{
+	if (!GetWorld() || Team == EFlickTeam::None || IsBobMode()
+		|| PlayerSlot < 0 || PlayerSlot >= CurrentPlayersPerTeam) return;
 
 	const float FormationDistance = ArenaRadius * FormationRadiusFraction;
 	const FFlickModeRules& Rules = FlickModeRules::Get(ActiveMatchVariant);
@@ -690,44 +706,73 @@ void AFlickGameMode::SpawnPieces()
 			TeamFormationPositions.Add(FVector2D(Offset.X, FormationDistance + Offset.Y));
 		}
 	}
-	int32 TeamPieceIndex = 0;
-	for (int32 PlayerSlot = 0; PlayerSlot < CurrentPlayersPerTeam; ++PlayerSlot)
+	for (int32 LoadoutSlot = 0; LoadoutSlot < PlayerPieceOffsets.Num(); ++LoadoutSlot)
 	{
-		for (int32 LoadoutSlot = 0; LoadoutSlot < PlayerPieceOffsets.Num(); ++LoadoutSlot)
+		const int32 TeamPieceIndex = PlayerSlot * PlayerPieceOffsets.Num() + LoadoutSlot;
+		const int32 PieceId = TeamPieceIndex + 1
+			+ (Team == EFlickTeam::Player2 ? CurrentStartingPiecesPerTeam : 0);
+		if (Pieces.ContainsByPredicate([Team, PieceId](const TObjectPtr<AFlickPiece>& Existing)
 		{
-			const FVector2D FormationPosition = TeamFormationPositions[TeamPieceIndex];
-			const EFlickPieceArchetype Player1Archetype = GetPlayerClassPiece(
-				EFlickTeam::Player1,
-				PlayerSlot,
-				LoadoutSlot);
-			const EFlickPieceArchetype Player2Archetype = GetPlayerClassPiece(
-				EFlickTeam::Player2,
-				PlayerSlot,
-				LoadoutSlot);
-			const float Player1SpawnZ = ArenaSurfaceZ
-				+ PieceThickness * FlickPieceArchetypeRules::Get(Player1Archetype).ThicknessMultiplier * 0.5f
-				+ 3.0f;
-			const float Player2SpawnZ = ArenaSurfaceZ
-				+ PieceThickness * FlickPieceArchetypeRules::Get(Player2Archetype).ThicknessMultiplier * 0.5f
-				+ 3.0f;
-			SpawnPiece(
-				EFlickTeam::Player1,
-				TeamPieceIndex + 1,
-				FVector(FormationPosition.X, -FormationPosition.Y, Player1SpawnZ),
-				Player1Archetype,
-				false,
-				PlayerSlot,
-				CurrentPlayersPerTeam > 1);
-			SpawnPiece(
-				EFlickTeam::Player2,
-				TeamPieceIndex + 1 + CurrentStartingPiecesPerTeam,
-				FVector(FormationPosition.X, FormationPosition.Y, Player2SpawnZ),
-				Player2Archetype,
-				false,
-				PlayerSlot,
-				CurrentPlayersPerTeam > 1);
-			++TeamPieceIndex;
+			return Existing && IsValid(Existing) && Existing->GetTeam() == Team
+				&& Existing->GetPieceId() == PieceId;
+		})) continue;
+		const FVector2D FormationPosition = TeamFormationPositions[TeamPieceIndex];
+		const EFlickPieceArchetype Archetype = GetPlayerClassPiece(Team, PlayerSlot, LoadoutSlot);
+		const float SpawnZ = ArenaSurfaceZ
+			+ PieceThickness * FlickPieceArchetypeRules::Get(Archetype).ThicknessMultiplier * 0.5f
+			+ 3.0f;
+		SpawnPiece(
+			Team,
+			PieceId,
+			FVector(FormationPosition.X,
+				Team == EFlickTeam::Player1 ? -FormationPosition.Y : FormationPosition.Y,
+				SpawnZ),
+			Archetype,
+			false,
+			PlayerSlot,
+			CurrentPlayersPerTeam > 1);
+	}
+}
+
+void AFlickGameMode::RemovePregamePiecesForPlayer(const EFlickTeam Team, const int32 PlayerSlot)
+{
+	if (!bPregamePreviewActive || Team == EFlickTeam::None) return;
+	for (int32 Index = Pieces.Num() - 1; Index >= 0; --Index)
+	{
+		AFlickPiece* Piece = Pieces[Index];
+		if (Piece && Piece->GetTeam() == Team && Piece->GetOwningPlayerSlot() == PlayerSlot)
+		{
+			Piece->Destroy();
+			Pieces.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 		}
+	}
+}
+
+void AFlickGameMode::PreparePregameArena()
+{
+	ApplySelectedMatchConfiguration();
+	EnsureActivePlayerClasses(CurrentPlayersPerTeam);
+	bPlayerClassesActiveForMatch = ActiveMatchVariant == EFlickMatchVariant::Classic;
+	DestroyPieces();
+	if (ArenaActor && IsValid(ArenaActor))
+	{
+		ArenaActor->Destroy();
+		ArenaActor = nullptr;
+		TestArenaActor = nullptr;
+	}
+	if (BobArenaActor && IsValid(BobArenaActor))
+	{
+		BobArenaActor->Destroy();
+		BobArenaActor = nullptr;
+	}
+	SpawnArenaIfNeeded();
+	bPregamePreviewActive = true;
+	if (AFlickGameState* State = GetFlickGameState())
+	{
+		State->SetTeamFormat(CurrentPlayersPerTeam);
+		State->SetMatchConfiguration(ActiveMatchVariant, ArenaSurfaceZ,
+			MaxDragDistance, MinDragDistance, PowerExponent, MaxLaunchSpeed);
+		State->SetMatchPhase(EFlickMatchPhase::WaitingToStart);
 	}
 }
 
@@ -798,21 +843,35 @@ void AFlickGameMode::DestroyPieces()
 	Pieces.Empty();
 }
 
-void AFlickGameMode::StartMatch()
+void AFlickGameMode::StartMatch(const bool bPreservePregamePieces)
 {
 	SpawnCameraIfNeeded();
 	SpawnAudioIfNeeded();
 	SpawnLightingIfNeeded();
 	SpawnArenaIfNeeded();
-	DestroyPieces();
+	if (!bPreservePregamePieces) DestroyPieces();
+	AFlickGameState* FlickGameState = GetFlickGameState();
+	// Tutorial stages own their opening phase and replace the match pieces immediately.
+	// Do not let the arrival timer restart a normal kickoff over a tutorial stage.
+	const bool bAnimatePucks = FlickGameState && FrontendScreen == EFlickFrontendScreen::Playing && !bTutorialMode;
+	if (FlickGameState)
+	{
+		FlickGameState->SetPuckArrivalState(bAnimatePucks, PuckArrivalDuration);
+	}
 	SpawnPieces();
+	if (bPreservePregamePieces)
+	{
+		for (AFlickPiece* Piece : Pieces)
+		{
+			if (Piece && IsValid(Piece)) Piece->SetPregamePreview(false);
+		}
+	}
 
 	ResolutionElapsed = 0.0f;
 	SettledElapsed = 0.0f;
 	LastImpactFeedbackTime = -100.0f;
 	LastStrongImpactEventTime = -100.0f;
 
-	AFlickGameState* FlickGameState = GetFlickGameState();
 	if (FlickGameState)
 	{
 		ResetShotClock();
@@ -828,10 +887,25 @@ void AFlickGameMode::StartMatch()
 		FlickGameState->ResetSeriesState(CurrentRoundsToWin);
 		FlickGameState->SetStartingPiecesPerTeam(CurrentStartingPiecesPerTeam);
 		UpdateGameStateCounts();
-		BeginOpeningPhase();
+		if (bAnimatePucks) SetCameraViewForTeam(EFlickTeam::Player1, true);
+		if (!bAnimatePucks) BeginOpeningPhase();
 	}
 
 	UE_LOG(LogFlick, Log, TEXT("Match started"));
+}
+
+void AFlickGameMode::UpdatePuckArrival()
+{
+	AFlickGameState* State = GetFlickGameState();
+	if (!State || !State->bPuckArrivalActive || State->GetPuckArrivalProgress() < 1.0f)
+	{
+		return;
+	}
+	State->SetPuckArrivalState(false, PuckArrivalDuration);
+	if (!bTutorialMode)
+	{
+		BeginOpeningPhase();
+	}
 }
 
 void AFlickGameMode::TryStartNetworkMatch()
@@ -1371,6 +1445,12 @@ void AFlickGameMode::SetCameraViewForTeam(const EFlickTeam Team, const bool bSna
 	{
 		return;
 	}
+	// The active shooter is gameplay state, not the viewer's camera target.
+	// Only an explicit round/start reset should reposition a player's view.
+	if (!bSnap)
+	{
+		return;
+	}
 
 	// Network players keep the camera on their own side. Turn ownership must not
 	// move one player's viewpoint to the opponent's end of the table.
@@ -1395,7 +1475,8 @@ void AFlickGameMode::SetCameraViewForTeam(const EFlickTeam Team, const bool bSna
 		return;
 	}
 	const EFlickTeam CameraTeam = IsTrainingBotMatch() ? EFlickTeam::Player1 : Team;
-	CameraPawn->SetGameplayViewIndex(CameraTeam == EFlickTeam::Player2 ? 2 : 0, bSnap);
+	const int32 ViewIndex = CameraTeam == EFlickTeam::Player2 ? 2 : 0;
+	CameraPawn->ResetRoundView(ViewIndex);
 }
 
 void AFlickGameMode::ClearControllerAiming() const

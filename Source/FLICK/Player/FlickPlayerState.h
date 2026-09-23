@@ -42,6 +42,8 @@ public:
 	void ClearPrivateControlledSlots();
 	bool ControlsPrivateSlot(EFlickTeam InTeam, int32 InPlayerSlot) const;
 	const TArray<int32>& GetPrivateControlledSlots() const { return PrivateControlledSlots; }
+	void SetPrivateRoleChosen(bool bInChosen);
+	bool HasChosenPrivateRole() const { return bPrivateRoleChosen; }
 
 private:
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Player")
@@ -82,4 +84,7 @@ private:
 
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Private Match")
 	TArray<int32> PrivateControlledSlots;
+
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Private Match")
+	bool bPrivateRoleChosen = false;
 };

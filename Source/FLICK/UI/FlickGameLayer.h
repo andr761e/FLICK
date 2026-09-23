@@ -14,6 +14,7 @@ class AFlickPlayerState;
 class UFlickRankingSubsystem;
 class UFlickSessionSubsystem;
 class SWidget;
+struct FSlateBrush;
 struct FFlickPlayerMatchStats;
 
 enum class EFlickPlayPlaylist : uint8
@@ -177,6 +178,7 @@ private:
 	FSlateColor GetNextTurnColor() const;
 	EVisibility GetNextTurnVisibility() const;
 	FText GetScoreboardPlayerName(EFlickTeam Team, int32 PlayerSlot) const;
+	const FSlateBrush* GetScoreboardPlayerAvatarBrush(EFlickTeam Team, int32 PlayerSlot) const;
 	const AFlickPlayerState* FindScoreboardPlayerState(EFlickTeam Team, int32 PlayerSlot) const;
 	FText GetScoreboardStatText(EFlickTeam Team, int32 PlayerSlot, int32 StatIndex) const;
 	FText GetScoreboardPingText(EFlickTeam Team, int32 PlayerSlot) const;

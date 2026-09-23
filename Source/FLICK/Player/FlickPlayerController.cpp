@@ -595,9 +595,20 @@ void AFlickPlayerController::HandleCancelPressed()
 		}
 		TrainingDraggedPiece = nullptr;
 	}
+	if (const AFlickGameState* State = GetFlickGameState();
+		State && State->bPrivateMatchAssignmentActive)
+	{
+		bPrivateTeamMenuOpen = true;
+		return;
+	}
 	if (!FlickGameMode)
 	{
-		ClearAiming();
+		const AFlickGameState* State = GetFlickGameState();
+		if (State && State->bPrivateMatchActive)
+		{
+			bPrivateTeamMenuOpen = !bPrivateTeamMenuOpen;
+		}
+		else ClearAiming();
 		return;
 	}
 
@@ -1183,7 +1194,8 @@ void AFlickPlayerController::RequestSelectClass(const EFlickLineupPreset Preset)
 void AFlickPlayerController::RequestConfirmClass()
 {
 	const AFlickGameState* FlickGameState = GetFlickGameState();
-	if (FlickGameState && FlickGameState->bNetworkClassSelectionActive)
+	if (FlickGameState && (FlickGameState->bNetworkClassSelectionActive
+		|| FlickGameState->bPrivateMatchAssignmentActive))
 	{
 		if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 		{
@@ -1205,7 +1217,7 @@ void AFlickPlayerController::RequestTogglePrivateMatchSlot(
 	const EFlickTeam Team,
 	const int32 PlayerSlot)
 {
-	bPrivateTeamMenuOpen = true;
+	bPrivateTeamMenuOpen = false;
 	bPrivateSpectateChosen = false;
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
@@ -1236,21 +1248,53 @@ bool AFlickPlayerController::ShouldShowPrivateTeamMenu() const
 	const AFlickGameState* State = GetFlickGameState();
 	if (!State || !State->bPrivateMatchActive) return false;
 	const AFlickPlayerState* LocalState = GetPlayerState<AFlickPlayerState>();
-	return bPrivateTeamMenuOpen || (LocalState && LocalState->GetTeam() == EFlickTeam::None && !bPrivateSpectateChosen);
+	return bPrivateTeamMenuOpen || (LocalState && !LocalState->HasChosenPrivateRole());
 }
 
-void AFlickPlayerController::SetPrivateSpectatorView(const EFlickTeam Team)
+void AFlickPlayerController::CyclePrivateSpectatorPlayer(const int32 Direction)
 {
 	const AFlickGameState* State = GetFlickGameState();
 	if (!State || !State->bPrivateMatchActive || GetLocalTeam() != EFlickTeam::None) return;
+	TArray<const AFlickPlayerState*> Players;
+	for (const APlayerState* BasePlayer : State->PlayerArray)
+	{
+		const AFlickPlayerState* CandidateState = Cast<AFlickPlayerState>(BasePlayer);
+		if (CandidateState && CandidateState->GetTeam() != EFlickTeam::None) Players.Add(CandidateState);
+	}
+	Players.Sort([](const AFlickPlayerState& A, const AFlickPlayerState& B)
+	{
+		return A.GetPlayerId() < B.GetPlayerId();
+	});
+	if (Players.IsEmpty()) return;
+	int32 Index = Players.IndexOfByPredicate([this](const AFlickPlayerState* CandidateState)
+	{
+		return CandidateState && CandidateState->GetPlayerId() == PrivateSpectatorTargetPlayerId;
+	});
+	Index = Index == INDEX_NONE ? 0 : (Index + (Direction >= 0 ? 1 : -1) + Players.Num()) % Players.Num();
+	const AFlickPlayerState* Target = Players[Index];
+	PrivateSpectatorTargetPlayerId = Target->GetPlayerId();
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		bPrivateSpectateChosen = true;
 		CameraPawn->SetFreeCameraEnabled(false);
 		SetFreeCameraInputMode(false);
-		CameraPawn->ResetGameplayView(Team == EFlickTeam::Player2 ? 2 : 0, true);
+		CameraPawn->ResetGameplayView(Target->GetTeam() == EFlickTeam::Player2 ? 2 : 0, true);
 		bPrivateTeamMenuOpen = false;
 	}
+}
+
+FString AFlickPlayerController::GetPrivateSpectatorTargetName() const
+{
+	const AFlickGameState* State = GetFlickGameState();
+	if (!State || PrivateSpectatorTargetPlayerId == INDEX_NONE) return TEXT("SELECT PLAYER");
+	for (const APlayerState* BasePlayer : State->PlayerArray)
+	{
+		if (BasePlayer && BasePlayer->GetPlayerId() == PrivateSpectatorTargetPlayerId)
+		{
+			return BasePlayer->GetPlayerName();
+		}
+	}
+	return TEXT("SELECT PLAYER");
 }
 
 void AFlickPlayerController::TogglePrivateSpectatorFreeCamera()
@@ -1835,7 +1879,9 @@ void AFlickPlayerController::ClientSetGameplayCameraTeam_Implementation(
 {
 	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()); Camera && Team != EFlickTeam::None)
 	{
-		Camera->SetGameplayViewIndex(Team == EFlickTeam::Player2 ? 2 : 0, bSnap);
+		const int32 ViewIndex = Team == EFlickTeam::Player2 ? 2 : 0;
+		if (bSnap) Camera->ResetRoundView(ViewIndex);
+		else Camera->SetGameplayViewIndex(ViewIndex, false);
 	}
 }
 

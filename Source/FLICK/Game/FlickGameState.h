@@ -61,6 +61,10 @@ public:
 	float GetRoundAdvanceTimeRemaining() const;
 	void SetNetworkClassSelectionState(bool bInActive, float InDuration = 10.0f);
 	float GetNetworkClassSelectionTimeRemaining() const;
+	void SetPrivateMatchAssignmentState(bool bInActive, bool bInCountdownActive = false, float InDuration = 10.0f);
+	float GetPrivateMatchAssignmentTimeRemaining() const;
+	void SetPuckArrivalState(bool bInActive, float InDuration = 1.2f);
+	float GetPuckArrivalProgress() const;
 	void SetTeamFormat(int32 InPlayersPerTeam);
 	void SetCurrentTeamPlayerSlot(int32 InPlayerSlot);
 	void SetActivePieceCounts(int32 InPlayer1Count, int32 InPlayer2Count);
@@ -220,6 +224,27 @@ public:
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Class Selection")
 	float NetworkClassSelectionEndServerTime = 0.0f;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match")
+	bool bPrivateMatchAssignmentActive = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match")
+	bool bPrivateMatchAssignmentCountdownActive = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match")
+	float PrivateMatchAssignmentDuration = 10.0f;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match")
+	float PrivateMatchAssignmentEndServerTime = 0.0f;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	bool bPuckArrivalActive = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	float PuckArrivalStartServerTime = 0.0f;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation")
+	float PuckArrivalDuration = 1.2f;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Match")
 	int32 Player1ShotsTaken = 0;

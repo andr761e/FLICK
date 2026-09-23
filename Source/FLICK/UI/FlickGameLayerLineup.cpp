@@ -1025,7 +1025,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassSelect()
 											return FText::FromString(TEXT("YOUR NEW CLASS APPLIES WHEN THE NEXT ROUND STARTS"));
 										}
 										const AFlickGameState* State = GetScoreboardGameState();
-										if (State && State->bNetworkClassSelectionActive)
+										if (State && (State->bNetworkClassSelectionActive || State->bPrivateMatchAssignmentActive))
 										{
 											return FText::FromString(TEXT("CHOOSE YOUR CLASS FOR THIS MATCH"));
 										}
@@ -1067,7 +1067,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassSelect()
 								.Visibility_Lambda([this]()
 								{
 									const AFlickGameState* State = GetScoreboardGameState();
-									return State && State->bNetworkClassSelectionActive
+									return State && (State->bNetworkClassSelectionActive || State->bPrivateMatchAssignmentActive)
 										? EVisibility::Collapsed : EVisibility::Visible;
 								})
 								.WidthOverride(190.0f)
@@ -1080,7 +1080,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassSelect()
 								.Visibility_Lambda([this]()
 								{
 									const AFlickGameState* State = GetScoreboardGameState();
-									return (State && State->bNetworkClassSelectionActive)
+									return (State && (State->bNetworkClassSelectionActive || State->bPrivateMatchAssignmentActive))
 										|| (GameMode.IsValid() && !GameMode->IsChangingClassForNextRound())
 										? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 								})
@@ -1089,6 +1089,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassSelect()
 									const AFlickGameState* State = GetScoreboardGameState();
 									const float Remaining = State && State->bNetworkClassSelectionActive
 										? State->GetNetworkClassSelectionTimeRemaining()
+										: State && State->bPrivateMatchAssignmentCountdownActive
+											? State->GetPrivateMatchAssignmentTimeRemaining()
 										: GameMode.IsValid() ? GameMode->GetInitialClassSelectionTimeRemaining() : 0.0f;
 									return FText::FromString(FString::Printf(
 										TEXT("AUTO CONFIRM IN %02d"),

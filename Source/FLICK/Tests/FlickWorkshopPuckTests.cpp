@@ -92,6 +92,18 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Physics mesh preserved"), Root->GetStaticMesh() == CollisionMesh);
 			TestEqual(TEXT("Physics mass preserved"), Root->GetMass(), Mass);
 			TestTrue(TEXT("Root still simulates physics"), Root->IsSimulatingPhysics());
+			if (Index == 0 && Team == EFlickTeam::Player1)
+			{
+				const FVector StartingLocation = Piece->GetActorLocation();
+				Piece->SetPregamePreview(true);
+				TestFalse(TEXT("Confirmed lineup preview cannot move under physics"), Root->IsSimulatingPhysics());
+				TestTrue(TEXT("Confirmed lineup preview cannot collide"),
+					Root->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+				Piece->SetPregamePreview(false);
+				TestTrue(TEXT("Physics resumes for the live match"), Root->IsSimulatingPhysics());
+				TestTrue(TEXT("Preview did not alter the puck starting position"),
+					Piece->GetActorLocation().Equals(StartingLocation, 0.1f));
+			}
 			UPointLightComponent* AccentLight = Piece->FindComponentByClass<UPointLightComponent>();
 			TestNotNull(TEXT("Workshop puck has a local accent light"), AccentLight);
 			if (AccentLight)

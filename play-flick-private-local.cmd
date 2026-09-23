@@ -21,5 +21,6 @@ start "FLICK - Party Guest" "%UNREAL_EDITOR%" "%PROJECT%" "127.0.0.1?FlickPartyI
 
 echo.
 echo In the leader window: PLAY, then PRIVATE MATCH.
-echo Both players can claim slots and ready; only the leader can change rules or start.
+echo Only the leader configures and launches the match. Then both players choose a team or spectate.
+echo Confirm a class after joining a team; empty seats become bots when the match starts.
 echo This validates gameplay transport and replication. Steam invites still require two Steam accounts.

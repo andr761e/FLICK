@@ -487,7 +487,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Right)
 		.VAlign(VAlign_Fill)
-		.Padding(0.0f, 0.0f, 0.0f, 0.0f)
+		// The main-menu footer is 32 units tall; leave a small visual gap above it.
+		.Padding(0.0f, 0.0f, 0.0f, 40.0f)
 		[
 			SNew(SBox)
 			.WidthOverride(468.0f)
@@ -1432,9 +1433,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 5.0f, 0.0f)
+					+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 5.0f, 0.0f)
 					[
-						SNew(SBox).HeightOverride(44.0f)
+						SNew(SBox).WidthOverride(140.0f).HeightOverride(44.0f)
 						[
 							SNew(SFlickAngularBorder)
 							.BackgroundColor(PanelRaised)
@@ -1466,9 +1467,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 							]
 						]
 					]
-					+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f, 0.0f, 0.0f)
+					+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(5.0f, 0.0f, 0.0f, 0.0f)
 					[
-						SNew(SBox).WidthOverride(150.0f)
+						SNew(SBox)
 						.Visibility_Lambda([this]() { return IsDisplayedPartyActive() && !IsLocalDisplayedPartyLeader() ? EVisibility::Visible : EVisibility::Collapsed; })
 						[
 							MakeMenuButton(TEXT("LEAVE PARTY"), FOnClicked::CreateLambda([this]()
@@ -1478,9 +1479,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 							}), false, true, 44.0f)
 						]
 					]
-					+ SHorizontalBox::Slot().AutoWidth().Padding(5.0f, 0.0f, 0.0f, 0.0f)
+					+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(5.0f, 0.0f, 0.0f, 0.0f)
 					[
-						SNew(SBox).WidthOverride(130.0f)
+						SNew(SBox)
 						.Visibility_Lambda([this]() { return IsDisplayedPartyActive() && IsLocalDisplayedPartyLeader() ? EVisibility::Visible : EVisibility::Collapsed; })
 						[
 							MakeMenuButton(TEXT("DISBAND"), FOnClicked::CreateLambda([this]()

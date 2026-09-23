@@ -511,6 +511,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Timers", meta = (ClampMin = "3.0", ClampMax = "60.0"))
 	float InitialClassSelectionTimeLimit = 10.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Private Match", meta = (ClampMin = "3.0", ClampMax = "30.0"))
+	float PrivateMatchAssignmentTimeLimit = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation", meta = (ClampMin = "0.4", ClampMax = "3.0"))
+	float PuckArrivalDuration = 1.2f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Match|Timers", meta = (ClampMin = "3.0", ClampMax = "60.0"))
 	float RoundAdvanceTimeLimit = 5.0f;
 
@@ -550,6 +556,9 @@ private:
 	void SpawnLightingIfNeeded();
 	void SpawnArenaIfNeeded();
 	void SpawnPieces();
+	void SpawnPiecesForPlayer(EFlickTeam Team, int32 PlayerSlot);
+	void PreparePregameArena();
+	void RemovePregamePiecesForPlayer(EFlickTeam Team, int32 PlayerSlot);
 	void SpawnBobPieces();
 	void BeginSelectedMatch();
 	void BeginTrainingActivity(bool bAgainstBot);
@@ -560,6 +569,12 @@ private:
 	void UpdateShotClock();
 	void UpdateInitialClassSelectionTimer(float DeltaSeconds);
 	void UpdateNetworkClassSelectionTimer();
+	void BeginPrivateMatchAssignment();
+	void UpdatePrivateMatchAssignment();
+	void UpdatePuckArrival();
+	void EvaluatePrivateMatchAssignment();
+	void FinalizePrivateMatchAssignment();
+	void PreparePrivatePlayerClass(AFlickPlayerState* PlayerState);
 	void UpdateRoundAdvanceTimer();
 	bool TryExecuteTrainingBotShot(EFlickTeam BotTeam, int32 BotPlayerSlot);
 	void ResetTrainingBotThinking();
@@ -581,7 +596,7 @@ private:
 	void PushPrivateMatchState();
 	EFlickPieceArchetype GetPlayerClassPiece(EFlickTeam Team, int32 PlayerSlot, int32 PieceSlot) const;
 	void DestroyPieces();
-	void StartMatch();
+	void StartMatch(bool bPreservePregamePieces = false);
 	void TryStartNetworkMatch();
 	void ResetLobbyReadiness();
 	void RestorePremadePartyAfterMatch();
@@ -811,6 +826,7 @@ private:
 	bool bTestArenaMode = false;
 	bool bPrivateMatchSetupActive = false;
 	bool bPrivateMatchActive = false;
+	bool bPregamePreviewActive = false;
 	FFlickPrivateMatchSettings PrivateMatchSettings;
 	EFlickMatchVariant PrivateMatchReturnVariant = EFlickMatchVariant::Classic;
 	int32 PrivateMatchReturnPlayersPerTeam = 1;

@@ -1324,6 +1324,8 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 	}
 	UpdateInitialClassSelectionTimer(DeltaSeconds);
 	UpdateNetworkClassSelectionTimer();
+	UpdatePrivateMatchAssignment();
+	UpdatePuckArrival();
 	UpdateRoundAdvanceTimer();
 	UpdateShotClock();
 	UpdateTrainingBot(DeltaSeconds);

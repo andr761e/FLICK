@@ -14,13 +14,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 {
 	return SNew(SOverlay)
 		.Visibility(EVisibility::SelfHitTestInvisible)
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(18.0f, 14.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
 			.Visibility_Lambda([this]() { return GameMode.IsValid() && (GameMode->IsFreePlayTraining() || GameMode->IsTutorialMode()) ? EVisibility::Collapsed : EVisibility::Visible; })
 			[BuildTeamPlate(EFlickTeam::Player1)]
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 16.0f, 24.0f, 0.0f)
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 14.0f, 18.0f, 0.0f)
 		[
 			SNew(SBox)
 			.Visibility_Lambda([this]() { return GameMode.IsValid() && (GameMode->IsFreePlayTraining() || GameMode->IsTutorialMode()) ? EVisibility::Collapsed : EVisibility::Visible; })
@@ -28,53 +28,24 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)[BuildTrainingToolsPanel()]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 132.0f, 0.0f, 0.0f)[BuildTutorialOverlay()]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 16.0f, 0.0f, 0.0f)
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 14.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
-			.WidthOverride(560.0f)
-			.HeightOverride(102.0f)
+			.WidthOverride(356.0f)
+			.HeightOverride(62.0f)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(Panel)
-				.AccentColor(Brand.CopyWithNewOpacity(0.72f))
-				.CutSize(0.0f)
+				.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.015f, 0.84f))
+				.AccentColor(Brand.CopyWithNewOpacity(0.6f))
+				.CutSize(7.0f)
 				.BorderWidth(1.0f)
-				.Padding(FMargin(18.0f, 6.0f, 18.0f, 6.0f))
+				.Padding(FMargin(10.0f, 3.0f))
 				[
 					SNew(SOverlay)
-					+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(0.0f, 3.0f, 0.0f, 0.0f)
-					[
-						SNew(SBox).WidthOverride(100.0f).HeightOverride(1.0f)
-						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline)]
-					]
-					+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 3.0f, 0.0f, 0.0f)
-					[
-						SNew(SBox).WidthOverride(100.0f).HeightOverride(1.0f)
-						[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline)]
-					]
 					+ SOverlay::Slot()
 					[
 						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
-						[
-							SNew(STextBlock)
-							.Text_Lambda([this]()
-							{
-								const AFlickGameState* State = GetScoreboardGameState();
-								return FText::FromString(GameMode.IsValid() && GameMode->IsTutorialMode()
-									? TEXT("TUTORIAL")
-									: GameMode.IsValid() && GameMode->IsTrainingBotMatch()
-									? State && State->ActiveMatchVariant == EFlickMatchVariant::Bob
-										? TEXT("BOB BOT")
-										: TEXT("BOT MATCH")
-									: GameMode.IsValid() && GameMode->IsTrainingMode()
-										? TEXT("TRAINING")
-										: State && State->ActiveMatchVariant == EFlickMatchVariant::Bob ? TEXT("BOB") : TEXT("FLICK"));
-							})
-							.Font(UiFont(11, true))
-							.ColorAndOpacity(Brand)
-						]
-						+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 5.0f, 0.0f, 5.0f)
+						+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 2.0f)
 						[
 							SNew(SScaleBox)
 							.Stretch(EStretch::ScaleToFit)
@@ -83,19 +54,19 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 							[
 								SNew(STextBlock)
 								.Text_Lambda([this]() { return GetMatchStatusText(); })
-								.Font(DisplayFont(20))
+								.Font(DisplayFont(16))
 								.ColorAndOpacity_Lambda([this]() { return GetMatchStatusColor(); })
 							]
 						]
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 2.0f)
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 						[
 							SNew(STextBlock)
 							.Visibility_Lambda([this]() { return GetNextTurnVisibility(); })
 							.Text_Lambda([this]() { return GetNextTurnText(); })
-							.Font(UiFont(10, true))
+							.Font(UiFont(8, true))
 							.ColorAndOpacity_Lambda([this]() { return GetNextTurnColor(); })
 						]
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 3.0f, 0.0f, 0.0f)
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 						[
 							SNew(STextBlock)
 							.Text_Lambda([this]()
@@ -107,67 +78,26 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 									if (GameMode->IsTutorialMode())
 									{
 										return FText::FromString(GameMode->IsTutorialComplete()
-											? TEXT("ALL LESSONS COMPLETE")
+											? TEXT("TUTORIAL COMPLETE")
 											: FString::Printf(TEXT("LESSON %d / %d"), GameMode->GetTutorialStageNumber(), GameMode->GetTutorialStageCount()));
-									}
-									if (GameMode->IsTrainingBotMatch())
-									{
-										const bool bBobBot = State->ActiveMatchVariant == EFlickMatchVariant::Bob;
-										if (State->bShotClockActive)
-										{
-											if (bBobBot)
-											{
-												return FText::FromString(FString::Printf(
-													TEXT("BOB TRAINING   /   TURN %d   /   SHOOT IN %02d"),
-													State->TurnNumber,
-													FMath::CeilToInt(State->GetShotClockTimeRemaining())));
-											}
-										return FText::FromString(FString::Printf(
-											TEXT("%dV%d TRAINING   /   ROUND %d   /   SHOT %d   /   SHOOT IN %02d"),
-											State->PlayersPerTeam,
-											State->PlayersPerTeam,
-											State->RoundNumber,
-												State->TurnNumber,
-												FMath::CeilToInt(State->GetShotClockTimeRemaining())));
-										}
-										if (bBobBot)
-										{
-											return FText::FromString(FString::Printf(
-												TEXT("BOB TRAINING   /   TURN %d"),
-												State->TurnNumber));
-										}
-									return FText::FromString(FString::Printf(
-										TEXT("%dV%d TRAINING   /   ROUND %d   /   SHOT %d"),
-										State->PlayersPerTeam,
-										State->PlayersPerTeam,
-										State->RoundNumber,
-											State->TurnNumber));
 									}
 									if (GameMode->IsTrainingEditMode())
 									{
-										if (GameMode->IsBobMode())
-										{
-											return FText::FromString(TEXT("BOARD EDITOR   /   STANDARD PUCKS ONLY   /   T SAVE & DONE"));
-										}
-										return FText::FromString(FString::Printf(
-											TEXT("BOARD EDITOR   /   %s   /   WHEEL PUCK TYPE   /   T SAVE & DONE"),
-											*GetPieceArchetypeName(GameMode->GetTrainingPlacementArchetype())));
+										return FText::FromString(TEXT("BOARD EDITOR  /  T SAVE"));
 									}
-									return FText::FromString(FString::Printf(
-										TEXT("FREE PLAY   /   SHOT %d   /   T EDIT BOARD   /   R RESET"),
-										State->TurnNumber));
+									if (!GameMode->IsTrainingBotMatch())
+									{
+										return FText::FromString(FString::Printf(TEXT("FREE PLAY  /  SHOT %d"), State->TurnNumber));
+									}
 								}
-								if (State->bShotClockActive)
-								{
-									return FText::FromString(State->ActiveMatchVariant == EFlickMatchVariant::Bob
-										? FString::Printf(TEXT("STANDARD PUCKS   /   SHOT %d   /   SHOOT IN %02d"), State->TurnNumber, FMath::CeilToInt(State->GetShotClockTimeRemaining()))
-										: FString::Printf(TEXT("ROUND %d   /   SHOT %d   /   SHOOT IN %02d"), State->RoundNumber, State->TurnNumber, FMath::CeilToInt(State->GetShotClockTimeRemaining())));
-								}
-								return FText::FromString(State->ActiveMatchVariant == EFlickMatchVariant::Bob
-									? FString::Printf(TEXT("STANDARD PUCKS   /   SHOT %d"), State->TurnNumber)
-									: FString::Printf(TEXT("ROUND %d   /   SHOT %d"), State->RoundNumber, State->TurnNumber));
+								const FString Context = State->ActiveMatchVariant == EFlickMatchVariant::Bob
+									? FString::Printf(TEXT("BOB  /  SHOT %d"), State->TurnNumber)
+									: FString::Printf(TEXT("ROUND %d  /  SHOT %d"), State->RoundNumber, State->TurnNumber);
+								return FText::FromString(State->bShotClockActive
+									? FString::Printf(TEXT("%s  /  %02d SEC"), *Context, FMath::CeilToInt(State->GetShotClockTimeRemaining()))
+									: Context);
 							})
-							.Font(UiFont(10, true))
+							.Font(UiFont(8, true))
 							.ColorAndOpacity(Muted)
 						]
 					]
@@ -188,7 +118,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 24.0f, 36.0f)[BuildControlHintPanel(true)]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 0.0f, 36.0f)[BuildCameraOrbitHint()]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 112.0f, 24.0f, 0.0f)[BuildEventFeed()];
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 86.0f, 18.0f, 0.0f)[BuildEventFeed()];
 }
 
 TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
@@ -513,6 +443,33 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 						SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Accent)
 					]
 				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 9.0f, 0.0f)
+				[
+					SNew(SBox).WidthOverride(32.0f).HeightOverride(32.0f)
+					[
+						SNew(SFlickAngularBorder)
+						.BackgroundColor(PanelRaised)
+						.AccentColor(Accent.CopyWithNewOpacity(0.65f))
+						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(1.0f))
+						[
+							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[
+								SNew(SImage)
+								.Image_Lambda([this, Team, PlayerSlot]() { return GetScoreboardPlayerAvatarBrush(Team, PlayerSlot); })
+								.Visibility_Lambda([this, Team, PlayerSlot]() { return GetScoreboardPlayerAvatarBrush(Team, PlayerSlot) ? EVisibility::Visible : EVisibility::Collapsed; })
+							]
+							+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("?")))
+								.Font(UiFont(12, true))
+								.ColorAndOpacity(Accent)
+								.Visibility_Lambda([this, Team, PlayerSlot]() { return GetScoreboardPlayerAvatarBrush(Team, PlayerSlot) ? EVisibility::Collapsed : EVisibility::Visible; })
+							]
+						]
+					]
+				]
 				+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
@@ -569,18 +526,19 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 	}
 
 	return SNew(SBox)
-		.WidthOverride(290.0f)
-		.HeightOverride(84.0f)
+		.WidthOverride(218.0f)
+		.HeightOverride(70.0f)
 		[
 			SNew(SOverlay)
 			+ SOverlay::Slot()
 			[
 				SNew(SFlickAngularBorder)
-			.BackgroundColor_Lambda([IsTeamToPlay]() { return IsTeamToPlay() ? PanelRaised : Panel; })
-			.AccentColor_Lambda([this, Team, IsTeamToPlay]() { return GetTeamAccent(Team).CopyWithNewOpacity(IsTeamToPlay() ? 1.0f : 0.28f); })
-			.CutSize(0.0f)
+			.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.015f, 0.84f))
+			.AccentColor_Lambda([this, Team, IsTeamToPlay]() { return GetTeamAccent(Team).CopyWithNewOpacity(IsTeamToPlay() ? 0.85f : 0.38f); })
+			.CutSize(7.0f)
 			.BorderWidth(1.0f)
-			.Padding(FMargin(14.0f, 6.0f, 14.0f, 8.0f))
+			// Reserve a clear baseline above the shot-clock strip for the rounds/pocketed label.
+			.Padding(FMargin(10.0f, 3.0f, 9.0f, 14.0f))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.0f)
@@ -604,14 +562,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 								? FString::Printf(TEXT("TEAM %d"), GetTeamNumber(Team))
 								: FString::Printf(TEXT("PLAYER %d"), GetTeamNumber(Team)));
 						})
-						.Font(UiFont(11, true))
+						.Font(UiFont(9, true))
 						.ColorAndOpacity(GetTeamAccent(Team))
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 1.0f, 0.0f, 0.0f)
 					[
 						SNew(STextBlock)
 						.Text_Lambda([IsTeamToPlay]() { return FText::FromString(IsTeamToPlay() ? TEXT("TO PLAY") : TEXT("")); })
-						.Font(UiFont(8, true))
+						.Font(UiFont(7, true))
 						.ColorAndOpacity(Paper)
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
@@ -631,21 +589,21 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 					[
 						SNew(STextBlock)
 						.Text_Lambda([this, Team]() { return GetRoundsText(Team); })
-						.Font(UiFont(9, true))
+						.Font(UiFont(8, true))
 						.ColorAndOpacity(Muted)
 					]
 				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(12.0f, -6.0f, 0.0f, 0.0f)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(5.0f, -3.0f, 0.0f, 0.0f)
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
 					[
 						SNew(STextBlock)
 						.Text_Lambda([this, Team]() { return GetPieceCountText(Team); })
-						.Font(DisplayFont(32))
+						.Font(DisplayFont(25))
 						.ColorAndOpacity(Paper)
 					]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, -5.0f, 0.0f, 0.0f)
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, -3.0f, 0.0f, 0.0f)
 					[
 						SNew(STextBlock)
 						.Text_Lambda([this]()
@@ -653,7 +611,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 							const AFlickGameState* State = GetScoreboardGameState();
 							return FText::FromString(State && State->ActiveMatchVariant == EFlickMatchVariant::Bob ? TEXT("LEFT TO POCKET") : TEXT("PUCKS IN PLAY"));
 						})
-						.Font(UiFont(9, true))
+						.Font(UiFont(7, true))
 						.ColorAndOpacity(Muted)
 					]
 				]
@@ -661,7 +619,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 			]
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Fill)
 			[
-				SNew(SBox).WidthOverride(4.0f)
+				SNew(SBox).WidthOverride(2.0f)
 				[
 					SNew(SBorder).BorderImage(WhiteBrush())
 					.BorderBackgroundColor_Lambda([this, Team, IsTeamToPlay]()
@@ -670,10 +628,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 					})
 				]
 			]
-			+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(4.0f, 0.0f, 0.0f, 0.0f)
+			+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(2.0f, 0.0f, 0.0f, 0.0f)
 			[
 				SNew(SBox)
-				.HeightOverride(3.0f)
+				.HeightOverride(2.0f)
 				.Visibility_Lambda([this]()
 				{
 					const AFlickGameState* State = PlayerController.IsValid()

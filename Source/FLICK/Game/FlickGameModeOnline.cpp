@@ -967,9 +967,20 @@ void AFlickGameMode::TogglePrivateMatchSlot(
 	}
 	// A human owns one seat only. Switching teams releases the old seat for a
 	// bot; occupied seats cannot be stolen from another player.
+	RemovePregamePiecesForPlayer(RequestingState->GetTeam(), RequestingState->GetTeamPlayerSlot());
 	RequestingState->ClearPrivateControlledSlots();
 	RequestingState->SetPrivateControlledSlots({EncodedSlot});
+	RequestingState->SetPrivateRoleChosen(true);
 	RefreshPrivatePrimaryAssignments();
+	if (bPrivateMatchActive)
+	{
+		if (AFlickGameState* State = GetFlickGameState(); State && State->bPrivateMatchAssignmentActive)
+		{
+			RequestingState->SetNetworkClassConfirmed(SelectedMatchVariant != EFlickMatchVariant::Classic);
+			if (SelectedMatchVariant == EFlickMatchVariant::Classic) PreparePrivatePlayerClass(RequestingState);
+			EvaluatePrivateMatchAssignment();
+		}
+	}
 	if (bPrivateMatchSetupActive) PushPrivateMatchState();
 }
 
@@ -982,8 +993,12 @@ void AFlickGameMode::SetPrivateMatchSpectating(APlayerController* RequestingPlay
 	{
 		return;
 	}
+	RemovePregamePiecesForPlayer(RequestingState->GetTeam(), RequestingState->GetTeamPlayerSlot());
 	RequestingState->ClearPrivateControlledSlots();
+	RequestingState->SetPrivateRoleChosen(true);
+	RequestingState->SetNetworkClassConfirmed(true);
 	RefreshPrivatePrimaryAssignments();
+	if (bPrivateMatchActive) EvaluatePrivateMatchAssignment();
 	if (bPrivateMatchSetupActive) PushPrivateMatchState();
 }
 
@@ -1603,7 +1618,7 @@ void AFlickGameMode::CompleteNetworkMatchStart(const FString& MatchId)
 	}
 	if (bStartingPrivateMatch)
 	{
-		BeginSelectedMatch();
+		BeginPrivateMatchAssignment();
 	}
 	else if (SelectedMatchVariant == EFlickMatchVariant::Classic)
 	{

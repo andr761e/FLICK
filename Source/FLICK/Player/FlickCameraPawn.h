@@ -31,6 +31,7 @@ public:
 	void RotateGameplayOrbit(float Direction, float DeltaSeconds, float Sensitivity = 0.35f);
 	void AdjustGameplayElevationFine(int32 StepDirection, float Sensitivity = 0.35f);
 	void ResetGameplayView(int32 InViewIndex, bool bResetElevation = true);
+	void ResetRoundView(int32 InViewIndex);
 	void AdjustGameplayElevation(int32 StepDirection);
 	void SetGameplayElevation(float InElevation, bool bSnap = false);
 	void ToggleTopDownView();

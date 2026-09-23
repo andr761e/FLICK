@@ -9,6 +9,7 @@ class UPhysicalMaterial;
 class UMaterialInstanceDynamic;
 class UPrimitiveComponent;
 class UPointLightComponent;
+class USceneComponent;
 class UStaticMeshComponent;
 class UTextRenderComponent;
 
@@ -32,6 +33,8 @@ public:
 		int32 InOwningPlayerSlot = 0,
 		bool bInShowPlayerIdentity = false);
 	void ApplyPhysicsSettings();
+	void SetPregamePreview(bool bInPreview);
+	void BeginArrival(float Duration);
 	/** Premium cosmetic mesh; the existing root remains the authoritative physics body. */
 	void EnableTestArenaVisuals();
 	bool HasTestArenaVisuals() const;
@@ -112,6 +115,9 @@ private:
 	UFUNCTION()
 	void OnRep_HighDetailVisuals();
 
+	UFUNCTION()
+	void OnRep_PregamePreview();
+
 	void ApplyEliminatedState();
 
 	UFUNCTION()
@@ -126,6 +132,8 @@ private:
 	void UpdateVisualTransforms();
 	void ApplyVisuals();
 	void UpdateTestArenaVisuals();
+	void UpdateArrivalVisuals();
+	void ApplyPregamePreview();
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> WorkshopMesh;
@@ -139,8 +147,24 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_HighDetailVisuals)
 	bool bHighDetailVisualsEnabled = false;
 
+	UPROPERTY(ReplicatedUsing = OnRep_PregamePreview)
+	bool bPregamePreview = false;
+
+	UPROPERTY(Replicated)
+	bool bArrivalActive = false;
+
+	UPROPERTY(Replicated)
+	float ArrivalStartServerTime = 0.0f;
+
+	UPROPERTY(Replicated)
+	float ArrivalDuration = 1.2f;
+
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PieceMesh;
+
+	/** Moves rendered parts during the opening arrival without moving the physics body. */
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<USceneComponent> VisualRoot;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> TopDisc;

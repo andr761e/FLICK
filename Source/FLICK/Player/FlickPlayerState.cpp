@@ -25,6 +25,7 @@ void AFlickPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AFlickPlayerState, AuthoritativeRankedRating);
 	DOREPLIFETIME(AFlickPlayerState, VerifiedOnlineAccountId);
 	DOREPLIFETIME(AFlickPlayerState, PrivateControlledSlots);
+	DOREPLIFETIME(AFlickPlayerState, bPrivateRoleChosen);
 }
 
 void AFlickPlayerState::ResetNetworkClassSelection(const EFlickLineupPreset InClass)
@@ -101,6 +102,15 @@ bool AFlickPlayerState::ControlsPrivateSlot(
 	const int32 InPlayerSlot) const
 {
 	return PrivateControlledSlots.Contains(EncodePrivatePlayerSlot(InTeam, InPlayerSlot));
+}
+
+void AFlickPlayerState::SetPrivateRoleChosen(const bool bInChosen)
+{
+	if (HasAuthority())
+	{
+		bPrivateRoleChosen = bInChosen;
+		ForceNetUpdate();
+	}
 }
 
 void AFlickPlayerState::SetRankedIdentity(
