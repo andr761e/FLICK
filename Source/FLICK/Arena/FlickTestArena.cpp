@@ -94,7 +94,7 @@ AFlickTestArena::AFlickTestArena()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopArenaAsset(
-		TEXT("/Game/TestArena/Arena/SM_TestArena_Static.SM_TestArena_Static"));
+		TEXT("/Game/ClassicArena/SM_ClassicArena_Premium.SM_ClassicArena_Premium"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopDividerAsset(
 		TEXT("/Game/TestArena/Arena/SM_TestArena_Divider.SM_TestArena_Divider"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopSocketAsset(
@@ -981,7 +981,7 @@ void AFlickTestArena::ApplyTestLayout()
 		Socket->SetRelativeLocation(FVector(PossibleDividerCenters[LocationIndex], SurfaceZ));
 		Socket->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(PossibleDividerAngles[LocationIndex]), 0.0f));
 		Socket->SetRelativeScale3D(bUsingWorkshopAssets
-			? FVector(PossibleDividerLengths[LocationIndex] / DividerLength, 1.0f, 1.0f)
+			? FVector(PossibleDividerLengths[LocationIndex] / DividerLength, 2.2f, 1.0f)
 			: FVector(
 				PossibleDividerLengths[LocationIndex] / 100.0f,
 				(DividerThickness + 8.0f) / 100.0f,
@@ -1052,7 +1052,7 @@ void AFlickTestArena::ApplyTestLayout()
 		{
 			SetAccentMaterial(DividerBaseMeshes[ActiveLocationIndices[Index]], AccentMaterials[Index]);
 			DividerBaseMeshes[ActiveLocationIndices[Index]]->SetRelativeScale3D(bUsingWorkshopAssets
-				? FVector(RandomizedDividerLengths[Index] / DividerLength, 1.0f, 1.0f)
+				? FVector(RandomizedDividerLengths[Index] / DividerLength, 2.2f, 1.0f)
 				: FVector(
 					RandomizedDividerLengths[Index] / 100.0f,
 					(DividerThickness + 8.0f) / 100.0f,

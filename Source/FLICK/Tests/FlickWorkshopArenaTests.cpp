@@ -77,15 +77,34 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Imported switch-dot presentation component"), SwitchDotArt);
 	TestNotNull(TEXT("Imported signal-trace presentation component"), SignalTraceArt);
 	TestNotNull(TEXT("Imported dormant-divider socket component"), DormantSocketArt);
+	if (DormantSocketArt)
+	{
+		TestTrue(TEXT("Real divider sockets have a readable visual width"),
+			DormantSocketArt->GetRelativeScale3D().Y >= 2.0f);
+		TestEqual(TEXT("Divider sockets remain non-colliding presentation"),
+			DormantSocketArt->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+	}
 	TestEqual(TEXT("All maximum-format socket components remain present"),
 		SocketCount, AFlickTestArena::MaxPossibleLocationCount);
 
 	Arena->InitializeTestArena(815.0f, 50.0f, 250.0f, 2);
 	TestEqual(TEXT("2v2 active divider count"), Arena->GetMechanismCount(), 12);
 	TestEqual(TEXT("2v2 designed location count"), Arena->GetPossibleLocationCount(), 28);
+	if (StaticArt && StaticArt->GetStaticMesh())
+	{
+		TestTrue(TEXT("2v2 visual radius follows the existing 815 cm board"),
+			FMath::IsNearlyEqual(StaticArt->GetStaticMesh()->GetBounds().BoxExtent.X
+				* StaticArt->GetRelativeScale3D().X, 815.0f, 1.0f));
+	}
 	Arena->InitializeTestArena(815.0f, 50.0f, 250.0f, 3);
 	TestEqual(TEXT("3v3 active divider count"), Arena->GetMechanismCount(), 14);
 	TestEqual(TEXT("3v3 designed location count"), Arena->GetPossibleLocationCount(), 36);
+	if (StaticArt && StaticArt->GetStaticMesh())
+	{
+		TestTrue(TEXT("3v3 visual radius follows the existing 815 cm board"),
+			FMath::IsNearlyEqual(StaticArt->GetStaticMesh()->GetBounds().BoxExtent.X
+				* StaticArt->GetRelativeScale3D().X, 815.0f, 1.0f));
+	}
 	Arena->BeginReplayPresentation();
 	Arena->ApplyReplayDividerState(static_cast<uint16>(1 << 13));
 	TestTrue(TEXT("Replay state preserves divider fourteen"), Arena->IsDividerRaised(13));
@@ -101,8 +120,8 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 				+ StaticArt->GetStaticMesh()->GetBounds().Origin.Z <= 3.0f);
 		TestEqual(TEXT("Arena art cannot collide"), StaticArt->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		TestTrue(TEXT("Imported arena presentation is visible"), StaticArt->IsVisible());
-		TestTrue(TEXT("Premium arena preserves its layered material separation"),
-			StaticArt->GetStaticMesh()->GetStaticMaterials().Num() >= 12);
+		TestEqual(TEXT("Premium arena keeps its eight authored surface treatments"),
+			StaticArt->GetStaticMesh()->GetStaticMaterials().Num(), 8);
 	}
 	else
 	{

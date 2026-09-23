@@ -1,0 +1,15 @@
+{
+  "collision_radius_cm": 650.0,
+  "visual_bounds_min_m": [
+    -6.5,
+    -6.5,
+    -0.5
+  ],
+  "visual_bounds_max_m": [
+    6.5,
+    6.5,
+    0.006699979305267334
+  ],
+  "visual_vertices": 17456,
+  "runtime_collision": "unchanged AFlickArena::ArenaMesh cylinder"
+}

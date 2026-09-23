@@ -37,6 +37,7 @@ $requiredFiles = @(
     'AssetDevelopment\Pucks\HighDetail\exports\Striker.fbx',
     'AssetDevelopment\Pucks\HighDetail\exports\Heavy.fbx',
     'AssetDevelopment\Arena\exports\SM_TestArena_Static.fbx',
+    'AssetDevelopment\ClassicArena\exports\SM_ClassicArena_Premium.fbx',
     'AssetDevelopment\Arena\exports\SM_TestArena_Divider.fbx',
     'AssetDevelopment\Arena\exports\SM_TestArena_DividerSocket.fbx',
     'AssetDevelopment\Arena\exports\SM_TestArena_SwitchHousing.fbx',
