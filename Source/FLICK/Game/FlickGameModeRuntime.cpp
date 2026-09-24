@@ -1,4 +1,5 @@
 #include "Game/FlickGameModePrivate.h"
+#include "Core/FlickVisualSettings.h"
 
 using namespace FlickGameModePrivate;
 
@@ -292,6 +293,7 @@ void AFlickGameMode::ApplyDisplaySettings()
 		Settings->SetScreenResolution(Settings->GetDesktopResolution());
 		Settings->ApplySettings(false);
 		Settings->SaveSettings();
+		FlickVisualSettings::ApplySaved();
 	}
 }
 

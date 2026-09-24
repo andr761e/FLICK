@@ -49,7 +49,8 @@ enum class EFlickSettingsTab : uint8
 	Camera,
 	Interface,
 	Sound,
-	Display
+	Display,
+	Controls
 };
 
 class SFlickGameLayer final : public SCompoundWidget
@@ -269,6 +270,7 @@ private:
 	int32 SelectedLockerCategory = 0;
 	TArray<int32> SelectedPuckSkins;
 	EFlickSettingsTab SelectedSettingsTab = EFlickSettingsTab::GameFeel;
+	FString ControlBindingMessage;
 	// Remote party members do not own the authoritative GameMode. Their
 	// non-gameplay frontend navigation therefore remains local to their Slate UI.
 	EFlickFrontendScreen RemotePartyScreen = EFlickFrontendScreen::MainMenu;

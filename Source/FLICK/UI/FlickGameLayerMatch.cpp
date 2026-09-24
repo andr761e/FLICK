@@ -847,7 +847,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 				.Padding(FMargin(7.0f, 3.0f))
 				[
 					SNew(STextBlock)
-					.Text(FText::FromString(Key))
+					.Text_Lambda([Key]()
+					{
+					const TCHAR* Id = Key == TEXT("T") ? TEXT("Editor")
+						: Key == TEXT("C") ? TEXT("Clear") : Key == TEXT("R") ? TEXT("Restart")
+						: Key == TEXT("X") ? TEXT("FreeCamera") : Key == TEXT("V") ? TEXT("TopView")
+						: Key == TEXT("TAB") ? TEXT("Scoreboard") : Key == TEXT("ESC") ? TEXT("Menu")
+						: Key == TEXT("LMB") ? TEXT("Shoot") : Key == TEXT("DEL") ? TEXT("Remove") : nullptr;
+					if (Key == TEXT("1 / 2"))
+					{
+						return FText::FromString(FlickControlBindings::GetKey(TEXT("OwnPuck")).GetDisplayName().ToString()
+							+ TEXT(" / ") + FlickControlBindings::GetKey(TEXT("TargetPuck")).GetDisplayName().ToString());
+					}
+					return FText::FromString(Id ? FlickControlBindings::GetKey(Id).GetDisplayName().ToString() : Key);
+					})
 					.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 				]
 			];

@@ -1,6 +1,7 @@
 #include "Game/FlickGameInstance.h"
 
 #include "Core/FlickPieceArchetypeRules.h"
+#include "Core/FlickVisualSettings.h"
 #include "MoviePlayer.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Styling/CoreStyle.h"
@@ -219,6 +220,7 @@ int32 FFlickProfileStats::GetAccoladeCount(const EFlickAccolade Accolade) const
 void UFlickGameInstance::Init()
 {
 	Super::Init();
+	if (!IsRunningCommandlet() && !IsRunningDedicatedServer()) FlickVisualSettings::ApplySaved();
 
 	bStartupPresentationComplete = FParse::Param(FCommandLine::Get(), TEXT("FlickSkipIntro"));
 	if (!bStartupPresentationComplete && !IsRunningCommandlet() && !IsRunningDedicatedServer())

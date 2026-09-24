@@ -1,5 +1,6 @@
 #include "UI/FlickGameLayer.h"
 #include "UI/FlickGameLayerPrivate.h"
+#include "UI/FlickAimArrowWidget.h"
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
 
 SFlickGameLayer::SFlickGameLayer()
@@ -93,6 +94,11 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 #if !UE_BUILD_SHIPPING
 	bSocialPanelOpen = FParse::Param(FCommandLine::Get(), TEXT("FlickSocialPreview"));
+	int32 SettingsPreviewTab = 0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("FlickSettingsTab="), SettingsPreviewTab))
+	{
+		SelectedSettingsTab = static_cast<EFlickSettingsTab>(FMath::Clamp(SettingsPreviewTab, 0, static_cast<int32>(EFlickSettingsTab::Controls)));
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickProfileCustomizePreview")))
 	{
 		SelectedProfileTab = EFlickProfileTab::Customization;
@@ -137,6 +143,10 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		})
 		[
 		SNew(SOverlay)
+		+ SOverlay::Slot()
+		[
+			SNew(SFlickAimArrowWidget).OwnerHud(OwnerHud).Visibility(EVisibility::HitTestInvisible)
+		]
 
 		+ SOverlay::Slot()
 		[

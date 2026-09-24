@@ -1286,6 +1286,135 @@ TSharedRef<SWidget> SFlickGameLayer::BuildArchetypeChoice(
 TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 {
 	const auto Checked = [](const bool bValue) { return bValue ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; };
+	TSharedRef<SVerticalBox> ControlRows = SNew(SVerticalBox);
+	FString LastGroup;
+	for (const FlickControlBindings::FControl& Control : FlickControlBindings::GetControls())
+	{
+		if (LastGroup != Control.Group)
+		{
+			LastGroup = Control.Group;
+			ControlRows->AddSlot().AutoHeight().Padding(0.0f, 13.0f, 0.0f, 5.0f)
+			[SNew(STextBlock).Text(FText::FromString(LastGroup)).Font(UiFont(11, true)).ColorAndOpacity(Brand)];
+		}
+		const FString Id(Control.Id);
+		ControlRows->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 5.0f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+			[SNew(STextBlock).Text(FText::FromString(Control.Label)).Font(UiFont(12)).ColorAndOpacity(Paper)]
+			+ SHorizontalBox::Slot().AutoWidth()
+			[
+				SNew(SBox).WidthOverride(210.0f)
+				[
+					SNew(SInputKeySelector)
+					.SelectedKey_Lambda([Id]() { return FInputChord(FlickControlBindings::GetKey(*Id)); })
+					.Font(UiFont(12, true)).AllowModifierKeys(false).AllowGamepadKeys(false)
+					.EscapeCancelsSelection(false)
+					.OnKeySelected_Lambda([this, Id](const FInputChord& Chord)
+					{
+						if (FlickControlBindings::SetKey(*Id, Chord.Key))
+						{
+							if (PlayerController.IsValid()) PlayerController->RefreshControlBindings();
+							ControlBindingMessage = TEXT("CONTROL SAVED");
+						}
+						else ControlBindingMessage = TEXT("KEY ALREADY IN USE OR UNSUPPORTED");
+					})
+				]
+			]
+		];
+	}
+	TSharedRef<SVerticalBox> GraphicsRows = SNew(SVerticalBox);
+	const auto QualityLabel = [](int32 Level) -> FText
+	{
+		static const TCHAR* Labels[] = {TEXT("LOW"), TEXT("MEDIUM"), TEXT("HIGH"), TEXT("EPIC")};
+		return FText::FromString(Level >= 0 && Level < 4 ? Labels[Level] : TEXT("CUSTOM"));
+	};
+	const auto AddQualityRow = [&GraphicsRows, QualityLabel, this](const TCHAR* Label, auto Getter, auto Setter)
+	{
+		GraphicsRows->AddSlot().AutoHeight()[MakeCycleRow(Label,
+			TAttribute<FText>::CreateLambda([Getter, QualityLabel]()
+			{
+				const UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
+				return Settings ? QualityLabel((Settings->*Getter)()) : FText::FromString(TEXT("EPIC"));
+			}),
+			FOnClicked::CreateLambda([Getter, Setter]()
+			{
+				if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
+				{
+					(Settings->*Setter)(FMath::Clamp((Settings->*Getter)() - 1, 0, 3));
+					Settings->ApplyNonResolutionSettings(); Settings->SaveSettings();
+					FlickVisualSettings::ApplySaved();
+				}
+				return FReply::Handled();
+			}),
+			FOnClicked::CreateLambda([Getter, Setter]()
+			{
+				if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
+				{
+					(Settings->*Setter)(FMath::Clamp((Settings->*Getter)() + 1, 0, 3));
+					Settings->ApplyNonResolutionSettings(); Settings->SaveSettings();
+					FlickVisualSettings::ApplySaved();
+				}
+				return FReply::Handled();
+			}))];
+	};
+	GraphicsRows->AddSlot().AutoHeight()[MakeCycleRow(TEXT("OVERALL QUALITY"),
+		TAttribute<FText>::CreateLambda([QualityLabel]()
+		{
+			const UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
+			return Settings ? QualityLabel(Settings->GetOverallScalabilityLevel()) : FText::FromString(TEXT("EPIC"));
+		}),
+		FOnClicked::CreateLambda([]()
+		{
+			if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
+			{
+				const int32 Current = Settings->GetOverallScalabilityLevel();
+				Settings->SetOverallScalabilityLevel(FMath::Clamp(Current < 0 ? 2 : Current - 1, 0, 3));
+				Settings->ApplyNonResolutionSettings(); Settings->SaveSettings(); FlickVisualSettings::ApplySaved();
+			}
+			return FReply::Handled();
+		}),
+		FOnClicked::CreateLambda([]()
+		{
+			if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
+			{
+				const int32 Current = Settings->GetOverallScalabilityLevel();
+				Settings->SetOverallScalabilityLevel(FMath::Clamp(Current < 0 ? 2 : Current + 1, 0, 3));
+				Settings->ApplyNonResolutionSettings(); Settings->SaveSettings(); FlickVisualSettings::ApplySaved();
+			}
+			return FReply::Handled();
+		}))];
+	GraphicsRows->AddSlot().AutoHeight()[MakeCycleRow(TEXT("RENDER SCALE"),
+		TAttribute<FText>::CreateLambda([]() { return FText::FromString(FString::Printf(TEXT("%d%%"), FlickVisualSettings::GetRenderScale())); }),
+		FOnClicked::CreateLambda([]()
+		{
+			static const int32 Steps[] = {50, 67, 75, 85, 100, 110};
+			const int32 Current = FlickVisualSettings::GetRenderScale();
+			int32 Next = Steps[0];
+			for (const int32 Step : Steps) { if (Step < Current) Next = Step; }
+			FlickVisualSettings::SetRenderScale(Next); return FReply::Handled();
+		}),
+		FOnClicked::CreateLambda([]()
+		{
+			static const int32 Steps[] = {50, 67, 75, 85, 100, 110};
+			const int32 Current = FlickVisualSettings::GetRenderScale();
+			int32 Next = Steps[UE_ARRAY_COUNT(Steps) - 1];
+			for (const int32 Step : Steps) { if (Step > Current) { Next = Step; break; } }
+			FlickVisualSettings::SetRenderScale(Next); return FReply::Handled();
+		}))];
+	GraphicsRows->AddSlot().AutoHeight()[MakeCycleRow(TEXT("HARDWARE LUMEN"),
+		TAttribute<FText>::CreateLambda([]() { return FText::FromString(FlickVisualSettings::IsHardwareLumenEnabled() ? TEXT("ON") : TEXT("OFF")); }),
+		FOnClicked::CreateLambda([]() { FlickVisualSettings::SetHardwareLumenEnabled(false); return FReply::Handled(); }),
+		FOnClicked::CreateLambda([]() { FlickVisualSettings::SetHardwareLumenEnabled(true); return FReply::Handled(); }))];
+	AddQualityRow(TEXT("GLOBAL ILLUMINATION"), &UGameUserSettings::GetGlobalIlluminationQuality, &UGameUserSettings::SetGlobalIlluminationQuality);
+	AddQualityRow(TEXT("REFLECTIONS"), &UGameUserSettings::GetReflectionQuality, &UGameUserSettings::SetReflectionQuality);
+	AddQualityRow(TEXT("SHADOWS"), &UGameUserSettings::GetShadowQuality, &UGameUserSettings::SetShadowQuality);
+	AddQualityRow(TEXT("ANTI-ALIASING"), &UGameUserSettings::GetAntiAliasingQuality, &UGameUserSettings::SetAntiAliasingQuality);
+	AddQualityRow(TEXT("VIEW DISTANCE"), &UGameUserSettings::GetViewDistanceQuality, &UGameUserSettings::SetViewDistanceQuality);
+	AddQualityRow(TEXT("POST-PROCESSING"), &UGameUserSettings::GetPostProcessingQuality, &UGameUserSettings::SetPostProcessingQuality);
+	AddQualityRow(TEXT("VISUAL EFFECTS"), &UGameUserSettings::GetVisualEffectQuality, &UGameUserSettings::SetVisualEffectQuality);
+	AddQualityRow(TEXT("TEXTURES"), &UGameUserSettings::GetTextureQuality, &UGameUserSettings::SetTextureQuality);
+	AddQualityRow(TEXT("SHADING"), &UGameUserSettings::GetShadingQuality, &UGameUserSettings::SetShadingQuality);
 	const auto SectionHeading = [](const FString& Number, const FString& Title, const FString& Description) -> TSharedRef<SWidget>
 	{
 		(void)Number;
@@ -1358,7 +1487,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Camera, TEXT("CAMERA"))]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Interface, TEXT("INTERFACE"))]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Display, TEXT("VIDEO"))]
-						+ SHorizontalBox::Slot().AutoWidth()[MakeSettingsTab(EFlickSettingsTab::Sound, TEXT("AUDIO"))]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Sound, TEXT("AUDIO"))]
+						+ SHorizontalBox::Slot().AutoWidth()[MakeSettingsTab(EFlickSettingsTab::Controls, TEXT("CONTROLS"))]
 					]
 					+ SVerticalBox::Slot().FillHeight(1.0f)
 					[
@@ -1366,6 +1496,26 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 						+ SScrollBox::Slot()
 						[
 							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[
+								SNew(SBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Controls ? EVisibility::Visible : EVisibility::Collapsed; })
+								.BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
+								[
+									SNew(SVerticalBox)
+									+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT(""), TEXT("CONTROLS"), TEXT("Select a binding, then press a new key or mouse button. Duplicate keys are rejected."))]
+									+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
+									[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(ControlBindingMessage); }).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, 16.0f)
+									[SNew(SBox).WidthOverride(270.0f)[MakeMenuButton(TEXT("RESET TO DEFAULTS"), FOnClicked::CreateLambda([this]()
+									{
+										FlickControlBindings::ResetToDefaults();
+										if (PlayerController.IsValid()) PlayerController->RefreshControlBindings();
+										ControlBindingMessage = TEXT("ALL CONTROLS RESET TO DEFAULT");
+										return FReply::Handled();
+									}), false, false, 44.0f)]]
+									+ SVerticalBox::Slot().AutoHeight()[ControlRows]
+								]
+							]
 							+ SOverlay::Slot()
 							[
 								SNew(SVerticalBox)
@@ -1409,10 +1559,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 									SNew(SBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Display ? EVisibility::Visible : EVisibility::Collapsed; }).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
 									[
 										SNew(SVerticalBox)
-										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("03"), TEXT("DISPLAY"), TEXT("Choose your screen setup, then apply below."))]
+										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("03"), TEXT("DISPLAY"), TEXT("Display changes apply below. Graphics quality saves immediately."))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("V-SYNC"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(GameMode.IsValid() && GameMode->IsVSyncEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->ToggleVSync(); }))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("WINDOW MODE"), TAttribute<FText>::CreateLambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetWindowModeLabel() : TEXT("WINDOWED")); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleWindowMode(-1); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleWindowMode(1); return FReply::Handled(); }))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeCycleRow(TEXT("RESOLUTION"), TAttribute<FText>::CreateLambda([this]() { return FText::FromString(GameMode.IsValid() ? GameMode->GetResolutionLabel() : TEXT("1920 x 1080")); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleResolution(-1); return FReply::Handled(); }), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CycleResolution(1); return FReply::Handled(); }))]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("RENDERING QUALITY  //  CHANGES SAVE IMMEDIATELY"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)]
+										+ SVerticalBox::Slot().AutoHeight()[GraphicsRows]
 									]
 								]
 							]
@@ -1425,7 +1577,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(150.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CloseSettings(); else RemotePartyScreen = EFlickFrontendScreen::MainMenu; return FReply::Handled(); }), false, false, 52.0f)]]
 						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(24.0f, 0.0f)
-						[SNew(STextBlock).Text(FText::FromString(TEXT("Gameplay and audio update immediately."))).Font(UiFont(11)).ColorAndOpacity(Muted)]
+						[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(SelectedSettingsTab == EFlickSettingsTab::Controls
+								? TEXT("Controls save immediately.") : (SelectedSettingsTab == EFlickSettingsTab::Display ? TEXT("Graphics quality saves immediately. Apply display changes above.") : TEXT("Gameplay and audio update immediately."))); }).Font(UiFont(11)).ColorAndOpacity(Muted)]
 						+ SHorizontalBox::Slot().AutoWidth()
 						[
 							SNew(SBox)

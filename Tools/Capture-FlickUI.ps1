@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Settings', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings')]
+    [ValidateSet('Home', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Settings', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'AimArrow', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -25,6 +25,8 @@ param(
     [int]$PlayersPerTeam = 1,
     [ValidateRange(0, 11)]
     [int]$LockerCategory = 0,
+    [ValidateRange(0, 5)]
+    [int]$SettingsTab = 0,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
     [string]$EngineRoot = $(if ($env:FLICK_UNREAL_ENGINE_ROOT) { $env:FLICK_UNREAL_ENGINE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.8' })
@@ -58,6 +60,7 @@ $previewFlags = @{
     Shop = @('-FlickItemShopPreview')
     Social = @('-FlickSocialPreview')
     Match = @('-Flick4v4Preview')
+    AimArrow = @('-Flick4v4Preview', '-FlickAimArrowPreview')
     Training = @('-FlickTrainingPreview')
     Pause = @('-FlickPausePreview')
     Result = @('-FlickMatchResultPreview')
@@ -83,7 +86,7 @@ foreach ($screenName in $Screen) {
         '-ddc=InstalledNoZenLocalFallback',
         '-nosound', '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame',
-        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", '-FlickTestArenaSeed=1337',
+        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickSettingsTab=$SettingsTab", '-FlickTestArenaSeed=1337',
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),
         ('-abslog="{0}"' -f $logPath)

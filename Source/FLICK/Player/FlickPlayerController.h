@@ -23,6 +23,7 @@ public:
 	virtual void BeginPlayingState() override;
 	virtual void PostSeamlessTravel() override;
 	virtual void SetupInputComponent() override;
+	void RefreshControlBindings();
 	virtual void PlayerTick(float DeltaTime) override;
 
 	void ClearAiming();

@@ -20,6 +20,14 @@ struct FFlickHudEventMessage
 	float ExpiresAt = 0.0f;
 };
 
+struct FFlickAimArrowVisual
+{
+	FVector2D Start = FVector2D::ZeroVector;
+	FVector2D End = FVector2D::ZeroVector;
+	FVector2D CanvasSize = FVector2D::ZeroVector;
+	FLinearColor Accent = FLinearColor::White;
+};
+
 enum class EFlickMenuAction : uint8
 {
 	None,
@@ -78,6 +86,7 @@ public:
 	void ResetPresentation();
 	bool HandleMenuClick(const FVector2D& ScreenPosition);
 	const TArray<FFlickHudEventMessage>& GetEventMessages() const { return EventMessages; }
+	const TArray<FFlickAimArrowVisual>& GetAimArrows() const { return AimArrows; }
 
 private:
 	void ObserveMatchState(const AFlickGameState& GameState, float Now);
@@ -105,12 +114,12 @@ private:
 	FLinearColor GetModeColor(EFlickMatchVariant Variant) const;
 	void DrawCenteredText(const FString& Text, float CenterX, float Y, const FLinearColor& Color, float Scale, bool bLargeFont = false);
 	void DrawCircle(const FVector2D& Center, float Radius, const FLinearColor& Color, int32 Segments = 24, float Thickness = 1.5f);
-	void DrawFilledTriangle(const FVector2D& A, const FVector2D& B, const FVector2D& C, const FLinearColor& Color);
 	void DrawPanel(float X, float Y, float Width, float Height, const FLinearColor& Color);
 	void DrawShowcasePanel(float X, float Y, float Width, float Height, const FLinearColor& Background, const FLinearColor& Accent, float CutSize = 10.0f);
 	FLinearColor GetPowerColor(float Power) const;
 
 	TArray<FFlickHudEventMessage> EventMessages;
+	TArray<FFlickAimArrowVisual> AimArrows;
 	EFlickMatchPhase LastObservedPhase = EFlickMatchPhase::WaitingToStart;
 	EFlickTeam LastObservedTeam = EFlickTeam::None;
 	int32 LastObservedDramaticEventSerial = 0;

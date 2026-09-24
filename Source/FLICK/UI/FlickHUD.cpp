@@ -14,6 +14,8 @@
 #include "Player/FlickPlayerController.h"
 #include "Player/FlickPlayerState.h"
 #include "UI/FlickGameLayer.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Widgets/SWeakWidget.h"
 
 namespace
@@ -98,6 +100,7 @@ void AFlickHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AFlickHUD::DrawHUD()
 {
 	Super::DrawHUD();
+	AimArrows.Reset();
 
 	const AFlickGameMode* FlickGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AFlickGameMode>() : nullptr;
 	const AFlickGameState* FlickGameState = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
@@ -196,6 +199,13 @@ void AFlickHUD::DrawHUD()
 			DrawControls(Height);
 		}
 	}
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickAimArrowPreview")))
+	{
+		DrawTechnicalAimArrow(FVector2D(Width * 0.37f, Height * 0.7f),
+			FVector2D(Width * 0.66f, Height * 0.43f), GetTeamColor(EFlickTeam::Player1));
+	}
+#endif
 }
 
 void AFlickHUD::DrawCinematicReplayPullback(const AFlickGameMode& GameMode)
@@ -289,82 +299,10 @@ void AFlickHUD::DrawTechnicalAimArrow(
 	const FVector2D& End,
 	const FLinearColor& Accent)
 {
-	const FVector2D ArrowVector = End - Start;
-	const float ArrowLength = ArrowVector.Size();
-	if (ArrowLength < 18.0f)
+	if (Canvas && FVector2D::Distance(Start, End) >= 18.0f)
 	{
-		return;
+		AimArrows.Add({Start, End, FVector2D(Canvas->ClipX, Canvas->ClipY), Accent});
 	}
-
-	const FVector2D Direction = ArrowVector / ArrowLength;
-	const FVector2D Side(-Direction.Y, Direction.X);
-	const float TailInset = FMath::Min(25.0f, ArrowLength * 0.16f);
-	const float HeadLength = FMath::Clamp(ArrowLength * 0.14f, 22.0f, 36.0f);
-	const FVector2D RailStart = Start + Direction * TailInset;
-	const FVector2D HeadBase = End - Direction * FMath::Min(HeadLength, ArrowLength * 0.4f);
-	const float RailLength = FVector2D::Distance(RailStart, HeadBase);
-	const FLinearColor BrightAccent = FMath::Lerp(Accent, FLinearColor::White, 0.22f);
-
-	// Thin parallel rails and separated power blocks mirror the angular HUD
-	// borders without covering the arena or the puck underneath the guide.
-	for (const float RailSide : {-1.0f, 1.0f})
-	{
-		const FVector2D RailOffset = Side * 6.0f * RailSide;
-		DrawLine(
-			RailStart.X + RailOffset.X,
-			RailStart.Y + RailOffset.Y,
-			HeadBase.X + RailOffset.X,
-			HeadBase.Y + RailOffset.Y,
-			FLinearColor(Accent.R, Accent.G, Accent.B, 0.24f),
-			1.0f);
-	}
-
-	constexpr int32 SegmentCount = 6;
-	for (int32 SegmentIndex = 0; SegmentIndex < SegmentCount; ++SegmentIndex)
-	{
-		const float SegmentStartAlpha = static_cast<float>(SegmentIndex) / SegmentCount;
-		const float SegmentEndAlpha = FMath::Min(
-			SegmentStartAlpha + 0.72f / SegmentCount,
-			1.0f);
-		const FVector2D SegmentStart = RailStart + Direction * RailLength * SegmentStartAlpha;
-		const FVector2D SegmentEnd = RailStart + Direction * RailLength * SegmentEndAlpha;
-		const float SegmentOpacity = FMath::Lerp(0.52f, 0.96f, SegmentEndAlpha);
-		DrawLine(SegmentStart.X, SegmentStart.Y, SegmentEnd.X, SegmentEnd.Y,
-			FLinearColor(0.0f, 0.006f, 0.012f, 0.9f), 8.0f);
-		DrawLine(SegmentStart.X, SegmentStart.Y, SegmentEnd.X, SegmentEnd.Y,
-			FLinearColor(Accent.R, Accent.G, Accent.B, SegmentOpacity), 3.5f);
-		DrawLine(SegmentStart.X, SegmentStart.Y, SegmentEnd.X, SegmentEnd.Y,
-			FLinearColor(BrightAccent.R, BrightAccent.G, BrightAccent.B, SegmentOpacity * 0.72f), 1.0f);
-	}
-
-	const FVector2D OuterLeft = HeadBase + Side * 17.0f;
-	const FVector2D OuterRight = HeadBase - Side * 17.0f;
-	const FVector2D InnerBase = HeadBase + Direction * 5.0f;
-	const FVector2D InnerLeft = InnerBase + Side * 10.5f;
-	const FVector2D InnerRight = InnerBase - Side * 10.5f;
-	DrawFilledTriangle(End + Direction * 3.0f, OuterLeft, OuterRight, FLinearColor(0.0f, 0.006f, 0.012f, 0.92f));
-	DrawLine(End.X, End.Y, OuterLeft.X, OuterLeft.Y, Accent, 3.0f);
-	DrawLine(End.X, End.Y, OuterRight.X, OuterRight.Y, Accent, 3.0f);
-	DrawLine(OuterLeft.X, OuterLeft.Y, InnerLeft.X, InnerLeft.Y, Accent.CopyWithNewOpacity(0.58f), 1.5f);
-	DrawLine(OuterRight.X, OuterRight.Y, InnerRight.X, InnerRight.Y, Accent.CopyWithNewOpacity(0.58f), 1.5f);
-	DrawLine(End.X, End.Y, InnerLeft.X, InnerLeft.Y, BrightAccent, 1.25f);
-	DrawLine(End.X, End.Y, InnerRight.X, InnerRight.Y, BrightAccent, 1.25f);
-
-	TArray<FVector2D, TInlineAllocator<9>> OriginPoints;
-	for (int32 PointIndex = 0; PointIndex <= 8; ++PointIndex)
-	{
-		const float Angle = PI * 0.125f + 2.0f * PI * static_cast<float>(PointIndex % 8) / 8.0f;
-		OriginPoints.Add(Start + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * 18.0f);
-	}
-	for (int32 PointIndex = 0; PointIndex < 8; ++PointIndex)
-	{
-		const FVector2D& A = OriginPoints[PointIndex];
-		const FVector2D& B = OriginPoints[PointIndex + 1];
-		DrawLine(A.X, A.Y, B.X, B.Y, FLinearColor(0.0f, 0.006f, 0.012f, 0.88f), 5.5f);
-		DrawLine(A.X, A.Y, B.X, B.Y, Accent.CopyWithNewOpacity(0.9f), 2.0f);
-	}
-	DrawLine(Start.X - Side.X * 7.0f, Start.Y - Side.Y * 7.0f,
-		Start.X + Side.X * 7.0f, Start.Y + Side.Y * 7.0f, BrightAccent, 1.5f);
 }
 
 void AFlickHUD::PushEventMessage(
@@ -1008,22 +946,6 @@ void AFlickHUD::DrawCircle(
 		DrawLine(Previous.X, Previous.Y, Current.X, Current.Y, Color, Thickness);
 		Previous = Current;
 	}
-}
-
-void AFlickHUD::DrawFilledTriangle(
-	const FVector2D& A,
-	const FVector2D& B,
-	const FVector2D& C,
-	const FLinearColor& Color)
-{
-	if (!Canvas)
-	{
-		return;
-	}
-	FCanvasTriangleItem Triangle(A, B, C, GWhiteTexture);
-	Triangle.SetColor(Color);
-	Triangle.BlendMode = SE_BLEND_Translucent;
-	Canvas->DrawItem(Triangle);
 }
 
 void AFlickHUD::DrawPanel(

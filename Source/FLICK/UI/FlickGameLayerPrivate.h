@@ -6,11 +6,14 @@
 
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Core/FlickCosmeticCatalog.h"
+#include "Core/FlickControlBindings.h"
+#include "Core/FlickVisualSettings.h"
 #include "Core/FlickRankRules.h"
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameInstance.h"
 #include "Game/FlickGameState.h"
 #include "Engine/GameInstance.h"
+#include "GameFramework/GameUserSettings.h"
 #include "Player/FlickPlayerController.h"
 #include "Player/FlickPlayerState.h"
 #include "Ranking/FlickRankingSubsystem.h"
@@ -22,11 +25,14 @@
 #include "Online/FlickPartySubsystem.h"
 #include "Rendering/DrawElements.h"
 #include "Rendering/RenderingCommon.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Brushes/SlateDynamicImageBrush.h"
 #include "Styling/CoreStyle.h"
 #include "Styling/SlateColor.h"
 #include "UI/FlickHUD.h"
 #include "UI/FlickLogoWidget.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SInputKeySelector.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Notifications/SProgressBar.h"
@@ -1404,12 +1410,14 @@ namespace
 			, _AccentColor(Brand)
 			, _CutSize(12.0f)
 			, _BorderWidth(1.15f)
+			, _ImageBrush(nullptr)
 			, _Padding(FMargin(0.0f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, BackgroundColor)
 			SLATE_ATTRIBUTE(FLinearColor, AccentColor)
 			SLATE_ARGUMENT(float, CutSize)
 			SLATE_ARGUMENT(float, BorderWidth)
+			SLATE_ATTRIBUTE(const FSlateBrush*, ImageBrush)
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
@@ -1420,6 +1428,7 @@ namespace
 			AccentColor = InArgs._AccentColor;
 			CutSize = InArgs._CutSize;
 			BorderWidth = InArgs._BorderWidth;
+			ImageBrush = InArgs._ImageBrush;
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
 		}
 
@@ -1451,6 +1460,24 @@ namespace
 			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
 			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
 				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
+			if (const FSlateBrush* Brush = ImageBrush.Get())
+			{
+				// Draw the artwork inside the same eight-sided geometry as the panel.
+				// A centred vertical crop preserves the source image's aspect ratio.
+				const FVector2D ImageSize = Brush->GetImageSize();
+				const float SourceAspect = ImageSize.Y > 0.0f ? ImageSize.X / ImageSize.Y : 1.0f;
+				const float PanelAspect = Size.X / Size.Y;
+				const float UvHeight = FMath::Min(1.0f, SourceAspect / PanelAspect);
+				const float UvTop = (1.0f - UvHeight) * 0.5f;
+				for (int32 Index = 0; Index < Points.Num(); ++Index)
+				{
+					const FVector2D Uv(Points[Index].X / Size.X, UvTop + Points[Index].Y / Size.Y * UvHeight);
+					Vertices[Index] = FSlateVertex::Make(Transform, FVector2f(Points[Index]), FVector2f(Uv), Tint.ToFColor(true));
+				}
+				const FSlateResourceHandle Handle = FSlateApplication::Get().GetRenderer()->GetResourceHandle(*Brush);
+				FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId + 1,
+					Handle, Vertices, Indices, nullptr, 0, 0, Effect);
+			}
 			// Low-contrast architectural facets keep the glass from reading as a flat fill.
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
 				TArray<FVector2D>{{Size.X * 0.39f, 1.0f}, {Size.X * 0.61f, Size.Y - 1.0f}},
@@ -1477,6 +1504,7 @@ namespace
 	private:
 		TAttribute<FLinearColor> BackgroundColor;
 		TAttribute<FLinearColor> AccentColor;
+		TAttribute<const FSlateBrush*> ImageBrush;
 		float CutSize = 12.0f;
 		float BorderWidth = 1.15f;
 	};

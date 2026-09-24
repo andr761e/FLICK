@@ -1,4 +1,5 @@
 #include "Player/FlickPlayerController.h"
+#include "Core/FlickControlBindings.h"
 
 #include "Core/FlickLog.h"
 #include "DrawDebugHelpers.h"
@@ -121,24 +122,31 @@ void AFlickPlayerController::ApplyFrontendInputMode()
 void AFlickPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
+	RefreshControlBindings();
+}
 
-	InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &AFlickPlayerController::HandlePrimaryPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::LeftMouseButton, IE_Released, this, &AFlickPlayerController::HandlePrimaryReleased).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &AFlickPlayerController::HandleSecondaryPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AFlickPlayerController::HandleCancelPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::R, IE_Pressed, this, &AFlickPlayerController::HandleRestartPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AFlickPlayerController::HandleTrainingEditorTogglePressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::One, IE_Pressed, this, &AFlickPlayerController::HandleTrainingOwnPuckPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &AFlickPlayerController::HandleTrainingTargetPuckPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::C, IE_Pressed, this, &AFlickPlayerController::HandleTrainingClearPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::X, IE_Pressed, this, &AFlickPlayerController::HandleFreeCameraTogglePressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Delete, IE_Pressed, this, &AFlickPlayerController::HandleTrainingRemovePressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AFlickPlayerController::HandleTopDownViewPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationUpPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationDownPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AFlickPlayerController::HandleScoreboardPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(EKeys::Tab, IE_Released, this, &AFlickPlayerController::HandleScoreboardReleased).bExecuteWhenPaused = true;
+void AFlickPlayerController::RefreshControlBindings()
+{
+	if (!InputComponent) return;
+	InputComponent->KeyBindings.Reset();
+	const auto Key = [](const TCHAR* Id) { return FlickControlBindings::GetKey(Id); };
+	InputComponent->BindKey(Key(TEXT("Shoot")), IE_Pressed, this, &AFlickPlayerController::HandlePrimaryPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Shoot")), IE_Released, this, &AFlickPlayerController::HandlePrimaryReleased).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Secondary")), IE_Pressed, this, &AFlickPlayerController::HandleSecondaryPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Menu")), IE_Pressed, this, &AFlickPlayerController::HandleCancelPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Restart")), IE_Pressed, this, &AFlickPlayerController::HandleRestartPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Editor")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingEditorTogglePressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("OwnPuck")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingOwnPuckPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("TargetPuck")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingTargetPuckPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Clear")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingClearPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("FreeCamera")), IE_Pressed, this, &AFlickPlayerController::HandleFreeCameraTogglePressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Remove")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingRemovePressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("TopView")), IE_Pressed, this, &AFlickPlayerController::HandleTopDownViewPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("CameraUp")), IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationUpPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("CameraDown")), IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationDownPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("CameraReset")), IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Scoreboard")), IE_Pressed, this, &AFlickPlayerController::HandleScoreboardPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("Scoreboard")), IE_Released, this, &AFlickPlayerController::HandleScoreboardReleased).bExecuteWhenPaused = true;
 }
 
 void AFlickPlayerController::PlayerTick(const float DeltaTime)
@@ -822,13 +830,15 @@ bool AFlickPlayerController::UpdateFreeCamera(const float DeltaSeconds)
 			Instance->GetFreeCameraLookSensitivity(),
 			Instance->GetFreeCameraMoveSensitivity());
 	}
-	const float Forward = (IsInputKeyDown(EKeys::W) ? 1.0f : 0.0f)
-		- (IsInputKeyDown(EKeys::S) ? 1.0f : 0.0f);
-	const float Right = (IsInputKeyDown(EKeys::D) ? 1.0f : 0.0f)
-		- (IsInputKeyDown(EKeys::A) ? 1.0f : 0.0f);
-	const float Up = (IsInputKeyDown(EKeys::SpaceBar) ? 1.0f : 0.0f)
-		- (IsInputKeyDown(EKeys::LeftControl) || IsInputKeyDown(EKeys::RightControl) ? 1.0f : 0.0f);
-	const bool bBoost = IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift);
+	const float Forward = (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveForward"))) ? 1.0f : 0.0f)
+		- (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveBack"))) ? 1.0f : 0.0f);
+	const float Right = (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveRight"))) ? 1.0f : 0.0f)
+		- (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveLeft"))) ? 1.0f : 0.0f);
+	const float Up = (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveUp"))) ? 1.0f : 0.0f)
+		- (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveDown")))
+			|| IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveDownAlt"))) ? 1.0f : 0.0f);
+	const bool bBoost = IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveBoost")))
+		|| IsInputKeyDown(FlickControlBindings::GetKey(TEXT("MoveBoostAlt")));
 	CameraPawn->AddFreeCameraInput(Forward, Right, Up, FVector2D(MouseX, MouseY), bBoost, DeltaSeconds);
 	CurrentMouseCursor = EMouseCursor::None;
 	return true;
@@ -1478,8 +1488,8 @@ void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 	}
 
 	const float Direction =
-		(IsInputKeyDown(EKeys::Q) ? 1.0f : 0.0f)
-		- (IsInputKeyDown(EKeys::E) ? 1.0f : 0.0f);
+		(IsInputKeyDown(FlickControlBindings::GetKey(TEXT("OrbitLeft"))) ? 1.0f : 0.0f)
+		- (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("OrbitRight"))) ? 1.0f : 0.0f);
 
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
 		CameraPawn && !FMath::IsNearlyZero(Direction))

@@ -1,10 +1,59 @@
 // main menu, profile, social, shop
 #include "UI/FlickGameLayerPrivate.h"
+#include "Misc/Paths.h"
 
 static TAutoConsoleVariable<int32> CVarFlickMainMenuBackdrop(
 	TEXT("flick.MainMenuBackdrop"), 0,
 	TEXT("Show the full-screen main-menu tint and decorative backdrop (0 = off, 1 = on)."),
 	ECVF_Default);
+
+namespace
+{
+	const FSlateBrush* GetCosmeticImageBrush(const int32 Category, const int32 Index)
+	{
+		static const TCHAR* BannerFiles[] = {
+			TEXT("Blue ice.png"), TEXT("cold.png"), TEXT("Crystal.png"), TEXT("Fire red.png"),
+			TEXT("Red crystal.png"), TEXT("Robotic.png"), TEXT("rock.png"), TEXT("tundra.png")};
+		static const TCHAR* BorderFiles[] = {
+			TEXT("gold.png"), TEXT("ice.png"), TEXT("purple crystal.png"), TEXT("robotic.png")};
+		const int32 AssetIndex = Index - 3; // The original three procedural styles retain their save indices.
+		const bool bBanner = Category == 0;
+		if (Category != 0 && Category != 2) return nullptr;
+		if (AssetIndex < 0 || AssetIndex >= (bBanner ? UE_ARRAY_COUNT(BannerFiles) : UE_ARRAY_COUNT(BorderFiles))) return nullptr;
+		static TMap<FString, TSharedPtr<FSlateDynamicImageBrush>> Brushes;
+		const FString Path = FPaths::ProjectContentDir() / TEXT("UI") /
+			(bBanner ? TEXT("Banners") : TEXT("Avatar borders")) /
+			(bBanner ? BannerFiles[AssetIndex] : BorderFiles[AssetIndex]);
+		if (!Brushes.Contains(Path))
+		{
+			Brushes.Add(Path, MakeShared<FSlateDynamicImageBrush>(FName(*Path),
+				bBanner ? FVector2D(2172.0f, 724.0f) : FVector2D(1254.0f, 1254.0f)));
+		}
+		return Brushes[Path].Get();
+	}
+
+	FLinearColor GetBannerTagColor(const int32 Index)
+	{
+		const FLinearColor Colors[] = {
+			Brand, Cyan, Orange, FLinearColor(0.82f, 0.58f, 1.0f),
+			FLinearColor(1.0f, 0.78f, 0.25f), Cyan, Paper, Orange,
+			FLinearColor(0.5f, 0.95f, 0.72f), FLinearColor(0.82f, 0.58f, 1.0f), Brand, Paper};
+		return Colors[FMath::Clamp(Index, 0, UE_ARRAY_COUNT(Colors) - 1)];
+	}
+
+	FSlateFontInfo GetBannerTagFont(const int32 Index, const int32 Size)
+	{
+		return Index % 3 == 0 ? DisplayFont(Size, true)
+			: Index % 3 == 1 ? DisplayFont(Size) : UiFont(Size, true);
+	}
+
+	FLinearColor GetBannerBackground(const int32 Index)
+	{
+		return Index == 2 ? FLinearColor(0.018f, 0.075f, 0.105f, 0.97f)
+			: Index == 1 ? FLinearColor(0.045f, 0.065f, 0.04f, 0.97f)
+			: FLinearColor::FromSRGBColor(FColor(14, 23, 25, 247));
+	}
+}
 
 TSharedRef<SWidget> SFlickGameLayer::BuildStartupOverlay()
 {
@@ -268,14 +317,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			SAssignNew(MainMenuProfileCard, SBox).WidthOverride(380.0f).HeightOverride(82.0f)
 			[
 				SNew(SFlickMainMenuPanel)
-				.BackgroundColor_Lambda([this]()
-				{
-					return SelectedBannerStyle == 2
-						? FLinearColor(0.018f, 0.075f, 0.105f, 0.97f)
-						: SelectedBannerStyle == 1
-							? FLinearColor(0.045f, 0.065f, 0.04f, 0.97f)
-							: FLinearColor::FromSRGBColor(FColor(14, 23, 25, 247));
-				})
+				.BackgroundColor_Lambda([this]() { return GetBannerBackground(SelectedBannerStyle); })
+				.ImageBrush_Lambda([this]() { return GetCosmeticImageBrush(0, SelectedBannerStyle); })
 				.AccentColor_Lambda([this]() { return SelectedAvatarBorder == 2 ? Brand : SelectedAvatarBorder == 1 ? Cyan : Hairline; })
 				.CutSize(10.0f).BorderWidth(1.15f).Padding(FMargin(12.0f, 9.0f))
 				[
@@ -283,6 +326,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Fill).Padding(0.0f, 0.0f, 13.0f, 0.0f)
 					[
 						SNew(SBox).WidthOverride(62.0f)
+						[
+						SNew(SOverlay)
+						+ SOverlay::Slot()
 						[
 						SNew(SFlickAngularBorder)
 						.BackgroundColor(PanelRaised)
@@ -303,12 +349,24 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 							]
 						]
 						]
+						+ SOverlay::Slot()
+						[
+							SNew(SImage).Image_Lambda([this]() { return GetCosmeticImageBrush(2, SelectedAvatarBorder); })
+						]
+						]
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 					[
 						SNew(SVerticalBox)
 						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda([this]() { const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER")); }).Font(UiFont(15, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)[SNew(STextBlock).Text_Lambda([this]() { static const TCHAR* Tags[] = {TEXT("READY TO FLICK"), TEXT("TABLE TACTICIAN"), TEXT("RIVAL INCOMING")}; return FText::FromString(Tags[SelectedBannerTag % 3]); }).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)
+						[
+							SNew(STextBlock)
+							.Text_Lambda([this]() { return FText::FromString(FlickCosmeticCatalog::GetItems(1)[SelectedBannerTag]); })
+							.Font_Lambda([this]() { return GetBannerTagFont(SelectedBannerTag, 10); })
+							.ColorAndOpacity_Lambda([this]() { return GetBannerTagColor(SelectedBannerTag); })
+							.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+						]
 					]
 				]
 			]
@@ -689,7 +747,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 	TSharedRef<SOverlay> LockerContents = SNew(SOverlay);
 	for (int32 Category = 0; Category < FlickCosmeticCatalog::CategoryCount; ++Category)
 	{
-		const bool bPuck = FlickCosmeticCatalog::IsPuckCategory(Category);
 		const FString CategoryName = FlickCosmeticCatalog::GetCategoryName(Category);
 		if (Category == 0 || Category == FlickCosmeticCatalog::PuckCategoryStart)
 		{
@@ -716,11 +773,53 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		const TArray<FString>& Names = FlickCosmeticCatalog::GetItems(Category);
 		for (int32 Index = 0; Index < Names.Num(); ++Index)
 		{
-			const FLinearColor PreviewAccent = Category == 2
-				? (Index == 1 ? Cyan : Index == 2 ? Brand : Paper)
+			const FLinearColor PreviewAccent = Category == 1 ? GetBannerTagColor(Index)
+				: Category == 2 ? (Index == 1 ? Cyan : Index == 2 ? Brand : Hairline)
 				: Category == 0 ? (Index == 1 ? Orange : Index == 2 ? Cyan : Brand) : Brand;
-			const FString PreviewLabel = Category == 1 ? Names[Index]
-				: Category == 2 ? TEXT("AVATAR") : TEXT("FLICK  //");
+			const bool bWide = Category == 0 || Category == 1;
+			const float CardWidth = bWide ? 340.0f : 166.0f;
+			const float CardHeight = bWide ? 132.0f : 168.0f;
+			TSharedRef<SWidget> Preview = SNew(SBox);
+			if (Category == 0)
+			{
+				Preview = SNew(SBox).HeightOverride(72.0f)
+				[
+					SNew(SFlickMainMenuPanel).BackgroundColor(GetBannerBackground(Index))
+					.ImageBrush(GetCosmeticImageBrush(0, Index))
+					.AccentColor(PreviewAccent).CutSize(10.0f).BorderWidth(1.5f).Padding(FMargin(15.0f, 10.0f))
+					[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK  //  KNOCKOUT"))).Font(DisplayFont(17)).ColorAndOpacity(Paper)]
+				];
+			}
+			else if (Category == 1)
+			{
+				Preview = SNew(SBox).HeightOverride(72.0f)
+				[
+					SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(PreviewAccent)
+					.CutSize(8.0f).BorderWidth(1.0f).Padding(FMargin(12.0f, 11.0f))
+					[SNew(STextBlock).Text(FText::FromString(Names[Index]))
+					.Font(GetBannerTagFont(Index, 17)).ColorAndOpacity(PreviewAccent)]
+				];
+			}
+			else if (Category == 2)
+			{
+				Preview = SNew(SBox).WidthOverride(94.0f).HeightOverride(94.0f)
+				[
+					SNew(SOverlay)
+					+ SOverlay::Slot()
+					[
+						SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(PreviewAccent)
+						.CutSize(13.0f).BorderWidth(3.0f).Padding(FMargin(9.0f))
+						[SNew(SFlickStatusGlobe).Color(Cyan)]
+					]
+					+ SOverlay::Slot()[SNew(SImage).Image(GetCosmeticImageBrush(2, Index))]
+				];
+			}
+			else
+			{
+				Preview = SNew(SFlickPuckDisc)
+					.Archetype(FlickCosmeticCatalog::GetPuckArchetype(Category))
+					.TeamColor(Cyan).AccentColor(Brand).Selected(true);
+			}
 			TSharedRef<SButton> Button = SNew(SButton).ButtonStyle(&TransparentButtonStyle)
 				.ContentPadding(0.0f).Cursor(EMouseCursor::Hand)
 				.OnClicked_Lambda([this, Category, Index]()
@@ -750,19 +849,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 						: Category == 2 ? SelectedAvatarBorder : SelectedPuckSkins[Category - FlickCosmeticCatalog::PuckCategoryStart];
 					return Selected == Index ? Brand : Hairline;
 				})
-				.CutSize(8.0f).BorderWidth(1.0f).Padding(FMargin(14.0f, 10.0f))
+				.CutSize(8.0f).BorderWidth(1.0f).Padding(FMargin(10.0f, 8.0f))
 				[
-					SNew(SBox).WidthOverride(190.0f).HeightOverride(130.0f)
+					SNew(SBox).WidthOverride(CardWidth).HeightOverride(CardHeight)
 					[
 						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().FillHeight(1.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
-						[
-							bPuck ? StaticCastSharedRef<SWidget>(SNew(SFlickPuckDisc)
-								.Archetype(FlickCosmeticCatalog::GetPuckArchetype(Category))
-								.TeamColor(Cyan).AccentColor(Brand).Selected(true))
-								: StaticCastSharedRef<SWidget>(SNew(STextBlock).Text(FText::FromString(PreviewLabel))
-								.Font(DisplayFont(Category == 1 ? 13 : 18)).ColorAndOpacity(PreviewAccent))
-						]
+						+ SVerticalBox::Slot().FillHeight(1.0f).HAlign(bWide ? HAlign_Fill : HAlign_Center).VAlign(VAlign_Center)
+						[Preview]
 						+ SVerticalBox::Slot().AutoHeight()
 						[SNew(STextBlock).Text(FText::FromString(Names[Index])).Font(UiFont(11, true)).ColorAndOpacity(Paper)]
 						+ SVerticalBox::Slot().AutoHeight()
@@ -774,7 +867,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 						}).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
 					]
 				]);
-			Items->AddSlot(Index % 3, Index / 3).Padding(0.0f, 0.0f, 8.0f, 8.0f)[Button];
+			Items->AddSlot(Index % (bWide ? 2 : 4), Index / (bWide ? 2 : 4))
+				.Padding(0.0f, 0.0f, 8.0f, 8.0f)[Button];
 		}
 		LockerContents->AddSlot()
 		[
@@ -784,7 +878,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(CategoryName)).Font(DisplayFont(25)).ColorAndOpacity(Paper)]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 14.0f)
 				[SNew(STextBlock).Text(FText::FromString(FString::Printf(TEXT("OWNED  %d  //  SELECT AN ITEM TO EQUIP"), Names.Num()))).Font(UiFont(10, true)).ColorAndOpacity(Muted)]
-				+ SVerticalBox::Slot().AutoHeight()[Items]
+				+ SVerticalBox::Slot().FillHeight(1.0f)
+				[
+					SNew(SScrollBox)
+					+ SScrollBox::Slot()[Items]
+				]
 			]
 		];
 	}
@@ -882,8 +980,17 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility(EVisibility::HitTestInvisible).Opacity(0.22f)]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(42.0f)
 		[
+			SNew(SBox).WidthOverride(1380.0f).HeightOverride(760.0f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth()
+				[
 			SNew(SBox)
-			.WidthOverride(1380.0f)
+			.WidthOverride_Lambda([this]()
+			{
+				if (SelectedProfileTab != EFlickProfileTab::Customization) return 1380.0f;
+				return FlickCosmeticCatalog::IsPuckCategory(SelectedLockerCategory) ? 650.0f : 1190.0f;
+			})
 			.HeightOverride(760.0f)
 			[
 			SNew(SFlickAngularBorder)
@@ -1031,6 +1138,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				[SNew(STextBlock).Text(FText::FromString(TEXT("PROFILE DATA SAVES AUTOMATICALLY"))).Font(UiFont(10)).ColorAndOpacity(Muted)]
 			]
 			]
+			]
+				]
 			]
 		];
 }
