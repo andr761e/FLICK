@@ -1065,9 +1065,6 @@ bool AFlickHUD::HandleMenuClick(const FVector2D& ScreenPosition)
 			if (!FlickGameMode) return false;
 			FlickGameMode->OpenLoadout();
 			break;
-		case EFlickMenuAction::StartMatch:
-			FlickGameMode->StartSelectedMatch();
-			break;
 		case EFlickMenuAction::SelectMode:
 			FlickGameMode->SelectMatchVariant(Region.MatchVariant);
 			break;
@@ -1170,7 +1167,6 @@ bool AFlickHUD::HandleMenuClick(const FVector2D& ScreenPosition)
 			return false;
 		}
 		const bool bConfirmSound = Region.Action == EFlickMenuAction::OpenLoadout
-			|| Region.Action == EFlickMenuAction::StartMatch
 			|| Region.Action == EFlickMenuAction::Resume
 			|| Region.Action == EFlickMenuAction::Restart
 			|| Region.Action == EFlickMenuAction::NextRound

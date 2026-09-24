@@ -32,7 +32,6 @@ enum class EFlickMenuAction : uint8
 {
 	None,
 	OpenLoadout,
-	StartMatch,
 	SelectMode,
 	OpenSettings,
 	Quit,

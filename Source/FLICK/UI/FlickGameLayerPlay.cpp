@@ -168,7 +168,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 			.Visibility_Lambda([this]() { return SelectedPlayPlaylist == EFlickPlayPlaylist::None ? EVisibility::Visible : EVisibility::Collapsed; })
 			[
 				SNew(SGridPanel).FillColumn(0, 1.0f).FillColumn(1, 1.0f)
-				+ SGridPanel::Slot(0, 0).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Casual, TEXT("CASUAL"), TEXT("LOCAL PLAY OR RELAXED ONLINE MATCHMAKING"))]
+				+ SGridPanel::Slot(0, 0).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Casual, TEXT("CASUAL"), TEXT("RELAXED ONLINE MATCHMAKING"))]
 				+ SGridPanel::Slot(1, 0).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Competitive, TEXT("COMPETITIVE"), TEXT("RANKED ONLINE MATCHES WITH MMR"))]
 				+ SGridPanel::Slot(0, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::Training, TEXT("TRAINING"), TEXT("LEARN THE BASICS, PRACTICE FREELY, OR PLAY AGAINST THE BOT"))]
 				+ SGridPanel::Slot(1, 1).Padding(UiMetrics::CardGap)[BuildPlayPlaylistCard(EFlickPlayPlaylist::PrivateMatch, TEXT("PRIVATE MATCH"), TEXT("CUSTOM RULES, FLEXIBLE TEAMS, AND SPECTATORS"))]
@@ -303,15 +303,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 						})
 						[
 							MakeMenuButton(TEXT("EDIT LINEUPS"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->OpenLoadout(); return FReply::Handled(); }), false, false, UiMetrics::ActionHeight)
-						]
-					]
-					+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 14.0f, 0.0f)
-					[
-						SNew(SBox).WidthOverride(224.0f)
-						.IsEnabled_Lambda([this]() { return SelectedPlayFormat != 0 && (!GameMode.IsValid() || !GameMode->IsPartySession()); })
-						.Visibility_Lambda([this]() { return SelectedPlayPlaylist == EFlickPlayPlaylist::Casual ? EVisibility::Visible : EVisibility::Collapsed; })
-						[
-							MakeMenuButton(TEXT("LOCAL MATCH"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->StartSelectedMatch(); return FReply::Handled(); }), false, false, UiMetrics::ActionHeight)
 						]
 					]
 					+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 14.0f, 0.0f)
@@ -487,7 +478,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayPlaylistCard(
 		: Playlist == EFlickPlayPlaylist::Competitive ? TEXT("02")
 		: Playlist == EFlickPlayPlaylist::Training ? TEXT("03")
 		: Playlist == EFlickPlayPlaylist::PrivateMatch ? TEXT("04") : TEXT("05");
-	const FString PlaylistTag = Playlist == EFlickPlayPlaylist::Casual ? TEXT("LOCAL + ONLINE")
+	const FString PlaylistTag = Playlist == EFlickPlayPlaylist::Casual ? TEXT("ONLINE")
 		: Playlist == EFlickPlayPlaylist::Competitive ? TEXT("RANKED ONLINE")
 		: Playlist == EFlickPlayPlaylist::Training ? TEXT("OFFLINE PRACTICE")
 		: Playlist == EFlickPlayPlaylist::PrivateMatch ? TEXT("YOUR RULES") : TEXT("EXPERIMENTAL");
