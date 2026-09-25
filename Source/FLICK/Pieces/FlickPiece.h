@@ -42,7 +42,6 @@ public:
 	void Eliminate();
 	void SetSelected(bool bInSelected);
 	void SetHovered(bool bInHovered);
-	void SetKickoffLocked(bool bInKickoffLocked);
 	void PlayImpactFlash(float Strength);
 	void ApplyTabletopSelfRighting(float TorqueStrength, float DampingStrength, float MinimumTiltDegrees);
 	void ApplyTabletopFlightContainment(float SurfaceZ, float MaximumUpwardSpeed, float DownwardAcceleration);
@@ -108,9 +107,6 @@ private:
 
 	UFUNCTION()
 	void OnRep_Eliminated();
-
-	UFUNCTION()
-	void OnRep_KickoffLocked();
 
 	UFUNCTION()
 	void OnRep_HighDetailVisuals();
@@ -312,9 +308,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Piece")
 	bool bHovered = false;
-
-	UPROPERTY(ReplicatedUsing = OnRep_KickoffLocked, VisibleAnywhere, Category = "FLICK|Piece")
-	bool bKickoffLocked = false;
 
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Piece")
 	bool bBobStriker = false;

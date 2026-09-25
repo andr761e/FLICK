@@ -328,10 +328,6 @@ public:
 	float GetResolutionElapsed() const { return ResolutionElapsed; }
 	float GetMaximumResolutionDuration() const { return MaximumResolutionDuration; }
 	bool IsResolvingKickoff() const { return bResolvingKickoff; }
-	bool HasLockedKickoffShot() const { return !LockedKickoffShots.IsEmpty(); }
-	const AFlickPiece* GetLockedKickoffPiece() const;
-	FVector GetLockedKickoffDirection() const;
-	float GetLockedKickoffPower() const;
 	int32 CountActivePieces(EFlickTeam Team) const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena")

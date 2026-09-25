@@ -103,6 +103,11 @@ public:
 	void SetPersistentPartyIdentity(const FString& PartyId, int32 PartySlot, int32 PartySize, bool bLeader);
 	void ClearPersistentPartyIdentity();
 	bool OpenInviteOverlay();
+	bool HasPendingPartyInvite() const { return PendingIncomingInviteLobbyId != 0 && !bIncomingPartyInviteSearch; }
+	const FString& GetPendingPartyInviteName() const { return PendingIncomingInviteName; }
+	bool AcceptPendingPartyInvite();
+	void DeclinePendingPartyInvite();
+	void NotifySteamPartyInvite(uint64 InviterId, uint64 LobbyId);
 	bool RefreshFriends();
 	bool InviteFriendToParty(int32 FriendIndex);
 	bool InviteRecentPlayerToParty(int32 RecentPlayerIndex);
@@ -176,6 +181,7 @@ private:
 		int32 ControllerId,
 		FUniqueNetIdPtr UserId,
 		const FOnlineSessionSearchResult& InviteResult);
+	void HandleFindInvitingFriendSession(int32 LocalUserNum, bool bWasSuccessful, const TArray<FOnlineSessionSearchResult>& Results);
 	void HandleSessionParticipantJoined(FName SessionName, const FUniqueNetId& UserId);
 	void HandleSessionParticipantLeft(FName SessionName, const FUniqueNetId& UserId, EOnSessionParticipantLeftReason Reason);
 	void HandleSessionSettingsUpdated(FName SessionName, const FOnlineSessionSettings& Settings);
@@ -216,6 +222,10 @@ private:
 	EFlickSessionPurpose ActivePurpose = EFlickSessionPurpose::Match;
 	FString PendingPartyInviteUserId;
 	FString PendingPartyInviteDisplayName;
+	uint64 PendingIncomingInviteLobbyId = 0;
+	uint64 PendingIncomingInviterId = 0;
+	FString PendingIncomingInviteName;
+	bool bIncomingPartyInviteSearch = false;
 	bool bHostAfterDestroy = false;
 	bool bJoinAfterDestroy = false;
 	bool bReturnAfterDestroy = false;
@@ -252,6 +262,7 @@ private:
 	FDelegateHandle JoinSessionHandle;
 	FDelegateHandle DestroySessionHandle;
 	FDelegateHandle InviteAcceptedHandle;
+	FDelegateHandle FindInvitingFriendHandle;
 	FDelegateHandle ParticipantJoinedHandle;
 	FDelegateHandle ParticipantLeftHandle;
 	FDelegateHandle SessionSettingsUpdatedHandle;

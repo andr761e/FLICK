@@ -266,7 +266,6 @@ void AFlickPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AFlickPiece, OwningPlayerSlot);
 	DOREPLIFETIME(AFlickPiece, bShowPlayerIdentity);
 	DOREPLIFETIME(AFlickPiece, bEliminated);
-	DOREPLIFETIME(AFlickPiece, bKickoffLocked);
 	DOREPLIFETIME(AFlickPiece, bBobStriker);
 	DOREPLIFETIME(AFlickPiece, bHighDetailVisualsEnabled);
 	DOREPLIFETIME(AFlickPiece, bPregamePreview);
@@ -305,7 +304,7 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 	VisualTime += DeltaSeconds;
 	const bool bWasFlashing = HitFlashRemaining > 0.0f;
 	HitFlashRemaining = FMath::Max(0.0f, HitFlashRemaining - DeltaSeconds);
-	if (bSelected || bHovered || bKickoffLocked || bWasFlashing)
+	if (bSelected || bHovered || bWasFlashing)
 	{
 		ApplyVisuals();
 	}
@@ -387,7 +386,6 @@ void AFlickPiece::InitializePiece(
 	bEliminated = false;
 	bSelected = false;
 	bHovered = false;
-	bKickoffLocked = false;
 	HitFlashRemaining = 0.0f;
 
 	SetActorHiddenInGame(false);
@@ -601,7 +599,6 @@ void AFlickPiece::Eliminate()
 	bEliminated = true;
 	bSelected = false;
 	bHovered = false;
-	bKickoffLocked = false;
 	ApplyEliminatedState();
 	ForceNetUpdate();
 	UE_LOG(LogFlick, Log, TEXT("Piece %d eliminated"), PieceId);
@@ -662,18 +659,6 @@ void AFlickPiece::SetSelected(const bool bInSelected)
 void AFlickPiece::SetHovered(const bool bInHovered)
 {
 	bHovered = !bEliminated && bInHovered;
-	ApplyVisuals();
-}
-
-void AFlickPiece::SetKickoffLocked(const bool bInKickoffLocked)
-{
-	bKickoffLocked = !bEliminated && bInKickoffLocked;
-	ApplyVisuals();
-	ForceNetUpdate();
-}
-
-void AFlickPiece::OnRep_KickoffLocked()
-{
 	ApplyVisuals();
 }
 
@@ -1387,7 +1372,7 @@ void AFlickPiece::UpdateTestArenaVisuals()
 	const float IdleLight = bUsingHighDetailPuck ? 8.0f : 11.0f;
 	const float HighlightLight = bUsingHighDetailPuck ? 14.0f : 18.0f;
 	AccentLight->SetIntensity(
-		bEliminated ? 0.0f : (bSelected || bHovered || bKickoffLocked ? HighlightLight : IdleLight));
+		bEliminated ? 0.0f : (bSelected || bHovered ? HighlightLight : IdleLight));
 }
 
 void AFlickPiece::ApplyVisuals()
@@ -1431,9 +1416,7 @@ void AFlickPiece::ApplyVisuals()
 		FMath::Lerp(CoolMetal, TeamColor, 0.12f),
 		VisualAccent,
 		ArchetypeMix);
-	const FLinearColor HaloColor = bKickoffLocked
-		? FMath::Lerp(TeamColor, FLinearColor::White, 0.7f)
-		: bSelected
+	const FLinearColor HaloColor = bSelected
 		? FLinearColor(1.0f, 0.78f, 0.05f, 1.0f)
 		: FMath::Lerp(TeamColor, FLinearColor::White, 0.38f);
 	FLinearColor PipColor = FMath::Lerp(
@@ -1504,7 +1487,7 @@ void AFlickPiece::ApplyVisuals()
 		? FLinearColor(0.026f, 0.033f, 0.042f, 1.0f)
 		: FMath::Lerp(FLinearColor(0.01f, 0.015f, 0.024f, 1.0f), FMath::Lerp(TeamColor, ArchetypeColor, 0.5f), 0.2f));
 	SetGlowColor(UnderglowMaterial, FMath::Lerp(TeamColor, FLinearColor::White, bSelected ? 0.12f : 0.0f), bSelected ? 0.1f : 0.018f);
-	SetGlowColor(HaloMaterial, HaloColor, bKickoffLocked ? 0.3f : bSelected ? 0.22f : 0.055f);
+	SetGlowColor(HaloMaterial, HaloColor, bSelected ? 0.22f : 0.055f);
 	SetAccentPaint(PipMaterial, PipColor, bSelected ? 0.34f : 0.16f);
 	SetAccentPaint(InnerRingMaterial, bShowPlayerIdentity
 		? PlayerIdentityColor
@@ -1560,8 +1543,8 @@ void AFlickPiece::ApplyVisuals()
 	AccentLight->SetLightColor(TeamColor);
 	AccentLight->SetIntensity(0.0f);
 
-	SelectionHalo->SetVisibility(bSelected || bHovered || bKickoffLocked);
-	const float Pulse = bSelected || bKickoffLocked
+	SelectionHalo->SetVisibility(bSelected || bHovered);
+	const float Pulse = bSelected
 		? 1.0f + 0.055f * FMath::Sin(VisualTime * 7.0f)
 		: 1.0f + 0.025f * FMath::Sin(VisualTime * 5.0f);
 	SelectionHalo->SetRelativeScale3D(FVector(

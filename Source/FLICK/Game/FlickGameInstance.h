@@ -101,6 +101,8 @@ public:
 	float GetFreeCameraMoveSensitivity() const { return FreeCameraMoveSensitivity; }
 	float GetShotMouseSensitivity() const { return ShotMouseSensitivity; }
 	float GetGameplayCameraSensitivity() const { return GameplayCameraSensitivity; }
+	float GetGameplayCameraDistance() const { return GameplayCameraDistance; }
+	float GetGameplayCameraFieldOfView() const { return GameplayCameraFieldOfView; }
 	FString GetClassName(EFlickLineupPreset Preset) const;
 	const FFlickProfileStats& GetProfileStats() const { return ProfileStats; }
 	const TArray<FFlickProfileMatchRecord>& GetRecentMatches() const { return RecentMatches; }
@@ -122,6 +124,8 @@ public:
 	void SetFreeCameraMoveSensitivity(float Sensitivity);
 	void SetShotMouseSensitivity(float Sensitivity);
 	void SetGameplayCameraSensitivity(float Sensitivity);
+	void SetGameplayCameraDistance(float Distance);
+	void SetGameplayCameraFieldOfView(float FieldOfView);
 	void SetClassName(EFlickLineupPreset Preset, const FString& Name);
 	void RecordCompletedMatch(
 		int32 Points,
@@ -158,6 +162,8 @@ private:
 	float FreeCameraMoveSensitivity = 0.38f;
 	float ShotMouseSensitivity = 0.5f;
 	float GameplayCameraSensitivity = 0.35f;
+	float GameplayCameraDistance = 0.9f;
+	float GameplayCameraFieldOfView = 49.2f;
 	TArray<FString> ClassNames;
 	FFlickProfileStats ProfileStats;
 	TArray<FFlickProfileMatchRecord> RecentMatches;

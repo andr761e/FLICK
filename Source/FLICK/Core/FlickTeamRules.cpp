@@ -22,6 +22,18 @@ int32 FlickTeamRules::AdvancePlayerSlot(const int32 CurrentSlot, const int32 Pla
 	return (FMath::Max(0, CurrentSlot) + 1) % ClampedTeamSize;
 }
 
+int32 FlickTeamRules::GetRoundOpeningPlayerSlot(
+	const int32 RoundNumber,
+	const EFlickTeam Team,
+	const int32 PlayersPerTeam)
+{
+	const int32 SafeRound = FMath::Max(1, RoundNumber);
+	const int32 TeamSize = ClampPlayersPerTeam(PlayersPerTeam);
+	// Blue 1, Orange 1, Blue 2, Orange 2... is one continuous cycle.
+	// Each new round starts at the next seat, even when kickoff is simultaneous.
+	return (Team == EFlickTeam::Player1 ? SafeRound / 2 : (SafeRound - 1) / 2) % TeamSize;
+}
+
 bool FlickTeamRules::IsActivePlayerSlot(
 	const int32 PlayerSlot,
 	const int32 CurrentPlayerSlot,

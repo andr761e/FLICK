@@ -89,6 +89,7 @@ private:
 	TSharedRef<SWidget> BuildOnlineBrowser();
 	TSharedRef<SWidget> BuildOnlineSessionRow(int32 ResultIndex);
 	TSharedRef<SWidget> BuildMatchmakingStatusBar();
+	TSharedRef<SWidget> BuildPartyInvitePrompt();
 	TSharedRef<SWidget> BuildNetworkLobby();
 	TSharedRef<SWidget> BuildLoadout();
 	TSharedRef<SWidget> BuildLoadoutWorkspace();

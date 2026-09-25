@@ -1223,10 +1223,10 @@ void AFlickGameMode::BeginOpeningPhase()
 			FlickGameState->SetMatchPhase(EFlickMatchPhase::Aiming);
 			return;
 		}
-		const int32 OpeningPlayerSlot = (FlickGameState->RoundNumber - 1)
-			% FlickTeamRules::ClampPlayersPerTeam(CurrentPlayersPerTeam);
-		Player1NextPlayerSlot = OpeningPlayerSlot;
-		Player2NextPlayerSlot = OpeningPlayerSlot;
+		Player1NextPlayerSlot = FlickTeamRules::GetRoundOpeningPlayerSlot(
+			FlickGameState->RoundNumber, EFlickTeam::Player1, CurrentPlayersPerTeam);
+		Player2NextPlayerSlot = FlickTeamRules::GetRoundOpeningPlayerSlot(
+			FlickGameState->RoundNumber, EFlickTeam::Player2, CurrentPlayersPerTeam);
 		FlickGameState->SetCurrentTeam(FlickGameState->RoundStartingTeam);
 		ActivateNextPlayerForTeam(FlickGameState->CurrentTeam);
 		SetCameraViewForTeam(FlickGameState->CurrentTeam);
@@ -1248,13 +1248,6 @@ void AFlickGameMode::BeginOpeningPhase()
 
 void AFlickGameMode::ResetKickoffState()
 {
-	for (const FFlickLockedKickoffShot& Shot : LockedKickoffShots)
-	{
-		if (Shot.Piece.IsValid())
-		{
-			Shot.Piece->SetKickoffLocked(false);
-		}
-	}
 	LockedKickoffShots.Reset();
 	if (AFlickGameState* FlickGameState = GetFlickGameState())
 	{

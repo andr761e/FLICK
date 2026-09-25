@@ -32,6 +32,39 @@ bool FFlickTeamRulesRotationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Doubles wraps"), FlickTeamRules::AdvancePlayerSlot(1, 2), 0);
 	TestEqual(TEXT("Trios advances"), FlickTeamRules::AdvancePlayerSlot(1, 3), 2);
 	TestEqual(TEXT("Trios wraps"), FlickTeamRules::AdvancePlayerSlot(2, 3), 0);
+	for (const int32 TeamSize : {2, 3})
+	{
+		for (int32 Round = 1; Round <= TeamSize * 2 + 2; ++Round)
+		{
+			const int32 OpeningSeat = (Round - 1) % (TeamSize * 2);
+			const EFlickTeam OpeningTeam = OpeningSeat % 2 == 0
+				? EFlickTeam::Player1 : EFlickTeam::Player2;
+			int32 BlueSlot = FlickTeamRules::GetRoundOpeningPlayerSlot(
+				Round, EFlickTeam::Player1, TeamSize);
+			int32 OrangeSlot = FlickTeamRules::GetRoundOpeningPlayerSlot(
+				Round, EFlickTeam::Player2, TeamSize);
+			EFlickTeam CurrentTeam = OpeningTeam;
+			for (int32 Turn = 0; Turn < TeamSize * 2; ++Turn)
+			{
+				const int32 ExpectedSeat = (OpeningSeat + Turn) % (TeamSize * 2);
+				const EFlickTeam ExpectedTeam = ExpectedSeat % 2 == 0
+					? EFlickTeam::Player1 : EFlickTeam::Player2;
+				const int32 ActualSlot = CurrentTeam == EFlickTeam::Player1 ? BlueSlot : OrangeSlot;
+				TestEqual(TEXT("Turn team follows interleaved cycle"), CurrentTeam, ExpectedTeam);
+				TestEqual(TEXT("Turn slot follows interleaved cycle"), ActualSlot, ExpectedSeat / 2);
+				if (CurrentTeam == EFlickTeam::Player1)
+				{
+					BlueSlot = FlickTeamRules::AdvancePlayerSlot(BlueSlot, TeamSize);
+					CurrentTeam = EFlickTeam::Player2;
+				}
+				else
+				{
+					OrangeSlot = FlickTeamRules::AdvancePlayerSlot(OrangeSlot, TeamSize);
+					CurrentTeam = EFlickTeam::Player1;
+				}
+			}
+		}
+	}
 	TestTrue(TEXT("Matching slot is active"), FlickTeamRules::IsActivePlayerSlot(1, 1, 3));
 	TestFalse(TEXT("Different slot is inactive"), FlickTeamRules::IsActivePlayerSlot(0, 1, 3));
 	TestTrue(TEXT("Private match accepts one human controlling several slots"),

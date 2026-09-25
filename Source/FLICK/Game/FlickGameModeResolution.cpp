@@ -1148,8 +1148,15 @@ void AFlickGameMode::CheckWinOrAdvanceTurn()
 		break;
 	}
 
-	// A kickoff is neutral: after both shots resolve, the round's designated
-	// starting team takes the first normal turn (blue in odd rounds, orange in even).
+	// Kickoff submissions advance each team's planning cursor. Restore the round's
+	// normal-turn seats before entering the interleaved blue/orange cycle.
+	if (bCompletedKickoff)
+	{
+		Player1NextPlayerSlot = FlickTeamRules::GetRoundOpeningPlayerSlot(
+			FlickGameState->RoundNumber, EFlickTeam::Player1, CurrentPlayersPerTeam);
+		Player2NextPlayerSlot = FlickTeamRules::GetRoundOpeningPlayerSlot(
+			FlickGameState->RoundNumber, EFlickTeam::Player2, CurrentPlayersPerTeam);
+	}
 	FlickGameState->SetCurrentTeam(bCompletedKickoff
 		? FlickGameState->RoundStartingTeam
 		: GetOpposingTeam(FlickGameState->CurrentTeam));

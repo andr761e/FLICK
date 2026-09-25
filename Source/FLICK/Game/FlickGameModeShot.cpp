@@ -509,8 +509,16 @@ bool AFlickGameMode::CanSelectPieceForController(
 	{
 		return false;
 	}
+	if (bPrivateMatchActive
+		&& GetPrivateSlotOwner(Piece->GetTeam(), Piece->GetOwningPlayerSlot())
+			!= RequestingPlayer->GetPlayerState<AFlickPlayerState>())
+	{
+		return false;
+	}
 
-	if (GetNetMode() == NM_Standalone)
+	// A solo private match can still run in standalone mode, but its empty seats
+	// belong to bots. Only ordinary offline training uses the legacy local-seat rule.
+	if (GetNetMode() == NM_Standalone && !bPrivateMatchActive)
 	{
 		return IsFreePlayTraining() || IsBobMode()
 			|| Piece->GetOwningPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot;
@@ -666,21 +674,6 @@ bool AFlickGameMode::TryLaunchPieceByIdForController(
 	return TryLaunchPieceForController(RequestingPlayer, RequestedPiece, Direction, NormalizedPower);
 }
 
-const AFlickPiece* AFlickGameMode::GetLockedKickoffPiece() const
-{
-	return LockedKickoffShots.IsEmpty() ? nullptr : LockedKickoffShots.Last().Piece.Get();
-}
-
-FVector AFlickGameMode::GetLockedKickoffDirection() const
-{
-	return LockedKickoffShots.IsEmpty() ? FVector::ZeroVector : LockedKickoffShots.Last().Direction;
-}
-
-float AFlickGameMode::GetLockedKickoffPower() const
-{
-	return LockedKickoffShots.IsEmpty() ? 0.0f : LockedKickoffShots.Last().Power;
-}
-
 bool AFlickGameMode::LockKickoffShot(
 	AFlickPiece* Piece,
 	const FVector& Direction,
@@ -720,7 +713,6 @@ bool AFlickGameMode::LockKickoffShot(
 	AdvanceCompletedPlayerTurn(PlanningTeam, PlanningPlayerSlot);
 	Piece->SetSelected(false);
 	Piece->SetHovered(false);
-	Piece->SetKickoffLocked(true);
 
 	const int32 RequiredShots = FlickTeamRules::GetSimultaneousKickoffShotCount(CurrentPlayersPerTeam);
 	FlickGameState->SetKickoffProgress(LockedKickoffShots.Num(), RequiredShots);
@@ -792,7 +784,6 @@ void AFlickGameMode::ReleaseKickoffShots()
 		const FVector LaunchLocation = Piece->GetActorLocation() + FVector(0.0f, 0.0f, PieceThickness * 0.65f);
 		FlickGameState->BeginShot(Shot.Team, Piece->GetPieceId(), Shot.Power);
 		FlickGameState->RecordPlayerShot(Shot.Team, Shot.PlayerSlot);
-		Piece->SetKickoffLocked(false);
 		Piece->SetSelected(false);
 		Piece->SetHovered(false);
 		Piece->Launch(Shot.Direction, Shot.Power, MaxLaunchSpeed);

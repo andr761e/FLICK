@@ -92,7 +92,6 @@ private:
 	void DrawTopBar(const AFlickGameState& GameState, float Width, float Now);
 	void DrawAimPresentation(const AFlickPlayerController& Controller);
 	void DrawCinematicReplayPullback(const AFlickGameMode& GameMode);
-	void DrawLockedKickoffPresentation(const AFlickGameMode& GameMode);
 	void DrawTechnicalAimArrow(const FVector2D& Start, const FVector2D& End, const FLinearColor& Accent);
 	void DrawPowerMeter(const AFlickPlayerController& Controller, float Width, float Height);
 	void DrawEventFeed(float Width, float Now);

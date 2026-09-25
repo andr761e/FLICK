@@ -60,6 +60,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera", meta = (ClampMin = "0.75", ClampMax = "1.25"))
 	float GameplayDistanceScale = 0.9f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera", meta = (ClampMin = "0.85", ClampMax = "1.0"))
+	float MultiplayerGameplayDistanceMultiplier = 0.95f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera", meta = (ClampMin = "0.75", ClampMax = "1.0"))
 	float TestArenaDistanceMultiplier = 0.90f;
 

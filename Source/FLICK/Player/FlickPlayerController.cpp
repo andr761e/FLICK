@@ -303,6 +303,10 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 		}
 	}
 
+	if (bAimingShot && !CanSelectPieceLocally(SelectedPiece))
+	{
+		ClearAiming();
+	}
 	if (bAimingShot)
 	{
 		UpdateAimFromCursor();
@@ -1017,32 +1021,32 @@ bool AFlickPlayerController::CanSelectPieceLocally(const AFlickPiece* Piece) con
 
 	const AFlickGameState* FlickGameState = GetFlickGameState();
 	const AFlickPlayerState* LocalPlayerState = GetPlayerState<AFlickPlayerState>();
-	const bool bControlsPrivateTurn = FlickGameState
-		&& LocalPlayerState
-		&& LocalPlayerState->ControlsPrivateSlot(
-			FlickGameState->CurrentTeam,
-			FlickGameState->CurrentTeamPlayerSlot);
-	const bool bKickoffPlanning = FlickGameState
-		&& FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning;
-	const bool bControlsKickoffPiece = bKickoffPlanning && Piece && LocalPlayerState
-		&& (LocalPlayerState->ControlsPrivateSlot(Piece->GetTeam(), Piece->GetOwningPlayerSlot())
-			|| (LocalPlayerState->GetTeam() == Piece->GetTeam()
-				&& LocalPlayerState->GetTeamPlayerSlot() == Piece->GetOwningPlayerSlot()));
-	return Piece
-		&& FlickGameState
-		&& LocalPlayerState
-		&& FlickGameState->IsGameplayActive()
-		&& (FlickGameState->MatchPhase == EFlickMatchPhase::Aiming
-			|| FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning)
-		&& (bControlsKickoffPiece || bControlsPrivateTurn
-			|| (GetLocalTeam() == FlickGameState->CurrentTeam
-				&& LocalPlayerState->GetTeamPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot))
-		&& Piece->IsSelectableBy(bKickoffPlanning ? Piece->GetTeam() : GetLocalTeam())
-		&& (FlickGameState->ActiveMatchVariant == EFlickMatchVariant::Bob
-			|| (bControlsPrivateTurn
-				? Piece->GetOwningPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot
-				: Piece->GetOwningPlayerSlot() == LocalPlayerState->GetTeamPlayerSlot()))
-		&& (FlickGameState->ActiveMatchVariant != EFlickMatchVariant::Bob || Piece->IsBobStriker());
+	if (!Piece || !FlickGameState || !LocalPlayerState
+		|| !FlickGameState->IsGameplayActive()
+		|| (FlickGameState->ActiveMatchVariant == EFlickMatchVariant::Bob && !Piece->IsBobStriker()))
+	{
+		return false;
+	}
+	if (FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning)
+	{
+		return Piece->IsSelectableBy(Piece->GetTeam())
+			&& (FlickGameState->bPrivateMatchActive
+				? LocalPlayerState->ControlsPrivateSlot(Piece->GetTeam(), Piece->GetOwningPlayerSlot())
+				: LocalPlayerState->GetTeam() == Piece->GetTeam()
+					&& LocalPlayerState->GetTeamPlayerSlot() == Piece->GetOwningPlayerSlot());
+	}
+	if (FlickGameState->MatchPhase != EFlickMatchPhase::Aiming
+		|| !Piece->IsSelectableBy(FlickGameState->CurrentTeam)
+		|| (FlickGameState->ActiveMatchVariant != EFlickMatchVariant::Bob
+			&& Piece->GetOwningPlayerSlot() != FlickGameState->CurrentTeamPlayerSlot))
+	{
+		return false;
+	}
+	return FlickGameState->bPrivateMatchActive
+		? LocalPlayerState->ControlsPrivateSlot(
+			FlickGameState->CurrentTeam, FlickGameState->CurrentTeamPlayerSlot)
+		: LocalPlayerState->GetTeam() == FlickGameState->CurrentTeam
+			&& LocalPlayerState->GetTeamPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot;
 }
 
 bool AFlickPlayerController::IsGameplayActive() const

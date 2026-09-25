@@ -168,11 +168,6 @@ void AFlickHUD::DrawHUD()
 		}
 		return;
 	}
-	if (FlickGameMode && FlickGameMode->HasLockedKickoffShot())
-	{
-		DrawLockedKickoffPresentation(*FlickGameMode);
-	}
-
 	if (FlickController && FlickController->IsAimingShot())
 	{
 		if (!FlickGameMode || FlickGameMode->IsAimGuideEnabled())
@@ -265,33 +260,6 @@ void AFlickHUD::DrawCinematicReplayPullback(const AFlickGameMode& GameMode)
 	{
 		Sessions->ResumePartySynchronizationAfterTravel();
 	}
-}
-
-void AFlickHUD::DrawLockedKickoffPresentation(const AFlickGameMode& GameMode)
-{
-	const AFlickPiece* Piece = GameMode.GetLockedKickoffPiece();
-	const APlayerController* Controller = GetOwningPlayerController();
-	if (!Piece || !Controller)
-	{
-		return;
-	}
-
-	const FVector StartWorld = Piece->GetActorLocation() + FVector(0.0f, 0.0f, 30.0f);
-	const float GuideLength = FMath::Lerp(260.0f, 920.0f, GameMode.GetLockedKickoffPower())
-		* Piece->GetLaunchSpeedMultiplier();
-	const FVector EndWorld = StartWorld + GameMode.GetLockedKickoffDirection() * GuideLength;
-	FVector2D StartScreen;
-	FVector2D EndScreen;
-	if (!Controller->ProjectWorldLocationToScreen(StartWorld, StartScreen)
-		|| !Controller->ProjectWorldLocationToScreen(EndWorld, EndScreen))
-	{
-		return;
-	}
-
-	DrawTechnicalAimArrow(
-		StartScreen,
-		EndScreen,
-		FMath::Lerp(GetTeamColor(Piece->GetTeam()), FLinearColor::White, 0.12f));
 }
 
 void AFlickHUD::DrawTechnicalAimArrow(

@@ -31,9 +31,43 @@
 #include "Styling/SlateBrush.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GenericPlatform/GenericPlatformHttp.h"
+#include "Async/Async.h"
 
 #if WITH_FLICK_STEAMWORKS
 #include "steam/steam_api.h"
+
+namespace
+{
+	class FFlickSteamInviteListener
+	{
+	public:
+		explicit FFlickSteamInviteListener(UFlickSessionSubsystem* InOwner) : Owner(InOwner)
+		{
+			InviteCallback.Register(this, &FFlickSteamInviteListener::OnLobbyInvite);
+		}
+		~FFlickSteamInviteListener() { InviteCallback.Unregister(); }
+
+	private:
+		void OnLobbyInvite(LobbyInvite_t* Invite)
+		{
+			if (!Invite) return;
+			const uint64 InviterId = Invite->m_ulSteamIDUser;
+			const uint64 LobbyId = Invite->m_ulSteamIDLobby;
+			const uint64 GameId = Invite->m_ulGameID;
+			const TWeakObjectPtr<UFlickSessionSubsystem> WeakOwner = Owner;
+			AsyncTask(ENamedThreads::GameThread, [WeakOwner, InviterId, LobbyId, GameId]()
+			{
+				if (WeakOwner.IsValid() && SteamUtils() && CGameID(GameId).AppID() == SteamUtils()->GetAppID())
+				{
+					WeakOwner->NotifySteamPartyInvite(InviterId, LobbyId);
+				}
+			});
+		}
+		TWeakObjectPtr<UFlickSessionSubsystem> Owner;
+		CCallbackManual<FFlickSteamInviteListener, LobbyInvite_t> InviteCallback;
+	};
+	TUniquePtr<FFlickSteamInviteListener> GSteamInviteListener;
+}
 #endif
 
 namespace
@@ -96,6 +130,12 @@ void UFlickSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		LocalShowcaseArchetype = static_cast<EFlickPieceArchetype>(SavedShowcaseArchetype);
 	}
 	RegisterOnlineDelegates();
+#if WITH_FLICK_STEAMWORKS
+	if (IsSteamAvailable() && SteamFriends() && !GSteamInviteListener)
+	{
+		GSteamInviteListener = MakeUnique<FFlickSteamInviteListener>(this);
+	}
+#endif
 	LoadRecentPlayers();
 	RefreshFriends();
 	if (GEngine)
@@ -113,6 +153,9 @@ void UFlickSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UFlickSessionSubsystem::Deinitialize()
 {
+#if WITH_FLICK_STEAMWORKS
+	GSteamInviteListener.Reset();
+#endif
 	TransferPartyLeadershipBeforeLeaving();
 	StopPartySynchronization();
 	if (GetWorld())
@@ -159,6 +202,8 @@ bool UFlickSessionSubsystem::RegisterOnlineDelegates()
 			FOnDestroySessionCompleteDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleDestroySessionComplete));
 		InviteAcceptedHandle = Sessions->AddOnSessionUserInviteAcceptedDelegate_Handle(
 			FOnSessionUserInviteAcceptedDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleInviteAccepted));
+		FindInvitingFriendHandle = Sessions->AddOnFindFriendSessionCompleteDelegate_Handle(0,
+			FOnFindFriendSessionCompleteDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleFindInvitingFriendSession));
 		ParticipantJoinedHandle = Sessions->AddOnSessionParticipantJoinedDelegate_Handle(
 			FOnSessionParticipantJoinedDelegate::CreateUObject(this, &UFlickSessionSubsystem::HandleSessionParticipantJoined));
 		ParticipantLeftHandle = Sessions->AddOnSessionParticipantLeftDelegate_Handle(
@@ -180,6 +225,7 @@ void UFlickSessionSubsystem::ClearOnlineDelegates()
 		Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionHandle);
 		Sessions->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionHandle);
 		Sessions->ClearOnSessionUserInviteAcceptedDelegate_Handle(InviteAcceptedHandle);
+		Sessions->ClearOnFindFriendSessionCompleteDelegate_Handle(0, FindInvitingFriendHandle);
 		Sessions->ClearOnSessionParticipantJoinedDelegate_Handle(ParticipantJoinedHandle);
 		Sessions->ClearOnSessionParticipantLeftDelegate_Handle(ParticipantLeftHandle);
 		Sessions->ClearOnSessionSettingsUpdatedDelegate_Handle(SessionSettingsUpdatedHandle);
@@ -189,6 +235,7 @@ void UFlickSessionSubsystem::ClearOnlineDelegates()
 	JoinSessionHandle.Reset();
 	DestroySessionHandle.Reset();
 	InviteAcceptedHandle.Reset();
+	FindInvitingFriendHandle.Reset();
 	ParticipantJoinedHandle.Reset();
 	ParticipantLeftHandle.Reset();
 	SessionSettingsUpdatedHandle.Reset();
@@ -2158,12 +2205,100 @@ void UFlickSessionSubsystem::HandleDestroySessionComplete(const FName SessionNam
 	}
 }
 
+void UFlickSessionSubsystem::NotifySteamPartyInvite(const uint64 InviterId, const uint64 LobbyId)
+{
+#if WITH_FLICK_STEAMWORKS
+	if (!IsSteamAvailable() || InviterId == 0 || LobbyId == 0 || !SteamFriends()
+		|| !CSteamID(LobbyId).IsLobby()
+		|| SteamFriends()->GetFriendRelationship(CSteamID(InviterId)) != k_EFriendRelationshipFriend)
+	{
+		return;
+	}
+	if (PendingIncomingInviteLobbyId == LobbyId || bIncomingPartyInviteSearch)
+	{
+		return;
+	}
+	if (HasActiveSession())
+	{
+		IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+		const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+		const FNamedOnlineSession* Current = Sessions.IsValid() ? Sessions->GetNamedSession(NAME_GameSession) : nullptr;
+		if (Current && GetSteamLobbyId(Current->GetSessionIdStr()) == LobbyId) return;
+	}
+	PendingIncomingInviteLobbyId = LobbyId;
+	PendingIncomingInviterId = InviterId;
+	PendingIncomingInviteName = UTF8_TO_TCHAR(SteamFriends()->GetFriendPersonaName(CSteamID(InviterId)));
+	UE_LOG(LogFlick, Log, TEXT("Steam party invite received from %s for lobby %llu"), *PendingIncomingInviteName, LobbyId);
+	OnSessionsChanged.Broadcast();
+#endif
+}
+
+void UFlickSessionSubsystem::DeclinePendingPartyInvite()
+{
+	PendingIncomingInviteLobbyId = 0;
+	PendingIncomingInviterId = 0;
+	PendingIncomingInviteName.Reset();
+	OnSessionsChanged.Broadcast();
+}
+
+bool UFlickSessionSubsystem::AcceptPendingPartyInvite()
+{
+	if (PendingIncomingInviteLobbyId == 0 || PendingIncomingInviterId == 0 || bIncomingPartyInviteSearch)
+	{
+		return false;
+	}
+	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
+	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
+	const IOnlineIdentityPtr Identity = OnlineSubsystem ? OnlineSubsystem->GetIdentityInterface() : nullptr;
+	const FUniqueNetIdPtr InviterId = Identity.IsValid()
+		? Identity->CreateUniquePlayerId(FString::Printf(TEXT("%llu"), PendingIncomingInviterId)) : nullptr;
+	if (!Sessions.IsValid() || !InviterId.IsValid() || !RegisterOnlineDelegates())
+	{
+		SetState(EFlickSessionState::Error, TEXT("STEAM COULD NOT LOOK UP THAT PARTY INVITE"));
+		return false;
+	}
+	bIncomingPartyInviteSearch = true;
+	if (!Sessions->FindFriendSession(0, *InviterId))
+	{
+		bIncomingPartyInviteSearch = false;
+		SetState(EFlickSessionState::Error, TEXT("THE INVITING FRIEND'S PARTY IS NO LONGER AVAILABLE"));
+		return false;
+	}
+	SetState(EFlickSessionState::Searching, TEXT("LOOKING UP YOUR FRIEND'S PARTY..."));
+	return true;
+}
+
+void UFlickSessionSubsystem::HandleFindInvitingFriendSession(
+	const int32 LocalUserNum, const bool bWasSuccessful, const TArray<FOnlineSessionSearchResult>& Results)
+{
+	if (!bIncomingPartyInviteSearch || LocalUserNum != 0) return;
+	bIncomingPartyInviteSearch = false;
+	for (const FOnlineSessionSearchResult& Result : Results)
+	{
+		FString GameMarker;
+		FString Purpose;
+		Result.Session.SessionSettings.Get(FlickGameKey, GameMarker);
+		Result.Session.SessionSettings.Get(FlickPurposeKey, Purpose);
+		if (bWasSuccessful && Result.IsValid()
+			&& GameMarker == FlickGameValue
+			&& Purpose.Equals(FlickPartyPurpose, ESearchCase::IgnoreCase)
+			&& GetSteamLobbyId(Result.GetSessionIdStr()) == PendingIncomingInviteLobbyId)
+		{
+			DeclinePendingPartyInvite();
+			HandleInviteAccepted(true, LocalUserNum, nullptr, Result);
+			return;
+		}
+	}
+	SetState(EFlickSessionState::Error, TEXT("THAT PARTY INVITE EXPIRED OR THE PARTY IS FULL"));
+}
+
 void UFlickSessionSubsystem::HandleInviteAccepted(
 	const bool bWasSuccessful,
 	const int32 ControllerId,
 	FUniqueNetIdPtr UserId,
 	const FOnlineSessionSearchResult& InviteResult)
 {
+	DeclinePendingPartyInvite();
 	if (!bWasSuccessful || !InviteResult.IsValid())
 	{
 		SetState(EFlickSessionState::Error, TEXT("THE STEAM INVITE WAS NO LONGER VALID"));

@@ -1060,7 +1060,9 @@ namespace
 			const FVector2D Size = AllottedGeometry.GetLocalSize();
 			const FVector2f Center(static_cast<float>(Size.X * 0.5f), static_cast<float>(Size.Y * 0.5f));
 			const float Scale = FMath::Clamp(RadiusScale.Get(), 0.78f, 1.18f);
-			const float BaseRadius = FMath::Min(Size.X, Size.Y) * 0.42f * Scale;
+			const EFlickPieceArchetype VisualArchetype = Archetype.Get();
+			const float RadiusRatio = FlickPieceArchetypeRules::Get(VisualArchetype).RadiusMultiplier;
+			const float BaseRadius = FMath::Min(Size.X, Size.Y) * 0.39f * Scale * RadiusRatio;
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 
 			const auto DrawDisc = [&OutDrawElements, &Transform, &Center](
@@ -1173,14 +1175,13 @@ namespace
 			};
 
 			const FLinearColor Team = TeamColor.Get();
-			const EFlickPieceArchetype VisualArchetype = Archetype.Get();
-			float TopScale = 0.82f;
+			float TopScale = 0.84f;
 			switch (VisualArchetype)
 			{
-			case EFlickPieceArchetype::Heavy: TopScale = 0.78f; break;
-			case EFlickPieceArchetype::Blocker: TopScale = 0.86f; break;
-			case EFlickPieceArchetype::Compact: TopScale = 0.78f; break;
-			case EFlickPieceArchetype::Toppler: TopScale = 0.79f; break;
+			case EFlickPieceArchetype::Heavy: TopScale = 0.77f; break;
+			case EFlickPieceArchetype::Blocker: TopScale = 0.87f; break;
+			case EFlickPieceArchetype::Compact: TopScale = 0.80f; break;
+			case EFlickPieceArchetype::Toppler: TopScale = 0.82f; break;
 			case EFlickPieceArchetype::Standard:
 			default: break;
 			}
@@ -1208,36 +1209,43 @@ namespace
 			// Layered sidewall, lower light channel and machined crown match the production pucks.
 			DrawDisc(LayerId + 3, BaseRadius, FVector2f(0.0f, 2.4f) * DetailScale,
 				MidMetal, FLinearColor(0.002f, 0.006f, 0.012f, 1.0f));
-			DrawDisc(LayerId + 4, BaseRadius * 0.96f, FVector2f::ZeroVector,
-				SilverHighlight, FLinearColor(0.18f, 0.25f, 0.31f, 1.0f));
-			DrawRing(LayerId + 5, BaseRadius * 0.96f, TeamLight.CopyWithNewOpacity(0.94f), FineLine * 1.45f);
+			DrawDisc(LayerId + 4, BaseRadius * 0.97f, FVector2f::ZeroVector,
+				SilverHighlight, FLinearColor(0.20f, 0.27f, 0.33f, 1.0f));
+			DrawRing(LayerId + 5, BaseRadius * 0.975f, TeamLight.CopyWithNewOpacity(0.94f), FineLine * 1.2f);
 			DrawDisc(LayerId + 6, BaseRadius * TopScale, FVector2f::ZeroVector, DarkMetal, MidMetal);
 
-			for (int32 WindowIndex = 0; WindowIndex < 8; ++WindowIndex)
+			// The real mesh has broad lit rim panels separated by graphite lugs, not a uniform cyan outline.
+			for (int32 WindowIndex = 0; WindowIndex < 12; ++WindowIndex)
 			{
-				const float CenterAngle = 2.0f * PI * static_cast<float>(WindowIndex) / 8.0f;
-				DrawArc(LayerId + 7, BaseRadius * 0.87f, CenterAngle - 0.22f, CenterAngle + 0.22f,
-					TeamLight, FineLine * 2.8f);
+				const float CenterAngle = 2.0f * PI * static_cast<float>(WindowIndex) / 12.0f;
+				DrawArc(LayerId + 7, BaseRadius * 0.89f, CenterAngle - 0.19f, CenterAngle + 0.19f,
+					TeamLight, FineLine * 5.2f);
+				if (WindowIndex % 3 == 0)
+				{
+					DrawArc(LayerId + 8, BaseRadius * 0.89f, CenterAngle - 0.065f, CenterAngle + 0.065f,
+						DarkMetal, FineLine * 5.7f);
+				}
 			}
-			DrawRing(LayerId + 8, BaseRadius * (TopScale - 0.09f), Silver.CopyWithNewOpacity(0.9f), FineLine * 0.85f);
-			DrawDisc(LayerId + 9, BaseRadius * (TopScale - 0.15f), FVector2f::ZeroVector, MidMetal, DarkMetal);
-			DrawRing(LayerId + 10, BaseRadius * (TopScale - 0.15f), TeamLight.CopyWithNewOpacity(0.98f), FineLine * 1.5f);
+			DrawRing(LayerId + 9, BaseRadius * (TopScale - 0.06f), Silver.CopyWithNewOpacity(0.85f), FineLine * 0.9f);
+			DrawDisc(LayerId + 10, BaseRadius * (TopScale - 0.14f), FVector2f::ZeroVector, MidMetal, DarkMetal);
+			DrawRing(LayerId + 11, BaseRadius * (TopScale - 0.14f), TeamLight.CopyWithNewOpacity(0.98f), FineLine * 1.45f);
 
 			const FVector2D SymbolCenter(Center.X, Center.Y);
-			const float SymbolRadius = BaseRadius * 0.22f;
+			const float SymbolRadius = BaseRadius * 0.26f;
 			switch (VisualArchetype)
 			{
 			case EFlickPieceArchetype::Standard:
 				DrawRing(LayerId + 13, SymbolRadius * 0.72f, TeamLight, FineLine * 1.9f);
 				break;
 			case EFlickPieceArchetype::Toppler:
-				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius, SymbolRadius * 0.05f), SymbolCenter + FVector2D(0.0f, -SymbolRadius), SymbolCenter + FVector2D(SymbolRadius, SymbolRadius * 0.05f)}, TeamLight, FineLine * 2.0f);
-				DrawSymbol({SymbolCenter + FVector2D(0.0f, -SymbolRadius), SymbolCenter + FVector2D(0.0f, SymbolRadius * 0.55f)}, TeamLight, FineLine * 2.0f);
-				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.42f, SymbolRadius * 0.82f), SymbolCenter + FVector2D(SymbolRadius * 0.42f, SymbolRadius * 0.82f)}, TeamLight, FineLine * 2.0f);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius, -SymbolRadius * 0.05f), SymbolCenter + FVector2D(0.0f, -SymbolRadius * 0.82f), SymbolCenter + FVector2D(SymbolRadius, -SymbolRadius * 0.05f)}, TeamLight, FineLine * 2.4f);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.82f, SymbolRadius * 0.52f), SymbolCenter + FVector2D(0.0f, -SymbolRadius * 0.24f), SymbolCenter + FVector2D(SymbolRadius * 0.82f, SymbolRadius * 0.52f)}, TeamLight, FineLine * 2.3f);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.34f, SymbolRadius * 0.92f), SymbolCenter + FVector2D(SymbolRadius * 0.34f, SymbolRadius * 0.92f)}, TeamLight, FineLine * 2.1f);
 				break;
 			case EFlickPieceArchetype::Bouncer:
-				DrawDisc(LayerId + 13, SymbolRadius * 0.22f, FVector2f(0.0f, -SymbolRadius * 0.42f), TeamLight, TeamLight);
-				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius, SymbolRadius * 0.05f), SymbolCenter + FVector2D(-SymbolRadius * 0.48f, SymbolRadius * 0.72f), SymbolCenter + FVector2D(0.0f, SymbolRadius * 0.34f), SymbolCenter + FVector2D(SymbolRadius * 0.48f, SymbolRadius * 0.72f), SymbolCenter + FVector2D(SymbolRadius, SymbolRadius * 0.05f)}, TeamLight, FineLine * 1.75f);
+				DrawDisc(LayerId + 13, SymbolRadius * 0.21f, FVector2f(0.0f, -SymbolRadius * 0.46f), TeamLight, TeamLight);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius, 0.0f), SymbolCenter + FVector2D(-SymbolRadius * 0.62f, SymbolRadius * 0.08f), SymbolCenter + FVector2D(-SymbolRadius * 0.30f, SymbolRadius * 0.75f)}, TeamLight, FineLine * 2.1f);
+				DrawSymbol({SymbolCenter + FVector2D(SymbolRadius, 0.0f), SymbolCenter + FVector2D(SymbolRadius * 0.62f, SymbolRadius * 0.08f), SymbolCenter + FVector2D(SymbolRadius * 0.30f, SymbolRadius * 0.75f)}, TeamLight, FineLine * 2.1f);
 				break;
 			case EFlickPieceArchetype::Compact:
 				DrawRing(LayerId + 13, SymbolRadius * 0.75f, TeamLight, FineLine * 1.7f);
@@ -1258,11 +1266,12 @@ namespace
 				for (int32 ChevronIndex = -1; ChevronIndex <= 1; ++ChevronIndex)
 				{
 					const float X = ChevronIndex * SymbolRadius * 0.64f;
-					DrawSymbol({SymbolCenter + FVector2D(X - SymbolRadius * 0.35f, -SymbolRadius * 0.68f), SymbolCenter + FVector2D(X + SymbolRadius * 0.25f, 0.0f), SymbolCenter + FVector2D(X - SymbolRadius * 0.35f, SymbolRadius * 0.68f)}, TeamLight, FineLine * 1.8f);
+					DrawSymbol({SymbolCenter + FVector2D(X - SymbolRadius * 0.35f, -SymbolRadius * 0.68f), SymbolCenter + FVector2D(X + SymbolRadius * 0.25f, 0.0f), SymbolCenter + FVector2D(X - SymbolRadius * 0.35f, SymbolRadius * 0.68f)}, TeamLight, FineLine * 2.5f);
 				}
 				break;
 			case EFlickPieceArchetype::Grippy:
-				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius, SymbolRadius * 0.72f), SymbolCenter + FVector2D(-SymbolRadius * 0.18f, -SymbolRadius * 0.65f), SymbolCenter + FVector2D(SymbolRadius * 0.16f, -SymbolRadius * 0.12f), SymbolCenter + FVector2D(SymbolRadius * 0.5f, -SymbolRadius * 0.52f), SymbolCenter + FVector2D(SymbolRadius, SymbolRadius * 0.72f)}, TeamLight, FineLine * 1.9f);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius, SymbolRadius * 0.60f), SymbolCenter + FVector2D(0.0f, -SymbolRadius * 0.82f), SymbolCenter + FVector2D(SymbolRadius, SymbolRadius * 0.60f)}, TeamLight, FineLine * 2.6f);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.47f, SymbolRadius * 0.08f), SymbolCenter + FVector2D(0.0f, -SymbolRadius * 0.43f), SymbolCenter + FVector2D(SymbolRadius * 0.47f, SymbolRadius * 0.08f)}, TeamLight, FineLine * 2.3f);
 				break;
 			case EFlickPieceArchetype::Striker:
 				DrawRing(LayerId + 13, SymbolRadius * 0.55f, TeamLight, FineLine * 1.55f);
@@ -1273,9 +1282,11 @@ namespace
 				DrawDisc(LayerId + 13, SymbolRadius * 0.16f, FVector2f::ZeroVector, TeamLight, TeamLight);
 				break;
 			case EFlickPieceArchetype::Heavy:
-				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.65f, 0.0f), SymbolCenter + FVector2D(SymbolRadius * 0.65f, 0.0f)}, TeamLight, FineLine * 2.2f);
-				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.7f, -SymbolRadius * 0.62f), SymbolCenter + FVector2D(-SymbolRadius * 0.7f, SymbolRadius * 0.62f)}, TeamLight, FineLine * 3.0f);
-				DrawSymbol({SymbolCenter + FVector2D(SymbolRadius * 0.7f, -SymbolRadius * 0.62f), SymbolCenter + FVector2D(SymbolRadius * 0.7f, SymbolRadius * 0.62f)}, TeamLight, FineLine * 3.0f);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.48f, 0.0f), SymbolCenter + FVector2D(SymbolRadius * 0.48f, 0.0f)}, TeamLight, FineLine * 2.6f);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.62f, -SymbolRadius * 0.65f), SymbolCenter + FVector2D(-SymbolRadius * 0.62f, SymbolRadius * 0.65f)}, TeamLight, FineLine * 5.0f);
+				DrawSymbol({SymbolCenter + FVector2D(SymbolRadius * 0.62f, -SymbolRadius * 0.65f), SymbolCenter + FVector2D(SymbolRadius * 0.62f, SymbolRadius * 0.65f)}, TeamLight, FineLine * 5.0f);
+				DrawSymbol({SymbolCenter + FVector2D(-SymbolRadius * 0.98f, -SymbolRadius * 0.32f), SymbolCenter + FVector2D(-SymbolRadius * 0.98f, SymbolRadius * 0.32f)}, TeamLight, FineLine * 2.5f);
+				DrawSymbol({SymbolCenter + FVector2D(SymbolRadius * 0.98f, -SymbolRadius * 0.32f), SymbolCenter + FVector2D(SymbolRadius * 0.98f, SymbolRadius * 0.32f)}, TeamLight, FineLine * 2.5f);
 				break;
 			default:
 				break;

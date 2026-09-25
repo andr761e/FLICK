@@ -329,9 +329,60 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		[
 			BuildMainMenuFooter()
 		]
+		+ SOverlay::Slot()
+		.HAlign(HAlign_Center)
+		.VAlign(VAlign_Top)
+		.Padding(0.0f, 84.0f, 0.0f, 0.0f)
+		[
+			SNew(SBox).WidthOverride(400.0f)
+			.Visibility_Lambda([this]()
+			{
+				const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
+				return Sessions && Sessions->HasPendingPartyInvite() ? EVisibility::Visible : EVisibility::Collapsed;
+			})
+			[BuildPartyInvitePrompt()]
+		]
 		]
 	];
 
+}
+
+TSharedRef<SWidget> SFlickGameLayer::BuildPartyInvitePrompt()
+{
+	return SNew(SFlickAngularBorder)
+		.BackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 248)))
+		.AccentColor(Brand)
+		.UseAccentForOutline(false)
+		.CutSize(10.0f)
+		.BorderWidth(1.2f)
+		.Padding(FMargin(17.0f, 13.0f))
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()
+			[SNew(STextBlock).Text(FText::FromString(TEXT("PARTY INVITE  //  STEAM"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 11.0f)
+			[SNew(STextBlock).Text_Lambda([this]()
+			{
+				const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
+				return FText::FromString(Sessions ? FString::Printf(TEXT("%s invited you to a party"), *Sessions->GetPendingPartyInviteName()) : FString());
+			}).Font(UiFont(15, true)).ColorAndOpacity(Paper)]
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 6.0f, 0.0f)
+				[SNew(SBox).HeightOverride(38.0f)[MakeMenuButton(TEXT("ACCEPT"), FOnClicked::CreateLambda([this]()
+				{
+					if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) Sessions->AcceptPendingPartyInvite();
+					return FReply::Handled();
+				}), true, false, 38.0f)]]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(6.0f, 0.0f, 0.0f, 0.0f)
+				[SNew(SBox).HeightOverride(38.0f)[MakeMenuButton(TEXT("DECLINE"), FOnClicked::CreateLambda([this]()
+				{
+					if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) Sessions->DeclinePendingPartyInvite();
+					return FReply::Handled();
+				}), false, false, 38.0f)]]
+			]
+		];
 }
 
 TSharedRef<SWidget> SFlickGameLayer::BuildMatchmakingStatusBar()

@@ -304,6 +304,8 @@ void UFlickGameInstance::Init()
 	GConfig->GetFloat(FlickSettingsSection, TEXT("FreeCameraMoveSensitivity"), FreeCameraMoveSensitivity, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("ShotMouseSensitivity"), ShotMouseSensitivity, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("GameplayCameraSensitivity"), GameplayCameraSensitivity, GGameUserSettingsIni);
+	GConfig->GetFloat(FlickSettingsSection, TEXT("GameplayCameraDistance"), GameplayCameraDistance, GGameUserSettingsIni);
+	GConfig->GetFloat(FlickSettingsSection, TEXT("GameplayCameraFieldOfView"), GameplayCameraFieldOfView, GGameUserSettingsIni);
 	CameraShakeIntensity = FMath::Clamp(CameraShakeIntensity, 0.0f, 1.0f);
 	MasterVolume = FMath::Clamp(MasterVolume, 0.0f, 1.0f);
 	EffectsVolume = FMath::Clamp(EffectsVolume, 0.0f, 1.0f);
@@ -312,6 +314,8 @@ void UFlickGameInstance::Init()
 	FreeCameraMoveSensitivity = FMath::Clamp(FreeCameraMoveSensitivity, 0.0f, 1.0f);
 	ShotMouseSensitivity = FMath::Clamp(ShotMouseSensitivity, 0.0f, 1.0f);
 	GameplayCameraSensitivity = FMath::Clamp(GameplayCameraSensitivity, 0.0f, 1.0f);
+	GameplayCameraDistance = FMath::Clamp(GameplayCameraDistance, 0.75f, 1.25f);
+	GameplayCameraFieldOfView = FMath::Clamp(GameplayCameraFieldOfView, 40.0f, 70.0f);
 
 	GConfig->GetInt(FlickProfileSection, TEXT("MatchesPlayed"), ProfileStats.MatchesPlayed, GGameUserSettingsIni);
 	GConfig->GetInt(FlickProfileSection, TEXT("Wins"), ProfileStats.Wins, GGameUserSettingsIni);
@@ -639,6 +643,18 @@ void UFlickGameInstance::SetGameplayCameraSensitivity(const float Sensitivity)
 	SaveFrontendSettings();
 }
 
+void UFlickGameInstance::SetGameplayCameraDistance(const float Distance)
+{
+	GameplayCameraDistance = FMath::Clamp(Distance, 0.75f, 1.25f);
+	SaveFrontendSettings();
+}
+
+void UFlickGameInstance::SetGameplayCameraFieldOfView(const float InFieldOfView)
+{
+	GameplayCameraFieldOfView = FMath::Clamp(InFieldOfView, 40.0f, 70.0f);
+	SaveFrontendSettings();
+}
+
 void UFlickGameInstance::SetClassName(const EFlickLineupPreset Preset, const FString& Name)
 {
 	const int32 Index = GetClassIndex(Preset);
@@ -746,5 +762,7 @@ void UFlickGameInstance::SaveFrontendSettings() const
 	GConfig->SetFloat(FlickSettingsSection, TEXT("FreeCameraMoveSensitivity"), FreeCameraMoveSensitivity, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("ShotMouseSensitivity"), ShotMouseSensitivity, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("GameplayCameraSensitivity"), GameplayCameraSensitivity, GGameUserSettingsIni);
+	GConfig->SetFloat(FlickSettingsSection, TEXT("GameplayCameraDistance"), GameplayCameraDistance, GGameUserSettingsIni);
+	GConfig->SetFloat(FlickSettingsSection, TEXT("GameplayCameraFieldOfView"), GameplayCameraFieldOfView, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 }

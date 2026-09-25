@@ -3,6 +3,8 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
 #include "Core/FlickTypes.h"
+#include "Game/FlickGameState.h"
+#include "Game/FlickGameInstance.h"
 #include "Kismet/KismetMathLibrary.h"
 
 AFlickCameraPawn::AFlickCameraPawn()
@@ -85,6 +87,13 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 		: bAimPresentation && bTestArenaPresentation
 			? AimFieldOfView
 			: bBobGameplayFraming ? BobFieldOfView : bCompactGameplayFraming ? CompactFieldOfView : FieldOfView;
+	if (!bMenuPresentation && !bCinematicReplay)
+	{
+		if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
+		{
+			TargetFieldOfView += Instance->GetGameplayCameraFieldOfView() - FieldOfView;
+		}
+	}
 	float BlendSpeed = PresentationBlendSpeed;
 	if (bCinematicReplay)
 	{
@@ -136,6 +145,13 @@ void AFlickCameraPawn::ApplyCameraSettings()
 	CurrentFieldOfView = bMenuPresentation
 		? MenuFieldOfView
 		: bBobGameplayFraming ? BobFieldOfView : bCompactGameplayFraming ? CompactFieldOfView : FieldOfView;
+	if (!bMenuPresentation)
+	{
+		if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
+		{
+			CurrentFieldOfView += Instance->GetGameplayCameraFieldOfView() - FieldOfView;
+		}
+	}
 	bGameplayViewTransitioning = false;
 	if (Camera)
 	{
@@ -514,9 +530,18 @@ FVector AFlickCameraPawn::GetGameplayTargetLocation() const
 		const float Height = (bBobGameplayFraming ? 2450.0f : 2200.0f) * ArenaFramingScale;
 		return FVector(0.0f, 0.0f, Height);
 	}
+	const AFlickGameState* MatchState = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
+	const float TeamSizeDistance = MatchState
+		&& MatchState->ActiveMatchVariant == EFlickMatchVariant::Classic
+		&& MatchState->PlayersPerTeam > 1
+		? FMath::Clamp(MultiplayerGameplayDistanceMultiplier, 0.85f, 1.0f)
+		: 1.0f;
+	const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>();
+	const float DistanceScale = Instance ? Instance->GetGameplayCameraDistance() : GameplayDistanceScale;
 	FVector TargetLocation = (bBobGameplayFraming ? BobCameraLocation : CameraLocation)
 		* ArenaFramingScale
-		* FMath::Clamp(GameplayDistanceScale, 0.75f, 1.25f)
+		* FMath::Clamp(DistanceScale, 0.75f, 1.25f)
+		* TeamSizeDistance
 		* (bTestArenaPresentation ? FMath::Clamp(TestArenaDistanceMultiplier, 0.75f, 1.0f) : 1.0f)
 		* (bAimPresentation ? FMath::Clamp(AimDistanceMultiplier, 0.82f, 1.0f) : 1.0f);
 	TargetLocation.Z += GameplayElevationAngle * ElevationHeightPerDegree;
