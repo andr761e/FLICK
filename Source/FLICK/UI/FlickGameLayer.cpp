@@ -120,9 +120,35 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
-		// Keep a stable 1080-unit vertical design grid while allowing the virtual
-		// canvas to become wider with the real viewport. This avoids 16:9
-		// letterboxing on ultrawide displays without stretching text or icons.
+		SNew(SOverlay)
+		+ SOverlay::Slot().VAlign(VAlign_Top)
+		[
+			SNew(SBox).HeightOverride_Lambda([this]() { return (ViewportLocalSize.Y - FlickPresentationFrame::GetContainedSize(ViewportLocalSize).Y) * 0.5f; })
+			[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Black)]
+		]
+		+ SOverlay::Slot().VAlign(VAlign_Bottom)
+		[
+			SNew(SBox).HeightOverride_Lambda([this]() { return (ViewportLocalSize.Y - FlickPresentationFrame::GetContainedSize(ViewportLocalSize).Y) * 0.5f; })
+			[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Black)]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Left)
+		[
+			SNew(SBox).WidthOverride_Lambda([this]() { return (ViewportLocalSize.X - FlickPresentationFrame::GetContainedSize(ViewportLocalSize).X) * 0.5f; })
+			[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Black)]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Right)
+		[
+			SNew(SBox).WidthOverride_Lambda([this]() { return (ViewportLocalSize.X - FlickPresentationFrame::GetContainedSize(ViewportLocalSize).X) * 0.5f; })
+			[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Black)]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+		SNew(SBox)
+		.WidthOverride_Lambda([this]() { return FlickPresentationFrame::GetContainedSize(ViewportLocalSize).X; })
+		.HeightOverride_Lambda([this]() { return FlickPresentationFrame::GetContainedSize(ViewportLocalSize).Y; })
+		[
+		// Keep a stable 900-unit vertical design grid inside the presentation
+		// frame. Ordinary displays expand naturally; extreme ratios use bars.
 		SNew(SDPIScaler)
 		.DPIScale_Lambda([this]()
 		{
@@ -137,7 +163,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 				ViewportSize.X = FMath::Min(ViewportSize.X, PhysicalSize.X);
 				ViewportSize.Y = FMath::Min(ViewportSize.Y, PhysicalSize.Y);
 			}
-			return FMath::Max(0.5f, FMath::Min(
+			return FMath::Max(0.25f, FMath::Min(
 				ViewportSize.Y / FlickUITheme::ReferenceHeight,
 				ViewportSize.X / FlickUITheme::ReferenceWidth));
 		})
@@ -343,6 +369,8 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			[BuildPartyInvitePrompt()]
 		]
 		]
+		]
+		]
 	];
 
 }
@@ -496,7 +524,8 @@ void SFlickGameLayer::Tick(
 	const float InDeltaTime)
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
-	LayerLocalSize = AllottedGeometry.GetLocalSize();
+	ViewportLocalSize = AllottedGeometry.GetLocalSize();
+	LayerLocalSize = FlickPresentationFrame::GetContainedSize(ViewportLocalSize);
 	const bool bFooterVisible = GetScreenVisibility(EFlickFrontendScreen::MainMenu) != EVisibility::Collapsed;
 	if (bFooterVisible)
 	{

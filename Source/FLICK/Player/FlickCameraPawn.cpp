@@ -3,6 +3,8 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
 #include "Core/FlickTypes.h"
+#include "Core/FlickPresentationFrame.h"
+#include "Engine/Engine.h"
 #include "Game/FlickGameState.h"
 #include "Game/FlickGameInstance.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -55,6 +57,19 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	if (!Camera)
 	{
 		return;
+	}
+	if (GEngine && GEngine->GameViewport)
+	{
+		FVector2D ViewportSize;
+		GEngine->GameViewport->GetViewportSize(ViewportSize);
+		if (ViewportSize.X > 0.0f && ViewportSize.Y > 0.0f)
+		{
+			const float ViewportAspect = ViewportSize.X / ViewportSize.Y;
+			const float FramedAspect = FMath::Clamp(ViewportAspect,
+				FlickPresentationFrame::MinimumAspect, FlickPresentationFrame::MaximumAspect);
+			Camera->SetConstraintAspectRatio(!FMath::IsNearlyEqual(ViewportAspect, FramedAspect));
+			Camera->SetAspectRatio(FramedAspect);
+		}
 	}
 	if (bFreeCameraEnabled)
 	{

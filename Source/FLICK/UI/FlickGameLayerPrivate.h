@@ -9,6 +9,7 @@
 #include "Core/FlickControlBindings.h"
 #include "Core/FlickVisualSettings.h"
 #include "Core/FlickRankRules.h"
+#include "Core/FlickPresentationFrame.h"
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameInstance.h"
 #include "Game/FlickGameState.h"
@@ -113,7 +114,8 @@ namespace
 			GEngine->GameViewport->GetViewportSize(ViewportSize);
 		}
 		if (ViewportSize.Y <= 0.0f) return 1.0f;
-		const float Aspect = ViewportSize.X / ViewportSize.Y;
+		const FVector2D FrameSize = FlickPresentationFrame::GetContainedSize(ViewportSize);
+		const float Aspect = FrameSize.X / FrameSize.Y;
 		return FMath::Clamp((16.0f / 9.0f) / Aspect, 0.78f, 1.0f);
 	}
 
@@ -191,8 +193,14 @@ namespace
 				return LayerId;
 			}
 
-			const float TopEdgeX = LocalSize.X * 0.345f;
-			const float BottomEdgeX = LocalSize.X * 0.395f;
+			// The menu column uses the 16:9 design canvas and is additionally
+			// reduced on ultrawide monitors. Size the panel from that same canvas,
+			// not the full ultrawide width, or its empty area grows while the cards
+			// stay fixed and visually shrink inside it.
+			const float DesignWidth = FMath::Min(LocalSize.X, LocalSize.Y * (16.0f / 9.0f));
+			const float ColumnScale = GetMainMenuColumnScale();
+			const float TopEdgeX = DesignWidth * 0.345f * ColumnScale;
+			const float BottomEdgeX = DesignWidth * 0.395f * ColumnScale;
 			// Slate custom vertices are not MSAA'd. Evaluate the diagonal's
 			// signed-distance coverage in screen pixels instead of ending a pair of
 			// triangles at an opaque, stair-stepped edge. Multiple narrow bands
