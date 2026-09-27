@@ -16,14 +16,14 @@ if not parent:
 # Values mirror the editable Blender source. The existing material parent adds
 # a subtle roughness breakup without bringing in texture dependencies.
 specs = {
-    "01_Deck_Graphite": ((.310, .320, .330), .38, .46, 0.0, .018),
-    "02_Field_Slate": ((.400, .410, .420), .22, .53, 0.0, .022),
-    "03_Gunmetal_Rail": ((.13, .14, .15), .72, .31, 0.0, .025),
-    "04_Satin_Titanium": ((.48, .49, .50), .84, .24, 0.0, .035),
-    "05_Deep_Recess": ((.018, .022, .027), .26, .59, 0.0, .005),
-    "06_Floor_Marking": ((.47, .49, .51), .25, .57, 0.0, .015),
-    "07_Warm_Light": ((1.0, .55, .23), .03, .20, 2.2, 0.0),
-    "08_Warm_Metal": ((.42, .31, .23), .72, .30, 0.0, .025),
+    "01_Deck_Graphite": ((.105, .145, .170), .42, .36, 0.0, .018),
+    "02_Field_Slate": ((.245, .315, .335), .17, .48, 0.0, .022),
+    "03_Gunmetal_Rail": ((.024, .039, .051), .78, .27, 0.0, .025),
+    "04_Satin_Titanium": ((.67, .73, .72), .86, .24, 0.0, .035),
+    "05_Deep_Recess": ((.008, .018, .025), .30, .52, 0.0, .005),
+    "06_Floor_Marking": ((.82, .82, .72), .30, .37, 0.0, .015),
+    "07_Warm_Light": ((1.0, .57, .18), .04, .22, 1.7, 0.0),
+    "08_Warm_Metal": ((.62, .42, .19), .82, .28, 0.0, .025),
 }
 materials = {}
 for key, (rgb, metallic, roughness, emission, lift) in specs.items():

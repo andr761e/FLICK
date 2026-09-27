@@ -5,6 +5,8 @@ from pathlib import Path
 
 import unreal as u
 
+asset_selected = globals().get("asset_selected", lambda _project, _source: True)
+
 project = Path(u.Paths.project_dir())
 source_root = project / "AssetDevelopment/Stadium"
 destination = "/Game/TestArena/Stadium"
@@ -39,14 +41,14 @@ if not parent:
 specs = {
     # Neutral architectural palette: bright enough to separate the stadium
     # from the arena, without borrowing either team's cyan/orange identity.
-    "01_Porcelain_Composite": ((.72, .77, .84), .08, .36, 0.0),
-    "02_Pale_Concrete": ((.52, .57, .64), .04, .56, 0.0),
-    "03_Graphite_Inset": ((.018, .032, .055), .46, .28, 0.0),
-    "04_Brushed_Aluminium": ((.56, .65, .75), .93, .22, 0.0),
-    "05_Warm_Architectural_Light": ((1.0, .86, .72), .05, .22, 3.0),
-    "06_Team_Cyan_Light": ((.0, .30, 1.0), .04, .18, 4.8),
-    "07_Team_Orange_Light": ((1.0, .10, .005), .04, .18, 4.8),
-    "08_Deep_Recess": ((.006, .012, .022), .30, .34, 0.0),
+    "01_Porcelain_Composite": ((.57, .66, .69), .12, .40, 0.0),
+    "02_Pale_Concrete": ((.24, .32, .37), .08, .56, 0.0),
+    "03_Graphite_Inset": ((.018, .036, .052), .48, .28, 0.0),
+    "04_Brushed_Aluminium": ((.65, .73, .75), .91, .24, 0.0),
+    "05_Warm_Architectural_Light": ((1.0, .78, .50), .03, .24, 2.4),
+    "06_Team_Cyan_Light": ((.02, .55, 1.0), .04, .18, 3.5),
+    "07_Team_Orange_Light": ((1.0, .23, .035), .04, .18, 3.5),
+    "08_Deep_Recess": ((.005, .013, .021), .34, .35, 0.0),
 }
 materials = {}
 for key, (rgb, metallic, roughness, emission) in specs.items():
@@ -65,6 +67,8 @@ for key, (rgb, metallic, roughness, emission) in specs.items():
 manifest = json.loads((source_root / "manifest.json").read_text())
 report = []
 for name in manifest["exports"]:
+    if not asset_selected(project, source_root / "exports" / f"{name}.fbx"):
+        continue
     task = u.AssetImportTask()
     task.filename = str(source_root / "exports" / f"{name}.fbx")
     task.destination_path = destination
@@ -107,8 +111,8 @@ for name in manifest["exports"]:
     bounds = mesh.get_bounds()
     report.append({"name": name, "dimensions_cm": [bounds.box_extent.x*2, bounds.box_extent.y*2, bounds.box_extent.z*2], "materials": mapped})
 
-structure = next(row for row in report if row["name"] == "SM_TestStadium_Structure")
-if structure["dimensions_cm"][0] < 3100.0 or structure["dimensions_cm"][0] > 3300.0:
+structure = next((row for row in report if row["name"] == "SM_TestStadium_Structure"), None)
+if structure and (structure["dimensions_cm"][0] < 3100.0 or structure["dimensions_cm"][0] > 3300.0):
     raise RuntimeError("Stadium import scale mismatch: " + str(structure["dimensions_cm"]))
 (project / "Saved/StadiumImportReport.json").write_text(json.dumps(report, indent=2))
 u.log("FLICK_STADIUM_IMPORT_COMPLETE")

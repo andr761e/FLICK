@@ -94,7 +94,7 @@ AFlickTestArena::AFlickTestArena()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopArenaAsset(
-		TEXT("/Game/ClassicArena/SM_ClassicArena_Premium.SM_ClassicArena_Premium"));
+		TEXT("/Game/TestArena/Arena/SM_TestArena_Static.SM_TestArena_Static"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopDividerAsset(
 		TEXT("/Game/TestArena/Arena/SM_TestArena_Divider.SM_TestArena_Divider"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopSocketAsset(

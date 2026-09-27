@@ -10,6 +10,6 @@
     6.5,
     0.006699979305267334
   ],
-  "visual_vertices": 17456,
+  "visual_vertices": 18192,
   "runtime_collision": "unchanged AFlickArena::ArenaMesh cylinder"
 }

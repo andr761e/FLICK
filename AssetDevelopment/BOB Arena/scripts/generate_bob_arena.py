@@ -70,15 +70,15 @@ def material(name, color, metallic=0.0, roughness=0.5, emission=0.0):
 
 
 MATS = {
-    "01_BOB_Surface": material("01_BOB_Surface", (0.72, 0.77, 0.80), 0.08, 0.46),
-    "02_BOB_Wood": material("02_BOB_Wood", (0.23, 0.12, 0.055), 0.0, 0.34),
-    "03_BOB_InnerWall": material("03_BOB_InnerWall", (0.64, 0.69, 0.72), 0.18, 0.31),
-    "04_BOB_Red": material("04_BOB_Red", (0.72, 0.025, 0.035), 0.1, 0.29, 0.15),
-    "05_BOB_PocketRed": material("05_BOB_PocketRed", (0.82, 0.018, 0.028), 0.18, 0.22, 0.55),
-    "06_BOB_PocketVoid": material("06_BOB_PocketVoid", (0.008, 0.011, 0.016), 0.1, 0.62),
-    "07_BOB_Silver": material("07_BOB_Silver", (0.72, 0.79, 0.84), 0.94, 0.20),
-    "08_BOB_DarkMetal": material("08_BOB_DarkMetal", (0.038, 0.050, 0.066), 0.72, 0.25),
-    "09_BOB_PocketBottom": material("09_BOB_PocketBottom", (0.11, 0.012, 0.018), 0.24, 0.32, 0.08),
+    "01_BOB_Surface": material("01_BOB_Surface", (.76, .76, .67), .08, .42),
+    "02_BOB_Wood": material("02_BOB_Wood", (.17, .075, .050), .02, .31),
+    "03_BOB_InnerWall": material("03_BOB_InnerWall", (.59, .58, .51), .20, .32),
+    "04_BOB_Red": material("04_BOB_Red", (.56, .018, .038), .12, .27, .12),
+    "05_BOB_PocketRed": material("05_BOB_PocketRed", (.80, .025, .048), .18, .23, .48),
+    "06_BOB_PocketVoid": material("06_BOB_PocketVoid", (.010, .012, .016), .12, .60),
+    "07_BOB_Silver": material("07_BOB_Silver", (.76, .66, .45), .90, .22),
+    "08_BOB_DarkMetal": material("08_BOB_DarkMetal", (.035, .040, .048), .76, .27),
+    "09_BOB_PocketBottom": material("09_BOB_PocketBottom", (.09, .010, .021), .24, .32, .08),
 }
 
 
@@ -294,6 +294,21 @@ for sx in (-1.0, 1.0):
                                   LINE_Z + 0.006, MATS["04_BOB_Red"], (sx * tangent, sy * tangent), 96))
 
 # Small dark-metal fasteners along each rail add scale without changing shape.
+# Fine fan motifs sit outside the scoring square and avoid the pocket mouths.
+for side in (-1.0, 1.0):
+    for index in range(7):
+        offset = (index - 3) * .82
+        objects.append(flat_rect("Inlaid sideline index", .018, .20,
+                                 LINE_Z + .002, MATS["07_BOB_Silver"],
+                                 (offset, side * 5.43)))
+        objects.append(flat_rect("Inlaid endline index", .20, .018,
+                                 LINE_Z + .002, MATS["07_BOB_Silver"],
+                                 (side * 5.43, offset)))
+for side in (-1.0, 1.0):
+    objects.append(flat_rect("Center axis jewel", .030, .36,
+                             LINE_Z + .002, MATS["07_BOB_Silver"],
+                             (0.0, side * 1.66)))
+
 for side in (-1.0, 1.0):
     for index in range(-4, 5):
         offset = index * 1.18

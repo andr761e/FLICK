@@ -45,19 +45,19 @@ def mat(name,color,metallic,roughness,emission=0):
 # The hierarchy deliberately mirrors the high-detail pucks: reflective charcoal,
 # bright machined metal, and sharp embedded team lighting. The floor stays in a
 # lighter blue-grey family so black puck sidewalls remain readable in gameplay.
-graphite=mat('01_Arena_Graphite',(0.18,0.225,0.29),.55,.28)
-floor_mat=mat('02_Arena_Surface',(0.62,0.70,0.79),.12,.46)
-rubber=mat('03_Rim_Polymer',(0.055,0.078,0.11),.22,.36)
-titanium=mat('04_Brushed_Titanium',(.72,.79,.87),.94,.20)
-recess=mat('05_Deep_Recess',(.022,.034,.050),.34,.34)
-cyan=mat('06_Team_Cyan',(0,.32,.76),.06,.25,2.75)
-orange=mat('07_Team_Orange',(.95,.16,.008),.06,.25,2.75)
-line_mat=mat('08_Floor_Lines',(.79,.85,.92),.48,.27)
-switch_mat=mat('09_Switch_Accent',(.025,.48,.72),.12,.32,.72)
-inner_field=mat('10_Inner_Field',(.53,.61,.70),.16,.42)
-center_inset=mat('11_Center_Inset',(.70,.77,.84),.28,.30)
-accent_metal=mat('12_Accent_Metal',(.43,.51,.61),.90,.23)
-dark_marking=mat('13_Dark_Marking',(.075,.105,.15),.40,.32)
+graphite=mat('01_Arena_Graphite',(.085,.145,.190),.58,.30)
+floor_mat=mat('02_Arena_Surface',(.67,.76,.78),.13,.43)
+rubber=mat('03_Rim_Polymer',(.020,.041,.059),.24,.40)
+titanium=mat('04_Brushed_Titanium',(.73,.82,.82),.92,.22)
+recess=mat('05_Deep_Recess',(.009,.022,.037),.38,.35)
+cyan=mat('06_Team_Cyan',(.005,.42,.92),.04,.23,2.4)
+orange=mat('07_Team_Orange',(1.0,.22,.018),.04,.23,2.4)
+line_mat=mat('08_Floor_Lines',(.91,.94,.87),.42,.31)
+switch_mat=mat('09_Switch_Accent',(.015,.54,.78),.12,.29,.80)
+inner_field=mat('10_Inner_Field',(.44,.58,.61),.17,.43)
+center_inset=mat('11_Center_Inset',(.74,.81,.77),.28,.32)
+accent_metal=mat('12_Accent_Metal',(.49,.62,.66),.89,.25)
+dark_marking=mat('13_Dark_Marking',(.035,.087,.118),.44,.34)
 
 def finish(obj,name,material,bevel=0.0):
     obj.name=name; obj.data.materials.append(material)
@@ -218,6 +218,21 @@ for index in range(24):
     # oblique supported camera angle. Major spokes remain slightly stronger.
     width=.012 if index%3==0 else .009
     parts.append(curve_line('Radial field spoke',[(start.x,start.y),(end.x,end.y)],dark_marking_top-.003,width,dark_marking))
+
+# The telemetry scale is printed into the outer tactical lane. It does not
+# indicate divider positions and adds no gameplay geometry or collision.
+for index in range(60):
+    angle=math.tau*index/60
+    half=.0019 if index%5 else .0032
+    parts.append(arc('Telemetry tick',arena_radius*.888,
+                     arena_radius*(.907 if index%5 else .923),
+                     dark_marking_top-.004,.007,angle-half,angle+half,
+                     dark_marking,2))
+for index in range(12):
+    center=math.tau*(index+.5)/12
+    parts.append(arc('Satin survey arc',arena_radius*.570,arena_radius*.574,
+                     dark_marking_top-.004,.006,center-.12,center+.12,
+                     line_mat,8))
 
 # Segmented circular records read like the dashed rings in the original Unreal
 # construction, but each dash has a tiny bevel and proper metallic response.

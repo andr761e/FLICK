@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import unreal as u
 
+asset_selected = globals().get("asset_selected", lambda _project, _source: True)
+
 
 project = Path(u.Paths.project_dir())
 source_root = project / "AssetDevelopment/Pucks/HighDetail"
@@ -79,6 +81,8 @@ for row in manifest:
     source_file = source_root / "exports" / (name + ".fbx")
     if not source_file.is_file():
         raise RuntimeError(name + ": source FBX is missing: " + str(source_file))
+    if not asset_selected(project, source_file):
+        continue
     task = u.AssetImportTask()
     task.filename = str(source_file)
     task.destination_path = destination
@@ -157,6 +161,8 @@ for identity in ("P1", "P2", "P3"):
             "exports" / f"{name}.fbx")
         if not source_file.is_file():
             raise RuntimeError(asset_name + ": source FBX is missing: " + str(source_file))
+        if not asset_selected(project, source_file):
+            continue
         task = u.AssetImportTask()
         task.filename = str(source_file)
         task.destination_path = identity_destination

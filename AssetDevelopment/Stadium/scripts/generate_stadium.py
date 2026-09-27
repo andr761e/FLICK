@@ -49,14 +49,14 @@ def material(name, color, metallic, roughness, emission=0.0):
 
 # Cool-neutral architectural surfaces keep both team colours equally readable.
 # The outer floor is deliberately the brightest large surface in the room.
-porcelain = material("01_Porcelain_Composite", (.80, .84, .90), .08, .36)
-concrete = material("02_Pale_Concrete", (.58, .62, .68), .04, .56)
-graphite = material("03_Graphite_Inset", (.025, .038, .058), .46, .28)
-metal = material("04_Brushed_Aluminium", (.50, .59, .68), .93, .22)
-warm = material("05_Warm_Architectural_Light", (1.0, .86, .72), .05, .22, 3.0)
-cyan = material("06_Team_Cyan_Light", (.0, .46, 1.0), .04, .18, 4.5)
-orange = material("07_Team_Orange_Light", (1.0, .18, .015), .04, .18, 4.5)
-dark = material("08_Deep_Recess", (.008, .014, .024), .30, .34)
+porcelain = material("01_Porcelain_Composite", (.57, .66, .69), .12, .40)
+concrete = material("02_Pale_Concrete", (.24, .32, .37), .08, .56)
+graphite = material("03_Graphite_Inset", (.018, .036, .052), .48, .28)
+metal = material("04_Brushed_Aluminium", (.65, .73, .75), .91, .24)
+warm = material("05_Warm_Architectural_Light", (1.0, .78, .50), .03, .24, 2.4)
+cyan = material("06_Team_Cyan_Light", (.02, .55, 1.0), .04, .18, 3.5)
+orange = material("07_Team_Orange_Light", (1.0, .23, .035), .04, .18, 3.5)
+dark = material("08_Deep_Recess", (.005, .013, .021), .34, .35)
 
 
 def finish(obj, name, mat, bevel=0.0):
@@ -215,6 +215,18 @@ lights.append(ring("Upper wall cove", 15.47, 15.535, 3.48, 3.58, warm))
 for name, angle_deg, light_material in (("Blue left", 135, cyan), ("Blue front", 225, cyan),
                                          ("Orange right", 45, orange), ("Orange front", 315, orange)):
     lights.append(radial_cube(name, angle_deg, 15.40, .15, .07, .18, 3.24, light_material, .004))
+
+# Broadcast identity: fine radial ticks and a continuous warm gallery band.
+# All pieces sit on the existing floor and inside the wall shell.
+for index in range(48):
+    angle = index * 7.5
+    structure.append(radial_cube("Concourse timing tick", angle, 10.55,
+                                 .32 if index % 4 == 0 else .14, .025,
+                                 STADIUM_FLOOR_Z_M + .010, .010, graphite))
+    if index % 4 == 0:
+        lights.append(radial_cube("Gallery beacon", angle, 15.455,
+                                  .11, .11, 2.45, .045, warm))
+lights.append(ring("Gallery amber reveal", 15.46, 15.49, 2.62, 2.65, warm))
 
 
 def join_asset(name, objects):

@@ -5,6 +5,8 @@ from pathlib import Path
 
 import unreal as u
 
+asset_selected = globals().get("asset_selected", lambda _project, _source: True)
+
 
 project = Path(u.Paths.project_dir())
 source_root = project / "AssetDevelopment/BOBStadium"
@@ -41,15 +43,15 @@ if not parent:
     u.EditorAssetLibrary.save_loaded_asset(parent)
 
 specs = {
-    "01_Foundry_Black": ((.028, .052, .061), .48, .34, 0.0),
-    "02_Blue_Steel": ((.12, .20, .24), .76, .28, 0.0),
-    "03_Gunmetal": ((.27, .34, .37), .84, .23, 0.0),
-    "04_Smoked_Concrete": ((.34, .39, .40), .04, .58, 0.0),
-    "05_Aged_Brass": ((.62, .37, .09), .82, .29, 0.0),
-    "06_Warm_Pocket_Light": ((1.0, .68, .28), .04, .18, 6.5),
-    "07_Cyan_Score_Light": ((.02, .72, 1.0), .03, .14, 7.5),
-    "08_Orange_Score_Light": ((1.0, .25, .035), .03, .14, 7.5),
-    "09_Light_Composite": ((.58, .66, .68), .16, .36, 0.0),
+    "01_Foundry_Black": ((.025, .031, .039), .52, .34, 0.0),
+    "02_Blue_Steel": ((.12, .17, .20), .76, .29, 0.0),
+    "03_Gunmetal": ((.29, .32, .32), .82, .27, 0.0),
+    "04_Smoked_Concrete": ((.31, .30, .29), .06, .61, 0.0),
+    "05_Aged_Brass": ((.68, .47, .20), .84, .28, 0.0),
+    "06_Warm_Pocket_Light": ((1.0, .66, .31), .04, .20, 5.0),
+    "07_Cyan_Score_Light": ((.04, .66, 1.0), .03, .16, 5.5),
+    "08_Orange_Score_Light": ((1.0, .22, .04), .03, .16, 5.5),
+    "09_Light_Composite": ((.67, .65, .56), .16, .40, 0.0),
 }
 materials = {}
 for key, (rgb, metallic, roughness, emission) in specs.items():
@@ -72,6 +74,8 @@ for name in manifest["exports"]:
     source_file = source_root / "exports" / f"{name}.fbx"
     if not source_file.is_file():
         raise RuntimeError("BOB stadium FBX is missing: " + str(source_file))
+    if not asset_selected(project, source_file):
+        continue
     task = u.AssetImportTask()
     task.filename = str(source_file)
     task.destination_path = destination
@@ -117,8 +121,8 @@ for name in manifest["exports"]:
                    "dimensions_cm": [bounds.box_extent.x * 2, bounds.box_extent.y * 2, bounds.box_extent.z * 2],
                    "materials": mapped})
 
-structure = next(row for row in report if row["name"] == "SM_BobStadium_Structure")
-if structure["dimensions_cm"][0] < 4100.0 or structure["dimensions_cm"][0] > 4400.0:
+structure = next((row for row in report if row["name"] == "SM_BobStadium_Structure"), None)
+if structure and (structure["dimensions_cm"][0] < 4100.0 or structure["dimensions_cm"][0] > 4400.0):
     raise RuntimeError("BOB stadium import scale mismatch: " + str(structure["dimensions_cm"]))
 (project / "Saved/BobStadiumImportReport.json").write_text(json.dumps(report, indent=2))
 u.log("FLICK_BOB_STADIUM_IMPORT_COMPLETE")

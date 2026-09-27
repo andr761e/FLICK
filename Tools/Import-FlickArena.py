@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import unreal as u
 
+asset_selected = globals().get("asset_selected", lambda _project, _source: True)
+
 
 project = Path(u.Paths.project_dir())
 source_root = project / "AssetDevelopment/Arena"
@@ -95,23 +97,23 @@ specs = {
     # by the test camera instead of letting the arena create a broad haze.
     # Tuple: colour, metallic, roughness, strip emission, ambient surface lift,
     # specular response, anisotropy, render-only Z offset in centimetres.
-    "01_Arena_Graphite": ((.18, .225, .29), .55, .28, 0.0, .12, .62, .28, -.05),
-    "02_Arena_Surface": ((.62, .70, .79), .12, .46, 0.0, .24, .55, .06, -.30),
-    "03_Rim_Polymer": ((.055, .078, .11), .22, .36, 0.0, .035, .58, .08, -.25),
-    "04_Brushed_Titanium": ((.72, .79, .87), .94, .20, 0.0, .22, .72, .68, -.20),
-    "05_Deep_Recess": ((.022, .034, .05), .34, .34, 0.0, .008, .48, .12, -.10),
+    "01_Arena_Graphite": ((.085, .145, .190), .58, .30, 0.0, .12, .62, .28, -.05),
+    "02_Arena_Surface": ((.67, .76, .78), .13, .43, 0.0, .24, .55, .06, -.30),
+    "03_Rim_Polymer": ((.020, .041, .059), .24, .40, 0.0, .035, .58, .08, -.25),
+    "04_Brushed_Titanium": ((.73, .82, .82), .92, .22, 0.0, .22, .72, .68, -.20),
+    "05_Deep_Recess": ((.009, .022, .037), .38, .35, 0.0, .008, .48, .12, -.10),
     # Bright embedded rim lenses: strong enough to read as arena lighting, but
     # still below the puck LEDs and restrained enough to preserve a sharp edge.
-    "06_Team_Cyan": ((0.0, .32, .76), .06, .25, 2.75, 0.0, .55, 0.0, 0.0),
-    "07_Team_Orange": ((.95, .16, .008), .06, .25, 2.75, 0.0, .55, 0.0, 0.0),
+    "06_Team_Cyan": ((.005, .42, .92), .04, .23, 2.4, 0.0, .55, 0.0, 0.0),
+    "07_Team_Orange": ((1.0, .22, .018), .04, .23, 2.4, 0.0, .55, 0.0, 0.0),
     # Marking separation is baked into the non-colliding visual mesh. Avoid
     # relying on WPO here: actual vertex separation is stable under every view.
-    "08_Floor_Lines": ((.79, .85, .92), .48, .27, 0.0, .10, .66, .24, 0.0),
-    "09_Switch_Accent": ((.025, .48, .72), .12, .32, .72, 0.0, .55, 0.0, 0.0),
-    "10_Inner_Field": ((.53, .61, .70), .16, .42, 0.0, .20, .58, .08, -.20),
-    "11_Center_Inset": ((.70, .77, .84), .28, .30, 0.0, .18, .64, .16, -.15),
-    "12_Accent_Metal": ((.43, .51, .61), .90, .23, 0.0, .18, .70, .56, -.15),
-    "13_Dark_Marking": ((.075, .105, .15), .40, .32, 0.0, .025, .56, .18, 0.0),
+    "08_Floor_Lines": ((.91, .94, .87), .42, .31, 0.0, .10, .66, .24, 0.0),
+    "09_Switch_Accent": ((.015, .54, .78), .12, .29, .80, 0.0, .55, 0.0, 0.0),
+    "10_Inner_Field": ((.44, .58, .61), .17, .43, 0.0, .20, .58, .08, -.20),
+    "11_Center_Inset": ((.74, .81, .77), .28, .32, 0.0, .18, .64, .16, -.15),
+    "12_Accent_Metal": ((.49, .62, .66), .89, .25, 0.0, .18, .70, .56, -.15),
+    "13_Dark_Marking": ((.035, .087, .118), .44, .34, 0.0, .025, .56, .18, 0.0),
 }
 materials = {}
 for key, (rgb, metallic, roughness, emission, lift, specular, anisotropy, layer_offset) in specs.items():
@@ -199,7 +201,7 @@ for name in asset_names:
     data.normal_import_method = u.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS
     task.options = options
     task.factory = u.FbxFactory()
-    if not materials_only:
+    if not materials_only and asset_selected(project, source_root / "exports" / (name + ".fbx")):
         # Reimport in place so every C++ soft reference remains live. Deleting a
         # referenced StaticMesh before import can leave Unreal's asset registry
         # holding a pending-kill object for the rest of the commandlet session.
@@ -208,7 +210,7 @@ for name in asset_names:
     mesh = u.load_asset(destination + "/" + name)
     if not isinstance(mesh, u.StaticMesh):
         raise RuntimeError("Mesh import failed: " + name)
-    if not materials_only:
+    if not materials_only and asset_selected(project, source_root / "exports" / (name + ".fbx")):
         settings = mesh_editor.get_lod_build_settings(mesh, 0)
         settings.recompute_normals = False
         settings.recompute_tangents = True
@@ -222,13 +224,13 @@ for name in asset_names:
         matches = [key for key in materials if key in slot_name]
         if len(matches) != 1:
             raise RuntimeError(f"Unknown material slot on {name}: {slot_name}")
-        if not materials_only:
+        if not materials_only and asset_selected(project, source_root / "exports" / (name + ".fbx")):
             key = matches[0]
             material = mechanism_materials.get(key, materials[key]) \
                 if name in flush_mechanism_names else materials[key]
             mesh.set_material(index, material)
         mapped.append(matches[0])
-    if not materials_only:
+    if not materials_only and asset_selected(project, source_root / "exports" / (name + ".fbx")):
         u.EditorAssetLibrary.save_loaded_asset(mesh)
     bounds = mesh.get_bounds()
     report.append({

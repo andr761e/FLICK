@@ -44,15 +44,15 @@ def material(name, color, metallic, roughness, emission=0.0):
     return value
 
 
-foundry_black = material("01_Foundry_Black", (.028, .052, .061), .48, .34)
-blue_steel = material("02_Blue_Steel", (.12, .20, .24), .76, .28)
-gunmetal = material("03_Gunmetal", (.27, .34, .37), .84, .23)
-concrete = material("04_Smoked_Concrete", (.34, .39, .40), .04, .58)
-brass = material("05_Aged_Brass", (.62, .37, .09), .82, .29)
-warm = material("06_Warm_Pocket_Light", (1.0, .68, .28), .04, .18, 6.5)
-cyan = material("07_Cyan_Score_Light", (.02, .72, 1.0), .03, .14, 7.5)
-orange = material("08_Orange_Score_Light", (1.0, .25, .035), .03, .14, 7.5)
-light_composite = material("09_Light_Composite", (.58, .66, .68), .16, .36)
+foundry_black = material("01_Foundry_Black", (.025, .031, .039), .52, .34)
+blue_steel = material("02_Blue_Steel", (.12, .17, .20), .76, .29)
+gunmetal = material("03_Gunmetal", (.29, .32, .32), .82, .27)
+concrete = material("04_Smoked_Concrete", (.31, .30, .29), .06, .61)
+brass = material("05_Aged_Brass", (.68, .47, .20), .84, .28)
+warm = material("06_Warm_Pocket_Light", (1.0, .66, .31), .04, .20, 5.0)
+cyan = material("07_Cyan_Score_Light", (.04, .66, 1.0), .03, .16, 5.5)
+orange = material("08_Orange_Score_Light", (1.0, .22, .04), .03, .16, 5.5)
+light_composite = material("09_Light_Composite", (.67, .65, .56), .16, .40)
 
 
 def finish(obj, name, mat, bevel=0.0, smooth=False):
@@ -727,6 +727,26 @@ for pod_index, (sx, sy) in enumerate(((-1, -1), (1, -1), (1, 1), (-1, 1))):
     pod_light = cyan if sx < 0 else orange
     lights.append(gallery_cube("Corner observation status", angle, radius - .69, 0.0,
                                (.035, 1.24, .055), 4.91, pod_light, .006))
+
+# Brass survey marks and pocket emblems are printed on the existing service
+# apron. Their shallow tops stay below the arena and add no new enclosure span.
+for sx in (-1, 1):
+    for sy in (-1, 1):
+        for index in range(3):
+            x = sx * (10.8 + index * .37)
+            y = sy * (10.8 + index * .37)
+            structure.append(cube("Pocket herald diagonal", (x, y, FLOOR_Z_M + .087),
+                                  (1.00 - index * .12, .022, .012), brass,
+                                  math.radians(45 * sx * sy)))
+        lights.append(cube("Pocket herald bead", (sx * 10.8, sy * 10.8,
+                                                   FLOOR_Z_M + .098),
+                           (.11, .11, .008), warm, math.radians(45)))
+for side in (-1, 1):
+    for index in range(-8, 9):
+        x = index * 1.38
+        structure.append(cube("Foundry apron ruler", (x, side * 13.8,
+                                                        FLOOR_Z_M + .085),
+                              (.025, .19 if index % 4 == 0 else .10, .010), brass))
 
 
 def join_asset(name, objects):

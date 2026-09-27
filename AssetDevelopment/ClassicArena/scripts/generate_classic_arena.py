@@ -32,14 +32,14 @@ def material(name, color, metallic, roughness, emission=0.0):
     return mat
 
 
-graphite = material("01_Deck_Graphite", (0.310, 0.320, 0.330), .38, .46)
-field = material("02_Field_Slate", (0.400, 0.410, 0.420), .22, .53)
-rail = material("03_Gunmetal_Rail", (0.13, 0.14, 0.15), .72, .31)
-titanium = material("04_Satin_Titanium", (0.48, 0.49, 0.50), .84, .24)
-recess = material("05_Deep_Recess", (0.018, 0.022, 0.027), .26, .59)
-mark = material("06_Floor_Marking", (0.47, 0.49, 0.51), .25, .57)
-warm = material("07_Warm_Light", (1.0, .55, .23), .03, .20, 2.2)
-muted_warm = material("08_Warm_Metal", (.42, .31, .23), .72, .30)
+graphite = material("01_Deck_Graphite", (.105, .145, .170), .42, .36)
+field = material("02_Field_Slate", (.245, .315, .335), .17, .48)
+rail = material("03_Gunmetal_Rail", (.024, .039, .051), .78, .27)
+titanium = material("04_Satin_Titanium", (.67, .73, .72), .86, .24)
+recess = material("05_Deep_Recess", (.008, .018, .025), .30, .52)
+mark = material("06_Floor_Marking", (.82, .82, .72), .30, .37)
+warm = material("07_Warm_Light", (1.0, .57, .18), .04, .22, 1.7)
+muted_warm = material("08_Warm_Metal", (.62, .42, .19), .82, .28)
 
 parts = []
 
@@ -145,6 +145,20 @@ for index in range(8):
     angle = math.tau*(index+.5)/8
     sector("Direction lozenge", RADIUS*.775, RADIUS*.804,
            .0042, .0054, angle-.013, angle+.013, muted_warm, 2)
+
+# A restrained engraved championship graphic lives on the existing surface.
+# The repeated marks are flat and remain well inside the 650 cm silhouette.
+for index in range(40):
+    angle = math.tau * index / 40
+    accent = muted_warm if index % 5 == 0 else mark
+    sector("Timing scale", RADIUS*.860, RADIUS*(.884 if index % 5 == 0 else .873),
+           .0045, .0052, angle-.0022, angle+.0022, accent, 2)
+for index in range(8):
+    angle = math.tau * (index+.5) / 8
+    sector("Laurel inner stroke", RADIUS*.205, RADIUS*.310,
+           .0047, .0055, angle-.025, angle-.018, muted_warm, 3)
+    sector("Laurel outer stroke", RADIUS*.205, RADIUS*.310,
+           .0047, .0055, angle+.018, angle+.025, muted_warm, 3)
 
 bpy.ops.object.select_all(action="DESELECT")
 for obj in parts:
