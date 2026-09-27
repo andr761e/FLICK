@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Settings', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'AimArrow', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Settings', 'Video', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'AimArrow', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -25,7 +25,7 @@ param(
     [int]$PlayersPerTeam = 1,
     [ValidateRange(0, 11)]
     [int]$LockerCategory = 0,
-    [ValidateRange(0, 5)]
+    [ValidateRange(0, 6)]
     [int]$SettingsTab = 0,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
@@ -45,6 +45,9 @@ if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
 
 $previewFlags = @{
     Home = @()
+    Invite = @('-FlickPartyInvitePreview')
+    Party = @('-FlickPartyTrayPreview')
+    Challenges = @('-FlickChallengesPreview')
     TestArena = @('-FlickTestArenaPreview')
     TestArenaSettings = @('-FlickTestArenaSettingsPreview')
     TestArenaStates = @('-FlickTestArenaPreview', '-FlickTestArenaStatePreview')
@@ -55,6 +58,7 @@ $previewFlags = @{
     CustomizePuck = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
     PrivateMatch = @('-FlickPrivateMatchPreview')
     Settings = @('-FlickSettingsPreview')
+    Video = @('-FlickSettingsPreview')
     Lineup = @('-Flick4v4LoadoutPreview')
     Class = @('-FlickClassSelectPreview')
     Shop = @('-FlickItemShopPreview')
@@ -73,6 +77,7 @@ $captures = @()
 
 foreach ($screenName in $Screen) {
     $selectedLockerCategory = if ($screenName -eq 'CustomizePuck') { 3 } else { $LockerCategory }
+    $selectedSettingsTab = if ($screenName -eq 'Video') { 4 } else { $SettingsTab }
     $captureName = '{0}-{1}x{2}' -f $screenName.ToLowerInvariant(), $Width, $Height
     $userDir = Join-Path $captureRoot $captureName
     New-Item -ItemType Directory -Path $userDir -Force | Out-Null
@@ -86,7 +91,7 @@ foreach ($screenName in $Screen) {
         '-ddc=InstalledNoZenLocalFallback',
         '-nosound', '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame',
-        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickSettingsTab=$SettingsTab", '-FlickTestArenaSeed=1337',
+        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),
         ('-abslog="{0}"' -f $logPath)

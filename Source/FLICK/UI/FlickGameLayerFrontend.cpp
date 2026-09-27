@@ -82,7 +82,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		]
 		+ SOverlay::Slot()
 		[
-			SNew(SFlickDiagonalPanel)
+			SAssignNew(MainMenuDiagonalPanel, SFlickDiagonalPanel)
 			.Visibility(EVisibility::HitTestInvisible)
 			.PanelColor(Ink)
 			.EdgeColor(Hairline)
@@ -376,17 +376,27 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Bottom)
-		.Padding(450.0f, 0.0f, 0.0f, 44.0f)
+		.Padding(0.0f, 0.0f, 0.0f, 44.0f)
 		[
-			SNew(SBox).HeightOverride(72.0f)
-			.Visibility_Lambda([this]() { return IsDisplayedPartyActive() ? EVisibility::Visible : EVisibility::Collapsed; })
+			SAssignNew(MainMenuPartyTray, SBox).HeightOverride(78.0f)
+			.Visibility_Lambda([this]() { return IsDisplayedPartyActive() || bPartyTrayPreview ? EVisibility::Visible : EVisibility::Collapsed; })
+			.RenderTransform_Lambda([this]()
+			{
+				const float Progress = FMath::Clamp(PartyTrayElapsed / 0.38f, 0.0f, 1.0f);
+				const float Eased = 1.0f - FMath::Pow(1.0f - Progress, 3.0f);
+				const FVector2D LocalFrameSize = MainMenuDiagonalPanel.IsValid()
+					? MainMenuDiagonalPanel->GetCachedGeometry().GetLocalSize() : LayerLocalSize;
+				return FSlateRenderTransform(FVector2D(
+					GetMainMenuDiagonalBottomEdgeX(LocalFrameSize) + 12.0f,
+					(1.0f - Eased) * 86.0f));
+			})
 			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 246)))
-				.AccentColor(Cyan.CopyWithNewOpacity(0.58f))
+				SNew(SFlickMainMenuPanel)
+				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(11, 22, 25, 248)))
+				.AccentColor(Brand)
 				.CutSize(10.0f)
-				.BorderWidth(1.0f)
-				.Padding(FMargin(9.0f, 6.0f))
+				.BorderWidth(1.15f)
+				.Padding(FMargin(11.0f, 7.0f))
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()
@@ -394,12 +404,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
-							SNew(SBox).WidthOverride(20.0f).HeightOverride(2.0f)
+							SNew(SBox).WidthOverride(22.0f).HeightOverride(2.0f)
 							[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Brand)]
 						]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(7.0f, 0.0f, 0.0f, 0.0f)
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("PARTY  //  SELECT A MEMBER FOR CONTROLS"))).Font(UiFont(7, true)).ColorAndOpacity(Muted)
+							SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("PARTY  //  %d MEMBERS"), bPartyTrayPreview ? 2 : GetDisplayedPartyMemberCount())); }).Font(UiFont(9, true)).ColorAndOpacity(Brand)
 						]
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
@@ -414,6 +424,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					]
 				]
 			]
+		]
+		+ SOverlay::Slot()
+		.HAlign(HAlign_Right)
+		.VAlign(VAlign_Center)
+		.Padding(0.0f, 0.0f, 34.0f, 0.0f)
+		[
+			SNew(SBox).WidthOverride(344.0f)
+			[BuildChallengePreview()]
 		]
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Right)
@@ -557,6 +575,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			[
 				BuildSocialPanel()
 			]
+		]
+		+ SOverlay::Slot()
+		[
+			SNew(SBox)
+			.Visibility_Lambda([this]() { return bChallengesOpen ? EVisibility::Visible : EVisibility::Collapsed; })
+			[BuildChallengesPanel()]
 		]
 		];
 }
@@ -1147,11 +1171,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartySlot)
 {
 	return SNew(SBox)
-		.WidthOverride(128.0f)
-		.HeightOverride(44.0f)
+		.WidthOverride(132.0f)
+		.HeightOverride(46.0f)
 		.Visibility_Lambda([this, PartySlot]()
 		{
-			return IsDisplayedPartyActive() && HasDisplayedPartyMember(PartySlot)
+			return (IsDisplayedPartyActive() && HasDisplayedPartyMember(PartySlot)) || (bPartyTrayPreview && PartySlot < 2)
 				? EVisibility::Visible : EVisibility::Collapsed;
 		})
 		[
@@ -1182,15 +1206,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 			})
 			[
 			SNew(SFlickMainMenuPanel)
-			.BackgroundColor(FLinearColor::FromSRGBColor(FColor(14, 23, 25, 248)))
+			.BackgroundColor(FLinearColor::FromSRGBColor(FColor(17, 31, 34, 248)))
 			.AccentColor_Lambda([this, PartySlot]()
 			{
-				return IsDisplayedPartyMemberLeader(PartySlot)
+				return (bPartyTrayPreview ? PartySlot == 0 : IsDisplayedPartyMemberLeader(PartySlot))
 					? Brand
 					: Cyan.CopyWithNewOpacity(0.5f);
 			})
-			.CutSize(7.0f)
-			.BorderWidth(1.0f)
+			.CutSize(8.0f)
+			.BorderWidth(1.1f)
 			.Padding(FMargin(8.0f, 5.0f))
 			[
 				SNew(SHorizontalBox)
@@ -1198,7 +1222,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 				[
 					SNew(SBox).WidthOverride(3.0f)
 					[
-						SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Brand)
+					SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor_Lambda([this, PartySlot]() { return (bPartyTrayPreview ? PartySlot == 0 : IsDisplayedPartyMemberLeader(PartySlot)) ? Brand : Cyan; })
 					]
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 9.0f, 0.0f)
@@ -1215,6 +1239,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 						SNew(STextBlock)
 						.Text_Lambda([this, PartySlot]()
 						{
+							if (bPartyTrayPreview) return FText::FromString(PartySlot == 0 ? TEXT("YOU") : TEXT("RIVAL PLAYER"));
 							if (IsDisplayedPartyActive())
 							{
 								return FText::FromString(GetDisplayedPartyMemberName(PartySlot));
@@ -1229,7 +1254,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 						SNew(STextBlock)
 						.Text_Lambda([this, PartySlot]()
 						{
-							return FText::FromString(IsDisplayedPartyMemberLeader(PartySlot) ? TEXT("PARTY LEADER") : TEXT("IN PARTY"));
+							return FText::FromString((bPartyTrayPreview ? PartySlot == 0 : IsDisplayedPartyMemberLeader(PartySlot)) ? TEXT("PARTY LEADER") : TEXT("IN PARTY"));
 						})
 						.Font(UiFont(7, true)).ColorAndOpacity(Cyan.CopyWithNewOpacity(0.82f))
 					]

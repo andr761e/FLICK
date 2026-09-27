@@ -1147,36 +1147,3 @@ float AFlickGameMode::GetInterfaceVolume() const
 	return FlickGameInstance ? FlickGameInstance->GetInterfaceVolume() : 1.0f;
 }
 
-bool AFlickGameMode::IsVSyncEnabled() const
-{
-	const UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
-	return Settings && Settings->IsVSyncEnabled();
-}
-
-FString AFlickGameMode::GetWindowModeLabel() const
-{
-	const UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
-	if (!Settings)
-	{
-		return TEXT("WINDOWED");
-	}
-
-	switch (Settings->GetFullscreenMode())
-	{
-	case EWindowMode::Fullscreen:
-		return TEXT("FULLSCREEN");
-	case EWindowMode::WindowedFullscreen:
-		return TEXT("BORDERLESS");
-	case EWindowMode::Windowed:
-	default:
-		return TEXT("WINDOWED");
-	}
-}
-
-FString AFlickGameMode::GetResolutionLabel() const
-{
-	const UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
-	const FIntPoint Resolution = Settings ? Settings->GetScreenResolution() : FIntPoint(1280, 720);
-	return FString::Printf(TEXT("%d x %d"), Resolution.X, Resolution.Y);
-}
-

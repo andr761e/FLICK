@@ -144,15 +144,6 @@ FString AFlickGameMode::InitNewPlayer(
 void AFlickGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-	if (GetNetMode() != NM_DedicatedServer)
-	{
-		if (UGameUserSettings* Display = GEngine ? GEngine->GetGameUserSettings() : nullptr)
-		{
-			Display->SetFullscreenMode(EWindowMode::WindowedFullscreen);
-			Display->SetScreenResolution(Display->GetDesktopResolution());
-			Display->ApplyResolutionSettings(false);
-		}
-	}
 	bNetworkMatchRequested |= FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkMatch"));
 	bPartyRequested |= FParse::Param(FCommandLine::Get(), TEXT("FlickParty"));
 	bMatchmakingRequested |= FParse::Param(FCommandLine::Get(), TEXT("FlickMatchmaking"));

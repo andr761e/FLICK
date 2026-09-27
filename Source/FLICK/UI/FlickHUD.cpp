@@ -1106,24 +1106,6 @@ bool AFlickHUD::HandleMenuClick(const FVector2D& ScreenPosition)
 			}
 			break;
 		}
-		case EFlickMenuAction::ToggleVSync:
-			FlickGameMode->ToggleVSync();
-			break;
-		case EFlickMenuAction::PreviousWindowMode:
-			FlickGameMode->CycleWindowMode(-1);
-			break;
-		case EFlickMenuAction::NextWindowMode:
-			FlickGameMode->CycleWindowMode(1);
-			break;
-		case EFlickMenuAction::PreviousResolution:
-			FlickGameMode->CycleResolution(-1);
-			break;
-		case EFlickMenuAction::NextResolution:
-			FlickGameMode->CycleResolution(1);
-			break;
-		case EFlickMenuAction::ApplyDisplay:
-			FlickGameMode->ApplyDisplaySettings();
-			break;
 		case EFlickMenuAction::PreviousLoadoutPiece:
 			FlickGameMode->CycleLoadoutPiece(Region.Team, Region.PieceSlot, -1);
 			break;
@@ -1138,8 +1120,7 @@ bool AFlickHUD::HandleMenuClick(const FVector2D& ScreenPosition)
 			|| Region.Action == EFlickMenuAction::Resume
 			|| Region.Action == EFlickMenuAction::Restart
 			|| Region.Action == EFlickMenuAction::NextRound
-			|| Region.Action == EFlickMenuAction::EditLoadout
-			|| Region.Action == EFlickMenuAction::ApplyDisplay;
+			|| Region.Action == EFlickMenuAction::EditLoadout;
 		if (FlickGameMode)
 		{
 			FlickGameMode->PlayMenuSound(bConfirmSound);

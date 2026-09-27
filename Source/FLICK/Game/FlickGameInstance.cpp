@@ -297,6 +297,7 @@ void UFlickGameInstance::Init()
 		static_cast<int32>(EFlickBotDifficulty::Easy),
 		static_cast<int32>(EFlickBotDifficulty::Expert)));
 	GConfig->GetFloat(FlickSettingsSection, TEXT("CameraShakeIntensity"), CameraShakeIntensity, GGameUserSettingsIni);
+	GConfig->GetBool(FlickSettingsSection, TEXT("ReplayMusicMutedForStreaming"), bReplayMusicMutedForStreaming, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("MasterVolume"), MasterVolume, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("EffectsVolume"), EffectsVolume, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("InterfaceVolume"), InterfaceVolume, GGameUserSettingsIni);
@@ -601,6 +602,12 @@ void UFlickGameInstance::SetCameraShakeIntensity(const float Intensity)
 	SaveFrontendSettings();
 }
 
+void UFlickGameInstance::SetReplayMusicMutedForStreaming(const bool bMuted)
+{
+	bReplayMusicMutedForStreaming = bMuted;
+	SaveFrontendSettings();
+}
+
 void UFlickGameInstance::SetMasterVolume(const float Volume)
 {
 	MasterVolume = FMath::Clamp(Volume, 0.0f, 1.0f);
@@ -755,6 +762,7 @@ void UFlickGameInstance::SaveFrontendSettings() const
 	GConfig->SetBool(FlickSettingsSection, TEXT("ControlOverviewEnabled"), bControlOverviewEnabled, GGameUserSettingsIni);
 	GConfig->SetInt(FlickSettingsSection, TEXT("BotDifficulty"), static_cast<int32>(BotDifficulty), GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("CameraShakeIntensity"), CameraShakeIntensity, GGameUserSettingsIni);
+	GConfig->SetBool(FlickSettingsSection, TEXT("ReplayMusicMutedForStreaming"), bReplayMusicMutedForStreaming, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("MasterVolume"), MasterVolume, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("EffectsVolume"), EffectsVolume, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("InterfaceVolume"), InterfaceVolume, GGameUserSettingsIni);

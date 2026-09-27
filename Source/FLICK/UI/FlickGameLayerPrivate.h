@@ -6,6 +6,7 @@
 
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Core/FlickCosmeticCatalog.h"
+#include "Core/FlickChallengeCatalog.h"
 #include "Core/FlickControlBindings.h"
 #include "Core/FlickVisualSettings.h"
 #include "Core/FlickRankRules.h"
@@ -33,6 +34,7 @@
 #include "UI/FlickHUD.h"
 #include "UI/FlickLogoWidget.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SInputKeySelector.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -119,6 +121,12 @@ namespace
 		return FMath::Clamp((16.0f / 9.0f) / Aspect, 0.78f, 1.0f);
 	}
 
+	float GetMainMenuDiagonalBottomEdgeX(const FVector2D& LocalSize)
+	{
+		const float DesignWidth = FMath::Min(LocalSize.X, LocalSize.Y * (16.0f / 9.0f));
+		return DesignWidth * 0.395f * GetMainMenuColumnScale();
+	}
+
 	float GetDisplayStatValue(const FFlickPieceDisplayStats& Stats, const int32 StatIndex)
 	{
 		switch (StatIndex)
@@ -200,7 +208,7 @@ namespace
 			const float DesignWidth = FMath::Min(LocalSize.X, LocalSize.Y * (16.0f / 9.0f));
 			const float ColumnScale = GetMainMenuColumnScale();
 			const float TopEdgeX = DesignWidth * 0.345f * ColumnScale;
-			const float BottomEdgeX = DesignWidth * 0.395f * ColumnScale;
+			const float BottomEdgeX = GetMainMenuDiagonalBottomEdgeX(LocalSize);
 			// Slate custom vertices are not MSAA'd. Evaluate the diagonal's
 			// signed-distance coverage in screen pixels instead of ending a pair of
 			// triangles at an opaque, stair-stepped edge. Multiple narrow bands

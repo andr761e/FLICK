@@ -244,59 +244,6 @@ void AFlickGameMode::PlayMenuSound(const bool bConfirm) const
 	}
 }
 
-void AFlickGameMode::ToggleVSync()
-{
-	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
-	{
-		Settings->SetVSyncEnabled(!Settings->IsVSyncEnabled());
-	}
-}
-
-void AFlickGameMode::CycleWindowMode(const int32 Direction)
-{
-	UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
-	if (!Settings)
-	{
-		return;
-	}
-
-	// FLICK is presented as a fullscreen title. Borderless fullscreen adapts to
-	// ultrawide and unusual desktop resolutions without a disruptive mode switch.
-	Settings->SetFullscreenMode(EWindowMode::WindowedFullscreen);
-}
-
-void AFlickGameMode::CycleResolution(const int32 Direction)
-{
-	UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
-	if (!Settings)
-	{
-		return;
-	}
-
-	const TArray<FIntPoint> Resolutions = {
-		FIntPoint(1280, 720),
-		FIntPoint(1600, 900),
-		FIntPoint(1920, 1080),
-		FIntPoint(2560, 1440)
-	};
-	int32 CurrentIndex = Resolutions.IndexOfByKey(Settings->GetScreenResolution());
-	CurrentIndex = CurrentIndex == INDEX_NONE ? 0 : CurrentIndex;
-	const int32 Step = Direction < 0 ? -1 : 1;
-	Settings->SetScreenResolution(Resolutions[(CurrentIndex + Step + Resolutions.Num()) % Resolutions.Num()]);
-}
-
-void AFlickGameMode::ApplyDisplaySettings()
-{
-	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
-	{
-		Settings->SetFullscreenMode(EWindowMode::WindowedFullscreen);
-		Settings->SetScreenResolution(Settings->GetDesktopResolution());
-		Settings->ApplySettings(false);
-		Settings->SaveSettings();
-		FlickVisualSettings::ApplySaved();
-	}
-}
-
 AFlickGameState* AFlickGameMode::GetFlickGameState() const
 {
 	return GetGameState<AFlickGameState>();

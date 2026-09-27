@@ -14,8 +14,10 @@ class AFlickPlayerState;
 class UFlickRankingSubsystem;
 class UFlickSessionSubsystem;
 class SWidget;
+class SVerticalBox;
 struct FSlateBrush;
 struct FFlickPlayerMatchStats;
+struct FFlickProfileStats;
 
 enum class EFlickPlayPlaylist : uint8
 {
@@ -50,6 +52,7 @@ enum class EFlickSettingsTab : uint8
 	Interface,
 	Sound,
 	Display,
+	StreamSafe,
 	Controls
 };
 
@@ -69,6 +72,13 @@ public:
 private:
 	TSharedRef<SWidget> BuildMainMenu();
 	TSharedRef<SWidget> BuildMainMenuFooter();
+	TSharedRef<SWidget> BuildChallengePreview();
+	TSharedRef<SWidget> BuildChallengesPanel();
+	TSharedRef<SWidget> BuildChallengeRow(int32 ChallengeIndex, bool bCompact);
+	void RefreshChallengePreview();
+	FFlickProfileStats GetChallengeStats() const;
+	void RefreshDisplayOptions();
+	void ApplyPendingDisplaySettings();
 	EFlickLineupPreset GetDisplayedLoadoutPreset() const;
 	EFlickPieceArchetype GetDisplayedLoadoutPiece(int32 SlotIndex) const;
 	void SetDisplayedLoadoutPiece(int32 SlotIndex, EFlickPieceArchetype Archetype);
@@ -252,6 +262,19 @@ private:
 	bool bSocialOfflineExpanded = true;
 	bool bSocialRecentExpanded = true;
 	TSharedPtr<SVerticalBox> SocialPlayerList;
+	TSharedPtr<SBox> InvitePromptWidget;
+	TSharedPtr<SBox> MainMenuPartyTray;
+	TSharedPtr<SWidget> MainMenuDiagonalPanel;
+	TSharedPtr<SVerticalBox> ChallengePreviewRows;
+	bool bChallengesOpen = false;
+	int32 SelectedChallengeCategory = 0;
+	uint32 LastChallengePreviewSignature = 0;
+	float InvitePromptElapsed = 0.0f;
+	bool bInvitePromptWasVisible = false;
+	float PartyTrayElapsed = 0.0f;
+	bool bPartyTrayWasVisible = false;
+	bool bInvitePromptPreview = false;
+	bool bPartyTrayPreview = false;
 	int32 CachedSocialFriendCount = INDEX_NONE;
 	int32 CachedSocialRecentCount = INDEX_NONE;
 	bool bStartupOverlayVisible = false;
@@ -272,6 +295,15 @@ private:
 	int32 SelectedLockerCategory = 0;
 	TArray<int32> SelectedPuckSkins;
 	EFlickSettingsTab SelectedSettingsTab = EFlickSettingsTab::GameFeel;
+	TArray<TSharedPtr<FIntPoint>> ResolutionOptions;
+	TArray<TSharedPtr<int32>> WindowModeOptions;
+	TArray<TSharedPtr<int32>> CameraShakeOptions;
+	TArray<TSharedPtr<int32>> FrameLimitOptions;
+	FIntPoint PendingResolution = FIntPoint::ZeroValue;
+	int32 PendingWindowMode = 1; // 0 fullscreen, 1 borderless, 2 windowed.
+	int32 PendingFrameLimit = 0; // Zero is uncapped.
+	bool bPendingVSync = false;
+	bool bDisplayOptionsInitialized = false;
 	FString ControlBindingMessage;
 	// Remote party members do not own the authoritative GameMode. Their
 	// non-gameplay frontend navigation therefore remains local to their Slate UI.

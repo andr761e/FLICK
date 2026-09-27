@@ -227,9 +227,6 @@ public:
 	float GetShotMouseSensitivity() const;
 	float GetGameplayCameraSensitivity() const;
 	FString GetClassName(EFlickLineupPreset Preset) const;
-	bool IsVSyncEnabled() const;
-	FString GetWindowModeLabel() const;
-	FString GetResolutionLabel() const;
 
 	void SelectMatchVariant(EFlickMatchVariant Variant);
 	void OpenModeSelect();
@@ -311,10 +308,6 @@ public:
 	UFlickSessionSubsystem* GetFlickSessionSubsystem() const;
 	UFlickMatchmakingCoordinatorSubsystem* GetFlickMatchmakingCoordinatorSubsystem() const;
 	UFlickRankingSubsystem* GetFlickRankingSubsystem() const;
-	void ToggleVSync();
-	void CycleWindowMode(int32 Direction);
-	void CycleResolution(int32 Direction);
-	void ApplyDisplaySettings();
 
 	UFUNCTION(BlueprintCallable, Category = "FLICK|Match")
 	void RestartMatch();

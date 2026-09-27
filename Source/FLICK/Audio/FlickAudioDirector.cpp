@@ -182,6 +182,11 @@ void AFlickAudioDirector::PlayRoundResult(
 void AFlickAudioDirector::PlayReplayMusic(const float Duration, const EFlickTeam WinningTeam)
 {
 	StopReplayMusic();
+	const UFlickGameInstance* Settings = Cast<UFlickGameInstance>(GetGameInstance());
+	if (Settings && Settings->IsReplayMusicMutedForStreaming())
+	{
+		return;
+	}
 	const float MixedVolume = 0.72f * GetEffectsVolume();
 	if (MixedVolume <= KINDA_SMALL_NUMBER)
 	{

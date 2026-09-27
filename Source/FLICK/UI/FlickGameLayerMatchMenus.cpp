@@ -594,8 +594,10 @@ TSharedRef<SWidget> SFlickGameLayer::MakeToggleRow(
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(13, true)).ColorAndOpacity(FLinearColor::White)]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				SNew(SBox).WidthOverride(74.0f).HeightOverride(32.0f)
+				SNew(SBox).WidthOverride(26.0f).HeightOverride(26.0f)
 				[
+					SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline).Padding(1.0f)
+					[
 					SNew(SCheckBox)
 					.Style(&ToggleStyle)
 					.IsChecked(State)
@@ -603,8 +605,9 @@ TSharedRef<SWidget> SFlickGameLayer::MakeToggleRow(
 					.HAlign(HAlign_Center)
 					[
 						SNew(STextBlock)
-						.Text_Lambda([State]() { return FText::FromString(State.Get() == ECheckBoxState::Checked ? TEXT("ON") : TEXT("OFF")); })
-						.Font(UiFont(10, true)).ColorAndOpacity_Lambda([State]() { return State.Get() == ECheckBoxState::Checked ? Ink : Paper; })
+						.Text_Lambda([State]() { return FText::FromString(State.Get() == ECheckBoxState::Checked ? TEXT("\u2713") : TEXT("")); })
+						.Font(UiFont(16, true)).ColorAndOpacity(Ink)
+					]
 					]
 				]
 			]

@@ -94,6 +94,7 @@ public:
 	bool IsControlOverviewEnabled() const { return bControlOverviewEnabled; }
 	EFlickBotDifficulty GetBotDifficulty() const { return BotDifficulty; }
 	float GetCameraShakeIntensity() const { return CameraShakeIntensity; }
+	bool IsReplayMusicMutedForStreaming() const { return bReplayMusicMutedForStreaming; }
 	float GetMasterVolume() const { return MasterVolume; }
 	float GetEffectsVolume() const { return EffectsVolume; }
 	float GetInterfaceVolume() const { return InterfaceVolume; }
@@ -117,6 +118,7 @@ public:
 	void SetControlOverviewEnabled(bool bEnabled);
 	void SetBotDifficulty(EFlickBotDifficulty Difficulty);
 	void SetCameraShakeIntensity(float Intensity);
+	void SetReplayMusicMutedForStreaming(bool bMuted);
 	void SetMasterVolume(float Volume);
 	void SetEffectsVolume(float Volume);
 	void SetInterfaceVolume(float Volume);
@@ -155,6 +157,7 @@ private:
 	bool bControlOverviewEnabled = true;
 	EFlickBotDifficulty BotDifficulty = EFlickBotDifficulty::Normal;
 	float CameraShakeIntensity = 0.75f;
+	bool bReplayMusicMutedForStreaming = false;
 	float MasterVolume = 0.85f;
 	float EffectsVolume = 0.85f;
 	float InterfaceVolume = 0.7f;

@@ -49,7 +49,7 @@ SFlickGameLayer::SFlickGameLayer()
 		.SetCheckedImage(FSlateColorBrush(Brand))
 		.SetCheckedHoveredImage(FSlateColorBrush(Paper))
 		.SetCheckedPressedImage(FSlateColorBrush(FLinearColor(0.0f, 0.42f, 0.62f, 1.0f)))
-		.SetPadding(FMargin(12.0f, 5.0f));
+		.SetPadding(FMargin(0.0f));
 	SliderStyle = FSliderStyle()
 		.SetNormalBarImage(FSlateColorBrush(FLinearColor(0.05f, 0.1f, 0.135f, 1.0f)))
 		.SetHoveredBarImage(FSlateColorBrush(FLinearColor(0.07f, 0.18f, 0.24f, 1.0f)))
@@ -93,6 +93,9 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	}
 
 #if !UE_BUILD_SHIPPING
+	bInvitePromptPreview = FParse::Param(FCommandLine::Get(), TEXT("FlickPartyInvitePreview"));
+	bPartyTrayPreview = FParse::Param(FCommandLine::Get(), TEXT("FlickPartyTrayPreview"));
+	bChallengesOpen = FParse::Param(FCommandLine::Get(), TEXT("FlickChallengesPreview"));
 	bSocialPanelOpen = FParse::Param(FCommandLine::Get(), TEXT("FlickSocialPreview"));
 	int32 SettingsPreviewTab = 0;
 	if (FParse::Value(FCommandLine::Get(), TEXT("FlickSettingsTab="), SettingsPreviewTab))
@@ -152,16 +155,19 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		SNew(SDPIScaler)
 		.DPIScale_Lambda([this]()
 		{
-			// Slate has already converted physical pixels to local units using the
-			// viewport's UI DPI. Scaling from raw pixels applied that factor twice
-			// on high-resolution displays and made the main-menu cards overlap.
+			// At low resolutions Unreal's UI DPI already shrinks Slate. Use the
+			// available local units there so FLICK does not shrink a second time.
+			// Keep the physical-size rule at ordinary and ultrawide resolutions.
 			FVector2D ViewportSize = LayerLocalSize;
 			if (GEngine && GEngine->GameViewport)
 			{
 				FVector2D PhysicalSize;
 				GEngine->GameViewport->GetViewportSize(PhysicalSize);
-				ViewportSize.X = FMath::Min(ViewportSize.X, PhysicalSize.X);
-				ViewportSize.Y = FMath::Min(ViewportSize.Y, PhysicalSize.Y);
+				if (PhysicalSize.Y >= FlickUITheme::ReferenceHeight)
+				{
+					ViewportSize.X = FMath::Min(ViewportSize.X, PhysicalSize.X);
+					ViewportSize.Y = FMath::Min(ViewportSize.Y, PhysicalSize.Y);
+				}
 			}
 			return FMath::Max(0.25f, FMath::Min(
 				ViewportSize.Y / FlickUITheme::ReferenceHeight,
@@ -351,22 +357,28 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			]
 		]
 		+ SOverlay::Slot()
+		.HAlign(HAlign_Right)
 		.VAlign(VAlign_Bottom)
+		.Padding(0.0f, 0.0f, 26.0f, 42.0f)
 		[
-			BuildMainMenuFooter()
-		]
-		+ SOverlay::Slot()
-		.HAlign(HAlign_Center)
-		.VAlign(VAlign_Top)
-		.Padding(0.0f, 84.0f, 0.0f, 0.0f)
-		[
-			SNew(SBox).WidthOverride(400.0f)
+			SAssignNew(InvitePromptWidget, SBox).WidthOverride(376.0f)
 			.Visibility_Lambda([this]()
 			{
 				const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
-				return Sessions && Sessions->HasPendingPartyInvite() ? EVisibility::Visible : EVisibility::Collapsed;
+				return (Sessions && Sessions->HasPendingPartyInvite()) || bInvitePromptPreview ? EVisibility::Visible : EVisibility::Collapsed;
+			})
+			.RenderTransform_Lambda([this]()
+			{
+				const float Alpha = FMath::Clamp(InvitePromptElapsed / 0.42f, 0.0f, 1.0f);
+				const float Eased = 1.0f - FMath::Pow(1.0f - Alpha, 3.0f);
+				return FSlateRenderTransform(FVector2D(0.0f, (1.0f - Eased) * 154.0f));
 			})
 			[BuildPartyInvitePrompt()]
+		]
+		+ SOverlay::Slot()
+		.VAlign(VAlign_Bottom)
+		[
+			BuildMainMenuFooter()
 		]
 		]
 		]
@@ -377,23 +389,31 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 TSharedRef<SWidget> SFlickGameLayer::BuildPartyInvitePrompt()
 {
-	return SNew(SFlickAngularBorder)
-		.BackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 248)))
+	return SNew(SFlickMainMenuPanel)
+		.BackgroundColor(FLinearColor::FromSRGBColor(FColor(11, 22, 25, 250)))
 		.AccentColor(Brand)
-		.UseAccentForOutline(false)
-		.CutSize(10.0f)
-		.BorderWidth(1.2f)
-		.Padding(FMargin(17.0f, 13.0f))
+		.CutSize(12.0f)
+		.BorderWidth(1.3f)
+		.Padding(FMargin(16.0f, 12.0f))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
-			[SNew(STextBlock).Text(FText::FromString(TEXT("PARTY INVITE  //  STEAM"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 11.0f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 8.0f, 0.0f)
+				[SNew(SFlickMainMenuIcon).Icon(EFlickMainMenuIcon::Social).Color(Brand)]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+				[SNew(STextBlock).Text(FText::FromString(TEXT("PARTY INVITE  //  STEAM"))).Font(UiFont(10, true)).ColorAndOpacity(Brand)]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
 			[SNew(STextBlock).Text_Lambda([this]()
 			{
 				const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
-				return FText::FromString(Sessions ? FString::Printf(TEXT("%s invited you to a party"), *Sessions->GetPendingPartyInviteName()) : FString());
-			}).Font(UiFont(15, true)).ColorAndOpacity(Paper)]
+				return FText::FromString(Sessions && Sessions->HasPendingPartyInvite()
+					? Sessions->GetPendingPartyInviteName() : TEXT("RIVAL PLAYER"));
+			}).Font(UiFont(17, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 11.0f)
+			[SNew(STextBlock).Text(FText::FromString(TEXT("INVITED YOU TO JOIN THEIR PARTY"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
 			+ SVerticalBox::Slot().AutoHeight()
 			[
 				SNew(SHorizontalBox)
@@ -526,6 +546,17 @@ void SFlickGameLayer::Tick(
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 	ViewportLocalSize = AllottedGeometry.GetLocalSize();
 	LayerLocalSize = FlickPresentationFrame::GetContainedSize(ViewportLocalSize);
+	const UFlickSessionSubsystem* InviteSessions = GetDisplayedSessionSubsystem();
+	const bool bInviteVisible = (InviteSessions && InviteSessions->HasPendingPartyInvite()) || bInvitePromptPreview;
+	InvitePromptElapsed = bInviteVisible
+		? (bInvitePromptWasVisible ? InvitePromptElapsed + FMath::Max(0.0f, InDeltaTime) : 0.0f)
+		: 0.0f;
+	bInvitePromptWasVisible = bInviteVisible;
+	if (InvitePromptWidget.IsValid())
+	{
+		const float Alpha = FMath::Clamp(InvitePromptElapsed / 0.26f, 0.0f, 1.0f);
+		InvitePromptWidget->SetRenderOpacity(0.35f + 0.65f * Alpha);
+	}
 	const bool bFooterVisible = GetScreenVisibility(EFlickFrontendScreen::MainMenu) != EVisibility::Collapsed;
 	if (bFooterVisible)
 	{
@@ -536,6 +567,31 @@ void SFlickGameLayer::Tick(
 			: 0.0;
 	}
 	bFooterTickerWasVisible = bFooterVisible;
+	const bool bPartyTrayVisible = bFooterVisible && (IsDisplayedPartyActive() || bPartyTrayPreview);
+	PartyTrayElapsed = bPartyTrayVisible
+		? (bPartyTrayWasVisible ? PartyTrayElapsed + FMath::Max(0.0f, InDeltaTime) : 0.0f)
+		: 0.0f;
+	bPartyTrayWasVisible = bPartyTrayVisible;
+	if (bFooterVisible && ChallengePreviewRows.IsValid())
+	{
+		const FFlickProfileStats Stats = GetChallengeStats();
+		uint32 Signature = GetTypeHash(Stats.MatchesPlayed);
+		Signature = HashCombine(Signature, GetTypeHash(Stats.Wins));
+		Signature = HashCombine(Signature, GetTypeHash(Stats.Points));
+		Signature = HashCombine(Signature, GetTypeHash(Stats.Knockouts));
+		Signature = HashCombine(Signature, GetTypeHash(Stats.DoubleKnockouts));
+		Signature = HashCombine(Signature, GetTypeHash(Stats.Shots));
+		if (Signature != LastChallengePreviewSignature)
+		{
+			LastChallengePreviewSignature = Signature;
+			RefreshChallengePreview();
+		}
+	}
+	if (MainMenuPartyTray.IsValid())
+	{
+		const float Alpha = FMath::Clamp(PartyTrayElapsed / 0.24f, 0.0f, 1.0f);
+		MainMenuPartyTray->SetRenderOpacity(0.35f + 0.65f * Alpha);
+	}
 	if (bStartupOverlayVisible)
 	{
 		StartupOverlayElapsed += InDeltaTime;
