@@ -287,6 +287,7 @@ public:
 	void StartNextRound();
 	void ReturnToLoadout();
 	void TogglePauseMenu();
+	bool CanPauseCurrentMatch() const;
 	void OpenSettings();
 	void CloseSettings();
 	void ReturnToMainMenu();

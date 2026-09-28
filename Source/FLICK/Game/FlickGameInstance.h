@@ -73,6 +73,13 @@ struct FFlickProfileStats
 	int32 GetAccoladeCount(EFlickAccolade Accolade) const;
 };
 
+enum class EFlickProfileStatsView : uint8
+{
+	Total,
+	Casual,
+	Competitive
+};
+
 UCLASS()
 class FLICK_API UFlickGameInstance : public UGameInstance
 {
@@ -106,6 +113,7 @@ public:
 	float GetGameplayCameraFieldOfView() const { return GameplayCameraFieldOfView; }
 	FString GetClassName(EFlickLineupPreset Preset) const;
 	const FFlickProfileStats& GetProfileStats() const { return ProfileStats; }
+	const FFlickProfileStats& GetProfileStatsForView(EFlickProfileStatsView View) const;
 	const TArray<FFlickProfileMatchRecord>& GetRecentMatches() const { return RecentMatches; }
 
 	void SetSelectedMatchVariant(EFlickMatchVariant Variant);
@@ -139,7 +147,8 @@ public:
 		bool bDraw,
 		EFlickMatchVariant Variant,
 		int32 PlayersPerTeam,
-		bool bRanked);
+		bool bRanked,
+		bool bMatchmade);
 	void SaveFrontendSettings() const;
 
 private:
@@ -169,6 +178,8 @@ private:
 	float GameplayCameraFieldOfView = 49.2f;
 	TArray<FString> ClassNames;
 	FFlickProfileStats ProfileStats;
+	FFlickProfileStats CasualProfileStats;
+	FFlickProfileStats CompetitiveProfileStats;
 	TArray<FFlickProfileMatchRecord> RecentMatches;
 	bool bStartupLoadingScreenConfigured = false;
 	bool bStartupPresentationComplete = false;

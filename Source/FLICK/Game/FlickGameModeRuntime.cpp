@@ -1,5 +1,6 @@
 #include "Game/FlickGameModePrivate.h"
 #include "Core/FlickVisualSettings.h"
+#include "Core/FlickPlaylistRules.h"
 
 using namespace FlickGameModePrivate;
 
@@ -66,17 +67,42 @@ void AFlickGameMode::ReturnToLoadout()
 	OpenLoadout();
 }
 
+bool AFlickGameMode::CanPauseCurrentMatch() const
+{
+	if (!GetWorld())
+	{
+		return false;
+	}
+	int32 HumanPlayers = 0;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (It->Get())
+		{
+			++HumanPlayers;
+		}
+	}
+	return FlickPlaylistRules::CanPauseWorld(
+		bTrainingMode, GetNetMode() == NM_Standalone, bPrivateMatchActive,
+		bMatchmakingRequested, GetNetMode() == NM_DedicatedServer, HumanPlayers);
+}
+
 void AFlickGameMode::TogglePauseMenu()
 {
 	if (FrontendScreen == EFlickFrontendScreen::Playing)
 	{
 		ClearControllerAiming();
 		FrontendScreen = EFlickFrontendScreen::Paused;
-		UGameplayStatics::SetGamePaused(this, true);
+		if (CanPauseCurrentMatch())
+		{
+			UGameplayStatics::SetGamePaused(this, true);
+		}
 	}
 	else if (FrontendScreen == EFlickFrontendScreen::Paused)
 	{
-		UGameplayStatics::SetGamePaused(this, false);
+		if (UGameplayStatics::IsGamePaused(this))
+		{
+			UGameplayStatics::SetGamePaused(this, false);
+		}
 		FrontendScreen = EFlickFrontendScreen::Playing;
 	}
 }

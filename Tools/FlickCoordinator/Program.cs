@@ -946,7 +946,7 @@ sealed class CoordinatorState
             logger.LogError("Unreal server launch path is invalid. Host={Host}, Project={Project}", settings.GetServerHostPath(), settings.ProjectPath);
             return false;
         }
-        var map = $"/Engine/Maps/Templates/OpenWorld?FlickNetworkMatch?FlickMatchmaking?FlickPlayersPerTeam={request.PlayersPerTeam}?FlickVariant={request.Variant}";
+        var map = $"/Engine/Maps/Entry?FlickNetworkMatch?FlickMatchmaking?FlickPlayersPerTeam={request.PlayersPerTeam}?FlickVariant={request.Variant}";
         if (request.Ranked) map += "?FlickRanked";
         map += $"?FlickCoordinatorMatchId={match.MatchId}";
         var packagedServer = !string.IsNullOrWhiteSpace(settings.ServerExecutablePath);
@@ -967,6 +967,7 @@ sealed class CoordinatorState
         if (!packagedServer)
         {
             start.ArgumentList.Add("-server");
+            start.ArgumentList.Add("-DDC-ForceMemoryCache");
         }
         start.ArgumentList.Add("-unattended");
         start.ArgumentList.Add("-NoSplash");

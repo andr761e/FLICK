@@ -289,6 +289,7 @@ private:
 	int32 SelectedPlayFormat = 0;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;
 	EFlickProfileTab SelectedProfileTab = EFlickProfileTab::Stats;
+	int32 SelectedProfileStatsView = 0; // Total, Casual, Competitive.
 	int32 SelectedBannerStyle = 0;
 	int32 SelectedBannerTag = 0;
 	int32 SelectedAvatarBorder = 0;

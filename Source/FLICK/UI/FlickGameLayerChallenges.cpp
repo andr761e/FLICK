@@ -179,7 +179,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengesPanel()
 								{
 									return FText::FromString(SelectedChallengeCategory == static_cast<int32>(ECategory::Events)
 										? TEXT("LIMITED EVENTS  //  NONE ACTIVE")
-										: TEXT("PERMANENT CAREER PROGRESS  //  ALL MODES"));
+										: TEXT("PERMANENT CAREER PROGRESS  //  CASUAL + COMPETITIVE"));
 								}).Font(UiFont(9, true)).ColorAndOpacity(Cyan)]
 								+ SVerticalBox::Slot().FillHeight(1.0f)
 								[SNew(SScrollBox) + SScrollBox::Slot()[ChallengeRows]]

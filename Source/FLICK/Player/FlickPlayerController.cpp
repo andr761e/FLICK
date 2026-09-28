@@ -14,6 +14,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
+#include "Core/FlickPlaylistRules.h"
 #include "Online/FlickSessionSubsystem.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
@@ -347,6 +348,17 @@ void AFlickPlayerController::UpdateCareerStatsTracking(const AFlickGameState* Fl
 	{
 		return;
 	}
+	// Training, private matches, and locally hosted sessions never advance the
+	// playlist career or its challenges. Matchmaking state is replicated by the
+	// authority and remains active through the completed series.
+	if (!FlickPlaylistRules::CountsForCareer(
+		FlickGameState->bSeriesComplete,
+		FlickGameState->bMatchmakingLobby,
+		FlickGameState->bPrivateMatchActive))
+	{
+		bCareerStatsRecordedForCurrentSeries = true;
+		return;
+	}
 
 	const AFlickPlayerState* LocalPlayerState = GetPlayerState<AFlickPlayerState>();
 	if (!LocalPlayerState
@@ -377,7 +389,8 @@ void AFlickPlayerController::UpdateCareerStatsTracking(const AFlickGameState* Fl
 		FlickGameState->bDraw,
 		FlickGameState->ActiveMatchVariant,
 		FlickGameState->PlayersPerTeam,
-		FlickGameState->bRankedMatch);
+		FlickGameState->bRankedMatch,
+		FlickGameState->bMatchmakingLobby);
 	bCareerStatsRecordedForCurrentSeries = true;
 }
 

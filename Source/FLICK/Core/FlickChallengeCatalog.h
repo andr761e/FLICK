@@ -17,7 +17,7 @@ namespace FlickChallengeCatalog
 	};
 
 	inline constexpr FDefinition Challenges[] = {
-		{TEXT("FIRST WHISTLE"), TEXT("Complete a match in any mode"), ECategory::FirstFlicks, EMetric::Matches, 1},
+		{TEXT("FIRST WHISTLE"), TEXT("Complete a Casual or Competitive match"), ECategory::FirstFlicks, EMetric::Matches, 1},
 		{TEXT("FIND YOUR ANGLE"), TEXT("Take 25 shots"), ECategory::FirstFlicks, EMetric::Shots, 25},
 		{TEXT("ON THE BOARD"), TEXT("Earn 250 career points"), ECategory::FirstFlicks, EMetric::Points, 250},
 		{TEXT("FIRST CONTACT"), TEXT("Knock out 5 opposing pucks"), ECategory::Precision, EMetric::Knockouts, 5},

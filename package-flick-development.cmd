@@ -8,7 +8,9 @@ if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.8"
 set "RUN_UAT=%ENGINE_ROOT%\Engine\Build\BatchFiles\RunUAT.bat"
 set "OUTPUT=%PROJECT_ROOT%Builds\Development"
 set "STAGING_ROOT=%FLICK_STAGING_DIR%"
-if "%STAGING_ROOT%"=="" set "STAGING_ROOT=%LOCALAPPDATA%\FLICK\StagedBuilds"
+if "%STAGING_ROOT%"=="" set "STAGING_ROOT=%PROJECT_ROOT%Saved\StagedBuilds"
+set "uebp_LogFolder=%PROJECT_ROOT%Saved\AutomationToolLogs"
+set "uebp_FinalLogFolder=%uebp_LogFolder%"
 set "STEAM_APP_ID=%PROJECT_ROOT%Build\Steam\steam_appid.txt"
 
 if not exist "%RUN_UAT%" (
@@ -40,6 +42,7 @@ call "%RUN_UAT%" BuildCookRun ^
     -platform=Win64 ^
     -clientconfig=Development ^
     -build ^
+    -nocompileeditor ^
     -cook ^
     -map=/Engine/Maps/Templates/OpenWorld ^
     -stage ^
@@ -50,7 +53,7 @@ call "%RUN_UAT%" BuildCookRun ^
     -archivedirectory="%OUTPUT%" ^
     -utf8output
 
-if errorlevel 1 (
+if not "%errorlevel%"=="0" (
     echo.
     echo FLICK packaging failed. Review the Unreal Automation Tool errors above.
     exit /b 1

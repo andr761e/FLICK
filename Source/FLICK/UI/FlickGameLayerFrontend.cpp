@@ -658,7 +658,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 						{
 							return FText::AsNumber(0);
 						}
-						const FFlickProfileStats& Stats = FlickGameInstance->GetProfileStats();
+						const FFlickProfileStats& Stats = FlickGameInstance->GetProfileStatsForView(
+							static_cast<EFlickProfileStatsView>(SelectedProfileStatsView));
 						switch (StatIndex)
 						{
 						case 0: return FText::AsNumber(Stats.MatchesPlayed);
@@ -712,10 +713,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 					{
 						const UFlickGameInstance* FlickGameInstance = PlayerController.IsValid()
 							? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr;
-						const FFlickProfileStats Stats = FlickGameInstance ? FlickGameInstance->GetProfileStats() : FFlickProfileStats();
+						const FFlickProfileStats Stats = FlickGameInstance
+							? FlickGameInstance->GetProfileStatsForView(static_cast<EFlickProfileStatsView>(SelectedProfileStatsView))
+							: FFlickProfileStats();
 						const int32 WinRate = Stats.MatchesPlayed > 0
 							? FMath::RoundToInt(100.0f * Stats.Wins / static_cast<float>(Stats.MatchesPlayed)) : 0;
-						return FText::FromString(FString::Printf(TEXT("ALL MODES  //  %d%% WIN RATE"), WinRate));
+						static const TCHAR* Names[] = {TEXT("TOTAL"), TEXT("CASUAL"), TEXT("COMPETITIVE")};
+						return FText::FromString(FString::Printf(TEXT("%s  //  %d%% WIN RATE"),
+							Names[FMath::Clamp(SelectedProfileStatsView, 0, 2)], WinRate));
 					})
 					.Font(UiFont(9, true))
 					.ColorAndOpacity(Brand)
@@ -723,10 +728,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 11.0f, 0.0f, 0.0f)
 			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 0.0f)
+				[MakeMenuButton(TEXT("TOTAL"), FOnClicked::CreateLambda([this]() { SelectedProfileStatsView = 0; return FReply::Handled(); }))]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 0.0f)
+				[MakeMenuButton(TEXT("CASUAL"), FOnClicked::CreateLambda([this]() { SelectedProfileStatsView = 1; return FReply::Handled(); }))]
+				+ SHorizontalBox::Slot().AutoWidth()
+				[MakeMenuButton(TEXT("COMPETITIVE"), FOnClicked::CreateLambda([this]() { SelectedProfileStatsView = 2; return FReply::Handled(); }))]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 11.0f, 0.0f, 0.0f)
+			[
 				SNew(SUniformGridPanel)
 				.SlotPadding(FMargin(6.0f))
 				+ SUniformGridPanel::Slot(0, 0)[MakeStatCell(TEXT("MATCHES PLAYED"), TEXT("COMPLETED SERIES"), 0, Cyan)]
-				+ SUniformGridPanel::Slot(1, 0)[MakeStatCell(TEXT("MATCH WINS"), TEXT("ALL PLAYLISTS"), 1, FLinearColor(0.26f, 0.9f, 0.58f, 1.0f))]
+				+ SUniformGridPanel::Slot(1, 0)[MakeStatCell(TEXT("MATCH WINS"), TEXT("ELIGIBLE PLAYLISTS"), 1, FLinearColor(0.26f, 0.9f, 0.58f, 1.0f))]
 				+ SUniformGridPanel::Slot(2, 0)[MakeStatCell(TEXT("CAREER POINTS"), TEXT("SHOTS, IMPACTS AND KOS"), 2, Orange)]
 				+ SUniformGridPanel::Slot(0, 1)[MakeStatCell(TEXT("KNOCKOUTS"), TEXT("OPPONENT PUCKS REMOVED"), 3, Cyan)]
 				+ SUniformGridPanel::Slot(1, 1)[MakeStatCell(TEXT("DOUBLE KOS"), TEXT("TWO PUCKS IN ONE SHOT"), 4, Orange)]
