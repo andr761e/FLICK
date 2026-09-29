@@ -2,6 +2,7 @@
 #include "Arena/FlickArenaLighting.h"
 #include "Core/FlickModeRules.h"
 #include "Core/FlickControlBindings.h"
+#include "Core/FlickCosmeticCatalog.h"
 
 #include "Core/FlickLog.h"
 #include "DrawDebugHelpers.h"
@@ -120,6 +121,7 @@ void AFlickPlayerController::BeginPlayingState()
 void AFlickPlayerController::PostSeamlessTravel()
 {
 	Super::PostSeamlessTravel();
+	bPuckSkinsSubmitted = false;
 
 	if (!IsGameplayActive())
 	{
@@ -199,6 +201,8 @@ void AFlickPlayerController::RefreshLocalLighting()
 void AFlickPlayerController::PlayerTick(const float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+	if (IsLocalController() && !bPuckSkinsSubmitted && GetPlayerState<AFlickPlayerState>()) SubmitLocalPuckSkins();
+	InspectedPiece.Reset();
 	const AFlickGameState* NetworkState = GetFlickGameState();
 	// Remote players own their light rig locally. Only update on presentation changes,
 	// never scan or recreate fixtures each frame, and never send preferences to the host.
@@ -998,7 +1002,13 @@ void AFlickPlayerController::UpdatePredictedContact()
 
 void AFlickPlayerController::UpdateHoveredPiece()
 {
-	AFlickPiece* NewHoveredPiece = FindPieceUnderCursor();
+	if (bCinematicReplayPresentationActive) { ApplyHoveredPiece(nullptr); return; }
+	ApplyHoveredPiece(FindPieceUnderCursor());
+}
+
+void AFlickPlayerController::ApplyHoveredPiece(AFlickPiece* NewHoveredPiece)
+{
+	InspectedPiece = NewHoveredPiece && NewHoveredPiece->IsActive() ? NewHoveredPiece : nullptr;
 	const AFlickGameMode* FlickGameMode = GetFlickGameMode();
 	const bool bCanEditHoveredPiece = FlickGameMode
 		&& FlickGameMode->IsTrainingEditMode()
@@ -1087,6 +1097,17 @@ EFlickTeam AFlickPlayerController::GetLocalTeam() const
 	return FlickPlayerState ? FlickPlayerState->GetTeam() : EFlickTeam::None;
 }
 
+bool AFlickPlayerController::OwnsPieceLocally(const AFlickPiece* Piece) const
+{
+	const AFlickGameState* State = GetFlickGameState();
+	const AFlickPlayerState* Local = GetPlayerState<AFlickPlayerState>();
+	if (!Piece || !State || !Local || Piece->GetTeam() == EFlickTeam::None) return false;
+	return State->bPrivateMatchActive
+		? Local->ControlsPrivateSlot(Piece->GetTeam(), Piece->GetOwningPlayerSlot())
+		: Local->GetTeam() == Piece->GetTeam()
+			&& Local->GetTeamPlayerSlot() == Piece->GetOwningPlayerSlot();
+}
+
 bool AFlickPlayerController::CanSelectPieceLocally(const AFlickPiece* Piece) const
 {
 	if (const AFlickGameMode* FlickGameMode = GetFlickGameMode())
@@ -1122,6 +1143,27 @@ bool AFlickPlayerController::CanSelectPieceLocally(const AFlickPiece* Piece) con
 			FlickGameState->CurrentTeam, FlickGameState->CurrentTeamPlayerSlot)
 		: LocalPlayerState->GetTeam() == FlickGameState->CurrentTeam
 			&& LocalPlayerState->GetTeamPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot;
+}
+
+void AFlickPlayerController::SubmitLocalPuckSkins()
+{
+	if (!IsLocalController()) return;
+	ServerSetPuckSkins(FlickCosmeticCatalog::LoadPuckSkins());
+	bPuckSkinsSubmitted = GetPlayerState<AFlickPlayerState>() != nullptr;
+}
+
+void AFlickPlayerController::ServerSetPuckSkins_Implementation(const TArray<int32>& Skins)
+{
+	AFlickPlayerState* State = GetPlayerState<AFlickPlayerState>();
+	if (!State || !State->SetPuckSkins(Skins)) return;
+	for (TActorIterator<AFlickPiece> It(GetWorld()); It; ++It)
+	{
+		if (State->ControlsPrivateSlot(It->GetTeam(), It->GetOwningPlayerSlot())
+			|| (State->GetTeam() == It->GetTeam() && State->GetTeamPlayerSlot() == It->GetOwningPlayerSlot()))
+		{
+			It->SetPuckSkin(State->GetPuckSkin(It->GetArchetype()));
+		}
+	}
 }
 
 bool AFlickPlayerController::IsGameplayActive() const
@@ -2014,6 +2056,14 @@ void AFlickPlayerController::ClientEndCinematicReplay_Implementation()
 
 AFlickPiece* AFlickPlayerController::FindPieceUnderCursor() const
 {
+#if !UE_BUILD_SHIPPING
+	// Exercise the real inspection/filter/UI path in offscreen presentation QA.
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickPuckHoverPreview")))
+	{
+		for (TActorIterator<AFlickPiece> It(GetWorld()); It; ++It)
+			if (It->IsActive() && It->GetTeam() != GetLocalTeam()) return *It;
+	}
+#endif
 	FHitResult HitResult;
 	if (!GetHitResultUnderCursorByChannel(
 		UEngineTypes::ConvertToTraceType(ECC_Visibility),

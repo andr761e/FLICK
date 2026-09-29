@@ -578,6 +578,9 @@ void AFlickGameMode::CloseProfile()
 {
 	if (FrontendScreen == EFlickFrontendScreen::Profile)
 	{
+		// Refresh the showcase's equipped appearance even if its puck type and
+		// party roster stayed the same while the locker was open.
+		bMenuPartyDisplayInitialized = false;
 		FrontendScreen = EFlickFrontendScreen::MainMenu;
 		SetCameraForFrontend();
 		PlayMenuSound(false);
@@ -1425,8 +1428,7 @@ bool AFlickGameMode::PlaceTrainingPuck(const FVector& WorldLocation)
 		PlacementLocation,
 		PlacementArchetype,
 		false,
-		0,
-		false);
+		0);
 	if (!Piece)
 	{
 		return false;

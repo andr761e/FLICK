@@ -34,6 +34,10 @@ public:
 	const AFlickPiece* GetSelectedPiece() const { return SelectedPiece; }
 	const FFlickLaunchResult& GetAimResult() const { return CurrentLaunchResult; }
 	bool HasAimCursorPoint() const { return bHasAimCursorPoint; }
+	AFlickPiece* GetInspectedPiece() const { return InspectedPiece.Get(); }
+	void SubmitLocalPuckSkins();
+	UFUNCTION(Server, Reliable)
+	void ServerSetPuckSkins(const TArray<int32>& Skins);
 	FVector GetAimCursorWorldPoint() const { return AimCursorWorldPoint; }
 	bool HasPredictedContact() const { return bHasPredictedContact; }
 	FVector GetPredictedContactWorldPoint() const { return PredictedContactWorldPoint; }
@@ -42,6 +46,8 @@ public:
 	bool IsScoreboardVisible() const { return bScoreboardVisible; }
 	EFlickTeam GetLocalTeam() const;
 	bool CanSelectPieceLocally(const AFlickPiece* Piece) const;
+	// Cosmetic ownership only: independent of whose turn it is.
+	bool OwnsPieceLocally(const AFlickPiece* Piece) const;
 	void RequestRestartMatch();
 	void RequestNextRound();
 	void ToggleLobbyReady();
@@ -107,6 +113,9 @@ public:
 	bool bDrawAimDebug = false;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FFlickPuckInspectionTest;
+#endif
 	void HandlePrimaryPressed();
 	void HandlePrimaryReleased();
 	void HandleCameraElevationUpPressed();
@@ -130,6 +139,7 @@ private:
 	void UpdateAimFromCursor();
 	void UpdatePredictedContact();
 	void UpdateHoveredPiece();
+	void ApplyHoveredPiece(AFlickPiece* Piece);
 	void ClearHoveredPiece();
 	void UpdateCareerStatsTracking(const AFlickGameState* FlickGameState);
 	void DrawAimDebug() const;
@@ -266,6 +276,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> HoveredPiece;
+	TWeakObjectPtr<AFlickPiece> InspectedPiece;
+	bool bPuckSkinsSubmitted = false;
 
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> PredictedContactPiece;

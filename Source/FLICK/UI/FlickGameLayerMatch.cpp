@@ -994,7 +994,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 		.HeightOverride(66.0f)
 		.Visibility_Lambda([this]()
 		{
-			return !GameMode.IsValid() || GameMode->IsControlOverviewEnabled()
+			return ShouldShowGameplayControls() && (!GameMode.IsValid() || GameMode->IsControlOverviewEnabled())
 				? EVisibility::HitTestInvisible
 				: EVisibility::Collapsed;
 		})
@@ -1118,7 +1118,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 		.HeightOverride(66.0f)
 		.Visibility_Lambda([this]()
 		{
-			return GameMode.IsValid()
+			return ShouldShowGameplayControls() && GameMode.IsValid()
 				&& GameMode->IsControlOverviewEnabled()
 				&& GameMode->CanChangeCameraView()
 				? EVisibility::HitTestInvisible

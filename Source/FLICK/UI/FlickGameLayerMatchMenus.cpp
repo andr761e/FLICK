@@ -876,6 +876,9 @@ int32 SFlickGameLayer::GetDisplayedPartyMemberCount() const
 
 EVisibility SFlickGameLayer::GetMatchHudVisibility() const
 {
+	const AFlickGameState* MenuState = GetScoreboardGameState();
+	if (MenuState && (MenuState->bPrivateMatchAssignmentActive || MenuState->bNetworkClassSelectionActive))
+		return EVisibility::Collapsed;
 	if (bReplayOverlayPreview || (PlayerController.IsValid() && PlayerController->IsCinematicReplayPresentationActive()))
 	{
 		return EVisibility::Collapsed;
@@ -898,6 +901,23 @@ EVisibility SFlickGameLayer::GetMatchHudVisibility() const
 		&& (!State->bPartyActive || State->bPrivateMatchActive)
 		? EVisibility::SelfHitTestInvisible
 		: EVisibility::Collapsed;
+}
+
+bool SFlickGameLayer::ShouldShowGameplayControls() const
+{
+	if (GetMatchHudVisibility() == EVisibility::Collapsed || bStartupOverlayVisible
+		|| bSocialPanelOpen || bChallengesOpen
+		|| (PlayerController.IsValid() && PlayerController->ShouldShowPrivateTeamMenu())
+		|| GetScoreboardVisibility() != EVisibility::Collapsed
+		|| GetRoundOverVisibility() != EVisibility::Collapsed) return false;
+	// Query the same visibility rules as the menus, including remote clients.
+	for (int32 Index = 0; Index <= static_cast<int32>(EFlickFrontendScreen::PrivateMatch); ++Index)
+	{
+		const EFlickFrontendScreen Screen = static_cast<EFlickFrontendScreen>(Index);
+		if (Screen != EFlickFrontendScreen::Playing && GetScreenVisibility(Screen) != EVisibility::Collapsed)
+			return false;
+	}
+	return true;
 }
 
 EVisibility SFlickGameLayer::GetScoreboardVisibility() const

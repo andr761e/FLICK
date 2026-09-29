@@ -560,8 +560,7 @@ void AFlickGameMode::SpawnPiecesForPlayer(const EFlickTeam Team, const int32 Pla
 				SpawnZ),
 			Archetype,
 			false,
-			PlayerSlot,
-			CurrentPlayersPerTeam > 1);
+			PlayerSlot);
 	}
 }
 

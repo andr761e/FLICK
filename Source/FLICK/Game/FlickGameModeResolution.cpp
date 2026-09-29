@@ -1,4 +1,5 @@
 #include "Game/FlickGameModePrivate.h"
+#include "Core/FlickCosmeticCatalog.h"
 
 using namespace FlickGameModePrivate;
 
@@ -1284,7 +1285,7 @@ void AFlickGameMode::CaptureTrainingResetSnapshot()
 		Snapshot.PieceId = Piece->GetPieceId();
 		Snapshot.OwningPlayerSlot = Piece->GetOwningPlayerSlot();
 		Snapshot.bBobStriker = Piece->IsBobStriker();
-		Snapshot.bShowPlayerIdentity = Piece->ShowsPlayerIdentity();
+		Snapshot.PuckSkin = Piece->GetPuckSkin();
 	}
 	bHasTrainingResetSnapshot = true;
 	UE_LOG(LogFlick, Log, TEXT("Saved training reset setup with %d pucks"), TrainingResetSnapshot.Num());
@@ -1305,12 +1306,12 @@ void AFlickGameMode::RestoreTrainingResetSnapshot()
 			Snapshot.Location,
 			Snapshot.Archetype,
 			Snapshot.bBobStriker,
-			Snapshot.OwningPlayerSlot,
-			Snapshot.bShowPlayerIdentity);
+			Snapshot.OwningPlayerSlot);
 		if (!Piece)
 		{
 			continue;
 		}
+		Piece->SetPuckSkin(Snapshot.PuckSkin);
 		if (Snapshot.bBobStriker)
 		{
 			if (Snapshot.Team == EFlickTeam::Player1)
@@ -1689,8 +1690,7 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 	const FVector& Location,
 	const EFlickPieceArchetype Archetype,
 	const bool bIsBobStriker,
-	const int32 OwningPlayerSlot,
-	const bool bShowPlayerIdentity)
+	const int32 OwningPlayerSlot)
 {
 	AFlickPiece* Piece = GetWorld()->SpawnActor<AFlickPiece>(AFlickPiece::StaticClass(), Location, FRotator::ZeroRotator);
 	if (!Piece)
@@ -1719,12 +1719,27 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 		PieceThickness * ArchetypeRules.ThicknessMultiplier,
 		Archetype,
 		bIsBobStriker,
-		OwningPlayerSlot,
-		bShowPlayerIdentity);
+		OwningPlayerSlot);
 	if (bTestArenaMode || IsBobMode())
 	{
 		Piece->EnableTestArenaVisuals();
 	}
+	int32 Skin = GetNetMode() == NM_Standalone && Team == EFlickTeam::Player1
+		? FlickCosmeticCatalog::LoadPuckSkins()[static_cast<int32>(Archetype)] : 0;
+	if (const AFlickGameState* SkinState = GetFlickGameState())
+	{
+		for (APlayerState* BaseState : SkinState->PlayerArray)
+		{
+			const AFlickPlayerState* SkinOwner = Cast<AFlickPlayerState>(BaseState);
+			if (SkinOwner && (SkinOwner->ControlsPrivateSlot(Team, OwningPlayerSlot)
+				|| (SkinOwner->GetTeam() == Team && SkinOwner->GetTeamPlayerSlot() == OwningPlayerSlot)))
+			{
+				Skin = SkinOwner->GetPuckSkin(Archetype);
+				break;
+			}
+		}
+	}
+	Piece->SetPuckSkin(Skin);
 	const AFlickGameState* State = GetFlickGameState();
 	if (bPregamePreviewActive && !(State && State->bPuckArrivalActive))
 	{

@@ -826,6 +826,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				: Category == 2 ? (Index == 1 ? Cyan : Index == 2 ? Brand : Hairline)
 				: Category == 0 ? (Index == 1 ? Orange : Index == 2 ? Cyan : Brand) : Brand;
 			const bool bWide = Category == 0 || Category == 1;
+			const int32 Columns = bWide || FlickCosmeticCatalog::IsPuckCategory(Category) ? 2 : 4;
 			const float CardWidth = bWide ? 340.0f : 166.0f;
 			const float CardHeight = bWide ? 132.0f : 168.0f;
 			TSharedRef<SWidget> Preview = SNew(SBox);
@@ -867,7 +868,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			{
 				Preview = SNew(SFlickPuckDisc)
 					.Archetype(FlickCosmeticCatalog::GetPuckArchetype(Category))
-					.TeamColor(Cyan).AccentColor(Brand).Selected(true);
+					.TeamColor(FlickCosmeticCatalog::GetPuckSkinColor(Index)).AccentColor(Brand).Selected(true);
 			}
 			TSharedRef<SButton> Button = SNew(SButton).ButtonStyle(&TransparentButtonStyle)
 				.ContentPadding(0.0f).Cursor(EMouseCursor::Hand)
@@ -879,6 +880,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 					else SelectedPuckSkins[Category - FlickCosmeticCatalog::PuckCategoryStart] = Index;
 					GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), *FlickCosmeticCatalog::GetConfigKey(Category), Index, GGameUserSettingsIni);
 					GConfig->Flush(false, GGameUserSettingsIni);
+					if (FlickCosmeticCatalog::IsPuckCategory(Category) && PlayerController.IsValid()) PlayerController->SubmitLocalPuckSkins();
 					return FReply::Handled();
 				});
 			const TWeakPtr<SButton> WeakButton = Button;
@@ -916,7 +918,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 						}).Font(UiFont(8, true)).ColorAndOpacity(Brand)]
 					]
 				]);
-			Items->AddSlot(Index % (bWide ? 2 : 4), Index / (bWide ? 2 : 4))
+			Items->AddSlot(Index % Columns, Index / Columns)
 				.Padding(0.0f, 0.0f, 8.0f, 8.0f)[Button];
 		}
 		LockerContents->AddSlot()
@@ -1039,7 +1041,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			.WidthOverride_Lambda([this]()
 			{
 				if (SelectedProfileTab != EFlickProfileTab::Customization) return 1380.0f;
-				return FlickCosmeticCatalog::IsPuckCategory(SelectedLockerCategory) ? 650.0f : 1190.0f;
+				return FlickCosmeticCatalog::IsPuckCategory(SelectedLockerCategory) ? 820.0f : 1190.0f;
 			})
 			.HeightOverride(760.0f)
 			[

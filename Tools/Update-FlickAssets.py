@@ -28,8 +28,8 @@ for importer in importers:
     # The Standard prototype provides shared materials used by the other pucks.
     # Import it first whenever any high-detail puck needs updating.
     prefixes = {
-        "Import-FlickBlueStandardPrototype.py": ("AssetDevelopment/Pucks/HighDetail/exports/Standard.fbx", "Tools/Import-FlickBlueStandardPrototype.py"),
-        "Import-FlickHighDetailPucks.py": ("AssetDevelopment/Pucks/HighDetail/", "AssetDevelopment/Pucks/PlayerIdentity/", "Tools/Import-FlickHighDetailPucks.py", "Tools/Import-FlickBlueStandardPrototype.py"),
+        "Import-FlickBlueStandardPrototype.py": ("AssetDevelopment/Pucks/ClassicBlue/exports/Standard.fbx", "Tools/Import-FlickBlueStandardPrototype.py"),
+        "Import-FlickHighDetailPucks.py": ("AssetDevelopment/Pucks/ClassicBlue/", "AssetDevelopment/Pucks/ClassicOrange/", "Tools/Import-FlickHighDetailPucks.py", "Tools/Import-FlickBlueStandardPrototype.py"),
         "Import-FlickArena.py": ("AssetDevelopment/Arena/", "Tools/Import-FlickArena.py"),
         "Import-FlickStadium.py": ("AssetDevelopment/Stadium/", "Tools/Import-FlickStadium.py"),
         "Import-FlickBobArena.py": ("AssetDevelopment/BOB Arena/", "Tools/Import-FlickBobArena.py"),
@@ -40,7 +40,7 @@ for importer in importers:
         continue
     u.log("FLICK_ASSET_UPDATE_START: " + importer)
     force_group = selection.changed is None or "Tools/" + importer in selection.changed or any(
-        name.endswith(".json") and name.startswith(prefix)
+        name.endswith(".json") and name.startswith(prefix) and not name.endswith("/ClassicOrange/set.json")
         for name in selection.changed for prefix in prefixes)
     runpy.run_path(str(path), run_name="__main__", init_globals={
         "asset_selected": (lambda _project, _source: True) if force_group else selection.selected})

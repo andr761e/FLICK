@@ -42,10 +42,15 @@ public:
 	void ClearPrivateControlledSlots();
 	bool ControlsPrivateSlot(EFlickTeam InTeam, int32 InPlayerSlot) const;
 	const TArray<int32>& GetPrivateControlledSlots() const { return PrivateControlledSlots; }
+	bool SetPuckSkins(const TArray<int32>& Skins);
+	int32 GetPuckSkin(EFlickPieceArchetype Archetype) const;
 	void SetPrivateRoleChosen(bool bInChosen);
 	bool HasChosenPrivateRole() const { return bPrivateRoleChosen; }
 
 private:
+	UPROPERTY(Replicated)
+	TArray<int32> PuckSkins;
+
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Player")
 	EFlickTeam Team = EFlickTeam::None;
 

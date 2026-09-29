@@ -15,4 +15,6 @@ namespace FlickCosmeticCatalog
 	FLICK_API FString GetCategoryName(int32 Category);
 	FLICK_API FString GetConfigKey(int32 Category);
 	FLICK_API const TArray<FString>& GetItems(int32 Category);
+	FLICK_API TArray<int32> LoadPuckSkins();
+	FLICK_API FLinearColor GetPuckSkinColor(int32 Skin);
 }

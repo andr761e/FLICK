@@ -1,4 +1,5 @@
 #include "Core/FlickCosmeticCatalog.h"
+#include "Misc/ConfigCacheIni.h"
 
 bool FlickCosmeticCatalog::IsPuckCategory(const int32 Category)
 {
@@ -51,7 +52,7 @@ const TArray<FString>& FlickCosmeticCatalog::GetItems(const int32 Category)
 		TEXT("CALCULATED CHAOS"), TEXT("ONE MORE ROUND"), TEXT("THE CLEAN SWEEP")};
 	static const TArray<FString> Borders = {TEXT("STANDARD"), TEXT("CYAN CIRCUIT"), TEXT("LIME CHAMPION"),
 		TEXT("GOLD"), TEXT("ICE"), TEXT("PURPLE CRYSTAL"), TEXT("ROBOTIC")};
-	static const TArray<FString> OriginalPuck = {TEXT("ORIGINAL")};
+	static const TArray<FString> OriginalPuck = {TEXT("CLASSIC BLUE"), TEXT("CLASSIC ORANGE")};
 	switch (Category)
 	{
 	case 0: return Banners;
@@ -59,4 +60,21 @@ const TArray<FString>& FlickCosmeticCatalog::GetItems(const int32 Category)
 	case 2: return Borders;
 	default: return OriginalPuck;
 	}
+}
+
+TArray<int32> FlickCosmeticCatalog::LoadPuckSkins()
+{
+	TArray<int32> Skins;
+	Skins.SetNumZeroed(FlickPieceArchetypeRules::ArchetypeCount);
+	for (int32 Index = 0; Index < Skins.Num(); ++Index)
+	{
+		GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), *GetConfigKey(PuckCategoryStart + Index), Skins[Index], GGameUserSettingsIni);
+		Skins[Index] = FMath::Clamp(Skins[Index], 0, 1);
+	}
+	return Skins;
+}
+
+FLinearColor FlickCosmeticCatalog::GetPuckSkinColor(const int32 Skin)
+{
+	return Skin == 1 ? FLinearColor(1.0f, .18f, .003f) : FLinearColor(0.0f, .55f, 1.0f);
 }

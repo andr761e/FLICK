@@ -6,6 +6,35 @@ namespace FlickVisualSettings
 {
 	static const TCHAR* Section = TEXT("FLICK.VisualSettings");
 	static constexpr int32 DefaultRenderScale = 110;
+	static const TCHAR* InterfaceSection = TEXT("FLICK.InterfaceSettings");
+
+	int32 GetPuckHoverSize()
+	{
+		int32 Value = 12;
+		if (GConfig) GConfig->GetInt(InterfaceSection, TEXT("PuckHoverSize"), Value, GGameUserSettingsIni);
+		return FMath::Clamp(Value, 10, 18);
+	}
+
+	void SetPuckHoverSize(int32 Size)
+	{
+		if (!GConfig) return;
+		GConfig->SetInt(InterfaceSection, TEXT("PuckHoverSize"), FMath::Clamp(Size, 10, 18), GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+
+	int32 GetPuckHoverDetail()
+	{
+		int32 Value = 3;
+		if (GConfig) GConfig->GetInt(InterfaceSection, TEXT("PuckHoverDetail"), Value, GGameUserSettingsIni);
+		return FMath::Clamp(Value, 0, 3);
+	}
+
+	void SetPuckHoverDetail(int32 Detail)
+	{
+		if (!GConfig) return;
+		GConfig->SetInt(InterfaceSection, TEXT("PuckHoverDetail"), FMath::Clamp(Detail, 0, 3), GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
 
 	bool IsFpsVisible()
 	{

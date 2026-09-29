@@ -1,4 +1,5 @@
 #include "Pieces/FlickPiece.h"
+#include "Core/FlickCosmeticCatalog.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -11,6 +12,7 @@
 #include "Engine/StaticMesh.h"
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameState.h"
+#include "Player/FlickPlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
@@ -238,22 +240,10 @@ AFlickPiece::AFlickPiece()
 	Label->SetCastShadow(false);
 	Label->SetAbsolute(false, false, true);
 	Label->SetVisibility(false);
-	PlayerLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("PlayerLabel"));
-	PlayerLabel->SetupAttachment(VisualRoot);
-	PlayerLabel->SetHorizontalAlignment(EHTA_Center);
-	PlayerLabel->SetVerticalAlignment(EVRTA_TextCenter);
-	PlayerLabel->SetWorldSize(24.0f);
-	PlayerLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 19.0f));
-	PlayerLabel->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
-	PlayerLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	PlayerLabel->SetCastShadow(false);
-	PlayerLabel->SetAbsolute(false, false, true);
-	PlayerLabel->SetVisibility(false);
 	static ConstructorHelpers::FObjectFinder<UFont> LabelFont(TEXT("/Engine/EngineFonts/RobotoDistanceField.RobotoDistanceField"));
 	if (LabelFont.Succeeded())
 	{
 		Label->SetFont(LabelFont.Object);
-		PlayerLabel->SetFont(LabelFont.Object);
 	}
 }
 
@@ -264,7 +254,7 @@ void AFlickPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AFlickPiece, Archetype);
 	DOREPLIFETIME(AFlickPiece, PieceId);
 	DOREPLIFETIME(AFlickPiece, OwningPlayerSlot);
-	DOREPLIFETIME(AFlickPiece, bShowPlayerIdentity);
+	DOREPLIFETIME(AFlickPiece, PuckSkin);
 	DOREPLIFETIME(AFlickPiece, bEliminated);
 	DOREPLIFETIME(AFlickPiece, bBobStriker);
 	DOREPLIFETIME(AFlickPiece, bHighDetailVisualsEnabled);
@@ -304,7 +294,10 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 	VisualTime += DeltaSeconds;
 	const bool bWasFlashing = HitFlashRemaining > 0.0f;
 	HitFlashRemaining = FMath::Max(0.0f, HitFlashRemaining - DeltaSeconds);
-	if (bSelected || bHovered || bWasFlashing)
+	const bool bOwnRing = UsesLocalOwnershipRing();
+	const bool bOwnershipChanged = bOwnRing != bLocalOwnershipRing;
+	bLocalOwnershipRing = bOwnRing;
+	if (bSelected || bHovered || bWasFlashing || bOwnershipChanged)
 	{
 		ApplyVisuals();
 	}
@@ -372,15 +365,13 @@ void AFlickPiece::InitializePiece(
 	const float InThickness,
 	const EFlickPieceArchetype InArchetype,
 	const bool bInBobStriker,
-	const int32 InOwningPlayerSlot,
-	const bool bInShowPlayerIdentity)
+	const int32 InOwningPlayerSlot)
 {
 	Team = InTeam;
 	PieceId = InPieceId;
 	Archetype = InArchetype;
 	bBobStriker = bInBobStriker;
 	OwningPlayerSlot = FMath::Max(0, InOwningPlayerSlot);
-	bShowPlayerIdentity = bInShowPlayerIdentity && !bInBobStriker;
 	PieceRadius = InRadius;
 	PieceThickness = InThickness;
 	bEliminated = false;
@@ -610,6 +601,27 @@ void AFlickPiece::OnRep_PieceConfiguration()
 	PieceMesh->SetWorldScale3D(NewScale);
 	UpdateVisualTransforms();
 	ApplyPhysicsSettings();
+	ApplyVisuals();
+}
+
+void AFlickPiece::SetPuckSkin(const int32 Skin)
+{
+	if (!HasAuthority()) return;
+	const int32 ValidSkin = FMath::Clamp(Skin, 0, 1);
+	if (PuckSkin == ValidSkin) return;
+	PuckSkin = ValidSkin;
+	OnRep_PuckSkin();
+	ForceNetUpdate();
+}
+
+void AFlickPiece::OnRep_PuckSkin()
+{
+	if (HasTestArenaVisuals())
+	{
+		WorkshopMesh->EmptyOverrideMaterials();
+		WorkshopMesh->SetStaticMesh(nullptr);
+		EnableTestArenaVisuals();
+	}
 	ApplyVisuals();
 }
 
@@ -1019,8 +1031,8 @@ void AFlickPiece::UpdateVisualTransforms()
 	Underglow->SetRelativeScale3D(FVector(1.11f, 1.11f, 1.2f / SafeThickness));
 	LowerTrim->SetRelativeLocation(FVector(0.0f, 0.0f, (-SafeThickness * 0.5f + 2.2f) / ParentZScale));
 	LowerTrim->SetRelativeScale3D(FVector(1.045f, 1.045f, 1.5f / SafeThickness));
-	SelectionHalo->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 0.7f) / ParentZScale));
-	BaseHaloRelativeScale = FVector(1.16f, 1.16f, 1.0f / SafeThickness);
+	SelectionHalo->SetRelativeLocation(FVector(0.0f, 0.0f, (-SafeThickness * 0.5f + 0.5f) / ParentZScale));
+	BaseHaloRelativeScale = FVector(1.15f, 1.15f, 0.7f / SafeThickness);
 	SelectionHalo->SetRelativeScale3D(BaseHaloRelativeScale);
 	TopBezel->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 1.28f) / ParentZScale));
 	const float TopBezelScale = FMath::Clamp(TopScale + 0.095f, 0.74f, 0.97f);
@@ -1030,36 +1042,23 @@ void AFlickPiece::UpdateVisualTransforms()
 	SignatureInset->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 3.08f) / ParentZScale));
 	SignatureInset->SetRelativeScale3D(FVector(SignatureInsetScale, SignatureInsetScale, 0.9f / SafeThickness));
 	InnerRing->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 3.56f) / ParentZScale));
-	const float InnerRingScale = bShowPlayerIdentity ? 0.52f : FMath::Max(0.36f, SignatureInsetScale - 0.085f);
+	const float InnerRingScale = FMath::Max(0.36f, SignatureInsetScale - 0.085f);
 	InnerRing->SetRelativeScale3D(FVector(InnerRingScale, InnerRingScale, 0.72f / SafeThickness));
 	CoreBezel->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 3.84f) / ParentZScale));
-	const float CoreBezelScale = bShowPlayerIdentity ? 0.455f : FMath::Max(0.31f, InnerRingScale - 0.062f);
+	const float CoreBezelScale = FMath::Max(0.31f, InnerRingScale - 0.062f);
 	CoreBezel->SetRelativeScale3D(FVector(CoreBezelScale, CoreBezelScale, 0.72f / SafeThickness));
 	CorePlate->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 4.12f) / ParentZScale));
-	const float CorePlateScale = bShowPlayerIdentity ? 0.39f : FMath::Max(0.26f, CoreBezelScale - 0.07f);
+	const float CorePlateScale = FMath::Max(0.26f, CoreBezelScale - 0.07f);
 	CorePlate->SetRelativeScale3D(FVector(CorePlateScale, CorePlateScale, 0.76f / SafeThickness));
 	CenterPip->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 4.52f) / ParentZScale));
 	CenterPip->SetRelativeScale3D(FVector(PipScale, PipScale, 1.05f / SafeThickness));
 	Label->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 5.5f) / ParentZScale));
-	if (bShowPlayerIdentity)
-	{
-		Label->SetRelativeLocation(FVector(
-			0.0f,
-			-PieceRadius * 0.43f / ParentXYScale,
-			(SafeThickness * 0.5f + 5.2f) / ParentZScale));
-	}
-	PlayerLabel->SetRelativeLocation(FVector(0.0f, 0.0f, (SafeThickness * 0.5f + 5.55f) / ParentZScale));
 
 	for (int32 Index = 0; Index < TopTicks.Num(); ++Index)
 	{
-		const bool bPlayerPatternTick = OwningPlayerSlot == 0
-			? Index == 0
-			: OwningPlayerSlot == 1
-				? Index == 0 || Index == TopTicks.Num() / 2
-				: Index % 4 == 0;
 		const bool bTopDetailVisible = Index % FMath::Max(1, TopDetailStride) == 0;
 		const bool bSideDetailVisible = Index % FMath::Max(1, SideDetailStride) == 0;
-		TopTicks[Index]->SetVisibility(bShowPlayerIdentity ? bPlayerPatternTick : bTopDetailVisible);
+		TopTicks[Index]->SetVisibility(bTopDetailVisible);
 		SideLugs[Index]->SetVisibility(bSideDetailVisible);
 		const float Angle = 2.0f * PI * static_cast<float>(Index) / FMath::Max(1, TopTicks.Num());
 		const float DetailRadius = PieceRadius * DetailRadiusFactor;
@@ -1068,8 +1067,8 @@ void AFlickPiece::UpdateVisualTransforms()
 			FMath::Sin(Angle) * DetailRadius / ParentXYScale,
 			(SafeThickness * 0.5f + 3.08f) / ParentZScale));
 		TopTicks[Index]->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(Angle) + 90.0f, 0.0f));
-		const float EffectiveTickLength = bShowPlayerIdentity ? 19.0f : TickLength * (Index % 2 == 0 ? 1.0f : 0.82f);
-		const float EffectiveTickWidth = bShowPlayerIdentity ? 6.5f : TickWidth;
+		const float EffectiveTickLength = TickLength * (Index % 2 == 0 ? 1.0f : 0.82f);
+		const float EffectiveTickWidth = TickWidth;
 		TopTicks[Index]->SetRelativeScale3D(FVector(
 			EffectiveTickLength / (100.0f * ParentXYScale),
 			EffectiveTickWidth / (100.0f * ParentXYScale),
@@ -1119,7 +1118,7 @@ void AFlickPiece::UpdateVisualTransforms()
 			0.72f / (100.0f * ParentZScale)));
 	};
 
-	if (!bShowPlayerIdentity && !bBobStriker)
+	if (!bBobStriker)
 	{
 		switch (Archetype)
 		{
@@ -1200,53 +1199,13 @@ void AFlickPiece::EnableTestArenaVisuals()
 		TEXT("Grippy"), TEXT("Slider"), TEXT("Blocker"), TEXT("Compact"), TEXT("Bouncer"), TEXT("Toppler")};
 	const int32 Index = static_cast<int32>(Archetype);
 	if (Index < 0 || Index >= UE_ARRAY_COUNT(Names)) return;
-	bUsingHighDetailPlayerIdentity = false;
-	bUsingHighDetailBobStriker = false;
-	FString HighDetailPath;
-	if (bBobStriker)
-	{
-		// BOB uses authored, integrated player emblems instead of a floating
-		// text renderer. P1/P2 also give the two shooting pieces distinct crowns.
-		const FString Identity = Team == EFlickTeam::Player2 ? TEXT("P2") : TEXT("P1");
-		HighDetailPath = FString::Printf(
-			TEXT("/Game/TestArena/Pucks/HighDetail/PlayerIdentity/%s/SM_Puck_Standard_%s_HighDetail.SM_Puck_Standard_%s_HighDetail"),
-			*Identity, *Identity, *Identity);
-	}
-	else if (bShowPlayerIdentity && OwningPlayerSlot >= 0 && OwningPlayerSlot < 3)
-	{
-		const FString Identity = FString::Printf(TEXT("P%d"), OwningPlayerSlot + 1);
-		HighDetailPath = FString::Printf(
-			TEXT("/Game/TestArena/Pucks/HighDetail/PlayerIdentity/%s/SM_Puck_%s_%s_HighDetail.SM_Puck_%s_%s_HighDetail"),
-			*Identity, Names[Index], *Identity, Names[Index], *Identity);
-	}
-	else
-	{
-		HighDetailPath = Archetype == EFlickPieceArchetype::Standard
+	const FString HighDetailPath = (bBobStriker || Archetype == EFlickPieceArchetype::Standard)
 		? TEXT("/Game/TestArena/Pucks/PrototypeStandard/SM_Puck_Standard_Blue_Prototype.SM_Puck_Standard_Blue_Prototype")
 		: FString::Printf(
 			TEXT("/Game/TestArena/Pucks/HighDetail/SM_Puck_%s_HighDetail.SM_Puck_%s_HighDetail"),
 			Names[Index], Names[Index]);
-	}
 	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *HighDetailPath);
-	bUsingHighDetailPlayerIdentity = Mesh != nullptr && bShowPlayerIdentity;
-	bUsingHighDetailBobStriker = Mesh != nullptr && bBobStriker;
 	bUsingHighDetailPuck = Mesh != nullptr;
-	if (!Mesh && bBobStriker)
-	{
-		HighDetailPath = TEXT("/Game/TestArena/Pucks/PrototypeStandard/SM_Puck_Standard_Blue_Prototype.SM_Puck_Standard_Blue_Prototype");
-		Mesh = LoadObject<UStaticMesh>(nullptr, *HighDetailPath);
-		bUsingHighDetailPuck = Mesh != nullptr;
-	}
-	if (!Mesh && bShowPlayerIdentity)
-	{
-		HighDetailPath = Archetype == EFlickPieceArchetype::Standard
-			? TEXT("/Game/TestArena/Pucks/PrototypeStandard/SM_Puck_Standard_Blue_Prototype.SM_Puck_Standard_Blue_Prototype")
-			: FString::Printf(
-				TEXT("/Game/TestArena/Pucks/HighDetail/SM_Puck_%s_HighDetail.SM_Puck_%s_HighDetail"),
-				Names[Index], Names[Index]);
-		Mesh = LoadObject<UStaticMesh>(nullptr, *HighDetailPath);
-		bUsingHighDetailPuck = Mesh != nullptr;
-	}
 	if (!Mesh)
 	{
 		const FString FallbackPath = FString::Printf(
@@ -1267,7 +1226,7 @@ void AFlickPiece::EnableTestArenaVisuals()
 			|| SlotName.Contains(TEXT("Cyan"));
 		if (bTeamLightSlot)
 		{
-			if (bUsingHighDetailPuck && Team == EFlickTeam::Player2)
+			if (bUsingHighDetailPuck && PuckSkin == 1)
 			{
 				const TCHAR* OrangeMaterialPath = SlotName.Contains(TEXT("center"), ESearchCase::IgnoreCase)
 					? TEXT("/Game/TestArena/Pucks/HighDetail/MI_Orange_Center_Emblem.MI_Orange_Center_Emblem")
@@ -1285,7 +1244,7 @@ void AFlickPiece::EnableTestArenaVisuals()
 		else if (bBobStriker)
 		{
 			// BOB's controllable strikers retain the Standard silhouette and
-			// physics, but receive a brighter team-tinted metal crown. The rack
+			// physics, but receive a brighter skin-tinted metal crown. The rack
 			// pucks keep the regular Standard treatment, so the shot pieces are
 			// recognizable without adding another broad light source to the board.
 			const bool bSilverCrown = SlotName.Contains(TEXT("brushed_silver"), ESearchCase::IgnoreCase)
@@ -1298,10 +1257,10 @@ void AFlickPiece::EnableTestArenaVisuals()
 				if (UMaterialInstanceDynamic* StrikerMaterial = WorkshopMesh->CreateDynamicMaterialInstance(Slot))
 				{
 					const FLinearColor CrownColor = FMath::Lerp(
-						FLinearColor(0.82f, 0.88f, 0.94f, 1.0f), GetTeamColor(Team), 0.34f);
+						FLinearColor(0.82f, 0.88f, 0.94f, 1.0f), FlickCosmeticCatalog::GetPuckSkinColor(PuckSkin), 0.34f);
 					StrikerMaterial->SetVectorParameterValue(
 						TEXT("BaseColor"),
-						bSilverCrown ? CrownColor : FMath::Lerp(FLinearColor(0.055f, 0.072f, 0.095f, 1.0f), GetTeamColor(Team), 0.13f));
+						bSilverCrown ? CrownColor : FMath::Lerp(FLinearColor(0.055f, 0.072f, 0.095f, 1.0f), FlickCosmeticCatalog::GetPuckSkinColor(PuckSkin), 0.13f));
 					StrikerMaterial->SetScalarParameterValue(TEXT("Metallic"), bSilverCrown ? 0.98f : 0.72f);
 					StrikerMaterial->SetScalarParameterValue(TEXT("Roughness"), bSilverCrown ? 0.16f : 0.24f);
 					StrikerMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), bSilverCrown ? 0.40f : 0.10f);
@@ -1338,7 +1297,7 @@ void AFlickPiece::UpdateTestArenaVisuals()
 	PieceMesh->SetVisibility(false);
 	for (USceneComponent* Child : VisualRoot->GetAttachChildren())
 	{
-		if (Child != WorkshopMesh && Child != SelectionHalo && Child != PlayerLabel && Child != AccentLight)
+		if (Child != WorkshopMesh && Child != SelectionHalo && Child != AccentLight)
 		{
 			Child->SetVisibility(false);
 		}
@@ -1347,9 +1306,9 @@ void AFlickPiece::UpdateTestArenaVisuals()
 	WorkshopMesh->SetVisibility(!bEliminated);
 	if (!WorkshopTeamMaterials.IsEmpty())
 	{
-		const FLinearColor Color = Team == EFlickTeam::Player2
+		const FLinearColor Color = PuckSkin == 1
 			? FLinearColor(1.0f, 0.18f, 0.003f) : FLinearColor(0.0f, 0.5f, 1.0f);
-		const FLinearColor DiffuserBaseColor = Team == EFlickTeam::Player2
+		const FLinearColor DiffuserBaseColor = PuckSkin == 1
 			? FLinearColor(0.125f, 0.022f, 0.002f) : FLinearColor(0.004f, 0.080f, 0.125f);
 		const float Flash = FMath::Clamp(HitFlashRemaining / 0.2f, 0.0f, 1.0f) * HitFlashStrength;
 		// The game camera runs below neutral exposure. HDR values in this range
@@ -1375,25 +1334,29 @@ void AFlickPiece::UpdateTestArenaVisuals()
 		bEliminated ? 0.0f : (bSelected || bHovered ? HighlightLight : IdleLight));
 }
 
+bool AFlickPiece::UsesLocalOwnershipRing() const
+{
+	if (!GetWorld() || GetNetMode() == NM_DedicatedServer || bPregamePreview) return false;
+	const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
+	if (!State || State->PlayersPerTeam < 2) return false;
+	const AFlickPlayerController* Local = Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController());
+	return Local && Local->IsLocalController() && Local->OwnsPieceLocally(this);
+}
+
 void AFlickPiece::ApplyVisuals()
 {
 	if (!PieceMesh || !TopDisc || !OuterTrim || !SideBand || !Underglow || !SelectionHalo || !CenterPip
 		|| !InnerRing || !CorePlate || !LowerTrim || !UpperShoulder || !LowerShoulder
-		|| !TopBezel || !CoreBezel || !SignatureRing || !SignatureInset || !Label || !PlayerLabel)
+		|| !TopBezel || !CoreBezel || !SignatureRing || !SignatureInset || !Label)
 	{
 		return;
 	}
 
 	EnsureVisualMaterials();
-	const FLinearColor TeamColor = GetTeamColor(Team);
+	const FLinearColor TeamColor = FlickCosmeticCatalog::GetPuckSkinColor(PuckSkin);
 	const FFlickPieceArchetypeRules& ArchetypeRules = FlickPieceArchetypeRules::Get(Archetype);
 	const FLinearColor ArchetypeColor = ArchetypeRules.AccentColor;
 	const FLinearColor VisualAccent = FlickPieceArchetypeRules::GetVisualAccent(Archetype, TeamColor);
-	const FLinearColor PlayerIdentityColor = OwningPlayerSlot == 0
-		? FLinearColor(0.92f, 0.96f, 1.0f, 1.0f)
-		: OwningPlayerSlot == 1
-			? FLinearColor(1.0f, 0.06f, 0.72f, 1.0f)
-			: FLinearColor(0.58f, 1.0f, 0.02f, 1.0f);
 	const float FlashAlpha = HitFlashRemaining > 0.0f
 		? FMath::Clamp(HitFlashRemaining / 0.2f, 0.0f, 1.0f) * HitFlashStrength
 		: 0.0f;
@@ -1401,10 +1364,6 @@ void AFlickPiece::ApplyVisuals()
 	FLinearColor BodyColor = bBobStriker
 		? FLinearColor(0.04f, 0.052f, 0.066f, 1.0f)
 		: FMath::Lerp(DarkMetal, TeamColor, 0.09f);
-	if (bShowPlayerIdentity)
-	{
-		BodyColor = FMath::Lerp(DarkMetal, TeamColor, 0.62f);
-	}
 	if (bHovered)
 	{
 		BodyColor = FMath::Lerp(BodyColor, FLinearColor::White, 0.16f);
@@ -1416,9 +1375,11 @@ void AFlickPiece::ApplyVisuals()
 		FMath::Lerp(CoolMetal, TeamColor, 0.12f),
 		VisualAccent,
 		ArchetypeMix);
-	const FLinearColor HaloColor = bSelected
-		? FLinearColor(1.0f, 0.78f, 0.05f, 1.0f)
-		: FMath::Lerp(TeamColor, FLinearColor::White, 0.38f);
+	// Saturated ownership colours stay distinct even beneath a mismatched skin.
+	const FLinearColor HaloColor = bLocalOwnershipRing
+		? FLinearColor(0.45f, 1.0f, 0.015f) : Team == EFlickTeam::Player2
+		? FLinearColor(1.0f, 0.10f, 0.01f) : Team == EFlickTeam::Player1
+			? FLinearColor(0.0f, 0.38f, 1.0f) : GetTeamColor(Team);
 	FLinearColor PipColor = FMath::Lerp(
 		FLinearColor(0.025f, 0.03f, 0.04f, 1.0f),
 		VisualAccent,
@@ -1427,13 +1388,6 @@ void AFlickPiece::ApplyVisuals()
 	{
 		TopColor = FMath::Lerp(FLinearColor(0.055f, 0.067f, 0.078f, 1.0f), TeamColor, 0.08f);
 		PipColor = FLinearColor(0.48f, 0.56f, 0.62f, 1.0f);
-	}
-	else if (bShowPlayerIdentity)
-	{
-		// Team modes reserve the broad puck construction for team identity and
-		// use only the enlarged center plate for the owning player identity.
-		TopColor = FMath::Lerp(CoolMetal, TeamColor, 0.3f);
-		PipColor = FLinearColor(0.012f, 0.018f, 0.028f, 1.0f);
 	}
 
 	const auto SetMaterialColor = [](UMaterialInstanceDynamic* Material, const FLinearColor& Color, const float Roughness = 0.88f)
@@ -1479,19 +1433,17 @@ void AFlickPiece::ApplyVisuals()
 	SetMaterialColor(TopMaterial, TopColor);
 	SetAccentPaint(OuterTrimMaterial, bBobStriker
 		? FMath::Lerp(TeamColor, FLinearColor::White, 0.18f)
-		: FMath::Lerp(TeamColor, FLinearColor::White, bShowPlayerIdentity ? 0.03f : 0.08f),
+		: FMath::Lerp(TeamColor, FLinearColor::White, 0.08f),
 		bSelected ? SelectedOuterBrightness : IdleOuterBrightness);
-	SetMaterialColor(SideBandMaterial, bShowPlayerIdentity
-		? FMath::Lerp(FLinearColor(0.008f, 0.012f, 0.02f, 1.0f), TeamColor, 0.92f)
-		: bBobStriker
+	SetMaterialColor(SideBandMaterial, bBobStriker
 		? FLinearColor(0.026f, 0.033f, 0.042f, 1.0f)
 		: FMath::Lerp(FLinearColor(0.01f, 0.015f, 0.024f, 1.0f), FMath::Lerp(TeamColor, ArchetypeColor, 0.5f), 0.2f));
 	SetGlowColor(UnderglowMaterial, FMath::Lerp(TeamColor, FLinearColor::White, bSelected ? 0.12f : 0.0f), bSelected ? 0.1f : 0.018f);
-	SetGlowColor(HaloMaterial, HaloColor, bSelected ? 0.22f : 0.055f);
+	// Ownership must be legible even when the chosen skin is the other team's
+	// colour. Keep this wider ownership marker steady and clearly visible.
+	SetGlowColor(HaloMaterial, HaloColor, bSelected ? 1.8f : 1.45f);
 	SetAccentPaint(PipMaterial, PipColor, bSelected ? 0.34f : 0.16f);
-	SetAccentPaint(InnerRingMaterial, bShowPlayerIdentity
-		? PlayerIdentityColor
-		: bBobStriker
+	SetAccentPaint(InnerRingMaterial, bBobStriker
 		? FMath::Lerp(TeamColor, FLinearColor::White, 0.16f)
 		: FMath::Lerp(VisualAccent, FLinearColor::White, 0.08f),
 		bSelected ? SelectedCoreBrightness : IdleCoreBrightness);
@@ -1501,27 +1453,17 @@ void AFlickPiece::ApplyVisuals()
 		bSelected ? SelectedSignatureBrightness : IdleSignatureBrightness);
 	SetMaterialColor(SignatureInsetMaterial, FMath::Lerp(
 		FLinearColor(0.008f, 0.014f, 0.024f, 1.0f), VisualAccent, 0.055f));
-	SetMaterialColor(CorePlateMaterial, bShowPlayerIdentity
-		? PlayerIdentityColor
-		: bBobStriker
+	SetMaterialColor(CorePlateMaterial, bBobStriker
 		? FLinearColor(0.025f, 0.035f, 0.045f, 1.0f)
 		: FMath::Lerp(FLinearColor(0.014f, 0.022f, 0.034f, 1.0f), VisualAccent, 0.19f));
 	SetMaterialColor(LowerTrimMaterial, FMath::Lerp(TeamColor, FLinearColor(0.004f, 0.008f, 0.014f, 1.0f), 0.52f));
-	SetMaterialColor(UpperShoulderMaterial, bShowPlayerIdentity
-		? FMath::Lerp(FLinearColor(0.08f, 0.12f, 0.16f, 1.0f), TeamColor, 0.42f)
-		: FMath::Lerp(FLinearColor(0.09f, 0.13f, 0.17f, 1.0f), TeamColor, 0.2f));
-	SetMaterialColor(LowerShoulderMaterial, bShowPlayerIdentity
-		? FMath::Lerp(FLinearColor(0.004f, 0.008f, 0.014f, 1.0f), TeamColor, 0.58f)
-		: FMath::Lerp(FLinearColor(0.004f, 0.008f, 0.014f, 1.0f), TeamColor, 0.22f));
-	SetMaterialColor(TopBezelMaterial, bShowPlayerIdentity
-		? FMath::Lerp(FLinearColor(0.12f, 0.17f, 0.22f, 1.0f), TeamColor, 0.3f)
-		: FMath::Lerp(FLinearColor(0.14f, 0.19f, 0.24f, 1.0f), TeamColor, 0.14f));
+	SetMaterialColor(UpperShoulderMaterial, FMath::Lerp(FLinearColor(0.09f, 0.13f, 0.17f, 1.0f), TeamColor, 0.2f));
+	SetMaterialColor(LowerShoulderMaterial, FMath::Lerp(FLinearColor(0.004f, 0.008f, 0.014f, 1.0f), TeamColor, 0.22f));
+	SetMaterialColor(TopBezelMaterial, FMath::Lerp(FLinearColor(0.14f, 0.19f, 0.24f, 1.0f), TeamColor, 0.14f));
 	SetMaterialColor(CoreBezelMaterial, FLinearColor(0.006f, 0.011f, 0.02f, 1.0f));
 	for (int32 Index = 0; Index < TopTickMaterials.Num(); ++Index)
 	{
-		const FLinearColor DetailColor = bShowPlayerIdentity
-			? FMath::Lerp(TeamColor, FLinearColor::White, 0.12f)
-			: Index % 4 == 0
+		const FLinearColor DetailColor = Index % 4 == 0
 				? FMath::Lerp(VisualAccent, FLinearColor::White, 0.18f)
 				: Index % 2 == 0
 					? VisualAccent
@@ -1543,10 +1485,10 @@ void AFlickPiece::ApplyVisuals()
 	AccentLight->SetLightColor(TeamColor);
 	AccentLight->SetIntensity(0.0f);
 
-	SelectionHalo->SetVisibility(bSelected || bHovered);
+	SelectionHalo->SetVisibility(!bEliminated && !bPregamePreview);
 	const float Pulse = bSelected
 		? 1.0f + 0.055f * FMath::Sin(VisualTime * 7.0f)
-		: 1.0f + 0.025f * FMath::Sin(VisualTime * 5.0f);
+		: 1.0f;
 	SelectionHalo->SetRelativeScale3D(FVector(
 		BaseHaloRelativeScale.X * Pulse,
 		BaseHaloRelativeScale.Y * Pulse,
@@ -1557,18 +1499,6 @@ void AFlickPiece::ApplyVisuals()
 		? FMath::Lerp(TeamColor, FLinearColor::White, 0.72f)
 		: FMath::Lerp(VisualAccent, FLinearColor::White, 0.45f)).ToFColor(true));
 	Label->SetWorldSize(bSelected ? 21.0f : 18.0f);
-	Label->SetVisibility(bBobStriker && !bShowPlayerIdentity && !bEliminated);
-	PlayerLabel->SetText(FText::FromString(FString::Printf(TEXT("P%d"), OwningPlayerSlot + 1)));
-	PlayerLabel->SetTextRenderColor((bBobStriker
-		? FMath::Lerp(TeamColor, FLinearColor::White, 0.78f)
-		: OwningPlayerSlot == 1
-			? FLinearColor::White
-			: FLinearColor(0.005f, 0.01f, 0.018f, 1.0f)).ToFColor(true));
-	PlayerLabel->SetWorldSize(bBobStriker
-		? (bSelected ? 31.0f : 29.0f)
-		: (bSelected ? 29.0f : 26.0f));
-	PlayerLabel->SetVisibility(
-		((bBobStriker && !bUsingHighDetailBobStriker)
-			|| (bShowPlayerIdentity && !bUsingHighDetailPlayerIdentity)) && !bEliminated);
+	Label->SetVisibility(bBobStriker && !bEliminated);
 	UpdateTestArenaVisuals();
 }

@@ -29,15 +29,15 @@ if (Get-Process -Name UnrealEditor -ErrorAction SilentlyContinue) {
 }
 
 $requiredFiles = @(
-    'AssetDevelopment\Pucks\HighDetail\exports\Standard.fbx',
-    'AssetDevelopment\Pucks\HighDetail\exports\Toppler.fbx',
-    'AssetDevelopment\Pucks\HighDetail\exports\Bouncer.fbx',
-    'AssetDevelopment\Pucks\HighDetail\exports\Compact.fbx',
-    'AssetDevelopment\Pucks\HighDetail\exports\Blocker.fbx',
-    'AssetDevelopment\Pucks\HighDetail\exports\Slider.fbx',
-    'AssetDevelopment\Pucks\HighDetail\exports\Grippy.fbx',
-    'AssetDevelopment\Pucks\HighDetail\exports\Striker.fbx',
-    'AssetDevelopment\Pucks\HighDetail\exports\Heavy.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Standard.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Toppler.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Bouncer.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Compact.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Blocker.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Slider.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Grippy.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Striker.fbx',
+    'AssetDevelopment\Pucks\ClassicBlue\exports\Heavy.fbx',
     'AssetDevelopment\Arena\exports\SM_TestArena_Static.fbx',
     'AssetDevelopment\ClassicArena\exports\SM_ClassicArena_Premium.fbx',
     'AssetDevelopment\Arena\exports\SM_TestArena_Divider.fbx',
@@ -61,10 +61,7 @@ if ($missingFiles.Count -gt 0) {
 
 $stampFile = Join-Path $projectRoot 'Saved\FlickAssetSourceHashes.json'
 $sourcePrefixes = @(
-    'AssetDevelopment/Pucks/HighDetail/',
-    'AssetDevelopment/Pucks/PlayerIdentity/P1/Blue/',
-    'AssetDevelopment/Pucks/PlayerIdentity/P2/Blue/',
-    'AssetDevelopment/Pucks/PlayerIdentity/P3/Blue/',
+    'AssetDevelopment/Pucks/ClassicBlue/',
     'AssetDevelopment/Arena/',
     'AssetDevelopment/ClassicArena/',
     'AssetDevelopment/Stadium/',
@@ -72,11 +69,9 @@ $sourcePrefixes = @(
     'AssetDevelopment/BOBStadium/'
 )
 $sourceManifests = @(
+    'AssetDevelopment/Pucks/ClassicOrange/set.json',
     'AssetDevelopment/Arena/dimensions.json',
-    'AssetDevelopment/Pucks/HighDetail/manifests/archetype_exports.json',
-    'AssetDevelopment/Pucks/PlayerIdentity/P1/Blue/manifest.json',
-    'AssetDevelopment/Pucks/PlayerIdentity/P2/Blue/manifest.json',
-    'AssetDevelopment/Pucks/PlayerIdentity/P3/Blue/manifest.json',
+    'AssetDevelopment/Pucks/ClassicBlue/manifests/archetype_exports.json',
     'AssetDevelopment/Stadium/manifest.json',
     'AssetDevelopment/BOBStadium/manifest.json'
 )
@@ -103,6 +98,10 @@ if (Test-Path -LiteralPath $stampFile) {
 }
 $changed = @($hashes.Keys | Where-Object { $Force -or -not $previous.ContainsKey($_) -or $previous[$_] -ne $hashes[$_] } | Sort-Object)
 $removed = @($previous.Keys | Where-Object { -not $hashes.ContainsKey($_) })
+$removed = @($removed | Where-Object {
+    $_ -notlike 'AssetDevelopment/Pucks/PlayerIdentity/*' -and
+    $_ -notlike 'AssetDevelopment/Pucks/HighDetail/*'
+}) # HighDetail was relocated to ClassicBlue; old stamps may still name it.
 if ($removed.Count -gt 0) {
     throw "Asset sources were removed since the last import. Restore or resolve them before updating:`n  $($removed -join "`n  ")"
 }

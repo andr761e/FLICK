@@ -71,6 +71,9 @@ public:
 	virtual void Tick(const FGeometry& AllottedGeometry, double InCurrentTime, float InDeltaTime) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FFlickPuckInspectionTest;
+#endif
 	TSharedRef<SWidget> BuildMainMenu();
 	TSharedRef<SWidget> BuildMainMenuFooter();
 	TSharedRef<SWidget> BuildChallengePreview();
@@ -176,6 +179,7 @@ private:
 	EVisibility GetScreenVisibility(EFlickFrontendScreen Screen) const;
 	EVisibility GetMatchmakingStatusVisibility() const;
 	EVisibility GetMatchHudVisibility() const;
+	bool ShouldShowGameplayControls() const;
 	EVisibility GetScoreboardVisibility() const;
 	EVisibility GetScoreboardPlayerVisibility(int32 PlayerSlot) const;
 	EVisibility GetRoundOverVisibility() const;
@@ -309,6 +313,8 @@ private:
 	TArray<TSharedPtr<FIntPoint>> ResolutionOptions;
 	TArray<TSharedPtr<int32>> WindowModeOptions;
 	TArray<TSharedPtr<int32>> CameraShakeOptions;
+	TArray<TSharedPtr<int32>> PuckHoverSizeOptions;
+	TArray<TSharedPtr<int32>> PuckHoverDetailOptions;
 	TArray<TSharedPtr<int32>> FrameLimitOptions;
 	FIntPoint PendingResolution = FIntPoint::ZeroValue;
 	int32 PendingWindowMode = 1; // 0 fullscreen, 1 borderless, 2 windowed.

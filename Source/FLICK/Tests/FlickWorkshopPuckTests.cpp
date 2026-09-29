@@ -16,7 +16,7 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickWorkshopPuckTest, "FLICK.Visuals.WorkshopPucks",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPlayerIdentityPuckTest, "FLICK.Visuals.PlayerIdentityPucks",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPuckSkinTest, "FLICK.Visuals.PuckSkins",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickTestArenaExposureTest, "FLICK.Visuals.TestArenaExposure",
@@ -185,6 +185,7 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 			UStaticMesh* CollisionMesh = Root->GetStaticMesh();
 			const float Mass = Root->GetMass();
 			TestFalse(TEXT("Ordinary puck does not load workshop art"), Piece->HasTestArenaVisuals());
+			Piece->SetPuckSkin(Team == EFlickTeam::Player2 ? 1 : 0);
 			Piece->EnableTestArenaVisuals();
 			TestTrue(TEXT("Test puck loads its imported mesh"), Piece->HasTestArenaVisuals());
 			TestTrue(TEXT("Physics mesh preserved"), Root->GetStaticMesh() == CollisionMesh);
@@ -298,22 +299,8 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("BOB striker has distinct dynamic crown and light materials"),
 				DynamicMaterialCount >= 4);
 		}
-		UTextRenderComponent* PlayerMarker = nullptr;
-		TInlineComponentArray<UTextRenderComponent*> TextComponents(BobStriker);
-		for (UTextRenderComponent* Text : TextComponents)
-		{
-			if (Text && Text->GetFName() == TEXT("PlayerLabel"))
-			{
-				PlayerMarker = Text;
-				break;
-			}
-		}
-		TestNotNull(TEXT("BOB striker has a player marker"), PlayerMarker);
-		if (PlayerMarker)
-		{
-			TestEqual(TEXT("Orange BOB striker is marked P2"), PlayerMarker->Text.ToString(), FString(TEXT("P2")));
-			TestFalse(TEXT("BOB premium art uses its integrated identity instead of a floating marker"), PlayerMarker->IsVisible());
-		}
+		for (UTextRenderComponent* Text : TInlineComponentArray<UTextRenderComponent*>(BobStriker))
+			TestFalse(TEXT("No obsolete P-number component remains"), Text->GetFName() == TEXT("PlayerLabel"));
 		BobStriker->Destroy();
 	}
 	World->DestroyWorld(false);
@@ -321,113 +308,59 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-bool FFlickPlayerIdentityPuckTest::RunTest(const FString& Parameters)
+bool FFlickPuckSkinTest::RunTest(const FString& Parameters)
 {
-	static const TCHAR* ArchetypeNames[] = {
-		TEXT("Standard"), TEXT("Heavy"), TEXT("Striker"), TEXT("Grippy"), TEXT("Slider"),
-		TEXT("Blocker"), TEXT("Compact"), TEXT("Bouncer"), TEXT("Toppler")};
-	static const TCHAR* IdentityNames[] = {TEXT("P1"), TEXT("P2"), TEXT("P3")};
-
-	for (const TCHAR* Identity : IdentityNames)
-	{
-		for (const TCHAR* Archetype : ArchetypeNames)
-		{
-			const FString MeshPath = FString::Printf(
-				TEXT("/Game/TestArena/Pucks/HighDetail/PlayerIdentity/%s/SM_Puck_%s_%s_HighDetail.SM_Puck_%s_%s_HighDetail"),
-				Identity, Archetype, Identity, Archetype, Identity);
-			UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *MeshPath);
-			if (!TestNotNull(*FString::Printf(TEXT("%s %s mesh"), Identity, Archetype), Mesh))
-			{
-				continue;
-			}
-			TestEqual(TEXT("Identity puck preserves seven authored material sections"),
-				Mesh->GetStaticMaterials().Num(), 7);
-
-			int32 PlayerIdentitySlotCount = 0;
-			int32 TeamLightSlotCount = 0;
-			for (const FStaticMaterial& Slot : Mesh->GetStaticMaterials())
-			{
-				const FString SlotName = Slot.MaterialSlotName.ToString();
-				if (SlotName.Contains(TEXT("Player_identity"), ESearchCase::IgnoreCase)
-					|| SlotName.Contains(TEXT("Player identity"), ESearchCase::IgnoreCase))
-				{
-					++PlayerIdentitySlotCount;
-					TestTrue(TEXT("Player-number material is independent from team colour"),
-						Slot.MaterialInterface
-						&& Slot.MaterialInterface->GetPathName().Contains(FString::Printf(TEXT("MI_Player_%s"), Identity)));
-				}
-				if (SlotName.Contains(TEXT("Cyan_light_diffuser"), ESearchCase::IgnoreCase)
-					|| SlotName.Contains(TEXT("Cyan light diffuser"), ESearchCase::IgnoreCase))
-				{
-					++TeamLightSlotCount;
-				}
-			}
-			TestEqual(TEXT("Puck has exactly one player-number section"), PlayerIdentitySlotCount, 1);
-			TestEqual(TEXT("Puck has exactly one team-light section"), TeamLightSlotCount, 1);
-		}
-	}
-
 	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
 		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(true);
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Settings);
-	if (!TestNotNull(TEXT("Player identity runtime world"), World)) return false;
+	if (!TestNotNull(TEXT("Cosmetic runtime world"), World)) return false;
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-
+	TArray<UStaticMesh*> BaseMeshes;
+	BaseMeshes.SetNumZeroed(FlickPieceArchetypeRules::ArchetypeCount);
 	for (int32 PlayerSlot = 0; PlayerSlot < 3; ++PlayerSlot)
+	for (EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+	for (int32 Skin = 0; Skin < 2; ++Skin)
+	for (int32 Type = 0; Type < FlickPieceArchetypeRules::ArchetypeCount; ++Type)
 	{
-		UStaticMesh* SharedIdentityMesh = nullptr;
-		for (const EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+		AFlickPiece* Piece = World->SpawnActor<AFlickPiece>();
+		Piece->InitializePiece(Team, 1, 45, 20, static_cast<EFlickPieceArchetype>(Type), false, PlayerSlot);
+		Piece->SetPuckSkin(Skin);
+		Piece->EnableTestArenaVisuals();
+		TestTrue(TEXT("Ownership independent of skin"), Piece->GetTeam() == Team);
+		TestEqual(TEXT("Requested cosmetic applied"), Piece->GetPuckSkin(), Skin);
+		TInlineComponentArray<UStaticMeshComponent*> Components(Piece);
+		for (UStaticMeshComponent* Visual : Components)
 		{
-			AFlickPiece* Piece = World->SpawnActor<AFlickPiece>();
-			if (!TestNotNull(TEXT("Spawned identity puck"), Piece)) continue;
-			Piece->InitializePiece(
-				Team, PlayerSlot + 1, 45.0f, 20.0f, EFlickPieceArchetype::Standard,
-				false, PlayerSlot, true);
-			Piece->EnableTestArenaVisuals();
-
-			UStaticMeshComponent* IdentityVisual = nullptr;
-			TInlineComponentArray<UStaticMeshComponent*> Components(Piece);
-			for (UStaticMeshComponent* Component : Components)
+			if (Visual->GetFName() == TEXT("SelectionHalo"))
 			{
-				if (Component && Component->GetFName() == TEXT("WorkshopMesh"))
+				TestTrue(TEXT("Team marker remains visible without selection"), Visual->IsVisible());
+				if (auto* Marker = Cast<UMaterialInstanceDynamic>(Visual->GetMaterial(0)))
 				{
-					IdentityVisual = Component;
-					break;
+					const FLinearColor Colour = Marker->K2_GetVectorParameterValue(TEXT("Color"));
+					TestTrue(TEXT("Ownership marker follows team, not skin"), Team == EFlickTeam::Player2 ? Colour.R > Colour.B : Colour.B > Colour.R);
 				}
 			}
-			if (!TestNotNull(TEXT("Runtime identity visual"), IdentityVisual))
+			if (Visual->GetFName() != TEXT("WorkshopMesh")) continue;
+			TestNotNull(TEXT("Base cosmetic mesh"), Visual->GetStaticMesh().Get());
+			TestTrue(TEXT("Cosmetic does not own collision"), Visual->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+			if (BaseMeshes[Type]) TestTrue(TEXT("All players and both skins reuse the base mesh"), BaseMeshes[Type] == Visual->GetStaticMesh());
+			BaseMeshes[Type] = Visual->GetStaticMesh();
+			for (const FStaticMaterial& Material : Visual->GetStaticMesh()->GetStaticMaterials())
+				TestFalse(TEXT("No baked player-number sections"), Material.MaterialSlotName.ToString().Contains(TEXT("identity"), ESearchCase::IgnoreCase));
+			int32 Lights = 0;
+			for (int32 Slot = 0; Slot < Visual->GetNumMaterials(); ++Slot)
 			{
-				Piece->Destroy();
-				continue;
-			}
-			TestTrue(TEXT("Runtime selected the requested P-number mesh"),
-				IdentityVisual->GetStaticMesh()
-				&& IdentityVisual->GetStaticMesh()->GetPathName().Contains(
-					FString::Printf(TEXT("P%d_HighDetail"), PlayerSlot + 1)));
-			if (SharedIdentityMesh)
-			{
-				TestTrue(TEXT("Blue and orange share the same player-identity geometry"),
-					IdentityVisual->GetStaticMesh() == SharedIdentityMesh);
-			}
-			SharedIdentityMesh = IdentityVisual->GetStaticMesh();
-
-			int32 DynamicTeamMaterialCount = 0;
-			for (int32 MaterialIndex = 0; MaterialIndex < IdentityVisual->GetNumMaterials(); ++MaterialIndex)
-			{
-				if (UMaterialInstanceDynamic* Dynamic =
-					Cast<UMaterialInstanceDynamic>(IdentityVisual->GetMaterial(MaterialIndex)))
+				if (UMaterialInstanceDynamic* Dynamic = Cast<UMaterialInstanceDynamic>(Visual->GetMaterial(Slot)))
 				{
-					const FLinearColor TeamColor = Dynamic->K2_GetVectorParameterValue(TEXT("TeamColor"));
-					TestTrue(TEXT("Runtime team light matches the puck team"),
-						Team == EFlickTeam::Player2 ? TeamColor.R > TeamColor.B : TeamColor.B > TeamColor.R);
-					++DynamicTeamMaterialCount;
+					const FLinearColor Color = Dynamic->K2_GetVectorParameterValue(TEXT("TeamColor"));
+					TestTrue(TEXT("LED colour follows chosen skin, never ownership"), Skin == 1 ? Color.R > Color.B : Color.B > Color.R);
+					++Lights;
 				}
 			}
-			TestEqual(TEXT("Only the team-light section is dynamically recoloured"), DynamicTeamMaterialCount, 1);
-			Piece->Destroy();
+			TestEqual(TEXT("Type symbol and rim both retained"), Lights, 2);
 		}
+		Piece->Destroy();
 	}
-
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
 	return true;

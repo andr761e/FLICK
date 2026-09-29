@@ -1,0 +1,15 @@
+{
+  "shared_geometry": "../ClassicBlue",
+  "materials": {
+    "MI_Orange_Light_Diffuser": {
+      "base_color": [0.125, 0.022, 0.002],
+      "emissive_color": [1.0, 0.18, 0.003],
+      "roughness": 0.22
+    },
+    "MI_Orange_Center_Emblem": {
+      "base_color": [0.10, 0.016, 0.002],
+      "emissive_color": [1.0, 0.18, 0.003],
+      "roughness": 0.23
+    }
+  }
+}

@@ -1,6 +1,7 @@
 #include "UI/FlickGameLayer.h"
 #include "UI/FlickGameLayerPrivate.h"
 #include "UI/FlickAimArrowWidget.h"
+#include "UI/FlickPuckHoverWidget.h"
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
 
 SFlickGameLayer::SFlickGameLayer()
@@ -199,6 +200,23 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot()
 		[
 			SNew(SFlickAimArrowWidget).OwnerHud(OwnerHud).Visibility(EVisibility::HitTestInvisible)
+		]
+		+ SOverlay::Slot()
+		[
+			SNew(SFlickPuckHoverWidget).Controller(PlayerController)
+			.OwnerName([this](const AFlickPiece* Piece)
+			{
+				if (const AFlickPlayerState* Owner = FindScoreboardPlayerState(Piece->GetTeam(), Piece->GetOwningPlayerSlot()))
+				{
+					if (!Owner->GetPlayerName().IsEmpty()) return Owner->GetPlayerName();
+				}
+				if (GameMode.IsValid() && GameMode->IsTrainingBotMatch() && Piece->GetTeam() == EFlickTeam::Player1)
+				{
+					if (const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) return Sessions->GetLocalDisplayName();
+				}
+				return GetScoreboardPlayerName(Piece->GetTeam(), Piece->GetOwningPlayerSlot()).ToString();
+			})
+			.Visibility(EVisibility::HitTestInvisible)
 		]
 
 		+ SOverlay::Slot()

@@ -36,7 +36,7 @@ struct FFlickTrainingPieceSnapshot
 	int32 PieceId = 0;
 	int32 OwningPlayerSlot = 0;
 	bool bBobStriker = false;
-	bool bShowPlayerIdentity = false;
+	int32 PuckSkin = 0;
 };
 
 struct FFlickLockedKickoffShot
@@ -718,8 +718,7 @@ private:
 		const FVector& Location,
 		EFlickPieceArchetype Archetype,
 		bool bIsBobStriker = false,
-		int32 OwningPlayerSlot = 0,
-		bool bShowPlayerIdentity = false);
+		int32 OwningPlayerSlot = 0);
 	UFlickGameInstance* GetFlickGameInstance() const;
 	UFlickRankedBackendSubsystem* GetFlickRankedBackendSubsystem() const;
 

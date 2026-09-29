@@ -5,7 +5,7 @@ import unreal as u
 
 
 project = Path(u.Paths.project_dir())
-source_root = project / "AssetDevelopment/Pucks/HighDetail"
+source_root = project / "AssetDevelopment/Pucks/ClassicBlue"
 destination = "/Game/TestArena/Pucks/PrototypeStandard"
 u.EditorAssetLibrary.make_directory(destination)
 assets = u.AssetToolsHelpers.get_asset_tools()

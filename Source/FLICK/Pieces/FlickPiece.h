@@ -30,13 +30,14 @@ public:
 		float InThickness,
 		EFlickPieceArchetype InArchetype,
 		bool bInBobStriker = false,
-		int32 InOwningPlayerSlot = 0,
-		bool bInShowPlayerIdentity = false);
+		int32 InOwningPlayerSlot = 0);
 	void ApplyPhysicsSettings();
 	void SetPregamePreview(bool bInPreview);
 	void BeginArrival(float Duration);
 	/** Premium cosmetic mesh; the existing root remains the authoritative physics body. */
 	void EnableTestArenaVisuals();
+	void SetPuckSkin(int32 Skin);
+	int32 GetPuckSkin() const { return PuckSkin; }
 	bool HasTestArenaVisuals() const;
 	void Launch(const FVector& Direction, float NormalizedPower, float MaxLaunchSpeed);
 	void Eliminate();
@@ -58,7 +59,6 @@ public:
 	bool IsBobStriker() const { return bBobStriker; }
 	int32 GetPieceId() const { return PieceId; }
 	int32 GetOwningPlayerSlot() const { return OwningPlayerSlot; }
-	bool ShowsPlayerIdentity() const { return bShowPlayerIdentity; }
 	FVector GetLinearVelocity() const;
 	FVector GetAngularVelocityDegrees() const;
 	float GetPieceRadius() const { return PieceRadius; }
@@ -127,6 +127,9 @@ private:
 	void EnsureVisualMaterials();
 	void UpdateVisualTransforms();
 	void ApplyVisuals();
+	bool UsesLocalOwnershipRing() const;
+	// Per-view presentation only; deliberately not replicated.
+	bool bLocalOwnershipRing = false;
 	void UpdateTestArenaVisuals();
 	void UpdateArrivalVisuals();
 	void ApplyPregamePreview();
@@ -137,8 +140,6 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> WorkshopTeamMaterials;
 	bool bUsingHighDetailPuck = false;
-	bool bUsingHighDetailPlayerIdentity = false;
-	bool bUsingHighDetailBobStriker = false;
 
 	UPROPERTY(ReplicatedUsing = OnRep_HighDetailVisuals)
 	bool bHighDetailVisualsEnabled = false;
@@ -222,9 +223,6 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UTextRenderComponent> Label;
 
-	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
-	TObjectPtr<UTextRenderComponent> PlayerLabel;
-
 	UPROPERTY(Transient)
 	TObjectPtr<UPhysicalMaterial> RuntimePhysicalMaterial;
 
@@ -297,8 +295,10 @@ private:
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Piece")
 	int32 OwningPlayerSlot = 0;
 
-	UPROPERTY(ReplicatedUsing = OnRep_PieceConfiguration, VisibleAnywhere, Category = "FLICK|Piece")
-	bool bShowPlayerIdentity = false;
+	UPROPERTY(ReplicatedUsing = OnRep_PuckSkin)
+	int32 PuckSkin = 0;
+	UFUNCTION()
+	void OnRep_PuckSkin();
 
 	UPROPERTY(ReplicatedUsing = OnRep_Eliminated, VisibleAnywhere, Category = "FLICK|Piece")
 	bool bEliminated = false;

@@ -1,6 +1,7 @@
 #include "Player/FlickPlayerState.h"
 
 #include "Core/FlickLineupRules.h"
+#include "Core/FlickPieceArchetypeRules.h"
 
 #include "Net/UnrealNetwork.h"
 
@@ -13,6 +14,7 @@ void AFlickPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AFlickPlayerState, Team);
+	DOREPLIFETIME(AFlickPlayerState, PuckSkins);
 	DOREPLIFETIME(AFlickPlayerState, TeamPlayerSlot);
 	DOREPLIFETIME(AFlickPlayerState, bLobbyReady);
 	DOREPLIFETIME(AFlickPlayerState, NetworkSelectedClass);
@@ -39,6 +41,21 @@ void AFlickPlayerState::ResetNetworkClassSelection(const EFlickLineupPreset InCl
 		bNetworkClassConfirmed = false;
 		ForceNetUpdate();
 	}
+}
+
+bool AFlickPlayerState::SetPuckSkins(const TArray<int32>& Skins)
+{
+	if (!HasAuthority() || Skins.Num() != FlickPieceArchetypeRules::ArchetypeCount) return false;
+	for (int32 Skin : Skins) if (Skin < 0 || Skin > 1) return false;
+	PuckSkins = Skins;
+	ForceNetUpdate();
+	return true;
+}
+
+int32 AFlickPlayerState::GetPuckSkin(const EFlickPieceArchetype Archetype) const
+{
+	const int32 Index = static_cast<int32>(Archetype);
+	return PuckSkins.IsValidIndex(Index) ? PuckSkins[Index] : 0;
 }
 
 void AFlickPlayerState::SetNetworkSelectedClass(const EFlickLineupPreset InClass)

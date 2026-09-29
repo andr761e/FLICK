@@ -1279,6 +1279,38 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 {
 	if (!bDisplayOptionsInitialized) RefreshDisplayOptions();
 	const auto Checked = [](const bool bValue) { return bValue ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; };
+	if (PuckHoverSizeOptions.IsEmpty())
+		for (int32 Size : {10, 12, 14, 16, 18}) PuckHoverSizeOptions.Add(MakeShared<int32>(Size));
+	if (PuckHoverDetailOptions.IsEmpty())
+		for (int32 Detail = 0; Detail < 4; ++Detail) PuckHoverDetailOptions.Add(MakeShared<int32>(Detail));
+	const auto HoverSizeLabel = [](int32 Size)
+	{
+		return FText::FromString(FString::Printf(TEXT("%d UI UNITS"), Size));
+	};
+	const auto HoverDetailLabel = [](int32 Detail)
+	{
+		static const TCHAR* Labels[] = {TEXT("OFF"), TEXT("NAME ONLY"), TEXT("PUCK TYPE ONLY"), TEXT("NAME + PUCK TYPE")};
+		return FText::FromString(Labels[FMath::Clamp(Detail, 0, 3)]);
+	};
+	const auto MakeHoverSelector = [this](TArray<TSharedPtr<int32>>& Options,
+		TFunction<int32()> Getter, TFunction<void(int32)> Setter, TFunction<FText(int32)> Label) -> TSharedRef<SWidget>
+	{
+		return SNew(SComboBox<TSharedPtr<int32>>)
+			.ComboBoxStyle(&DropdownStyle).ItemStyle(&DropdownRowStyle).OptionsSource(&Options)
+			.OnGenerateWidget_Lambda([Label](TSharedPtr<int32> Option)
+			{
+				return SNew(STextBlock).Text(Label(Option.IsValid() ? *Option : 0)).Font(UiFont(10)).ColorAndOpacity(Paper);
+			})
+			.OnSelectionChanged_Lambda([Setter](TSharedPtr<int32> Option, ESelectInfo::Type)
+			{
+				if (Option.IsValid()) Setter(*Option);
+			})
+			[SNew(STextBlock).Text_Lambda([Getter, Label]() { return Label(Getter()); }).Font(UiFont(10, true)).ColorAndOpacity(Paper)];
+	};
+	const TSharedRef<SWidget> HoverSizeSelector = MakeHoverSelector(PuckHoverSizeOptions,
+		FlickVisualSettings::GetPuckHoverSize, FlickVisualSettings::SetPuckHoverSize, HoverSizeLabel);
+	const TSharedRef<SWidget> HoverDetailSelector = MakeHoverSelector(PuckHoverDetailOptions,
+		FlickVisualSettings::GetPuckHoverDetail, FlickVisualSettings::SetPuckHoverDetail, HoverDetailLabel);
 	if (CameraShakeOptions.IsEmpty())
 	{
 		for (int32 Level = 0; Level < 4; ++Level) CameraShakeOptions.Add(MakeShared<int32>(Level));
@@ -1641,6 +1673,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("01"), TEXT("GAMEPLAY"), TEXT("Tune aiming and the physical feedback of every shot."))]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("02"), TEXT("CAMERA"), TEXT("Adjust camera motion, orbit response, and free-camera control."))]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("03"), TEXT("INTERFACE"), TEXT("Choose the guides and information shown during play."))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeOptionRow(TEXT("PUCK HOVER TEXT SIZE"), HoverSizeSelector)]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeOptionRow(TEXT("PUCK HOVER INFORMATION"), HoverDetailSelector)]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeToggleRow(TEXT("AIM AND CONTACT GUIDE"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return Checked(GameMode.IsValid() ? GameMode->IsAimGuideEnabled() : I && I->IsAimGuideEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetAimGuideEnabled(!GameMode->IsAimGuideEnabled()); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetAimGuideEnabled(!I->IsAimGuideEnabled()); }))]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel ? EVisibility::Visible : EVisibility::Collapsed; })[MakeToggleRow(TEXT("WORLD IMPACT EFFECTS"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return Checked(GameMode.IsValid() ? GameMode->AreImpactEffectsEnabled() : I && I->AreImpactEffectsEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetImpactEffectsEnabled(!GameMode->AreImpactEffectsEnabled()); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetImpactEffectsEnabled(!I->AreImpactEffectsEnabled()); }))]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeToggleRow(TEXT("CONTROL OVERVIEW"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return Checked(GameMode.IsValid() ? GameMode->IsControlOverviewEnabled() : I && I->IsControlOverviewEnabled()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState) { if (GameMode.IsValid()) GameMode->SetControlOverviewEnabled(!GameMode->IsControlOverviewEnabled()); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetControlOverviewEnabled(!I->IsControlOverviewEnabled()); }))]]

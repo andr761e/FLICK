@@ -7,8 +7,9 @@ Byg development build:
 Åben dobbelt spil
 .\play-flick-network.cmd
 
-Opdater assets
-.\update-flick-assets.cmd
+It reimports all nine base puck types, regenerates P1/P2/P3 from those current FBX files (AssetDevelopment/Pucks/HighDetail/exports), and supports both Blue and Orange through shared geometry and team-colour materials.
+Opdater pucks + lav alle P1, P2 og P3 versioner
+.\update-flick-pucks.cmd
 
 Til OH;
 - Starting pucks in BOB need to be more distinct from the standard pucks
