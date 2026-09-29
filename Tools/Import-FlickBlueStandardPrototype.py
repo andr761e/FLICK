@@ -71,6 +71,9 @@ mesh_path = destination + "/SM_Puck_Standard_Blue_Prototype"
 source_file = source_root / "exports/Standard.fbx"
 if not source_file.is_file():
     raise RuntimeError("Blue Standard source FBX is missing: " + str(source_file))
+# Use the legacy FBX path: Interchange can retain/rebuild incompatible sections
+# when replacing this long-lived combined mesh.
+u.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX 0")
 task = u.AssetImportTask()
 task.filename = str(source_file)
 task.destination_path = destination
