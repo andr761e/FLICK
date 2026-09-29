@@ -6,9 +6,9 @@
 SFlickGameLayer::SFlickGameLayer()
 {
 	MenuButtonStyle = FButtonStyle()
-		.SetNormal(FSlateColorBrush(Panel))
-		.SetHovered(FSlateColorBrush(PanelRaised))
-		.SetPressed(FSlateColorBrush(FLinearColor(0.0f, 0.46f, 0.68f, 1.0f)))
+		.SetNormal(FSlateRoundedBoxBrush(Panel, 3.0f, Hairline, 1.0f))
+		.SetHovered(FSlateRoundedBoxBrush(PanelRaised, 3.0f, Brand, 1.0f))
+		.SetPressed(FSlateRoundedBoxBrush(Ink, 3.0f, Cyan, 1.0f))
 		.SetNormalPadding(FMargin(21.0f, 10.0f))
 		.SetPressedPadding(FMargin(24.0f, 11.0f, 18.0f, 9.0f));
 	PrimaryButtonStyle = FButtonStyle()
@@ -43,13 +43,27 @@ SFlickGameLayer::SFlickGameLayer()
 		.SetPressedPadding(FMargin(0.0f));
 	ToggleStyle = FCheckBoxStyle()
 		.SetCheckBoxType(ESlateCheckBoxType::ToggleButton)
-		.SetUncheckedImage(FSlateColorBrush(Ink))
-		.SetUncheckedHoveredImage(FSlateColorBrush(FLinearColor(0.035f, 0.16f, 0.22f, 1.0f)))
-		.SetUncheckedPressedImage(FSlateColorBrush(FLinearColor(0.02f, 0.3f, 0.4f, 1.0f)))
-		.SetCheckedImage(FSlateColorBrush(Brand))
-		.SetCheckedHoveredImage(FSlateColorBrush(Paper))
-		.SetCheckedPressedImage(FSlateColorBrush(FLinearColor(0.0f, 0.42f, 0.62f, 1.0f)))
+		.SetUncheckedImage(FSlateRoundedBoxBrush(Ink, 3.0f, Hairline, 1.0f))
+		.SetUncheckedHoveredImage(FSlateRoundedBoxBrush(PanelRaised, 3.0f, Brand, 1.0f))
+		.SetUncheckedPressedImage(FSlateRoundedBoxBrush(PanelRaised, 3.0f, Cyan, 1.0f))
+		.SetCheckedImage(FSlateRoundedBoxBrush(Brand, 3.0f))
+		.SetCheckedHoveredImage(FSlateRoundedBoxBrush(FMath::Lerp(Brand, Paper, 0.15f), 3.0f))
+		.SetCheckedPressedImage(FSlateRoundedBoxBrush(Ice, 3.0f))
 		.SetPadding(FMargin(0.0f));
+	// Own these styles for the lifetime of the widget; Slate keeps pointers.
+	DropdownStyle = FCoreStyle::Get().GetWidgetStyle<FComboBoxStyle>("ComboBox");
+	DropdownStyle.ComboButtonStyle.ButtonStyle = CompactMenuButtonStyle;
+	DropdownStyle.ComboButtonStyle.SetMenuBorderBrush(FSlateRoundedBoxBrush(Ink, 3.0f, Hairline, 1.0f));
+	DropdownStyle.ComboButtonStyle.SetMenuBorderPadding(FMargin(4.0f));
+	DropdownRowStyle = FCoreStyle::Get().GetWidgetStyle<FTableRowStyle>("TableView.Row");
+	DropdownRowStyle.SetEvenRowBackgroundBrush(FSlateColorBrush(Ink))
+		.SetOddRowBackgroundBrush(FSlateColorBrush(Ink))
+		.SetEvenRowBackgroundHoveredBrush(FSlateRoundedBoxBrush(PanelRaised, 2.0f, Cyan, 1.0f))
+		.SetOddRowBackgroundHoveredBrush(FSlateRoundedBoxBrush(PanelRaised, 2.0f, Cyan, 1.0f))
+		.SetActiveBrush(FSlateRoundedBoxBrush(PanelRaised, 2.0f, Brand, 1.0f))
+		.SetActiveHoveredBrush(FSlateRoundedBoxBrush(PanelRaised, 2.0f, Brand, 1.0f))
+		.SetInactiveBrush(FSlateRoundedBoxBrush(PanelRaised, 2.0f, Hairline, 1.0f))
+		.SetInactiveHoveredBrush(FSlateRoundedBoxBrush(PanelRaised, 2.0f, Cyan, 1.0f));
 	SliderStyle = FSliderStyle()
 		.SetNormalBarImage(FSlateColorBrush(FLinearColor(0.05f, 0.1f, 0.135f, 1.0f)))
 		.SetHoveredBarImage(FSlateColorBrush(FLinearColor(0.07f, 0.18f, 0.24f, 1.0f)))
@@ -60,8 +74,8 @@ SFlickGameLayer::SFlickGameLayer()
 	SliderStyle.HoveredThumbImage.ImageSize = FVector2D(12.0f, 22.0f);
 	SliderStyle.SetNormalBarImage(FSlateNoResource()).SetHoveredBarImage(FSlateNoResource());
 	ShotClockBarStyle = FProgressBarStyle()
-		.SetBackgroundImage(FSlateColorBrush(FLinearColor(0.018f, 0.035f, 0.05f, 1.0f)))
-		.SetFillImage(FSlateColorBrush(FLinearColor::White))
+		.SetBackgroundImage(FSlateRoundedBoxBrush(Track, 2.5f))
+		.SetFillImage(FSlateRoundedBoxBrush(FLinearColor::White, 2.5f))
 		.SetMarqueeImage(FSlateNoResource());
 }
 
@@ -95,13 +109,17 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 #if !UE_BUILD_SHIPPING
 	bInvitePromptPreview = FParse::Param(FCommandLine::Get(), TEXT("FlickPartyInvitePreview"));
 	bPartyTrayPreview = FParse::Param(FCommandLine::Get(), TEXT("FlickPartyTrayPreview"));
+	bReplayOverlayPreview = FParse::Param(FCommandLine::Get(), TEXT("FlickReplayPreview"));
+	bFpsPreview = FParse::Param(FCommandLine::Get(), TEXT("FlickFpsPreview"));
 	bChallengesOpen = FParse::Param(FCommandLine::Get(), TEXT("FlickChallengesPreview"));
 	bSocialPanelOpen = FParse::Param(FCommandLine::Get(), TEXT("FlickSocialPreview"));
 	int32 SettingsPreviewTab = 0;
 	if (FParse::Value(FCommandLine::Get(), TEXT("FlickSettingsTab="), SettingsPreviewTab))
 	{
-		SelectedSettingsTab = static_cast<EFlickSettingsTab>(FMath::Clamp(SettingsPreviewTab, 0, static_cast<int32>(EFlickSettingsTab::Controls)));
+		SelectedSettingsTab = static_cast<EFlickSettingsTab>(FMath::Clamp(SettingsPreviewTab, 0, static_cast<int32>(EFlickSettingsTab::Lighting)));
 	}
+	bLightingPreview = SelectedSettingsTab == EFlickSettingsTab::Lighting
+		&& FParse::Param(FCommandLine::Get(), TEXT("FlickLightingPreview"));
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickProfileCustomizePreview")))
 	{
 		SelectedProfileTab = EFlickProfileTab::Customization;
@@ -120,6 +138,9 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		Player1HoveredLoadoutArchetype = EFlickPieceArchetype::Heavy;
 	}
 #endif
+	bEditMenuLighting = !GameMode.IsValid() || GameMode->GetSettingsReturnScreen() == EFlickFrontendScreen::MainMenu;
+	if (GameMode.IsValid() && GameMode->GetFrontendScreen() == EFlickFrontendScreen::Settings)
+		LastFocusedScreen = EFlickFrontendScreen::Settings;
 
 	ChildSlot
 	[
@@ -285,7 +306,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			.Visibility_Lambda([this]()
 			{
 				return ((GameMode.IsValid() && GameMode->IsCinematicReplayActive())
-					|| (PlayerController.IsValid() && PlayerController->IsCinematicReplayPresentationActive()))
+					|| (PlayerController.IsValid() && PlayerController->IsCinematicReplayPresentationActive()) || bReplayOverlayPreview)
 					? EVisibility::HitTestInvisible
 					: EVisibility::Collapsed;
 			})
@@ -379,6 +400,16 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		.VAlign(VAlign_Bottom)
 		[
 			BuildMainMenuFooter()
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(12.0f, 0.0f, 0.0f, 8.0f)
+		[
+			SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Ink).Padding(FMargin(6.0f, 2.0f))
+			.Visibility_Lambda([this]() { return FlickVisualSettings::IsFpsVisible() || bFpsPreview ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			[
+				SNew(STextBlock)
+				.Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("%d FPS"), FMath::RoundToInt(1.0f / FMath::Max(SmoothedFrameSeconds, 0.0001f)))); })
+				.Font(UiFont(9, true)).ColorAndOpacity(Muted)
+			]
 		]
 		]
 		]
@@ -544,6 +575,10 @@ void SFlickGameLayer::Tick(
 	const float InDeltaTime)
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+	if (InDeltaTime > 0.0f)
+	{
+		SmoothedFrameSeconds = FMath::Lerp(SmoothedFrameSeconds, InDeltaTime, 1.0f - FMath::Exp(-InDeltaTime * 4.0f));
+	}
 	ViewportLocalSize = AllottedGeometry.GetLocalSize();
 	LayerLocalSize = FlickPresentationFrame::GetContainedSize(ViewportLocalSize);
 	const UFlickSessionSubsystem* InviteSessions = GetDisplayedSessionSubsystem();
@@ -634,6 +669,12 @@ void SFlickGameLayer::Tick(
 	}
 
 	const EFlickFrontendScreen CurrentScreen = GameMode->GetFrontendScreen();
+	if (CurrentScreen == EFlickFrontendScreen::Settings && LastFocusedScreen != EFlickFrontendScreen::Settings)
+	{
+		// Reopening from a match must not retain a menu-only preview from the previous visit.
+		bEditMenuLighting = GameMode->GetSettingsReturnScreen() == EFlickFrontendScreen::MainMenu;
+		bLightingPreview = false;
+	}
 	if (CurrentScreen == EFlickFrontendScreen::Loadout
 		&& LastFocusedScreen != EFlickFrontendScreen::Loadout)
 	{

@@ -4,6 +4,10 @@ from pathlib import Path
 
 import unreal as u
 
+# Legacy FBX handles multiple UCX hulls reliably; Interchange 5.8 can retain
+# cooked convex resources during reimport and trigger a Chaos assignment ensure.
+u.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX 0")
+
 
 project = Path(u.Paths.project_dir())
 source_root = project / "AssetDevelopment/BOB Arena"
@@ -116,10 +120,16 @@ options.mesh_type_to_import = u.FBXImportType.FBXIT_STATIC_MESH
 data = options.static_mesh_import_data
 data.combine_meshes = True
 data.auto_generate_collision = False
+data.one_convex_hull_per_ucx = True
 data.generate_lightmap_u_vs = True
 data.normal_import_method = u.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS
 task.options = options
 task.factory = u.FbxFactory()
+# Reimport can otherwise retain previous automatic/full-board hulls in addition
+# to the UCX openings. Clear collision before importing the authoritative set.
+existing_mesh = u.load_asset(destination + "/" + asset_name)
+if existing_mesh:
+    mesh_editor.remove_collisions(existing_mesh)
 assets.import_asset_tasks([task])
 
 mesh = u.load_asset(destination + "/" + asset_name)
@@ -131,6 +141,10 @@ settings.recompute_tangents = True
 settings.use_mikk_t_space = True
 settings.remove_degenerates = True
 mesh_editor.set_lod_build_settings(mesh, 0, settings)
+# Use only the authored floor hulls for both physics and traces. Complex artwork
+# includes decorative pocket bottoms that must never stop a falling puck.
+mesh.get_editor_property("body_setup").set_editor_property(
+    "collision_trace_flag", u.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX)
 
 mapped = []
 for index, slot in enumerate(mesh.get_editor_property("static_materials")):
@@ -143,6 +157,8 @@ for index, slot in enumerate(mesh.get_editor_property("static_materials")):
 u.EditorAssetLibrary.save_loaded_asset(mesh)
 
 bounds = mesh.get_bounds()
+if mesh_editor.get_convex_collision_count(mesh) < 9:
+    raise RuntimeError("BOB arena is missing its pocket-cutout floor collision")
 dimensions = [bounds.box_extent.x * 2.0, bounds.box_extent.y * 2.0, bounds.box_extent.z * 2.0]
 if abs(dimensions[0] - 1308.0) > 1.0 or abs(dimensions[1] - 1308.0) > 1.0:
     raise RuntimeError("BOB arena scale mismatch: " + str(dimensions))
@@ -150,5 +166,6 @@ if abs(dimensions[0] - 1308.0) > 1.0 or abs(dimensions[1] - 1308.0) > 1.0:
     "asset": asset_name,
     "dimensions_cm": dimensions,
     "materials": mapped,
+    "floor_collision_hulls": mesh_editor.get_convex_collision_count(mesh),
 }, indent=2))
 u.log("FLICK_BOB_ARENA_IMPORT_COMPLETE")

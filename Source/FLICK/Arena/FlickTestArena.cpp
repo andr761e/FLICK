@@ -92,6 +92,7 @@ AFlickTestArena::AFlickTestArena()
 {
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	CreateOneVsOnePresentationComponents(CubeMesh.Object, CylinderMesh.Object);
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WorkshopArenaAsset(
 		TEXT("/Game/TestArena/Arena/SM_TestArena_Static.SM_TestArena_Static"));
@@ -575,6 +576,47 @@ bool AFlickTestArena::ToggleTrainingMechanismAtWorldLocation(
 	return true;
 }
 
+void AFlickTestArena::SetMenuPresentationEnabled(const bool bEnabled)
+{
+	if (!WorkshopArenaMesh || bMenuMaterialsEnabled == bEnabled) return;
+	if (bEnabled && MenuPresentationMaterials.IsEmpty())
+	{
+		for (int32 Index = 0; Index < WorkshopArenaMesh->GetNumMaterials(); ++Index)
+		{
+			UMaterialInterface* Original = WorkshopArenaMesh->GetMaterial(Index);
+			MenuOriginalMaterials.Add(Original);
+			// Unreal cannot render a MID parented to another MID. Clone the
+			// format overrides onto a sibling sharing the authored parent.
+			UMaterialInstanceDynamic* OriginalDynamic = Cast<UMaterialInstanceDynamic>(Original);
+			UMaterialInterface* Parent = OriginalDynamic ? OriginalDynamic->Parent.Get() : Original;
+			UMaterialInstanceDynamic* Material = Parent ? UMaterialInstanceDynamic::Create(Parent, this) : nullptr;
+			if (Material && OriginalDynamic) Material->CopyInterpParameters(OriginalDynamic);
+			MenuPresentationMaterials.Add(Material);
+			if (!Material) continue;
+			float Emission = 0.0f;
+			Original->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), Emission);
+			if (Emission > 0.1f)
+			{
+				Material->SetScalarParameterValue(TEXT("Emission"), Emission * 4.0f);
+			}
+			else if (Original->GetName().Contains(TEXT("Arena_Surface"))
+				|| Original->GetName().Contains(TEXT("Inner_Field"))
+				|| Original->GetName().Contains(TEXT("Center_Inset")))
+			{
+				Material->SetScalarParameterValue(TEXT("Metallic"), bOneVsOnePresentationEnabled ? OneVsOneDeckMetallic : 0.48f);
+				Material->SetScalarParameterValue(TEXT("Roughness"), bOneVsOnePresentationEnabled ? OneVsOneMenuDeckRoughness : 0.26f);
+				Material->SetScalarParameterValue(TEXT("SurfaceLift"), bOneVsOnePresentationEnabled ? 0.025f : 0.015f);
+			}
+		}
+	}
+	for (int32 Index = 0; Index < MenuOriginalMaterials.Num(); ++Index)
+	{
+		WorkshopArenaMesh->SetMaterial(Index, bEnabled && MenuPresentationMaterials[Index]
+			? static_cast<UMaterialInterface*>(MenuPresentationMaterials[Index].Get()) : MenuOriginalMaterials[Index].Get());
+	}
+	bMenuMaterialsEnabled = bEnabled;
+}
+
 void AFlickTestArena::BeginReplayPresentation()
 {
 	if (bReplayPresentationActive)
@@ -722,7 +764,12 @@ FLinearColor AFlickTestArena::GetMechanismColor(const int32 MechanismIndex) cons
 		FLinearColor(0.20f, 0.82f, 0.64f, 1.0f),
 		FLinearColor(0.68f, 0.88f, 0.16f, 1.0f)
 	};
-	return Colors[FMath::Clamp(MechanismIndex, 0, MaxMechanismCount - 1)];
+	const FLinearColor Color = Colors[FMath::Clamp(MechanismIndex, 0, MaxMechanismCount - 1)];
+	// Preserve each mechanism's hue/identity, with the same rich signal colours
+	// across all Knockout formats.
+	FLinearColor HSV = Color.LinearRGBToHSV();
+	HSV.G = FMath::Max(HSV.G, 0.92f);
+	return HSV.HSVToLinearRGB();
 }
 
 void AFlickTestArena::OnRep_DividerState()
@@ -863,7 +910,11 @@ void AFlickTestArena::BuildLayoutFromSeed()
 		const bool bOuter = (LocationIndex % 2) == 0;
 		const float RadialAngle = FMath::DegreesToRadians(LocationIndex * (360.0f / LocationCount));
 		const FVector2D Radial(FMath::Cos(RadialAngle), FMath::Sin(RadialAngle));
-		PossibleDividerCenters[LocationIndex] = Radial * ArenaRadius * (bOuter ? OuterDividerRadiusFraction : 0.82f);
+		const float RadiusFraction = (bOuter ? OuterDividerRadiusFraction : 0.82f)
+			- FMath::Clamp(DividerRadialInsetFraction, 0.0f, 0.10f);
+		// All slots, live divider colliders/art, switches and traces consume this
+		// shared placement, so the complete mechanism stays aligned after moving.
+		PossibleDividerCenters[LocationIndex] = Radial * ArenaRadius * RadiusFraction;
 		PossibleDividerAngles[LocationIndex] = RadialAngle + PI * 0.5f
 			+ (bOuter ? 0.0f : FMath::DegreesToRadians((LocationIndex % 4) == 1 ? 11.0f : -11.0f));
 		PossibleDividerLengths[LocationIndex] = DividerLength * (bOuter ? 0.92f : 1.08f);
@@ -1072,6 +1123,7 @@ void AFlickTestArena::ApplyTestLayout()
 			DividerThickness / 18.0f,
 			DividerHeight / 56.0f));
 	}
+	UpdateOneVsOnePresentation();
 }
 
 void AFlickTestArena::CreateRuntimeMaterials()
@@ -1177,6 +1229,15 @@ void AFlickTestArena::ApplyMechanismState()
 			bPending ? FLinearColor(0.95f, 0.96f, 0.87f, 1.0f) : BaseColor, 0.72f);
 		SetMaterialColor(TraceMaterials.IsValidIndex(Index) ? TraceMaterials[Index] : nullptr,
 			FLinearColor(BaseColor.R, BaseColor.G, BaseColor.B, 1.0f) * (bPending ? 0.65f : bRaised ? 0.4f : 0.18f), 0.9f);
+		if (bUsingWorkshopAssets)
+		{
+			// State colours stay authoritative; all formats share the same richer
+			// rendered signal output without changing activation or divider state.
+			if (AccentMaterials.IsValidIndex(Index) && AccentMaterials[Index])
+				AccentMaterials[Index]->SetScalarParameterValue(TEXT("Emission"), 1.2f);
+			if (DotMaterials.IsValidIndex(Index) && DotMaterials[Index])
+				DotMaterials[Index]->SetScalarParameterValue(TEXT("Emission"), 1.8f);
+		}
 		DividerCapMeshes[Index]->SetVisibility(bRaised && !bUsingWorkshopAssets);
 		DividerCapMeshes[Index]->SetHiddenInGame(!bRaised || bUsingWorkshopAssets);
 		if (DividerVisualMeshes.IsValidIndex(Index) && DividerVisualMeshes[Index])

@@ -1,0 +1,23 @@
+{
+  "source": "BobArena.blend",
+  "triangles": 69860,
+  "dimensions_m": [
+    13.079999923706055,
+    13.079999923706055,
+    0.9570000171661377
+  ],
+  "materials": [
+    "02_BOB_Wood",
+    "06_BOB_PocketVoid",
+    "01_BOB_Surface",
+    "08_BOB_DarkMetal",
+    "07_BOB_Silver",
+    "03_BOB_InnerWall",
+    "05_BOB_PocketRed",
+    "09_BOB_PocketBottom",
+    "04_BOB_Red"
+  ],
+  "corrected_ring_faces": 160,
+  "floor_collision_hulls": 137,
+  "flattened_pocket_vertices": 5120
+}

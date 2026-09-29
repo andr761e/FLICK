@@ -12,8 +12,7 @@ Opdater assets
 
 Til OH;
 - Starting pucks in BOB need to be more distinct from the standard pucks
-- Fix the red cups in the BOB Arena.
-- Make red ring in BOB Arena smaller so it encloses the pucks
+-  
 
 Til André;
 -

@@ -21,9 +21,10 @@ public:
 	void ApplyCameraSettings();
 	void AddCameraImpulse(float Strength);
 	void SetMenuPresentation(bool bInMenuPresentation);
-	void SetMenuOrbitEnabled(bool bEnabled) { bMenuOrbitEnabled = bEnabled; }
+	void SetMenuOrbitEnabled(bool bEnabled);
 	void SetBobGameplayFraming(bool bInBobGameplayFraming);
 	void SetTestArenaPresentation(bool bInTestArenaPresentation);
+	void SetOneVsOneArenaPresentation(bool bEnabled);
 	void SetAimPresentation(bool bEnabled, const FVector& FocusPoint = FVector::ZeroVector);
 	void SetCompactGameplayFraming(bool bInCompactGameplayFraming);
 	void SetArenaFramingScale(float InArenaFramingScale);
@@ -103,10 +104,37 @@ public:
 	float MenuOrbitDegreesPerSecond = 1.4f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.6", ClampMax = "1.0"))
-	float MenuOrbitRadiusScale = 0.84f;
+	float MenuOrbitRadiusScale = 0.95f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.6", ClampMax = "1.0"))
 	float MenuOrbitHeightScale = 0.78f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.0", ClampMax = "300.0"))
+	float MenuOrbitFocusHeight = 175.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float MenuBloomIntensity = 0.65f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "1.0", ClampMax = "1.5"))
+	float MenuColorSaturation = 1.22f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float OneVsOneMenuBloomIntensity = 0.85f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "1.0", ClampMax = "4.0"))
+	float OneVsOneMenuFstop = 1.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "24.0", ClampMax = "70.0"))
+	float OneVsOneMenuSensorWidth = 60.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "0.85", ClampMax = "1.0"))
+	float OneVsOneMenuDistanceMultiplier = 0.94f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "1.0", ClampMax = "1.25"))
+	float OneVsOneMenuHeightMultiplier = 1.18f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "0.0", ClampMax = "250.0"))
+	float OneVsOneMenuFocusHeight = 115.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "2.0"))
 	float ClassicBloomIntensity = 0.28f;
@@ -227,10 +255,13 @@ private:
 	bool bGameplayElevationLocked = false;
 	bool bMenuPresentation = false;
 	bool bMenuOrbitEnabled = false;
+	TWeakObjectPtr<class ARectLight> MenuKeyLight;
+	TWeakObjectPtr<class ARectLight> MenuRimLight;
 	bool bMenuOrbitInitialized = false;
 	float MenuOrbitAngle = 0.0f;
 	bool bBobGameplayFraming = false;
 	bool bTestArenaPresentation = false;
+	bool bOneVsOneArenaPresentation = false;
 	bool bAimPresentation = false;
 	bool bCompactGameplayFraming = false;
 	bool bCinematicReplay = false;

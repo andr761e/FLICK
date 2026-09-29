@@ -44,11 +44,11 @@ public:
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category = "FLICK|BOB")
 	float PocketInset = 150.0f;
 
-	/** Minimum vertical tolerance above the flat tabletop for pocket-opening capture. */
+	/** Depth below the tabletop before a physically falling puck is pocketed. */
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category = "FLICK|BOB|Pocket Physics", meta = (ClampMin = "2.0", ClampMax = "40.0"))
-	float PocketCaptureDepth = 8.0f;
+	float PocketCaptureDepth = 24.0f;
 
-	/** Fraction of puck radius that must pass inside the visual pocket lip before capture. */
+	/** Extra radial tolerance for tilted pucks, used only after physically falling below the lip. */
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, Category = "FLICK|BOB|Pocket Physics", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float PocketCaptureRadiusScale = 0.35f;
 
@@ -80,11 +80,15 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> BoardBase;
 
-	/** Legacy pocket-cutout tiles retained for component compatibility; collision is disabled. */
+	/** Hidden simple compound floor collider with round pocket openings. */
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UStaticMeshComponent> PocketedTabletop;
+
+	/** Fallback pocket-cutout support, disabled when the imported compound floor is available. */
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> BoardCollisionTiles;
 
-	/** Blender-authored presentation; gameplay continues to use BoardBase and Rails. */
+	/** Blender-authored presentation; gameplay uses its UCX floor through PocketedTabletop and separate Rails. */
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> HighDetailArenaMesh;
 

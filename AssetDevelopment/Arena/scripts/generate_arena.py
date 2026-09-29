@@ -22,6 +22,7 @@ switch_radius=cpp_float(SOURCE,'ControlZoneRadius',40.0)/100
 dot_radius=cpp_float(SOURCE,'SwitchActivationDotRadius',8.0)/100
 switch_distance=cpp_float(SOURCE,'SwitchDistanceFromDivider',145.0)/100
 outer_radius_fraction=cpp_float(SOURCE,'OuterDividerRadiusFraction',.935)
+divider_radial_inset_fraction=cpp_float(SOURCE,'DividerRadialInsetFraction',.035)
 possible_count=20
 active_count=8
 
@@ -180,9 +181,8 @@ parts += [cylinder('Playing surface',arena_radius*.960,.055,-.0275,floor_mat,192
 # of the original 1v1 arena while remaining only fractions of a centimeter high.
 parts += [cylinder('Inner tactical field',arena_radius*.705,.004,-.001,inner_field,192,.001)]
 parts += [ring('Outer tactical lane',arena_radius*.708,arena_radius*.956,-.001,.004,floor_mat,192)]
-# The authoritative outer dividers reach 629.75 cm and their sockets reach
-# 633.75 cm. Start the visible rim beyond both footprints instead of letting
-# its trim intersect the mechanisms.
+# Modular divider placement includes the C++ radial inset so even the widened
+# runtime sockets clear this collar. The rim and playing radius remain unchanged.
 parts += [ring('Outer chassis',arena_radius*.968,arena_radius,-.20,.31,rubber,192)]
 # The complete upper rim is a solid annular collar whose top is flush with the
 # authoritative Z=0 play surface. Earlier raised clamps reached 16.5 cm above
@@ -330,7 +330,7 @@ active_indices=[0,2,5,7,10,12,15,17]
 for index in range(possible_count):
     outer=index%2==0; radial_angle=math.radians(index*(360/possible_count))
     radial=Vector((math.cos(radial_angle),math.sin(radial_angle)))
-    center=radial*arena_radius*(outer_radius_fraction if outer else .82)
+    center=radial*arena_radius*((outer_radius_fraction if outer else .82)-divider_radial_inset_fraction)
     angle=radial_angle+math.pi/2+(0 if outer else math.radians(11 if index%4==1 else -11))
     length=divider_length*(.92 if outer else 1.08)
     socket=socket_asset.copy(); socket.data=socket_asset.data.copy(); socket.hide_render=False
@@ -381,6 +381,7 @@ manifest={'arena_radius_cm':arena_radius*100,'arena_thickness_cm':arena_thicknes
           'switch_radius_cm':switch_radius*100,'activation_dot_radius_cm':dot_radius*100,
           'rim_inner_radius_cm':arena_radius*.977*100,
           'outer_divider_radius_fraction':outer_radius_fraction,
+          'divider_radial_inset_fraction':divider_radial_inset_fraction,
           'possible_locations':locations,'exports':[asset.name for asset in assets]}
 (ROOT/'dimensions.json').write_text(json.dumps(manifest,indent=2))
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'TestArenaWorkshop.blend'))

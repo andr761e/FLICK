@@ -1,4 +1,6 @@
 #include "Player/FlickPlayerController.h"
+#include "Arena/FlickArenaLighting.h"
+#include "Core/FlickModeRules.h"
 #include "Core/FlickControlBindings.h"
 
 #include "Core/FlickLog.h"
@@ -43,6 +45,23 @@ void AFlickPlayerController::SetGameplayCameraTeamFromServer(const EFlickTeam Te
 		return;
 	}
 	ClientSetGameplayCameraTeam(Team, bSnap);
+}
+
+void AFlickPlayerController::HandleReplaySkipPressed()
+{
+	if (!bCinematicReplayPresentationActive) return;
+	if (const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>())
+	{
+		ServerRequestReplaySkip(State->ReplaySerial);
+	}
+}
+
+void AFlickPlayerController::ServerRequestReplaySkip_Implementation(const int32 ReplaySerial)
+{
+	if (AFlickGameMode* Mode = GetWorld()->GetAuthGameMode<AFlickGameMode>())
+	{
+		Mode->RequestReplaySkip(this, ReplaySerial);
+	}
 }
 
 void AFlickPlayerController::BeginCinematicReplayFromServer(const FVector& InitialFocus, const EFlickTeam ShootingTeam)
@@ -131,6 +150,7 @@ void AFlickPlayerController::RefreshControlBindings()
 	if (!InputComponent) return;
 	InputComponent->KeyBindings.Reset();
 	const auto Key = [](const TCHAR* Id) { return FlickControlBindings::GetKey(Id); };
+	InputComponent->BindKey(Key(TEXT("ReplaySkip")), IE_Pressed, this, &AFlickPlayerController::HandleReplaySkipPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Shoot")), IE_Pressed, this, &AFlickPlayerController::HandlePrimaryPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Shoot")), IE_Released, this, &AFlickPlayerController::HandlePrimaryReleased).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Secondary")), IE_Pressed, this, &AFlickPlayerController::HandleSecondaryPressed).bExecuteWhenPaused = true;
@@ -150,10 +170,52 @@ void AFlickPlayerController::RefreshControlBindings()
 	InputComponent->BindKey(Key(TEXT("Scoreboard")), IE_Released, this, &AFlickPlayerController::HandleScoreboardReleased).bExecuteWhenPaused = true;
 }
 
+void AFlickPlayerController::RefreshLocalLighting()
+{
+	if (!IsLocalController()) return;
+	if (AFlickGameMode* Mode = GetFlickGameMode())
+	{
+		Mode->RefreshLightingSettings();
+		return;
+	}
+	const AFlickGameState* State = GetFlickGameState();
+	if (!State) return;
+	FlickArenaLighting::FParameters Parameters;
+	Parameters.bClassicArenaLighting = State->ActiveMatchVariant == EFlickMatchVariant::Classic;
+	Parameters.bBobArenaLighting = State->ActiveMatchVariant == EFlickMatchVariant::Bob;
+	Parameters.bTestArenaMode = FlickModeRules::Get(State->ActiveMatchVariant).bUseSwitchyardArena;
+	Parameters.bPremiumArena = Parameters.bTestArenaMode;
+	Parameters.bPremiumMenu = State->bPartyActive && !State->IsGameplayActive() && !State->bNetworkLobbyActive
+		&& !State->bPrivateMatchActive && !State->bPrivateMatchLobbyActive && !State->bNetworkClassSelectionActive;
+	Parameters.bFrontendShowcase = Parameters.bPremiumMenu || !State->IsGameplayActive();
+	Parameters.ArenaRadius = FlickModeRules::GetArenaRadius(State->ActiveMatchVariant, State->PlayersPerTeam);
+	if (Parameters.bClassicArenaLighting && (State->bPrivateMatchActive || State->bPrivateMatchLobbyActive))
+		Parameters.ArenaRadius *= FMath::Clamp(State->PrivateMatchSettings.ArenaScale, 0.85f, 1.3f);
+	Parameters.ArenaSurfaceZ = State->ArenaSurfaceZ;
+	FlickArenaLighting::FRig Rig = FlickArenaLighting::FindRig(GetWorld());
+	FlickArenaLighting::Configure(GetWorld(), Rig, Parameters);
+}
+
 void AFlickPlayerController::PlayerTick(const float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
 	const AFlickGameState* NetworkState = GetFlickGameState();
+	// Remote players own their light rig locally. Only update on presentation changes,
+	// never scan or recreate fixtures each frame, and never send preferences to the host.
+	if (IsLocalController() && GetNetMode() == NM_Client && NetworkState)
+	{
+		const int32 Context = static_cast<int32>(NetworkState->ActiveMatchVariant)
+			| (NetworkState->PlayersPerTeam << 4) | (NetworkState->bPartyActive << 8)
+			| (NetworkState->bNetworkLobbyActive << 9) | (NetworkState->bPrivateMatchActive << 10)
+			| (NetworkState->bPrivateMatchLobbyActive << 11) | (NetworkState->bNetworkClassSelectionActive << 12)
+			| (NetworkState->IsGameplayActive() << 13);
+		if (LocalLightingContext != Context || LocalLightingArenaScale != NetworkState->PrivateMatchSettings.ArenaScale)
+		{
+			LocalLightingContext = Context;
+			LocalLightingArenaScale = NetworkState->PrivateMatchSettings.ArenaScale;
+			RefreshLocalLighting();
+		}
+	}
 	const bool bPrivateMatchNowActive = NetworkState && NetworkState->bPrivateMatchActive;
 	if (bPrivateMatchNowActive && !bObservedPrivateMatchActive)
 	{

@@ -7,6 +7,8 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -55,6 +57,12 @@ AFlickBobArena::AFlickBobArena()
 	};
 
 	BoardBase = CreateMesh(TEXT("BoardBase"), CubeMesh.Object);
+	PocketedTabletop = CreateMesh(TEXT("PocketedTabletop"), nullptr);
+	PocketedTabletop->SetVisibility(false);
+	PocketedTabletop->SetHiddenInGame(true);
+	PocketedTabletop->SetCastShadow(false);
+	if (HighDetailArenaAsset.Succeeded())
+		PocketedTabletop->SetStaticMesh(HighDetailArenaAsset.Object);
 	for (int32 Index = 0; Index < 9; ++Index)
 	{
 		BoardCollisionTiles.Add(CreateMesh(
@@ -139,7 +147,10 @@ AFlickBobArena::AFlickBobArena()
 	// Keep one uninterrupted collider under the entire tabletop. The old nine-tile
 	// pocket cutout produced coplanar collision seams whose contact normals could
 	// redirect a puck even though no obstruction was visible.
-	BoardBase->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	BoardBase->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	PocketedTabletop->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	PocketedTabletop->SetCollisionObjectType(ECC_WorldStatic);
+	PocketedTabletop->SetCollisionResponseToAllChannels(ECR_Block);
 	BoardBase->SetCollisionObjectType(ECC_WorldStatic);
 	BoardBase->SetCollisionResponseToAllChannels(ECR_Block);
 	BoardBase->SetGenerateOverlapEvents(false);
@@ -260,11 +271,8 @@ bool AFlickBobArena::IsCapturedByPocket(const FVector& WorldLocation, const floa
 {
 	const FVector LocalLocation = GetActorTransform().InverseTransformPosition(WorldLocation);
 	const float SafePieceRadius = FMath::Max(0.0f, PieceRadius);
-	// The tabletop is deliberately one seamless collider, so pocket capture is
-	// determined by the puck center crossing the inset opening rather than by a
-	// physical hole assembled from several collision tiles.
-	if (LocalLocation.Z > SurfaceZ + SafePieceRadius
-		|| LocalLocation.Z < SurfaceZ - BoardThickness)
+	// Let Chaos carry the puck below the real opening before hiding/scoring it.
+	if (LocalLocation.Z > SurfaceZ - PocketCaptureDepth)
 	{
 		return false;
 	}
@@ -272,7 +280,7 @@ bool AFlickBobArena::IsCapturedByPocket(const FVector& WorldLocation, const floa
 	const float PocketOffset = BoardHalfExtent - PocketInset;
 	const float CaptureRadius = FMath::Max(
 		4.0f,
-		PocketRadius - SafePieceRadius * PocketCaptureRadiusScale);
+		PocketRadius + SafePieceRadius * PocketCaptureRadiusScale);
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
 		const FVector2D Center(
@@ -346,8 +354,20 @@ void AFlickBobArena::ApplyArenaShape()
 	const float PedestalHeight = FMath::Max(80.0f, BottomZ);
 	BoardBase->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - BoardThickness * 0.5f));
 	BoardBase->SetRelativeScale3D(FVector(BoardHalfExtent / 50.0f, BoardHalfExtent / 50.0f, BoardThickness / 100.0f));
-	// Keep the legacy pocket-cutout components aligned for asset compatibility.
-	// They are presentation-only now; BoardBase is the seamless collider.
+	const bool bHasPocketCollision = PocketedTabletop && PocketedTabletop->GetStaticMesh()
+		&& PocketedTabletop->GetStaticMesh()->GetBodySetup()
+		&& PocketedTabletop->GetStaticMesh()->GetBodySetup()->AggGeom.ConvexElems.Num() >= 9;
+	if (PocketedTabletop)
+	{
+		PocketedTabletop->SetRelativeScale3D(FVector(BoardHalfExtent / 620.0f, BoardHalfExtent / 620.0f, BoardThickness / 50.0f));
+		// Z scaling must keep the top plane at SurfaceZ.
+		PocketedTabletop->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 250.0f * BoardThickness / 50.0f));
+		PocketedTabletop->SetCollisionEnabled(bHasPocketCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	}
+	// Older/missing exports degrade to the pocket-cutout tiles, never a solid slab.
+	for (UStaticMeshComponent* Tile : BoardCollisionTiles)
+		Tile->SetCollisionEnabled(bHasPocketCollision ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+	// Keep the fallback pocket-cutout components aligned for older exports.
 	if (BoardCollisionTiles.Num() == 9)
 	{
 		const float HoleCenter = BoardHalfExtent - PocketInset;
@@ -704,6 +724,7 @@ void AFlickBobArena::ApplyPhysicsMaterials()
 	RailPhysicalMaterial->bOverrideRestitutionCombineMode = true;
 	RailPhysicalMaterial->RestitutionCombineMode = EFrictionCombineMode::Average;
 	BoardBase->SetPhysMaterialOverride(BoardPhysicalMaterial);
+	PocketedTabletop->SetPhysMaterialOverride(BoardPhysicalMaterial);
 	for (UStaticMeshComponent* Tile : BoardCollisionTiles)
 	{
 		Tile->SetPhysMaterialOverride(BoardPhysicalMaterial);

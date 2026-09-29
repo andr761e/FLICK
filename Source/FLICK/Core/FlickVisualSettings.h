@@ -10,4 +10,6 @@ namespace FlickVisualSettings
 	FLICK_API bool IsHardwareLumenEnabled();
 	FLICK_API void SetHardwareLumenEnabled(bool bEnabled);
 	FLICK_API void ApplySaved();
+	FLICK_API bool IsFpsVisible();
+	FLICK_API void SetFpsVisible(bool bVisible);
 }

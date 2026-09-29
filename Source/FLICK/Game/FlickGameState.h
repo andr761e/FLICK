@@ -116,6 +116,24 @@ public:
 	float GetDramaticEventTimeRemaining() const;
 
 	bool IsGameplayActive() const { return MatchPhase != EFlickMatchPhase::WaitingToStart; }
+	bool RegisterReplaySkipVote(APlayerState* Player, int32 Serial);
+	TArray<APlayerState*> GetPendingReplayPlayers() const;
+	bool HasReplaySkipConsensus() const;
+
+	UPROPERTY(Replicated)
+	int32 ReplaySerial = 0;
+
+	UPROPERTY(Replicated)
+	EFlickTeam ReplayShootingTeam = EFlickTeam::None;
+
+	UPROPERTY(Replicated)
+	int32 ReplayShootingPlayerSlot = 0;
+
+	UPROPERTY(Replicated)
+	bool bReplaySelfKnockout = false;
+
+	UPROPERTY(Replicated)
+	TArray<TObjectPtr<APlayerState>> ReplaySkipVotes;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Match")
 	EFlickMatchPhase MatchPhase = EFlickMatchPhase::WaitingToStart;

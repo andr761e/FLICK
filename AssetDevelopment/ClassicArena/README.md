@@ -14,5 +14,12 @@ Regenerate with Blender 5.2:
 ```
 
 This writes `ClassicArenaPremium.blend`, an FBX/GLB export, a review render,
-and `dimensions.json`. Close Unreal Editor and run `./update-flick-assets.cmd`
-to import the FBX. The import script deliberately disables mesh collision.
+and `dimensions.json`.
+
+## Legacy source archive
+
+This deck has been superseded by the modular arena under `AssetDevelopment/Arena`.
+Its unused Unreal mesh was removed after a runtime-path
+and Asset Registry reference audit. The source files and manual importer are
+retained for recovery, but `update-flick-assets.cmd` no longer imports this deck.
+The current gameplay arena, collision and lighting are unchanged.

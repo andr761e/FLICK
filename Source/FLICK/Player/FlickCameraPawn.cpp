@@ -1,4 +1,7 @@
 #include "Player/FlickCameraPawn.h"
+#include "Arena/FlickArenaLighting.h"
+#include "Core/FlickModeRules.h"
+#include "Engine/RectLight.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
@@ -85,15 +88,25 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	FRotator MenuTargetRotation = MenuCameraRotation;
 	if (bMenuPresentation && bMenuOrbitEnabled)
 	{
+		const FVector MenuFocus(0.0f, 0.0f, bOneVsOneArenaPresentation ? OneVsOneMenuFocusHeight : MenuOrbitFocusHeight);
+		const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
+		const FVector OpticalFocus = bOneVsOneArenaPresentation
+			? FVector(0.0f, 0.0f, (State ? State->ArenaSurfaceZ : 250.0f) + 20.0f) : MenuFocus;
+		Camera->PostProcessSettings.DepthOfFieldFocalDistance = bOneVsOneArenaPresentation
+			? FMath::Max(1.0f, FVector::DotProduct(OpticalFocus - GetActorLocation(), GetActorForwardVector()))
+			: FVector::Distance(GetActorLocation(), MenuFocus);
 		if (!bMenuOrbitInitialized)
 		{
 			MenuOrbitAngle = FMath::Atan2(MenuCameraLocation.Y, MenuCameraLocation.X);
 			bMenuOrbitInitialized = true;
 		}
 		MenuOrbitAngle = FMath::Fmod(MenuOrbitAngle + FMath::DegreesToRadians(MenuOrbitDegreesPerSecond) * DeltaSeconds, 2.0f * PI);
-		const float Radius = FVector2D(MenuCameraLocation.X, MenuCameraLocation.Y).Size() * ArenaFramingScale * MenuOrbitRadiusScale;
-		MenuTargetLocation = FVector(Radius * FMath::Cos(MenuOrbitAngle), Radius * FMath::Sin(MenuOrbitAngle), MenuCameraLocation.Z * ArenaFramingScale * MenuOrbitHeightScale);
-		MenuTargetRotation = UKismetMathLibrary::FindLookAtRotation(MenuTargetLocation, FVector(0.0f, 0.0f, 100.0f));
+		const float Radius = FVector2D(MenuCameraLocation.X, MenuCameraLocation.Y).Size() * ArenaFramingScale * MenuOrbitRadiusScale
+			* (bOneVsOneArenaPresentation ? OneVsOneMenuDistanceMultiplier : 1.0f);
+		MenuTargetLocation = FVector(Radius * FMath::Cos(MenuOrbitAngle), Radius * FMath::Sin(MenuOrbitAngle),
+			MenuCameraLocation.Z * ArenaFramingScale * MenuOrbitHeightScale
+			* (bOneVsOneArenaPresentation ? OneVsOneMenuHeightMultiplier : 1.0f));
+		MenuTargetRotation = UKismetMathLibrary::FindLookAtRotation(MenuTargetLocation, MenuFocus);
 	}
 	FVector TargetLocation = bMenuPresentation ? MenuTargetLocation : GetGameplayTargetLocation();
 	FRotator TargetRotation = bMenuPresentation ? MenuTargetRotation : GetGameplayTargetRotation();
@@ -102,6 +115,14 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 		: bAimPresentation && bTestArenaPresentation
 			? AimFieldOfView
 			: bBobGameplayFraming ? BobFieldOfView : bCompactGameplayFraming ? CompactFieldOfView : FieldOfView;
+	if (bMenuPresentation && bMenuOrbitEnabled && bOneVsOneArenaPresentation)
+	{
+		// Keep the reference's vertical board composition on ultrawide screens,
+		// revealing extra stadium at the sides rather than cropping both rims.
+		const float AspectExpansion = FMath::Max(1.0f, Camera->AspectRatio / (16.0f / 9.0f));
+		TargetFieldOfView = FMath::RadiansToDegrees(2.0f * FMath::Atan(
+			FMath::Tan(FMath::DegreesToRadians(MenuFieldOfView * 0.5f)) * AspectExpansion));
+	}
 	if (!bMenuPresentation && !bCinematicReplay)
 	{
 		if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
@@ -129,6 +150,20 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	const FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, BlendSpeed);
 	SetActorLocation(NewLocation);
 	SetActorRotation(NewRotation);
+	if (bMenuPresentation && bMenuOrbitEnabled && (bTestArenaPresentation || bOneVsOneArenaPresentation))
+	{
+		if (!MenuKeyLight.IsValid() || !MenuRimLight.IsValid())
+		{
+			const FlickArenaLighting::FRig Rig = FlickArenaLighting::FindRig(GetWorld());
+			MenuKeyLight = Rig.TestPuckKeyLight;
+			MenuRimLight = Rig.TestPuckRimLight;
+		}
+		const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
+		const float Radius = FlickModeRules::GetArenaRadius(EFlickMatchVariant::Classic, State ? State->PlayersPerTeam : 1)
+			* (State && State->bPrivateMatchActive ? FMath::Clamp(State->PrivateMatchSettings.ArenaScale, 0.85f, 1.3f) : 1.0f);
+		FlickArenaLighting::UpdateMenuSoftboxes(MenuKeyLight.Get(), MenuRimLight.Get(),
+			GetActorLocation(), Radius, State ? State->ArenaSurfaceZ : 250.0f);
+	}
 	bGameplayViewTransitioning = !bMenuPresentation
 		&& (!NewLocation.Equals(TargetLocation, 1.0f) || !NewRotation.Equals(TargetRotation, 0.08f));
 	CurrentFieldOfView = FMath::FInterpTo(CurrentFieldOfView, TargetFieldOfView, DeltaSeconds, BlendSpeed);
@@ -186,6 +221,13 @@ void AFlickCameraPawn::SetMenuPresentation(const bool bInMenuPresentation)
 	}
 	bGameplayViewTransitioning = !bMenuPresentation;
 	ShakeTrauma = 0.0f;
+	ApplyArenaPostProcess();
+}
+
+void AFlickCameraPawn::SetMenuOrbitEnabled(const bool bEnabled)
+{
+	bMenuOrbitEnabled = bEnabled;
+	ApplyArenaPostProcess();
 }
 
 void AFlickCameraPawn::SetBobGameplayFraming(const bool bInBobGameplayFraming)
@@ -212,6 +254,12 @@ void AFlickCameraPawn::SetAimPresentation(const bool bEnabled, const FVector& Fo
 	{
 		AimFocusPoint = FVector(FocusPoint.X, FocusPoint.Y, 0.0f);
 	}
+}
+
+void AFlickCameraPawn::SetOneVsOneArenaPresentation(const bool bEnabled)
+{
+	bOneVsOneArenaPresentation = bEnabled;
+	ApplyArenaPostProcess();
 }
 
 void AFlickCameraPawn::ApplyArenaPostProcess()
@@ -263,6 +311,25 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 		Camera->PostProcessSettings.Bloom4Size = 4.0f;
 		Camera->PostProcessSettings.Bloom5Size = 10.0f;
 		Camera->PostProcessSettings.Bloom6Size = 22.0f;
+	}
+	const bool bPremiumMenu = bMenuPresentation && bMenuOrbitEnabled;
+	const bool bOneVsOneMenu = bPremiumMenu && bOneVsOneArenaPresentation;
+	Camera->PostProcessSettings.ColorGamma = bOneVsOneMenu ? FVector4(1.0f, 1.0f, 1.0f, 1.0f) : FVector4(0.96f, 0.975f, 1.0f, 1.0f);
+	if (bOneVsOneMenu) Camera->PostProcessSettings.AutoExposureBias = 0.0f;
+	Camera->PostProcessSettings.ColorSaturation = bPremiumMenu
+		? FVector4(MenuColorSaturation, MenuColorSaturation, MenuColorSaturation, 1.0f) : FVector4(1.02f, 1.02f, 1.02f, 1.0f);
+	Camera->PostProcessSettings.ColorContrast = bPremiumMenu
+		? FVector4(1.24f, 1.24f, 1.24f, 1.0f) : FVector4(1.16f, 1.16f, 1.16f, 1.0f);
+	Camera->PostProcessSettings.VignetteIntensity = bPremiumMenu ? 0.36f : 0.43f;
+	Camera->PostProcessSettings.bOverride_DepthOfFieldFocalDistance = bPremiumMenu;
+	Camera->PostProcessSettings.bOverride_DepthOfFieldFstop = bPremiumMenu;
+	Camera->PostProcessSettings.bOverride_DepthOfFieldSensorWidth = bOneVsOneMenu;
+	Camera->PostProcessSettings.DepthOfFieldSensorWidth = OneVsOneMenuSensorWidth;
+	Camera->PostProcessSettings.DepthOfFieldFstop = bOneVsOneArenaPresentation ? OneVsOneMenuFstop : 3.2f;
+	if (bPremiumMenu)
+	{
+		Camera->PostProcessSettings.BloomIntensity = bOneVsOneArenaPresentation ? OneVsOneMenuBloomIntensity : MenuBloomIntensity;
+		Camera->PostProcessSettings.BloomThreshold = bOneVsOneArenaPresentation ? 0.5f : 0.8f;
 	}
 }
 

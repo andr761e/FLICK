@@ -1,4 +1,5 @@
 #include "Game/FlickGameModePrivate.h"
+#include "Arena/FlickArenaLighting.h"
 #include "Core/FlickVisualSettings.h"
 #include "Core/FlickPlaylistRules.h"
 
@@ -311,6 +312,7 @@ void AFlickGameMode::SpawnCameraIfNeeded()
 	{
 		CameraPawn->SetBobGameplayFraming(ActiveMatchVariant == EFlickMatchVariant::Bob);
 		CameraPawn->SetTestArenaPresentation(bTestArenaMode);
+		CameraPawn->SetOneVsOneArenaPresentation(bTestArenaMode && CurrentPlayersPerTeam == 1);
 		CameraPawn->SetCompactGameplayFraming(false);
 		CameraPawn->SetArenaFramingScale(
 			ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
@@ -331,202 +333,56 @@ void AFlickGameMode::SpawnAudioIfNeeded()
 		FRotator::ZeroRotator);
 }
 
+void AFlickGameMode::RefreshLightingSettings()
+{
+	SpawnLightingIfNeeded();
+}
+
 void AFlickGameMode::SpawnLightingIfNeeded()
 {
-	if (!GetWorld())
-	{
-		return;
-	}
-	const bool bClassicArenaLighting = ActiveMatchVariant == EFlickMatchVariant::Classic;
-	const bool bBobArenaLighting = ActiveMatchVariant == EFlickMatchVariant::Bob;
+	FlickArenaLighting::FParameters Parameters;
+	Parameters.bTestArenaMode = bTestArenaMode;
+	Parameters.bClassicArenaLighting = ActiveMatchVariant == EFlickMatchVariant::Classic;
+	Parameters.bBobArenaLighting = ActiveMatchVariant == EFlickMatchVariant::Bob;
 	const bool bSettingsOverMatch = FrontendScreen == EFlickFrontendScreen::Settings
 		&& SettingsReturnScreen == EFlickFrontendScreen::Paused;
 	const bool bClassSelectionOverMatch = FrontendScreen == EFlickFrontendScreen::ClassSelect
 		&& ClassSelectionReturnScreen == EFlickFrontendScreen::Paused;
-	const bool bFrontendShowcase = FrontendScreen != EFlickFrontendScreen::Playing
-		&& FrontendScreen != EFlickFrontendScreen::Paused
-		&& !bSettingsOverMatch
-		&& !bClassSelectionOverMatch;
-	const float DirectionalMultiplier = bFrontendShowcase
-		? FrontendArenaDirectionalLightMultiplier : 1.0f;
-	const float SkyMultiplier = bFrontendShowcase ? FrontendArenaSkyLightMultiplier : 1.0f;
-	const float FillMultiplier = bFrontendShowcase ? FrontendArenaFillLightMultiplier : 1.0f;
-
-	if (!DirectionalLightActor || !IsValid(DirectionalLightActor))
-	{
-		for (TActorIterator<ADirectionalLight> It(GetWorld()); It; ++It)
-		{
-			DirectionalLightActor = *It;
-			break;
-		}
-		if (!DirectionalLightActor)
-		{
-			DirectionalLightActor = GetWorld()->SpawnActor<ADirectionalLight>(
-				ADirectionalLight::StaticClass(),
-				FVector(-300.0f, -500.0f, 900.0f),
-				FRotator(-55.0f, -30.0f, 0.0f));
-		}
-	}
-
-	if (!SkyLightActor || !IsValid(SkyLightActor))
-	{
-		for (TActorIterator<ASkyLight> It(GetWorld()); It; ++It)
-		{
-			SkyLightActor = *It;
-			break;
-		}
-		if (!SkyLightActor)
-		{
-			SkyLightActor = GetWorld()->SpawnActor<ASkyLight>(
-				ASkyLight::StaticClass(),
-				FVector(0.0f, 0.0f, 900.0f),
-				FRotator::ZeroRotator);
-		}
-	}
-
-	if (UDirectionalLightComponent* Light = DirectionalLightActor
-		? Cast<UDirectionalLightComponent>(DirectionalLightActor->GetLightComponent())
-		: nullptr)
-	{
-		Light->SetMobility(EComponentMobility::Movable);
-		DirectionalLightActor->SetActorRotation(FRotator(-72.0f, -25.0f, 0.0f));
-		Light->SetLightColor(bTestArenaMode
-			? FLinearColor(0.92f, 0.95f, 1.0f)
-			: bClassicArenaLighting
-				? FLinearColor(0.82f, 0.88f, 0.96f)
-				: FLinearColor(0.9f, 0.94f, 1.0f));
-		Light->SetIntensity(
-			(bTestArenaMode ? 1.45f : bClassicArenaLighting ? 0.78f : bBobArenaLighting ? 1.32f : 1.15f)
-			* DirectionalMultiplier);
-		Light->SetLightSourceAngle(bTestArenaMode ? 5.0f : 3.0f);
-		Light->SetSpecularScale(bTestArenaMode ? 0.60f : bClassicArenaLighting ? 0.14f : 0.32f);
-		Light->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.72f : 0.8f);
-		Light->SetCastShadows(true);
-	}
-	if (SkyLightActor && SkyLightActor->GetLightComponent())
-	{
-		auto* Sky = SkyLightActor->GetLightComponent();
-		Sky->SetMobility(EComponentMobility::Movable);
-		// Metallic workshop surfaces need an environment to reflect even on an empty map.
-		if (bTestArenaMode)
-		{
-			if (auto* Environment = LoadObject<UTextureCube>(nullptr,
-				TEXT("/Game/TestArena/Pucks/T_PuckEnvironment.T_PuckEnvironment")))
-			{
-				Sky->SourceType = SLS_SpecifiedCubemap;
-				Sky->SetCubemap(Environment);
-			}
-		}
-		else if (Sky->SourceType == SLS_SpecifiedCubemap && Sky->Cubemap
-			&& Sky->Cubemap->GetPathName().StartsWith(TEXT("/Game/TestArena/Pucks/")))
-		{
-			Sky->SourceType = SLS_CapturedScene;
-			Sky->SetCubemap(nullptr);
-		}
-		Sky->SetIntensity(
-			(bTestArenaMode ? 1.05f : bClassicArenaLighting ? 0.34f : bBobArenaLighting ? 0.55f : 0.28f)
-			* SkyMultiplier);
-	}
-
-	const auto SpawnAccentLight = [this, bClassicArenaLighting, bBobArenaLighting, bFrontendShowcase](
-		TObjectPtr<APointLight>& LightActor,
-		const FVector& Location,
-		const FLinearColor& Color)
-	{
-		if (!LightActor || !IsValid(LightActor))
-		{
-			LightActor = GetWorld()->SpawnActor<APointLight>(
-				APointLight::StaticClass(), Location, FRotator::ZeroRotator);
-		}
-		if (LightActor && LightActor->PointLightComponent)
-		{
-			UPointLightComponent* Light = LightActor->PointLightComponent;
-			Light->SetMobility(EComponentMobility::Movable);
-			LightActor->SetActorLocation(Location);
-			// Preserve the neutral gameplay wash, but let the main-menu orbit show
-			// the arena's team colors and material highlights without a screen tint.
-			Light->SetLightColor(FMath::Lerp(
-				Color, FLinearColor::White,
-				bTestArenaMode ? 0.38f : bClassicArenaLighting ? (bFrontendShowcase ? 0.52f : 0.88f) : 0.72f));
-			Light->SetIntensity(bTestArenaMode ? 190.0f : bClassicArenaLighting ? (bFrontendShowcase ? 90.0f : 52.0f) : bBobArenaLighting ? 205.0f : 165.0f);
-			Light->SetAttenuationRadius(
-				(bTestArenaMode ? 700.0f : bClassicArenaLighting ? 720.0f : bBobArenaLighting ? 1500.0f : 820.0f)
-					* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
-			Light->SetSourceRadius((bTestArenaMode ? 100.0f : bClassicArenaLighting ? 260.0f : 120.0f)
-				* ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
-			Light->SetSpecularScale(bTestArenaMode ? 0.52f : bClassicArenaLighting ? (bFrontendShowcase ? 0.24f : 0.04f) : 0.48f);
-			Light->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.15f : 0.42f);
-			Light->SetCastShadows(false);
-		}
-	};
-
-	const float ArenaScale = ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius;
-	SpawnAccentLight(Player1AccentLight, FVector(0.0f, -690.0f * ArenaScale, 620.0f * ArenaScale), GetTeamColor(EFlickTeam::Player1));
-	SpawnAccentLight(Player2AccentLight, FVector(0.0f, 690.0f * ArenaScale, 620.0f * ArenaScale), GetTeamColor(EFlickTeam::Player2));
-	if (!ArenaFillLight || !IsValid(ArenaFillLight))
-	{
-		ArenaFillLight = GetWorld()->SpawnActor<APointLight>(
-			APointLight::StaticClass(),
-			FVector(0.0f, 0.0f, 920.0f),
-			FRotator::ZeroRotator);
-	}
-	if (ArenaFillLight && ArenaFillLight->PointLightComponent)
-	{
-		ArenaFillLight->PointLightComponent->SetMobility(EComponentMobility::Movable);
-		ArenaFillLight->SetActorLocation(FVector(0.0f, 0.0f, 920.0f * ArenaScale));
-		ArenaFillLight->PointLightComponent->SetLightColor(bClassicArenaLighting
-			? FLinearColor(0.62f, 0.7f, 0.82f)
-			: FLinearColor(0.72f, 0.78f, 0.88f));
-		ArenaFillLight->PointLightComponent->SetIntensity(
-			(bTestArenaMode ? 440.0f : bClassicArenaLighting ? 112.0f : bBobArenaLighting ? 260.0f : 190.0f)
-			* FillMultiplier);
-		ArenaFillLight->PointLightComponent->SetAttenuationRadius(
-			(bBobArenaLighting ? 2400.0f : 1280.0f) * ArenaScale);
-		ArenaFillLight->PointLightComponent->SetSourceRadius((bTestArenaMode ? 240.0f : 180.0f) * ArenaScale);
-		ArenaFillLight->PointLightComponent->SetSpecularScale(bTestArenaMode ? 0.32f : bClassicArenaLighting ? 0.06f : 0.26f);
-		ArenaFillLight->PointLightComponent->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.45f : 0.34f);
-		ArenaFillLight->PointLightComponent->SetCastShadows(false);
-	}
-
-	// Large neutral cards create narrow, moving highlight bands on the prototype's
-	// machined rings and graphite bevels. They are specular-first fixtures rather
-	// than another arena flood, and are disabled outside Switchyard.
-	const auto ConfigurePuckSoftbox = [this, ArenaScale](
-		TObjectPtr<ARectLight>& LightActor,
-		const FVector& Location,
-		const FLinearColor& Color,
-		const float Intensity,
-		const float Width,
-		const float Height)
-	{
-		if (!LightActor || !IsValid(LightActor))
-		{
-			LightActor = GetWorld()->SpawnActor<ARectLight>(
-				ARectLight::StaticClass(), Location, FRotator::ZeroRotator);
-		}
-		if (!LightActor || !LightActor->RectLightComponent)
-		{
-			return;
-		}
-		URectLightComponent* Light = LightActor->RectLightComponent;
-		Light->SetMobility(EComponentMobility::Movable);
-		const FVector ScaledLocation = Location * ArenaScale;
-		LightActor->SetActorLocation(ScaledLocation);
-		LightActor->SetActorRotation(
-			(FVector(0.0f, 0.0f, 45.0f * ArenaScale) - ScaledLocation).Rotation());
-		Light->SetLightColor(Color);
-		Light->SetIntensity(bTestArenaMode ? Intensity : 0.0f);
-		Light->SetAttenuationRadius(1250.0f * ArenaScale);
-		Light->SetSourceWidth(Width * ArenaScale);
-		Light->SetSourceHeight(Height * ArenaScale);
-		Light->SetSpecularScale(1.0f);
-		Light->SetIndirectLightingIntensity(0.05f);
-		Light->SetCastShadows(false);
-	};
-	ConfigurePuckSoftbox(TestPuckKeyLight, FVector(-620.0f, -420.0f, 560.0f),
-		FLinearColor(0.82f, 0.91f, 1.0f), TestPuckKeyLightIntensity, 460.0f, 170.0f);
-	ConfigurePuckSoftbox(TestPuckRimLight, FVector(600.0f, 300.0f, 450.0f),
-		FLinearColor(1.0f, 0.86f, 0.72f), TestPuckRimLightIntensity, 360.0f, 130.0f);
+	Parameters.bFrontendShowcase = FrontendScreen != EFlickFrontendScreen::Playing
+		&& FrontendScreen != EFlickFrontendScreen::Paused && !bSettingsOverMatch && !bClassSelectionOverMatch;
+	// Keep menu lighting while editing it; opening settings must not change the preview preset.
+	Parameters.bPremiumMenu = FrontendScreen == EFlickFrontendScreen::MainMenu
+		|| (FrontendScreen == EFlickFrontendScreen::Settings && SettingsReturnScreen == EFlickFrontendScreen::MainMenu);
+	Parameters.bPremiumArena = bTestArenaMode;
+	Parameters.ArenaRadius = ArenaRadius;
+	Parameters.ArenaSurfaceZ = ArenaSurfaceZ;
+	Parameters.TestPuckKeyLightIntensity = TestPuckKeyLightIntensity;
+	Parameters.TestPuckRimLightIntensity = TestPuckRimLightIntensity;
+	Parameters.MenuAccentLightIntensity = MenuAccentLightIntensity;
+	Parameters.MenuSoftboxLightMultiplier = MenuSoftboxLightMultiplier;
+	Parameters.OneVsOneMenuSoftboxMultiplier = OneVsOneMenuSoftboxMultiplier;
+	Parameters.OneVsOneGameplaySoftboxMultiplier = OneVsOneGameplaySoftboxMultiplier;
+	Parameters.OneVsOneSkyLightMultiplier = OneVsOneSkyLightMultiplier;
+	Parameters.OneVsOneFillLightIntensity = OneVsOneFillLightIntensity;
+	Parameters.FrontendArenaDirectionalLightMultiplier = FrontendArenaDirectionalLightMultiplier;
+	Parameters.FrontendArenaSkyLightMultiplier = FrontendArenaSkyLightMultiplier;
+	Parameters.FrontendArenaFillLightMultiplier = FrontendArenaFillLightMultiplier;
+	FlickArenaLighting::FRig Rig;
+	Rig.DirectionalLightActor = DirectionalLightActor;
+	Rig.SkyLightActor = SkyLightActor;
+	Rig.Player1AccentLight = Player1AccentLight;
+	Rig.Player2AccentLight = Player2AccentLight;
+	Rig.ArenaFillLight = ArenaFillLight;
+	Rig.TestPuckKeyLight = TestPuckKeyLight;
+	Rig.TestPuckRimLight = TestPuckRimLight;
+	FlickArenaLighting::Configure(GetWorld(), Rig, Parameters);
+	DirectionalLightActor = Rig.DirectionalLightActor;
+	SkyLightActor = Rig.SkyLightActor;
+	Player1AccentLight = Rig.Player1AccentLight;
+	Player2AccentLight = Rig.Player2AccentLight;
+	ArenaFillLight = Rig.ArenaFillLight;
+	TestPuckKeyLight = Rig.TestPuckKeyLight;
+	TestPuckRimLight = Rig.TestPuckRimLight;
 }
 
 void AFlickGameMode::SetFreeCameraLookSensitivity(const float Sensitivity)
@@ -792,7 +648,7 @@ void AFlickGameMode::SpawnBobPieces()
 		BobArenaActor->GetStrikerStart(EFlickTeam::Player2, PieceThickness),
 		EFlickPieceArchetype::Standard,
 		true,
-		1);
+		0);
 }
 
 void AFlickGameMode::DestroyPieces()
@@ -1389,6 +1245,8 @@ void AFlickGameMode::ShowModePreview(
 
 void AFlickGameMode::SetCameraForFrontend()
 {
+	const bool bMenuContext = FrontendScreen == EFlickFrontendScreen::MainMenu
+		|| (FrontendScreen == EFlickFrontendScreen::Settings && SettingsReturnScreen == EFlickFrontendScreen::MainMenu);
 	if (CameraPawn)
 	{
 		const bool bSettingsOverMatch = FrontendScreen == EFlickFrontendScreen::Settings
@@ -1399,12 +1257,13 @@ void AFlickGameMode::SetCameraForFrontend()
 			&& FrontendScreen != EFlickFrontendScreen::Paused
 			&& !bSettingsOverMatch
 			&& !bClassSelectionOverMatch);
-		CameraPawn->SetMenuOrbitEnabled(FrontendScreen == EFlickFrontendScreen::MainMenu);
+		CameraPawn->SetMenuOrbitEnabled(bMenuContext);
 	}
 	// Existing light actors are reused across frontend and gameplay. Retune them
 	// whenever presentation state changes so showcase exposure cannot leak into
 	// a live match (or vice versa).
 	SpawnLightingIfNeeded();
+	if (TestArenaActor) TestArenaActor->SetMenuPresentationEnabled(bMenuContext);
 }
 
 void AFlickGameMode::SetCameraViewForTeam(const EFlickTeam Team, const bool bSnap)

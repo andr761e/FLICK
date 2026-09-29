@@ -12,6 +12,7 @@ namespace FlickControlBindings
 			{TEXT("Secondary"), TEXT("SECONDARY ACTION"), TEXT("MATCH"), EKeys::RightMouseButton},
 			{TEXT("Menu"), TEXT("PAUSE / BACK"), TEXT("MATCH"), EKeys::Escape},
 			{TEXT("Scoreboard"), TEXT("SHOW SCOREBOARD"), TEXT("MATCH"), EKeys::Tab},
+			{TEXT("ReplaySkip"), TEXT("SKIP CINEMATIC REPLAY"), TEXT("MATCH"), EKeys::Enter},
 			{TEXT("TopView"), TEXT("TOP VIEW"), TEXT("CAMERA"), EKeys::V},
 			{TEXT("FreeCamera"), TEXT("FREE CAMERA"), TEXT("CAMERA"), EKeys::X},
 			{TEXT("CameraReset"), TEXT("RESET CAMERA"), TEXT("CAMERA"), EKeys::F},

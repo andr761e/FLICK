@@ -53,7 +53,8 @@ enum class EFlickSettingsTab : uint8
 	Sound,
 	Display,
 	StreamSafe,
-	Controls
+	Controls,
+	Lighting
 };
 
 class SFlickGameLayer final : public SCompoundWidget
@@ -117,6 +118,7 @@ private:
 	TSharedRef<SWidget> BuildArchetypePicker(EFlickTeam Team);
 	TSharedRef<SWidget> BuildArchetypeChoice(EFlickTeam Team, EFlickPieceArchetype Archetype);
 	TSharedRef<SWidget> BuildSettings();
+	TSharedRef<SWidget> BuildLightingSettings();
 	TSharedRef<SWidget> BuildMatchHud();
 	TSharedRef<SWidget> BuildCinematicReplayOverlay();
 	TSharedRef<SWidget> BuildScoreboardOverlay();
@@ -243,6 +245,8 @@ private:
 	FButtonStyle CompactDangerButtonStyle;
 	FButtonStyle TransparentButtonStyle;
 	FCheckBoxStyle ToggleStyle;
+	FComboBoxStyle DropdownStyle;
+	FTableRowStyle DropdownRowStyle;
 	FSliderStyle SliderStyle;
 	FProgressBarStyle ShotClockBarStyle;
 	TSharedPtr<SWidget> StartupOverlayWidget;
@@ -275,6 +279,8 @@ private:
 	bool bPartyTrayWasVisible = false;
 	bool bInvitePromptPreview = false;
 	bool bPartyTrayPreview = false;
+	bool bReplayOverlayPreview = false;
+	bool bFpsPreview = false;
 	int32 CachedSocialFriendCount = INDEX_NONE;
 	int32 CachedSocialRecentCount = INDEX_NONE;
 	bool bStartupOverlayVisible = false;
@@ -296,6 +302,10 @@ private:
 	int32 SelectedLockerCategory = 0;
 	TArray<int32> SelectedPuckSkins;
 	EFlickSettingsTab SelectedSettingsTab = EFlickSettingsTab::GameFeel;
+	bool bEditMenuLighting = true;
+	bool bLightingPreview = false;
+	TArray<TSharedPtr<int32>> LightingSceneOptions;
+	float SmoothedFrameSeconds = 1.0f / 60.0f;
 	TArray<TSharedPtr<FIntPoint>> ResolutionOptions;
 	TArray<TSharedPtr<int32>> WindowModeOptions;
 	TArray<TSharedPtr<int32>> CameraShakeOptions;

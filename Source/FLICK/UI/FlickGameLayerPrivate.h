@@ -3,6 +3,7 @@
 
 #include "UI/FlickGameLayer.h"
 #include "UI/FlickUITheme.h"
+#include "UI/FlickMainMenuStyle.h"
 
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Core/FlickCosmeticCatalog.h"
@@ -29,6 +30,7 @@
 #include "Rendering/RenderingCommon.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Brushes/SlateDynamicImageBrush.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Styling/CoreStyle.h"
 #include "Styling/SlateColor.h"
 #include "UI/FlickHUD.h"
@@ -71,39 +73,7 @@ namespace
 		constexpr float ActionHeight = 52.0f;
 	}
 
-	namespace MainMenuStackMetrics
-	{
-		constexpr float PrimaryHeight = 86.0f;
-		constexpr float SecondaryHeight = 62.0f;
-		constexpr float Gap = 8.0f;
-		constexpr float FirstWidth = 450.0f;
-		constexpr float LeftEdgeSlope = 0.0f;
-		constexpr float RightEdgeSlope = 0.0f;
-
-		constexpr float GetRowTop(const int32 RowIndex)
-		{
-			return RowIndex <= 0
-				? 0.0f
-				: PrimaryHeight + Gap + (RowIndex - 1) * (SecondaryHeight + Gap);
-		}
-
-		constexpr float GetRowHeight(const int32 RowIndex)
-		{
-			return RowIndex == 0 ? PrimaryHeight : SecondaryHeight;
-		}
-
-		constexpr float GetRowLeft(const int32 RowIndex)
-		{
-			return GetRowTop(RowIndex) * LeftEdgeSlope;
-		}
-
-		constexpr float GetRowWidth(const int32 RowIndex)
-		{
-			const float FirstTopRight = FirstWidth - PrimaryHeight * RightEdgeSlope;
-			const float RowBottom = GetRowTop(RowIndex) + GetRowHeight(RowIndex);
-			return FirstTopRight + RowBottom * RightEdgeSlope - GetRowLeft(RowIndex);
-		}
-	}
+	namespace MainMenuStackMetrics = FlickMainMenuStyle::Navigation;
 
 	// The left-hand menu is designed for 16:9. On wider monitors its fixed
 	// 450-unit cards otherwise dominate the diagonal panel; scale the whole
@@ -123,8 +93,7 @@ namespace
 
 	float GetMainMenuDiagonalBottomEdgeX(const FVector2D& LocalSize)
 	{
-		const float DesignWidth = FMath::Min(LocalSize.X, LocalSize.Y * (16.0f / 9.0f));
-		return DesignWidth * 0.395f * GetMainMenuColumnScale();
+		return FlickMainMenuStyle::GetDiagonalBottomEdgeX(LocalSize, GetMainMenuColumnScale());
 	}
 
 	float GetDisplayStatValue(const FFlickPieceDisplayStats& Stats, const int32 StatIndex)
@@ -144,6 +113,18 @@ namespace
 	const FSlateBrush* WhiteBrush()
 	{
 		return FCoreStyle::Get().GetBrush("WhiteBrush");
+	}
+
+	// Slate is composed after scene bloom. Soft, screen-space coverage layers
+	// provide UI glow without post-process changes, blur targets or bitmap art.
+	void DrawMenuGlow(FSlateWindowElementList& Elements, const FGeometry& Geometry, const int32 Layer,
+		const TArray<FVector2D>& Points, const FLinearColor& Color, const float Strength = 1.0f)
+	{
+		constexpr float Widths[] = {24.0f, 14.0f, 7.0f, 3.5f};
+		constexpr float Alpha[] = {0.012f, 0.026f, 0.060f, 0.10f};
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Widths); ++Index)
+			FSlateDrawElement::MakeLines(Elements, Layer, Geometry.ToPaintGeometry(), Points,
+				ESlateDrawEffect::None, Color.CopyWithNewOpacity(Color.A * Alpha[Index] * Strength), true, Widths[Index]);
 	}
 
 	FSlateFontInfo UiFont(const int32 Size, const bool bBold = false)
@@ -205,9 +186,8 @@ namespace
 			// reduced on ultrawide monitors. Size the panel from that same canvas,
 			// not the full ultrawide width, or its empty area grows while the cards
 			// stay fixed and visually shrink inside it.
-			const float DesignWidth = FMath::Min(LocalSize.X, LocalSize.Y * (16.0f / 9.0f));
 			const float ColumnScale = GetMainMenuColumnScale();
-			const float TopEdgeX = DesignWidth * 0.345f * ColumnScale;
+			const float TopEdgeX = FlickMainMenuStyle::GetDiagonalTopEdgeX(LocalSize, ColumnScale);
 			const float BottomEdgeX = GetMainMenuDiagonalBottomEdgeX(LocalSize);
 			// Slate custom vertices are not MSAA'd. Evaluate the diagonal's
 			// signed-distance coverage in screen pixels instead of ending a pair of
@@ -218,38 +198,43 @@ namespace
 			constexpr float CoverageAlpha[] = {1.0f, 1.0f, 0.90f, 0.5f, 0.10f, 0.0f, 0.0f};
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			const FLinearColor LeftPanelColor = PanelColor.Get() * InWidgetStyle.GetColorAndOpacityTint();
-			FLinearColor RightPanelColor = LeftPanelColor;
-			RightPanelColor.A *= 0.93f;
-			const FColor LeftPanelTint = LeftPanelColor.ToFColor(true);
+			const FLinearColor EdgeSheen = FLinearColor::FromSRGBColor(FColor(10, 29, 35, 242)) * InWidgetStyle.GetColorAndOpacityTint();
 
 			TArray<FSlateVertex> Vertices;
 			constexpr int32 Columns = 1 + UE_ARRAY_COUNT(CoverageOffsets);
-			Vertices.Reserve(Columns * 2);
+			constexpr int32 Rows = 3;
+			Vertices.Reserve(Columns * Rows);
 			const auto AddVertex = [&Vertices, &Transform](const FVector2f Position, const FVector2f Uv, const FColor Color)
 			{
 				Vertices.Add(FSlateVertex::Make(Transform, Position, Uv, Color));
 			};
 			TArray<SlateIndex> Indices;
-			Indices.Reserve((Columns - 1) * 6);
-			for (int32 Row = 0; Row < 2; ++Row)
+			Indices.Reserve((Columns - 1) * (Rows - 1) * 6);
+			for (int32 Row = 0; Row < Rows; ++Row)
 			{
-				const float Y = Row == 0 ? 0.0f : LocalSize.Y;
-				const float EdgeX = Row == 0 ? TopEdgeX : BottomEdgeX;
-				AddVertex(FVector2f(0.0f, Y), FVector2f(0.0f, static_cast<float>(Row)), LeftPanelTint);
+				const float VerticalAlpha = static_cast<float>(Row) / (Rows - 1);
+				const float Y = LocalSize.Y * VerticalAlpha;
+				const float EdgeX = FMath::Lerp(TopEdgeX, BottomEdgeX, VerticalAlpha);
+				FLinearColor RowColor = LeftPanelColor;
+				RowColor.A *= Row == 1 ? 0.985f : 1.0f;
+				FLinearColor RightPanelColor = FMath::Lerp(RowColor, EdgeSheen, Row == 1 ? 0.32f : 0.12f);
+				RightPanelColor.A = RowColor.A * 0.96f;
+				AddVertex(FVector2f(0.0f, Y), FVector2f(0.0f, VerticalAlpha), RowColor.ToFColor(true));
 				for (int32 Band = 0; Band < UE_ARRAY_COUNT(CoverageOffsets); ++Band)
 				{
 					FLinearColor BandColor = RightPanelColor;
 					BandColor.A *= CoverageAlpha[Band];
 					AddVertex(
 						FVector2f(EdgeX + CoverageOffsets[Band] / PixelScale, Y),
-						FVector2f(1.0f, static_cast<float>(Row)),
+						FVector2f(1.0f, VerticalAlpha),
 						BandColor.ToFColor(true));
 				}
 			}
+			for (int32 Row = 0; Row < Rows - 1; ++Row)
 			for (int32 Column = 0; Column < Columns - 1; ++Column)
 			{
-				const SlateIndex TopLeft = static_cast<SlateIndex>(Column);
-				const SlateIndex BottomLeft = static_cast<SlateIndex>(Column + Columns);
+				const SlateIndex TopLeft = static_cast<SlateIndex>(Row * Columns + Column);
+				const SlateIndex BottomLeft = static_cast<SlateIndex>((Row + 1) * Columns + Column);
 				Indices.Add(TopLeft);
 				Indices.Add(TopLeft + 1);
 				Indices.Add(BottomLeft + 1);
@@ -266,13 +251,22 @@ namespace
 				nullptr,
 				0,
 				0);
+			const TArray<FVector2D> Edge = {{TopEdgeX, 0.0f}, {BottomEdgeX, LocalSize.Y}};
+			const FLinearColor EdgeTint = EdgeColor.Get() * InWidgetStyle.GetColorAndOpacityTint();
+			DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 1, Edge, EdgeTint, 0.8f);
 			FSlateDrawElement::MakeLines(
 				OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
-				{FVector2D(TopEdgeX, 0.0f), FVector2D(BottomEdgeX, LocalSize.Y)},
+				Edge,
 				ESlateDrawEffect::None,
-				EdgeColor.Get() * InWidgetStyle.GetColorAndOpacityTint(),
-				true, 1.0f / PixelScale);
-			return LayerId + 1;
+				EdgeTint, true, 1.5f / PixelScale);
+			// A short luminous cap gives the glass edge a highlight, not a solid
+			// neon outline. Both paths stay anti-aliased at final screen resolution.
+			const TArray<FVector2D> Cap = {{TopEdgeX, 0.0f},
+				{FMath::Lerp(TopEdgeX, BottomEdgeX, 0.08f), LocalSize.Y * 0.08f}};
+			DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 2, Cap, FlickMainMenuStyle::Ice * InWidgetStyle.GetColorAndOpacityTint());
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(), Cap,
+				ESlateDrawEffect::None, FlickMainMenuStyle::Ice * InWidgetStyle.GetColorAndOpacityTint(), true, 2.0f / PixelScale);
+			return LayerId + 2;
 		}
 
 	private:
@@ -417,41 +411,61 @@ namespace
 			const bool bParentEnabled) const override
 		{
 			const FVector2D Size = AllottedGeometry.GetLocalSize();
-			// A short forward cut repeats the launch-direction motif.
-			const float RightCut = 12.0f;
-			const float LeftSkew = 0.0f;
-			const TArray<FVector2D> Points = {
-				FVector2D(0.0f, 0.0f),
-				FVector2D(Size.X - RightCut, 0.0f),
-				FVector2D(Size.X, Size.Y),
-				FVector2D(LeftSkew, Size.Y)};
+			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
+			const bool bPrimary = Primary.Get();
+			const TArray<FVector2D> Points = FlickMainMenuStyle::GetCardOutline(Size);
+			TArray<FVector2D> Outline = Points;
+			Outline.Add(Points[0]);
+			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
+			// Soft shadow and glow are underneath the face, keeping its lettering
+			// crisp. Only PLAY has a full luminous surround; other cards light the
+			// swept right edge and gain a full focus outline on hover/controller focus.
+			TArray<FVector2D> Shadow = Outline;
+			for (FVector2D& Point : Shadow) Point.Y += 4.0f;
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Shadow,
+				ESlateDrawEffect::None, FLinearColor(0.0f, 0.0f, 0.0f, 0.32f) * Tint, true, 12.0f);
+			if (bPrimary || HighlightAlpha > 0.01f)
+				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline,
+					FlickMainMenuStyle::Lime * Tint, bPrimary ? 1.6f : HighlightAlpha * 0.8f);
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			const FLinearColor Left = FMath::Lerp(StartColor.Get(), HoverStartColor.Get(), HighlightAlpha) * InWidgetStyle.GetColorAndOpacityTint();
 			const FLinearColor Right = FMath::Lerp(EndColor.Get(), HoverEndColor.Get(), HighlightAlpha) * InWidgetStyle.GetColorAndOpacityTint();
 			const FLinearColor OutlineColor = FMath::Lerp(BorderColor.Get(), HoverBorderColor.Get(), HighlightAlpha) * InWidgetStyle.GetColorAndOpacityTint();
 			TArray<FSlateVertex> Vertices;
-			Vertices.Reserve(5);
+			Vertices.Reserve(Points.Num() + 1);
+			const auto SurfaceColor = [&](const FVector2D Position)
+			{
+				FLinearColor Color = FMath::Lerp(Left, Right, static_cast<float>(Position.X / Size.X));
+				const FLinearColor Sheen = (bPrimary ? FLinearColor(0.95f, 1.0f, 0.32f) : FLinearColor::FromSRGBColor(FColor(26, 47, 53))) * Tint;
+				return FMath::Lerp(Color, Sheen, (1.0f - static_cast<float>(Position.Y / Size.Y)) * (bPrimary ? 0.15f : 0.32f)).ToFColor(true);
+			};
 			Vertices.Add(FSlateVertex::Make(
 				Transform,
 				FVector2f(static_cast<float>(Size.X * 0.5f), static_cast<float>(Size.Y * 0.5f)),
 				FVector2f(0.5f, 0.5f),
-				FMath::Lerp(Left, Right, 0.5f).ToFColor(true)));
+				SurfaceColor(Size * 0.5f)));
 			for (int32 PointIndex = 0; PointIndex < Points.Num(); ++PointIndex)
 			{
 				const FVector2D& Point = Points[PointIndex];
-				const bool bRightPoint = PointIndex == 1 || PointIndex == 2;
 				Vertices.Add(FSlateVertex::Make(
 					Transform,
 					FVector2f(static_cast<float>(Point.X), static_cast<float>(Point.Y)),
 					FVector2f(static_cast<float>(Point.X / FMath::Max(Size.X, 1.0f)), static_cast<float>(Point.Y / FMath::Max(Size.Y, 1.0f))),
-					(bRightPoint ? Right : Left).ToFColor(true)));
+					SurfaceColor(Point)));
 			}
-			const TArray<SlateIndex> Indices = {0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1};
+			TArray<SlateIndex> Indices;
+			for (int32 Index = 0; Index < Points.Num(); ++Index)
+				Indices.Append({0, static_cast<SlateIndex>(Index + 1), static_cast<SlateIndex>((Index + 1) % Points.Num() + 1)});
 			FSlateDrawElement::MakeCustomVerts(
-				OutDrawElements, LayerId, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
-
-			TArray<FVector2D> Outline = Points;
-			Outline.Add(Points[0]);
+				OutDrawElements, LayerId + 1, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
+			if (bPrimary)
+			{
+				TArray<FVector2D> OuterFrame = Outline;
+				for (FVector2D& Point : OuterFrame)
+					Point = (Point - Size * 0.5f) * FVector2D((Size.X + 6.0f) / Size.X, (Size.Y + 6.0f) / Size.Y) + Size * 0.5f;
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(), OuterFrame,
+					ESlateDrawEffect::None, FlickMainMenuStyle::Lime.CopyWithNewOpacity(0.82f) * Tint, true, 1.0f);
+			}
 
 			FSlateDrawElement::MakeLines(
 				OutDrawElements,
@@ -465,7 +479,6 @@ namespace
 
 			// Small broken rails give each row the same technical, asymmetric character as the
 			// larger HUD panels without turning the whole outline into a neon border.
-			const bool bPrimary = Primary.Get();
 			const FLinearColor RailColor = (bPrimary
 				? FLinearColor(0.015f, 0.025f, 0.025f, 0.86f)
 				: FMath::Lerp(FLinearColor(0.32f, 0.42f, 0.44f, 0.62f), HoverBorderColor.Get(), HighlightAlpha * 0.72f))
@@ -480,11 +493,11 @@ namespace
 					ESlateDrawEffect::None, Color, true, Width);
 			};
 
-			DrawRail({FVector2D(10.0f, 1.0f), FVector2D(54.0f, 1.0f)}, RailColor, bPrimary ? 2.0f : 1.35f);
-			DrawRail({FVector2D(Size.X - 72.0f, Size.Y - 1.0f), FVector2D(Size.X - 17.0f, Size.Y - 1.0f)}, RailColor, 1.35f);
-			DrawRail({
-				FVector2D(Size.X - RightCut - 3.0f, 1.0f),
-				FVector2D(Size.X - 2.0f, Size.Y - 2.0f)}, AccentColor, bPrimary ? 2.4f : 1.5f);
+			DrawRail({FVector2D(10.0f, 1.0f), FVector2D(42.0f, 1.0f)}, RailColor, bPrimary ? 2.0f : 1.35f);
+			const TArray<FVector2D> SweptRail = {Points[1] - FVector2D(22.0f, 0.0f), Points[1], Points[2], Points[3], Points[4], Points[4] - FVector2D(18.0f, 0.0f)};
+			if (!bPrimary)
+				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 2, SweptRail, FlickMainMenuStyle::Lime * Tint, 0.65f);
+			DrawRail(SweptRail, bPrimary ? RailColor : FlickMainMenuStyle::Lime * Tint, bPrimary ? 1.0f : 1.6f);
 
 			if (bPrimary || HighlightAlpha > 0.01f)
 			{
@@ -521,7 +534,9 @@ namespace
 		Settings,
 		Quit,
 		Rank,
-		Social
+		Social,
+		Whistle,
+		Target
 	};
 
 	class SFlickMainMenuIcon final : public SLeafWidget
@@ -530,15 +545,18 @@ namespace
 		SLATE_BEGIN_ARGS(SFlickMainMenuIcon)
 			: _Icon(EFlickMainMenuIcon::Play)
 			, _Color(FLinearColor::White)
+			, _Glow(false)
 		{}
 			SLATE_ARGUMENT(EFlickMainMenuIcon, Icon)
 			SLATE_ATTRIBUTE(FLinearColor, Color)
+			SLATE_ARGUMENT(bool, Glow)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
 		{
 			Icon = InArgs._Icon;
 			Color = InArgs._Color;
+			bGlow = InArgs._Glow;
 			SetCanTick(false);
 		}
 
@@ -558,9 +576,16 @@ namespace
 		{
 			const FVector2D Size = AllottedGeometry.GetLocalSize();
 			const FVector2D Center = Size * 0.5f;
-			const FLinearColor Tint = Color.Get();
-			const auto DrawLines = [&OutDrawElements, &AllottedGeometry, &Tint, LayerId](const TArray<FVector2D>& Points, const float Width = 2.0f)
+			const FLinearColor Tint = Color.Get() * InWidgetStyle.GetColorAndOpacityTint();
+			const auto DrawLines = [this, &OutDrawElements, &AllottedGeometry, &Tint, LayerId](const TArray<FVector2D>& Points, const float Width = 2.0f)
 			{
+				if (bGlow)
+				{
+					FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Points,
+						ESlateDrawEffect::None, Tint.CopyWithNewOpacity(Tint.A * 0.025f), true, Width + 6.0f);
+					FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Points,
+						ESlateDrawEffect::None, Tint.CopyWithNewOpacity(Tint.A * 0.06f), true, Width + 2.5f);
+				}
 				FSlateDrawElement::MakeLines(
 					OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Points,
 					ESlateDrawEffect::None, Tint, true, Width);
@@ -621,6 +646,18 @@ namespace
 				DrawLines({Center, FVector2D(Center.X, 10.0f)}, 2.1f);
 				DrawLines({Center, FVector2D(28.0f, 24.0f)}, 2.1f);
 				break;
+			case EFlickMainMenuIcon::Whistle:
+				DrawLines({{6.0f, 18.0f}, {15.0f, 9.0f}, {30.0f, 9.0f}, {34.0f, 14.0f}, {29.0f, 21.0f},
+					{21.0f, 21.0f}, {13.0f, 33.0f}, {7.0f, 29.0f}, {17.0f, 14.0f}}, 2.0f);
+				DrawLines(CirclePoints(FVector2D(27.0f, 14.0f), 2.5f), 1.5f);
+				DrawLines({{5.0f, 6.0f}, {8.0f, 8.0f}}, 1.5f);
+				break;
+			case EFlickMainMenuIcon::Target:
+				DrawLines(CirclePoints(Center, 13.0f), 2.0f);
+				DrawLines(CirclePoints(Center, 8.0f), 1.5f);
+				DrawLines(CirclePoints(Center, 3.0f), 2.0f);
+				DrawLines({Center, {32.0f, 6.0f}, {32.0f, 12.0f}, {37.0f, 12.0f}}, 2.0f);
+				break;
 			case EFlickMainMenuIcon::Back:
 				DrawLines({FVector2D(31.0f, 8.0f), FVector2D(14.0f, 19.0f), FVector2D(31.0f, 30.0f)}, 2.6f);
 				DrawLines({FVector2D(14.0f, 19.0f), FVector2D(36.0f, 19.0f)}, 2.6f);
@@ -659,6 +696,7 @@ namespace
 	private:
 		EFlickMainMenuIcon Icon = EFlickMainMenuIcon::Play;
 		TAttribute<FLinearColor> Color;
+		bool bGlow = false;
 	};
 
 	class SFlickMainMenuTechLines final : public SLeafWidget
@@ -1371,28 +1409,18 @@ namespace
 			const FVector2D Size = AllottedGeometry.GetLocalSize();
 			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
 			const float Cut = FMath::Clamp(CutSize, 0.0f, FMath::Min(Size.X, Size.Y) * 0.24f);
-			const TArray<FVector2D> Points = {
-				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
-				{Size.X, Size.Y}, {Cut, Size.Y}, {0.0f, Size.Y - Cut}};
+			const TArray<FVector2D> Points = FlickUITheme::GetPanelOutline(Size, Cut);
 			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
-			FLinearColor RequestedFill = BackgroundColor.Get();
-			// Keep legacy dark panels in the same teal-black glass family as the
-			// redesigned menu cards while preserving intentional colored states.
-			if (RequestedFill.R < 0.08f && RequestedFill.G < 0.08f && RequestedFill.B < 0.08f)
-			{
-				RequestedFill.R = Panel.R;
-				RequestedFill.G = Panel.G;
-				RequestedFill.B = Panel.B;
-				RequestedFill.A = FMath::Min(RequestedFill.A, Panel.A);
-			}
-			const FLinearColor Fill = RequestedFill * Tint;
+			const FLinearColor Fill = BackgroundColor.Get();
+			const FLinearColor Highlight = FlickUITheme::GetSurfaceHighlight(Fill);
 			const FLinearColor Accent = AccentColor.Get() * Tint;
 			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			TArray<FSlateVertex> Vertices;
 			TArray<SlateIndex> Indices;
 			for (const FVector2D& Point : Points)
 			{
-				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
+				const FLinearColor Surface = FMath::Lerp(Highlight, Fill, static_cast<float>(Point.Y / Size.Y)) * Tint;
+				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Surface.ToFColor(true)));
 			}
 			for (int32 Index = 1; Index + 1 < Points.Num(); ++Index)
 			{
@@ -1404,15 +1432,27 @@ namespace
 			if (bDrawNeutralOutline)
 			{
 				TArray<FVector2D> Outline = Points;
-				Outline.Add(FVector2D::ZeroVector);
+				Outline.Add(Points[0]);
 				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
-					Outline, Effect, FLinearColor(0.27f, 0.36f, 0.39f, bUseAccentForOutline ? 0.82f : 0.62f) * Tint, true, BorderWidth);
+					Outline, Effect, (bUseAccentForOutline ? Accent : Hairline * Tint), true, BorderWidth);
 			}
 			if (Accent.A > KINDA_SMALL_NUMBER)
 			{
+				const float Bracket = FMath::Min(32.0f, Size.X * 0.18f);
+				const TArray<FVector2D> Top = {{0, Cut}, {Cut, 0}, {Bracket, 0}};
+				const TArray<FVector2D> Bottom = {{Size.X - Bracket, Size.Y}, {Size.X - Cut, Size.Y}, {Size.X, Size.Y - Cut}};
+				// Only colored corner accents glow. Dense settings/HUD rows keep a
+				// quiet neutral outline rather than a screenful of luminous boxes.
+				if (bParentEnabled && IsEnabled() && FMath::Max3(Accent.R, Accent.G, Accent.B)
+					- FMath::Min3(Accent.R, Accent.G, Accent.B) > 0.3f)
+				{
+					DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 1, Top, Accent, 0.35f);
+					DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 1, Bottom, Accent, 0.35f);
+				}
 				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
-					{FVector2D(0.0f, 0.0f), FVector2D(FMath::Min(Size.X - Cut, 36.0f), 0.0f)},
-					Effect, Accent, false, FMath::Max(2.0f, BorderWidth));
+					Top, Effect, Accent, true, FMath::Max(1.5f, BorderWidth));
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
+					Bottom, Effect, Accent, true, FMath::Max(1.5f, BorderWidth));
 			}
 			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
 				OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
@@ -1427,8 +1467,8 @@ namespace
 		bool bUseAccentForOutline = false;
 	};
 
-	// Main-menu proof-of-concept frame: a restrained dark glass panel with a
-	// complete chamfered outline and opposing team-lime corner brackets.
+	// Image-capable shared frame. Premium treatment is reserved for feature
+	// panels; regular cards use the same framing with quieter edge accents.
 	class SFlickMainMenuPanel final : public SCompoundWidget
 	{
 	public:
@@ -1438,6 +1478,7 @@ namespace
 			, _CutSize(12.0f)
 			, _BorderWidth(1.15f)
 			, _ImageBrush(nullptr)
+			, _Premium(false)
 			, _Padding(FMargin(0.0f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, BackgroundColor)
@@ -1445,6 +1486,7 @@ namespace
 			SLATE_ARGUMENT(float, CutSize)
 			SLATE_ARGUMENT(float, BorderWidth)
 			SLATE_ATTRIBUTE(const FSlateBrush*, ImageBrush)
+			SLATE_ARGUMENT(bool, Premium)
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
@@ -1456,6 +1498,7 @@ namespace
 			CutSize = InArgs._CutSize;
 			BorderWidth = InArgs._BorderWidth;
 			ImageBrush = InArgs._ImageBrush;
+			bPremium = InArgs._Premium;
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
 		}
 
@@ -1467,25 +1510,38 @@ namespace
 			const FVector2D Size = AllottedGeometry.GetLocalSize();
 			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
 			const float Cut = FMath::Clamp(CutSize, 0.0f, FMath::Min(Size.X, Size.Y) * 0.2f);
-			const TArray<FVector2D> Points = {
-				{Cut, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut}, {Size.X, Size.Y - Cut},
-				{Size.X - Cut, Size.Y}, {Cut, Size.Y}, {0.0f, Size.Y - Cut}, {0.0f, Cut}};
+			const TArray<FVector2D> Points = FlickUITheme::GetPanelOutline(Size, Cut);
 			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
 			const FLinearColor Fill = BackgroundColor.Get() * Tint;
 			const FLinearColor Accent = AccentColor.Get() * Tint;
+			TArray<FVector2D> Outline = Points;
+			Outline.Add(Points[0]);
+			const int32 SurfaceLayer = LayerId + (bPremium ? 1 : 0);
+			if (bPremium)
+			{
+				TArray<FVector2D> Shadow = Outline;
+				for (FVector2D& Point : Shadow) Point.Y += 3.0f;
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Shadow,
+					ESlateDrawEffect::None, FLinearColor(0.0f, 0.0f, 0.0f, 0.32f) * Tint, true, 10.0f);
+				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline, Accent, 0.7f);
+			}
 			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			TArray<FSlateVertex> Vertices;
 			TArray<SlateIndex> Indices;
 			for (const FVector2D& Point : Points)
 			{
-				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
+				FLinearColor Sheen = FLinearColor::FromSRGBColor(FColor(24, 45, 52)) * Tint;
+				Sheen.A = Fill.A;
+				const FLinearColor Surface = bPremium ? FMath::Lerp(Fill, Sheen, (1.0f - static_cast<float>(Point.Y / Size.Y)) * 0.32f)
+					: FMath::Lerp(FlickUITheme::GetSurfaceHighlight(BackgroundColor.Get()) * Tint, Fill, static_cast<float>(Point.Y / Size.Y));
+				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Surface.ToFColor(true)));
 			}
 			for (int32 Index = 1; Index + 1 < Points.Num(); ++Index)
 			{
 				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
 			}
 			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
+			FSlateDrawElement::MakeCustomVerts(OutDrawElements, SurfaceLayer,
 				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
 			if (const FSlateBrush* Brush = ImageBrush.Get())
 			{
@@ -1502,40 +1558,45 @@ namespace
 					Vertices[Index] = FSlateVertex::Make(Transform, FVector2f(Points[Index]), FVector2f(Uv), Tint.ToFColor(true));
 				}
 				const FSlateResourceHandle Handle = FSlateApplication::Get().GetRenderer()->GetResourceHandle(*Brush);
-				FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId + 1,
+				FSlateDrawElement::MakeCustomVerts(OutDrawElements, SurfaceLayer + 1,
 					Handle, Vertices, Indices, nullptr, 0, 0, Effect);
 			}
-			// Low-contrast architectural facets keep the glass from reading as a flat fill.
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{Size.X * 0.39f, 1.0f}, {Size.X * 0.61f, Size.Y - 1.0f}},
-				Effect, FLinearColor::FromSRGBColor(FColor(22, 33, 36, 42)) * Tint, true, 42.0f);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{Size.X * 0.72f, 1.0f}, {Size.X * 0.9f, Size.Y - 1.0f}},
-				Effect, FLinearColor::FromSRGBColor(FColor(9, 17, 19, 38)) * Tint, true, 26.0f);
-			TArray<FVector2D> Outline = Points;
-			Outline.Add(Points[0]);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
-				Outline, Effect, FLinearColor(0.26f, 0.34f, 0.38f, 0.88f) * Tint, true, BorderWidth);
+			if (bPremium)
+			{
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+					TArray<FVector2D>{{Cut + 24.0f, 1.0f}, {Size.X - Cut - 34.0f, 1.0f}}, Effect,
+					FlickMainMenuStyle::Ice.CopyWithNewOpacity(0.52f) * Tint, true, 1.0f);
+			}
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
+				Outline, Effect, (bPremium ? FLinearColor::FromSRGBColor(FColor(99, 136, 149, 210)) : FLinearColor(0.26f, 0.34f, 0.38f, 0.88f)) * Tint, true, BorderWidth);
 
 			const float Bracket = FMath::Min(34.0f, Size.X * 0.12f);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{0.0f, Cut}, {Cut, 0.0f}, {Bracket, 0.0f}},
-				Effect, Accent, false, FMath::Max(1.8f, BorderWidth));
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{Size.X - Bracket, Size.Y}, {Size.X - Cut, Size.Y}, {Size.X, Size.Y - Cut}},
-				Effect, Accent, false, FMath::Max(1.8f, BorderWidth));
+			const TArray<FVector2D> TopBracket = {{0.0f, Cut}, {Cut, 0.0f}, {Bracket, 0.0f}};
+			const TArray<FVector2D> BottomBracket = {{Size.X - Bracket, Size.Y}, {Size.X - Cut, Size.Y}, {Size.X, Size.Y - Cut}};
+			if (bPremium)
+			{
+				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 3, TopBracket, Accent);
+				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 3, BottomBracket, Accent);
+			}
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 4, AllottedGeometry.ToPaintGeometry(),
+				TopBracket, Effect, Accent, true, FMath::Max(1.8f, BorderWidth));
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 4, AllottedGeometry.ToPaintGeometry(),
+				BottomBracket, Effect, Accent, true, FMath::Max(1.8f, BorderWidth));
 			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
-				OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
+				OutDrawElements, LayerId + 5, InWidgetStyle, bParentEnabled);
 		}
 
 	private:
 		TAttribute<FLinearColor> BackgroundColor;
 		TAttribute<FLinearColor> AccentColor;
 		TAttribute<const FSlateBrush*> ImageBrush;
+		bool bPremium = false;
 		float CutSize = 12.0f;
 		float BorderWidth = 1.15f;
 	};
 
+	// Playlist pages use the same framing as the rest of the interface.
+	// These adapters retain existing call sites and selection bindings.
 	class SFlickPlayHeaderPanel final : public SCompoundWidget
 	{
 	public:
@@ -1543,62 +1604,10 @@ namespace
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
-
 		void Construct(const FArguments& InArgs)
 		{
-			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
-		}
-
-		virtual int32 OnPaint(
-			const FPaintArgs& Args, const FGeometry& AllottedGeometry,
-			const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
-			const int32 LayerId, const FWidgetStyle& InWidgetStyle, const bool bParentEnabled) const override
-		{
-			const FVector2D Size = AllottedGeometry.GetLocalSize();
-			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
-			const float Cut = FMath::Min(14.0f, Size.Y * 0.2f);
-			const TArray<FVector2D> Frame = {
-				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
-				{Size.X, Size.Y}, {Cut, Size.Y}, {0.0f, Size.Y - Cut}};
-			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
-			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
-			TArray<FSlateVertex> Vertices;
-			TArray<SlateIndex> Indices;
-			const FLinearColor Fill = FLinearColor::FromSRGBColor(FColor(10, 18, 21, 232)) * Tint;
-			for (const FVector2D& Point : Frame)
-			{
-				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
-			}
-			for (int32 Index = 1; Index + 1 < Frame.Num(); ++Index)
-			{
-				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
-			}
-			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
-				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{Size.X * 0.28f, 1.0f}, {Size.X * 0.36f, Size.Y - 1.0f}},
-				Effect, FLinearColor(0.14f, 0.25f, 0.29f, 0.12f) * Tint, true, 46.0f);
-
-			TArray<FVector2D> Outline = Frame;
-			Outline.Add(FVector2D::ZeroVector);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
-				Outline, Effect, FLinearColor(0.31f, 0.42f, 0.47f, 0.82f) * Tint, true, 1.0f);
-			const FLinearColor CoolRail(0.19f, 0.56f, 0.65f, 0.62f);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{Size.X * 0.12f, 0.0f}, {Size.X * 0.22f, 0.0f}}, Effect, CoolRail * Tint, false, 1.2f);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{Size.X * 0.61f, Size.Y}, {Size.X * 0.76f, Size.Y}}, Effect, CoolRail * Tint, false, 1.2f);
-
-			const FLinearColor Lime = Brand * Tint;
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 4, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{Size.X - Cut, 0.0f}, {Size.X, Cut}},
-				Effect, Lime, false, 5.0f);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 4, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{0.0f, Size.Y - Cut}, {Cut, Size.Y}},
-				Effect, Lime, false, 5.0f);
-			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
-				OutDrawElements, LayerId + 5, InWidgetStyle, bParentEnabled);
+			ChildSlot[SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(Brand)
+				.CutSize(14.0f).Padding(InArgs._Padding)[InArgs._Content.Widget]];
 		}
 	};
 
@@ -1610,83 +1619,14 @@ namespace
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
-
 		void Construct(const FArguments& InArgs)
 		{
 			Selected = InArgs._Selected;
-			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
+			ChildSlot[SNew(SFlickAngularBorder)
+				.BackgroundColor_Lambda([this]() { return Selected.Get() ? PanelRaised : Panel; })
+				.AccentColor_Lambda([this]() { return Selected.Get() ? Brand : Hairline; })
+				.UseAccentForOutline(true).CutSize(10.0f).Padding(InArgs._Padding)[InArgs._Content.Widget]];
 		}
-
-		virtual int32 OnPaint(
-			const FPaintArgs& Args, const FGeometry& AllottedGeometry,
-			const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
-			const int32 LayerId, const FWidgetStyle& InWidgetStyle, const bool bParentEnabled) const override
-		{
-			const FVector2D Size = AllottedGeometry.GetLocalSize();
-			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
-			const float Cut = FMath::Min(13.0f, Size.Y * 0.16f);
-			const TArray<FVector2D> Frame = {
-				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
-				{Size.X, Size.Y}, {Cut, Size.Y}, {0.0f, Size.Y - Cut}};
-			const bool bSelected = Selected.Get(false);
-			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
-			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
-
-			TArray<FSlateVertex> Vertices;
-			TArray<SlateIndex> Indices;
-			const FLinearColor Fill = FLinearColor::FromSRGBColor(FColor(9, 17, 19, bSelected ? 240 : 226)) * Tint;
-			for (const FVector2D& Point : Frame)
-			{
-				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
-			}
-			for (int32 Index = 1; Index + 1 < Frame.Num(); ++Index)
-			{
-				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
-			}
-			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
-				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
-
-			TArray<FVector2D> Outline = Frame;
-			Outline.Add(Frame[0]);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
-				Outline, Effect, FLinearColor(0.30f, 0.40f, 0.44f, bSelected ? 0.92f : 0.72f) * Tint, true, 1.0f);
-
-			if (bSelected)
-			{
-				const FLinearColor Lime = Brand * Tint;
-				// The active state carries a fine gold-lime circuit continuously around the frame.
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					Outline, Effect, Lime.CopyWithNewOpacity(0.92f), true, 1.7f);
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{0.0f, Size.Y - Cut}, {Cut, Size.Y}}, Effect, Lime, false, 5.0f);
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{Size.X - Cut, 0.0f}, {Size.X, Cut}}, Effect, Lime, false, 6.0f);
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{0.0f, 0.0f}, {Size.X * 0.18f, 0.0f}}, Effect, Lime.CopyWithNewOpacity(0.82f), false, 1.8f);
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{Cut, Size.Y}, {Size.X * 0.72f, Size.Y}}, Effect, Lime.CopyWithNewOpacity(0.88f), false, 1.8f);
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{0.0f, Cut * 1.6f}, {0.0f, Size.Y - Cut}}, Effect, Lime.CopyWithNewOpacity(0.76f), false, 1.6f);
-			}
-			else
-			{
-				const FLinearColor Cool(0.38f, 0.46f, 0.49f, 0.78f);
-				// Idle cards retain the heavy structural chamfer caps, but never inherit lime.
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{0.0f, Size.Y - Cut}, {Cut, Size.Y}}, Effect, Cool * Tint, false, 4.0f);
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{Size.X - Cut, 0.0f}, {Size.X, Cut}}, Effect, Cool * Tint, false, 4.0f);
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{0.0f, 0.0f}, {Size.X * 0.10f, 0.0f}}, Effect, Cool * Tint, false, 1.0f);
-				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-					TArray<FVector2D>{{Size.X * 0.82f, Size.Y}, {Size.X, Size.Y}}, Effect, Cool * Tint, false, 1.0f);
-			}
-
-			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
-				OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
-		}
-
 	private:
 		TAttribute<bool> Selected;
 	};
@@ -1698,51 +1638,11 @@ namespace
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
-
 		void Construct(const FArguments& InArgs)
 		{
-			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
-		}
-
-		virtual int32 OnPaint(
-			const FPaintArgs& Args, const FGeometry& AllottedGeometry,
-			const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
-			const int32 LayerId, const FWidgetStyle& InWidgetStyle, const bool bParentEnabled) const override
-		{
-			const FVector2D Size = AllottedGeometry.GetLocalSize();
-			if (Size.X < 2.0f || Size.Y < 2.0f) return LayerId;
-			const float Cut = FMath::Min(12.0f, Size.Y * 0.18f);
-			const TArray<FVector2D> Frame = {
-				{0.0f, 0.0f}, {Size.X - Cut, 0.0f}, {Size.X, Cut},
-				{Size.X, Size.Y - Cut}, {Size.X - Cut, Size.Y}, {Cut, Size.Y},
-				{0.0f, Size.Y - Cut}};
-			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
-			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
-			TArray<FSlateVertex> Vertices;
-			TArray<SlateIndex> Indices;
-			const FLinearColor Fill = Panel * Tint;
-			for (const FVector2D& Point : Frame)
-			{
-				Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point), FVector2f::ZeroVector, Fill.ToFColor(true)));
-			}
-			for (int32 Index = 1; Index + 1 < Frame.Num(); ++Index)
-			{
-				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
-			}
-			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
-				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
-			TArray<FVector2D> Outline = Frame;
-			Outline.Add(Frame[0]);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
-				Outline, Effect, FLinearColor(0.31f, 0.43f, 0.46f, 0.82f) * Tint, true, 1.0f);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{0.0f, Size.Y - Cut}, {Cut, Size.Y}}, Effect, Brand * Tint, false, 3.5f);
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
-				TArray<FVector2D>{{0.0f, 0.0f}, {Size.X * 0.18f, 0.0f}}, Effect,
-				FLinearColor(0.18f, 0.58f, 0.64f, 0.54f) * Tint, false, 1.2f);
-			return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect,
-				OutDrawElements, LayerId + 3, InWidgetStyle, bParentEnabled);
+			ChildSlot[SNew(SFlickAngularBorder).BackgroundColor(Panel)
+				.AccentColor(Cyan.CopyWithNewOpacity(0.6f)).CutSize(10.0f)
+				.Padding(InArgs._Padding)[InArgs._Content.Widget]];
 		}
 	};
 

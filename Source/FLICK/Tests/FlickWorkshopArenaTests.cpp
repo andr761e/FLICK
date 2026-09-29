@@ -4,6 +4,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstance.h"
 #include "Arena/FlickBobArena.h"
 #include "Arena/FlickTestArena.h"
 
@@ -120,8 +121,12 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 				+ StaticArt->GetStaticMesh()->GetBounds().Origin.Z <= 3.0f);
 		TestEqual(TEXT("Arena art cannot collide"), StaticArt->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		TestTrue(TEXT("Imported arena presentation is visible"), StaticArt->IsVisible());
-		TestEqual(TEXT("Premium arena keeps its eight authored surface treatments"),
-			StaticArt->GetStaticMesh()->GetStaticMaterials().Num(), 8);
+		// The upgraded deck has more than the original eight treatments. Verify
+		// the actual layered finishes, not a stale exact material-slot count.
+		TestTrue(TEXT("Premium arena preserves layered surface treatments"),
+			StaticArt->GetStaticMesh()->GetStaticMaterials().Num() >= 8);
+		for (const TCHAR* Slot : {TEXT("02_Arena_Surface"), TEXT("04_Brushed_Titanium"), TEXT("10_Inner_Field"), TEXT("11_Center_Inset")})
+			TestTrue(FString::Printf(TEXT("Premium deck keeps %s"), Slot), StaticArt->GetMaterialIndex(Slot) != INDEX_NONE);
 	}
 	else
 	{
@@ -181,8 +186,22 @@ bool FFlickWorkshopArenaTest::RunTest(const FString& Parameters)
 		for (int32 MaterialIndex = 0; MaterialIndex < FlushMechanism->GetNumMaterials(); ++MaterialIndex)
 		{
 			const UMaterialInterface* Material = FlushMechanism->GetMaterial(MaterialIndex);
-			bUsesDedicatedFlushMaterial |= Material
-				&& Material->GetName().StartsWith(TEXT("MI_Flush_"));
+			// Cosmetic MIDs keep the dedicated anti-flicker parent and its depth
+			// offset. Their own object name is not a rendering contract.
+			for (const UMaterialInterface* Source = Material; Source;)
+			{
+				if (Source->GetName().StartsWith(TEXT("MI_Flush_")))
+				{
+					bUsesDedicatedFlushMaterial = true;
+					float Offset = 0.0f, AuthoredOffset = 0.0f;
+					Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("RenderLayerOffset")), Offset);
+					Source->GetScalarParameterValue(FMaterialParameterInfo(TEXT("RenderLayerOffset")), AuthoredOffset);
+					TestEqual(TEXT("Cosmetic finish preserves the dedicated flush depth offset"), Offset, AuthoredOffset);
+					break;
+				}
+				const auto* Instance = Cast<UMaterialInstance>(Source);
+				Source = Instance ? Instance->Parent.Get() : nullptr;
+			}
 		}
 		TestTrue(TEXT("Closed mechanism uses dedicated anti-flicker materials"),
 			bUsesDedicatedFlushMaterial);
@@ -241,6 +260,7 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	UStaticMeshComponent* StadiumLights = nullptr;
 	UStaticMeshComponent* LegacyVenue = nullptr;
 	UStaticMeshComponent* BoardCollider = nullptr;
+	UStaticMeshComponent* PocketFloor = nullptr;
 	UStaticMeshComponent* PocketedBoardCollider = nullptr;
 	UStaticMeshComponent* RailCollider = nullptr;
 	TInlineComponentArray<UStaticMeshComponent*> Components(Arena);
@@ -251,6 +271,7 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 		if (Component->GetFName() == TEXT("HighDetailStadiumLights")) StadiumLights = Component;
 		if (Component->GetFName() == TEXT("VenueBackWall")) LegacyVenue = Component;
 		if (Component->GetFName() == TEXT("BoardBase")) BoardCollider = Component;
+		if (Component->GetFName() == TEXT("PocketedTabletop")) PocketFloor = Component;
 		if (Component->GetFName() == TEXT("BoardCollision_0")) PocketedBoardCollider = Component;
 		if (Component->GetFName() == TEXT("Rail_0")) RailCollider = Component;
 	}
@@ -267,6 +288,9 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("BOB art keeps the authoritative 1308 cm outer span"),
 			FMath::IsNearlyEqual(Size.X, 1308.0f, 1.0f)
 			&& FMath::IsNearlyEqual(Size.Y, 1308.0f, 1.0f));
+		TestTrue(TEXT("Optimized BOB art stays below the old 83,960-triangle mesh"),
+			HighDetailArt->GetStaticMesh()->GetNumTriangles(0) > 0
+			&& HighDetailArt->GetStaticMesh()->GetNumTriangles(0) <= 70000);
 		TestEqual(TEXT("BOB art cannot affect puck physics"),
 			HighDetailArt->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		TestTrue(TEXT("High-detail BOB presentation is visible"), HighDetailArt->IsVisible());
@@ -311,8 +335,36 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	}
 	if (BoardCollider)
 	{
-		TestEqual(TEXT("BOB uses one seamless authoritative tabletop collider"),
-			BoardCollider->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+		TestEqual(TEXT("Solid legacy slab cannot block pockets"),
+			BoardCollider->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+	}
+	if (TestNotNull(TEXT("Pocketed tabletop collision"), PocketFloor))
+	{
+		TestEqual(TEXT("Compound floor supports physical falling"), PocketFloor->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+		TestFalse(TEXT("Hidden collision mesh cannot cover the centre ring"), PocketFloor->IsVisible());
+		FHitResult Hit;
+		for (int32 PocketIndex = 0; PocketIndex < 4; ++PocketIndex)
+		{
+			const FVector Opening = Arena->GetPocketWorldLocation(PocketIndex);
+			TestFalse(TEXT("Every pocket opening has no invisible floor"), World->LineTraceSingleByChannel(Hit,
+				Opening + FVector(0,0,80), Opening - FVector(0,0,80), ECC_Visibility));
+			const FVector Lip = Opening + FVector(45,55,0);
+			TestTrue(TEXT("Round pocket lips retain support rather than square cutouts"), World->LineTraceSingleByChannel(Hit,
+				Lip + FVector(0,0,80), Lip - FVector(0,0,80), ECC_Visibility));
+			for (int32 Sample = 0; Sample < 32; ++Sample)
+			{
+				const float Angle = 2.0f * PI * Sample / 32.0f;
+				const FVector Rim = Opening + FVector(74.0f * FMath::Cos(Angle), 74.0f * FMath::Sin(Angle), 0);
+				if (TestTrue(TEXT("Pocket surrounds have continuous floor support"), World->LineTraceSingleByChannel(Hit,
+					Rim + FVector(0,0,80), Rim - FVector(0,0,80), ECC_Visibility)))
+				{
+					TestTrue(TEXT("Pocket surrounds are flush with the tabletop, not raised rings"),
+						FMath::IsNearlyEqual(Hit.ImpactPoint.Z, Arena->GetSurfaceZ(), 0.05f));
+				}
+			}
+		}
+		TestTrue(TEXT("The tabletop still supports pucks outside openings"), World->LineTraceSingleByChannel(Hit,
+			FVector(0,0,330), FVector(0,0,170), ECC_Visibility));
 	}
 	if (PocketedBoardCollider)
 	{
@@ -326,8 +378,12 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Legacy BOB collision presentation is hidden"), RailCollider->IsVisible());
 	}
 	const FVector Pocket = Arena->GetPocketWorldLocation(0);
-	TestTrue(TEXT("Puck is captured after its center crosses the pocket opening"),
+	TestFalse(TEXT("Puck above a pocket is not hidden before falling"),
 		Arena->IsCapturedByPocket(FVector(Pocket.X, Pocket.Y, 262.0f), 24.0f));
+	TestTrue(TEXT("Puck is captured only after dropping into the pocket"),
+		Arena->IsCapturedByPocket(FVector(Pocket.X, Pocket.Y, 220.0f), 24.0f));
+	TestTrue(TEXT("A tilted puck below the lip cannot remain active forever"),
+		Arena->IsCapturedByPocket(FVector(Pocket.X + 68.0f, Pocket.Y, 220.0f), 24.0f));
 	TestFalse(TEXT("Tabletop positions away from a pocket are not captured"),
 		Arena->IsCapturedByPocket(FVector(0.0f, 0.0f, 262.0f), 24.0f));
 

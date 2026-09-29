@@ -91,6 +91,13 @@ if not parent:
     u.EditorAssetLibrary.save_loaded_asset(parent)
 
 
+# The 1v1 recessed rim lenses share this parent and render in four instanced
+# batches. This enables that vertex factory without changing any surface art.
+if not parent.get_editor_property("used_with_instanced_static_meshes"):
+    parent.set_editor_property("used_with_instanced_static_meshes", True)
+    editing.recompile_material(parent)
+    u.EditorAssetLibrary.save_loaded_asset(parent)
+
 specs = {
     # A diffuse blue-grey deck gives the bright puck metal a mid-value backdrop.
     # Emissive strength is deliberately restrained; localized bloom is handled

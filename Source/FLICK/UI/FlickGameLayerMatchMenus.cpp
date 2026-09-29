@@ -360,7 +360,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 	];
 	ResultLayout->AddSlot().AutoHeight()
 	[
-		SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(18.0f, 16.0f))
+		SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Cyan).CutSize(10.0f).Padding(FMargin(18.0f, 16.0f))
 		[
 			SNew(STextBlock)
 			.Text_Lambda([this]() { return GetRoundScoreText(); })
@@ -455,30 +455,33 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMainMenuButton(
 		: Label == TEXT("ITEM SHOP") ? TEXT("Explore the collection")
 		: Label == TEXT("SETTINGS") ? TEXT("Make yourself comfortable") : FString();
 	TSharedRef<SButton> Button = SNew(SButton)
-		.ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(22.0f, 0.0f, 24.0f, 0.0f))
+		.ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(28.0f, 0.0f, 25.0f, 0.0f))
 		.HAlign(HAlign_Fill).VAlign(VAlign_Center).OnClicked(OnClicked);
 	const TWeakPtr<SButton> WeakButton = Button;
 	Button->SetContent(
 		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 18.0f, 0.0f)
-		[SNew(SFlickMainMenuIcon).Icon(Icon).Color(bPrimary ? Ink : bDanger ? Muted : Brand)]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 24.0f, 0.0f)
+		[SNew(SFlickMainMenuIcon).Icon(Icon).Color(bPrimary ? Ink : bDanger ? Paper : FlickMainMenuStyle::Lime).Glow(!bPrimary && !bDanger)]
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
-			[SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(bPrimary ? 30 : 21)).ColorAndOpacity(bPrimary ? Ink : Paper)]
-			+ SVerticalBox::Slot().AutoHeight()
-			[SNew(STextBlock).Text(FText::FromString(Detail)).Font(UiFont(10)).ColorAndOpacity(bPrimary ? Ink : Muted)
+			[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(bPrimary ? 27 : 20, true)).ColorAndOpacity(bPrimary ? Ink : FLinearColor(0.98f, 0.99f, 1.0f))]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
+			[SNew(STextBlock).Text(FText::FromString(Detail)).Font(UiFont(10)).ColorAndOpacity(bPrimary ? Ink : FLinearColor(0.67f, 0.75f, 0.78f))
 				.Visibility(Detail.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible)]
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-		[SNew(STextBlock).Text(FText::FromString(TEXT("\u2197"))).Font(UiFont(20)).ColorAndOpacity(bPrimary ? Ink : Brand)]);
+		[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(21)).ColorAndOpacity(bPrimary ? Ink : Paper)]);
 	return SNew(SBox).HeightOverride(Height)
 	[
 		SNew(SFlickMainMenuFrame)
-		.StartColor(bPrimary ? Brand : Panel).EndColor(bPrimary ? Brand : Panel)
-		.HoverStartColor(bPrimary ? FMath::Lerp(Brand, Paper, 0.16f) : PanelRaised).HoverEndColor(bPrimary ? FMath::Lerp(Brand, Paper, 0.16f) : PanelRaised)
-		.BorderColor(bPrimary ? Brand : Hairline).HoverBorderColor(bDanger ? Orange : Brand)
+		.StartColor(bPrimary ? FLinearColor::FromSRGBColor(FColor(197, 251, 8)) : FLinearColor::FromSRGBColor(FColor(6, 16, 21, 249)))
+		.EndColor(bPrimary ? FLinearColor::FromSRGBColor(FColor(225, 255, 38)) : FLinearColor::FromSRGBColor(FColor(3, 10, 15, 249)))
+		.HoverStartColor(bPrimary ? FLinearColor::FromSRGBColor(FColor(222, 255, 48)) : FLinearColor::FromSRGBColor(FColor(13, 34, 42, 251)))
+		.HoverEndColor(bPrimary ? FLinearColor::FromSRGBColor(FColor(238, 255, 79)) : FLinearColor::FromSRGBColor(FColor(5, 21, 29, 251)))
+		.BorderColor(bPrimary ? FlickMainMenuStyle::Lime : FLinearColor::FromSRGBColor(FColor(99, 139, 151, 204)))
+		.HoverBorderColor(bDanger ? Orange : FlickMainMenuStyle::Ice)
 		.Primary(bPrimary)
 		.Highlighted_Lambda([WeakButton]()
 		{
@@ -496,8 +499,8 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 	const bool bDanger,
 	const float Height)
 {
-	FString Icon = TEXT(">");
-	if (Label.Contains(TEXT("BACK"))) Icon = TEXT("<");
+	FString Icon = TEXT("\u2192");
+	if (Label.Contains(TEXT("BACK"))) Icon = TEXT("\u2190");
 	else if (Label.Contains(TEXT("LINEUP"))) Icon = TEXT("III");
 	else if (Label.Contains(TEXT("SHOP"))) Icon = TEXT("$");
 	else if (Label.Contains(TEXT("SETTINGS"))) Icon = TEXT("*");
@@ -535,10 +538,12 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 			[
-				SNew(STextBlock)
+				SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly).HAlign(HAlign_Left)
+				[SNew(STextBlock)
 				.Text(FText::FromString(Label))
-				.Font(UiFont(15, true))
+				.Font(UiFont(13, true))
 				.ColorAndOpacity(bPrimary ? Ink : Paper)
+				]
 			]
 		];
 	const TWeakPtr<SButton> WeakButton = Button;
@@ -570,12 +575,13 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 				const TSharedPtr<SButton> PinnedButton = WeakButton.Pin();
 				if (PinnedButton.IsValid() && (PinnedButton->HasKeyboardFocus() || PinnedButton->IsHovered()))
 				{
-					return Brand;
+					return bDanger ? Orange : Brand;
 				}
 				return bPrimary ? Brand : bDanger ? Orange : Hairline;
 			})
 			.CutSize(8.0f)
 			.BorderWidth(1.0f)
+			.UseAccentForOutline(true)
 			.Padding(FMargin(1.0f))
 			[
 				Button
@@ -591,12 +597,12 @@ TSharedRef<SWidget> SFlickGameLayer::MakeToggleRow(
 	return SNew(SBox).HeightOverride(58.0f)
 		[
 			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(13, true)).ColorAndOpacity(FLinearColor::White)]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(12, true)).ColorAndOpacity(Paper)]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
 				SNew(SBox).WidthOverride(26.0f).HeightOverride(26.0f)
 				[
-					SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline).Padding(1.0f)
+					SNew(SBox)
 					[
 					SNew(SCheckBox)
 					.Style(&ToggleStyle)
@@ -622,7 +628,7 @@ TSharedRef<SWidget> SFlickGameLayer::MakeSliderRow(
 	return SNew(SBox).HeightOverride(58.0f)
 		[
 			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().FillWidth(0.36f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(13, true)).ColorAndOpacity(FLinearColor::White)]
+			+ SHorizontalBox::Slot().FillWidth(0.36f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(12, true)).ColorAndOpacity(Paper)]
 			+ SHorizontalBox::Slot().FillWidth(0.54f).VAlign(VAlign_Center)
 			[
 				SNew(SOverlay)
@@ -659,7 +665,7 @@ TSharedRef<SWidget> SFlickGameLayer::MakeCycleRow(
 	return SNew(SBox).HeightOverride(58.0f)
 		[
 			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(13, true)).ColorAndOpacity(FLinearColor::White)]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(12, true)).ColorAndOpacity(Paper)]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(36.0f).HeightOverride(34.0f)[SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).ContentPadding(0.0f).OnClicked(Previous)[SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(13, true)).ColorAndOpacity(Paper).Justification(ETextJustify::Center)]]]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(154.0f)[SNew(STextBlock).Text(Value).Font(UiFont(12, true)).Justification(ETextJustify::Center).ColorAndOpacity(Brand)]]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(36.0f).HeightOverride(34.0f)[SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).ContentPadding(0.0f).OnClicked(Next)[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(13, true)).ColorAndOpacity(Paper).Justification(ETextJustify::Center)]]]
@@ -870,7 +876,7 @@ int32 SFlickGameLayer::GetDisplayedPartyMemberCount() const
 
 EVisibility SFlickGameLayer::GetMatchHudVisibility() const
 {
-	if (PlayerController.IsValid() && PlayerController->IsCinematicReplayPresentationActive())
+	if (bReplayOverlayPreview || (PlayerController.IsValid() && PlayerController->IsCinematicReplayPresentationActive()))
 	{
 		return EVisibility::Collapsed;
 	}

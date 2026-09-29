@@ -7,6 +7,20 @@ namespace FlickVisualSettings
 	static const TCHAR* Section = TEXT("FLICK.VisualSettings");
 	static constexpr int32 DefaultRenderScale = 110;
 
+	bool IsFpsVisible()
+	{
+		bool bVisible = false;
+		if (GConfig) GConfig->GetBool(Section, TEXT("ShowFPS"), bVisible, GGameUserSettingsIni);
+		return bVisible;
+	}
+
+	void SetFpsVisible(const bool bVisible)
+	{
+		if (!GConfig) return;
+		GConfig->SetBool(Section, TEXT("ShowFPS"), bVisible, GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+
 	int32 GetRenderScale()
 	{
 		int32 Value = DefaultRenderScale;

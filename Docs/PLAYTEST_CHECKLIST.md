@@ -6,6 +6,11 @@ run `Tools/Test-FlickUISmoke.ps1` and inspect its PNGs for clipping and overlap.
 - Does startup show the main menu without accepting accidental board input?
 - Does the translucent menu panel cover roughly the left third, keep the arena visible, and slope from its narrower top edge to its wider bottom edge at common aspect ratios?
 - Does the main-menu arena orbit remain smooth with the selected display puck visible?
+- Do the premium Home cards, rank, Social, Challenges, display selector and profile remain readable and non-overlapping at 1280x720, 1920x1080 and 3440x1440?
+- Do mouse/controller focus, all six navigation actions, challenge details, party cards and display-puck changes still work with the new card framing?
+- Do the brighter menu LEDs and softbox reflections retain floor detail rather than becoming a broad neon haze?
+- When starting a match or opening another frontend screen, do the arena materials and camera effects restore without menu-only blur or lighting leaking into play?
+- For lighting comparisons, use `Tools/Capture-FlickUI.ps1 -Screen Home -CaptureDelaySeconds 8` so rendering has time to warm up.
 - Does each automatic arena change ease through its transition without a visible one-frame rebuild or input interruption?
 - Are 1v1, 2v2, 3v3 Knockout, and BOB available in the appropriate playlists?
 - Do all Knockout cards and result screens consistently say first to three round wins?
@@ -22,6 +27,9 @@ run `Tools/Test-FlickUISmoke.ps1` and inspect its PNGs for clipping and overlap.
 - When Lineups is opened from Mode Select, does Back return to Mode Select rather than Home?
 - Does the Item Shop open from Home, show three non-purchasable cosmetic placeholders, and return cleanly with Back or Escape?
 - Do Main Menu, Mode Select, Lineup, Settings, Item Shop, match HUDs, and Pause share the same angular panel language and cyan/orange team accents?
+- Do Profile/Locker, Challenges, Social, private-match/lobby screens, results and replay cards use the same graphite surfaces, cut corners, lime actions and readable text hierarchy as Home?
+- Do settings dropdown pop-ups, checkboxes and remapping buttons remain legible, with visible hover/keyboard focus and no clipped action labels?
+- Do settings and HUDs keep restrained accents instead of the main menu's large glowing CTA treatment, while preserving team colours and cosmetic artwork?
 - Do all nine puck-type cards, the formation, radar, class controls, Back, and Save fit without clipping at 1280x720, 1920x1080, and 3440x1440?
 - Can the locker switch between banner, banner tag, avatar border, and all nine puck types without losing scroll or focus?
 - Does each locker category show its owned items as a grid, highlight the equipped item, and preserve the choice after relaunch?
@@ -30,6 +38,11 @@ run `Tools/Test-FlickUISmoke.ps1` and inspect its PNGs for clipping and overlap.
 - Do the profile, customization, private-match, and main-menu screens avoid overlapping controls at ultrawide and high-DPI resolutions?
 - Does hovering a puck type update both the selected-slot deltas and aggregate radar without moving the surrounding layout?
 - Are Settings toggles, sliders, selectors, Back, and Apply Changes fully readable without text clipping?
+- Does Video > Display Current FPS persist after relaunch and show a small, readable counter in the lower-left corner without covering controls?
+- Does the compact cinematic replay shot-maker card show the correct name/avatar for host, client, and bot shots, centered at 79% of screen height, with self-knockouts labeled explicitly?
+- During a replay, does Enter (or the rebound Replay Skip key) register one vote and remove that player's name from everyone's bottom-right waiting list?
+- Does the replay end only after all connected humans, including spectators, vote, while bots and disconnected players do not hold it up?
+- Are votes cleared every replay, and does the normal round transition remain correct after skipping?
 - Is each puck role identifiable by shape, accent, and top mark during play?
 - Does Heavy noticeably win equal-speed momentum exchanges without feeling unusably slow?
 - Does Striker travel faster and farther while remaining easier to displace?
@@ -76,6 +89,20 @@ run `Tools/Test-FlickUISmoke.ps1` and inspect its PNGs for clipping and overlap.
 - Does each ring-out, turn change, round result, and match result produce one cue?
 - Do all three audio sliders persist and reach true silence at zero?
 - Do the cyan perimeter, graphite rings, and four inward chevrons remain readable without overpowering puck colors?
+- Do the 1v1, 2v2 and 3v3 decks all read as satin silver metal with soft highlights, without mirror glare hiding pucks or markings?
+- Are all three floors evenly readable from all four gameplay camera sides, without a single bright patch against a dark centre?
+- Do all formats have matching darker stadium seating, balanced warm/cyan lighting and flush cyan rim inserts without adding collision or raised lamps?
+- Compare the first visible menu frame with the orbit after 20 seconds: are reflections restrained, without a washed-out puck or a concentrated white hotspot?
+- In Settings > Lighting, do both presets save independently after relaunch, with all seven controls affecting their intended lights?
+- Does Preview Arena leave the arena visible next to the compact panel? Do menu orbit/lighting stay consistent while settings are open, and match lighting stay consistent when opening settings from pause?
+- Does raising Arena Fill brighten the whole board in 1v1, 2v2 and 3v3 without strengthening reflected glare? Does lowering Direct Light Reflections reduce softbox/puck glare without changing the material finish?
+- Does Reset Lighting restore both presets across all Knockout formats and BOB, while leaving unrelated settings alone?
+- In BOB, do ambient, fill, key, rim, team accents, direct light and highlights apply live, persist after relaunch, and affect only the local player's rendering? Check that the optimized board's pockets and rails align with gameplay collision.
+- Is BOB's red centre ring visible? Can a puck fall under gravity into each of the four holes without disappearing while still on the tabletop? Check lip support and flat movement across the board.
+- In BOB vs Bot, does orange aim and shoot its striker after blue's turn? In private BOB, do empty seats on either team shoot, while human-owned seats stay under human control?
+- With two Steam accounts, do lighting changes on one machine leave the other player's lighting unchanged?
+- Do darker switch rings and closed-divider surrounds leave their coloured state indicators clearly readable in every format?
+- After switching repeatedly between 1v1, 2v2 and 3v3, does the shared finish remain consistent, with the correct 8/12/14 active dividers, 20/28/36 sockets and unchanged arena sizes?
 - Do impact shards remain readable without obscuring puck positions?
 - Does Escape reliably pause and resume during a match?
 - Can D-pad left/right and either shoulder cycle only through the active player's selectable pucks?

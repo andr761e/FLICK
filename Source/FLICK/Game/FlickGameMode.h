@@ -117,6 +117,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
+	void RefreshLightingSettings();
 
 	bool CanSelectPiece(const AFlickPiece* Piece) const;
 	bool CanSelectPieceForController(const APlayerController* RequestingPlayer, const AFlickPiece* Piece) const;
@@ -164,6 +165,7 @@ public:
 	bool IsTutorialTransitioning() const { return TutorialTransitionRemaining > 0.0f; }
 	bool IsTestArenaMode() const { return bTestArenaMode; }
 	bool IsCinematicReplayActive() const { return bCinematicReplayActive; }
+	void RequestReplaySkip(APlayerController* Player, int32 ReplaySerial);
 	bool IsCinematicReplayPullbackActive() const;
 	float GetCinematicReplayProgress() const;
 	float GetCinematicReplayPullbackAlpha() const;
@@ -531,6 +533,25 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Test Arena", meta = (ClampMin = "0.0", ClampMax = "1000.0"))
 	float TestPuckRimLightIntensity = 180.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "0.0", ClampMax = "10000.0"))
+	float MenuAccentLightIntensity = 3200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "0.0", ClampMax = "150.0"))
+	float MenuSoftboxLightMultiplier = 80.0f;
+
+	// Retain serialized property names; the same base rig now serves all Knockout formats.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Menu Softbox Multiplier", ClampMin = "0.0", ClampMax = "1000.0"))
+	float OneVsOneMenuSoftboxMultiplier = 250.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Gameplay Softbox Multiplier", ClampMin = "0.0", ClampMax = "80.0"))
+	float OneVsOneGameplaySoftboxMultiplier = 50.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Sky Light Multiplier", ClampMin = "1.0", ClampMax = "4.0"))
+	float OneVsOneSkyLightMultiplier = 2.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Fill Light Intensity (650 cm Base)", ClampMin = "0.0", ClampMax = "300000.0"))
+	float OneVsOneFillLightIntensity = 150000.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "1.0", ClampMax = "2.0"))
 	float FrontendArenaDirectionalLightMultiplier = 1.22f;
 
@@ -541,6 +562,9 @@ public:
 	float FrontendArenaFillLightMultiplier = 1.18f;
 
 private:
+	friend class FFlickOneVsOneLightingTest;
+	friend class FFlickBobGameplayTest;
+
 	void SpawnCameraIfNeeded();
 	void SpawnAudioIfNeeded();
 	void SpawnLightingIfNeeded();

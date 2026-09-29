@@ -84,13 +84,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		[
 			SAssignNew(MainMenuDiagonalPanel, SFlickDiagonalPanel)
 			.Visibility(EVisibility::HitTestInvisible)
-			.PanelColor(Ink)
-			.EdgeColor(Hairline)
+			.PanelColor(FLinearColor::FromSRGBColor(FColor(4, 10, 14, 252)))
+			.EdgeColor(FlickMainMenuStyle::Ice.CopyWithNewOpacity(0.68f))
 		]
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Top)
-		.Padding(52.0f, 62.0f, 0.0f, 0.0f)
+		.Padding(FlickMainMenuStyle::LeftPadding, 50.0f, 0.0f, 0.0f)
 		[
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
 			[
@@ -120,15 +120,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 				[
 					SNew(STextBlock)
 					.Text(FText::FromString(TEXT("PHYSICS. PRECISION. RIVALRY.")))
-					.Font(UiFont(11, true))
-					.ColorAndOpacity(Brand)
+					.Font(WordmarkTaglineFont(9))
+					.ColorAndOpacity(FlickMainMenuStyle::Lime)
 				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(-5.0f, 7.0f, 0.0f, 0.0f)
 			[
 				SNew(SBox)
-				.WidthOverride(450.0f)
-				.HeightOverride(150.0f)
+				.WidthOverride(428.0f)
+				.HeightOverride(142.0f)
 				[
 					SNew(SScaleBox)
 					.Stretch(EStretch::ScaleToFit)
@@ -161,12 +161,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Top)
-		.Padding(52.0f, 282.0f, 0.0f, 0.0f)
+		.Padding(FlickMainMenuStyle::LeftPadding, FlickMainMenuStyle::NavigationTop, 0.0f, 0.0f)
 		[
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
 			[
 			SNew(SBox)
-			.WidthOverride(450.0f)
+			.WidthOverride(MainMenuStackMetrics::StackWidth)
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, 0.0f, 0.0f, MainMenuStackMetrics::Gap)
@@ -254,9 +254,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				SAssignNew(MainMenuPuckAnchor, SBox).WidthOverride(380.0f).HeightOverride(32.0f)
+				SAssignNew(MainMenuPuckAnchor, SBox).WidthOverride(410.0f).HeightOverride(32.0f)
 				[
-				SNew(SBox).WidthOverride(380.0f).HeightOverride(32.0f)
+				SNew(SBox).WidthOverride(410.0f).HeightOverride(32.0f)
 				.RenderTransform_Lambda([this]()
 				{
 					if (!MainMenuQuitCard.IsValid() || !MainMenuProfileCard.IsValid() || !MainMenuPuckAnchor.IsValid())
@@ -278,20 +278,24 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 				})
 				[
 					SNew(SFlickMainMenuPanel)
-					.BackgroundColor(FLinearColor::FromSRGBColor(FColor(10, 20, 23, 238)))
-					.AccentColor(Cyan.CopyWithNewOpacity(0.58f))
+					.Premium(true)
+					.BackgroundColor(FLinearColor::FromSRGBColor(FColor(5, 13, 19, 245)))
+					.AccentColor(Cyan.CopyWithNewOpacity(0.9f))
 					.CutSize(6.0f).BorderWidth(1.0f).Padding(FMargin(11.0f, 2.0f))
 					[
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("DISPLAY PUCK"))).Font(UiFont(8, true)).ColorAndOpacity(Muted)
-						]
+							SNew(STextBlock).Text(FText::FromString(TEXT("DISPLAY PUCK"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.63f, 0.75f, 0.79f))
+							]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12.0f, 0.0f)
+						[SNew(SBox).WidthOverride(1.0f).HeightOverride(12.0f)
+							[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FlickMainMenuStyle::Ice.CopyWithNewOpacity(0.30f))]]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
 							SNew(SButton).ButtonStyle(&TransparentButtonStyle)
 							.OnClicked_Lambda([this]() { if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) Sessions->CycleShowcaseArchetype(-1); return FReply::Handled(); })
-							[SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(12, true)).ColorAndOpacity(Brand)]
+							[SNew(STextBlock).Text(FText::FromString(TEXT("\u2039"))).Font(UiFont(17, true)).ColorAndOpacity(FlickMainMenuStyle::Lime)]
 						]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.0f, 0.0f)
 						[
@@ -306,7 +310,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						[
 							SNew(SButton).ButtonStyle(&TransparentButtonStyle)
 							.OnClicked_Lambda([this]() { if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) Sessions->CycleShowcaseArchetype(1); return FReply::Handled(); })
-							[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(12, true)).ColorAndOpacity(Brand)]
+							[SNew(STextBlock).Text(FText::FromString(TEXT("\u203A"))).Font(UiFont(17, true)).ColorAndOpacity(FlickMainMenuStyle::Lime)]
 						]
 					]
 				]
@@ -314,12 +318,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
 			[
-			SAssignNew(MainMenuProfileCard, SBox).WidthOverride(380.0f).HeightOverride(82.0f)
+			SAssignNew(MainMenuProfileCard, SBox).WidthOverride(410.0f).HeightOverride(82.0f)
 			[
 				SNew(SFlickMainMenuPanel)
 				.BackgroundColor_Lambda([this]() { return GetBannerBackground(SelectedBannerStyle); })
+				.Premium(true)
 				.ImageBrush_Lambda([this]() { return GetCosmeticImageBrush(0, SelectedBannerStyle); })
-				.AccentColor_Lambda([this]() { return SelectedAvatarBorder == 2 ? Brand : SelectedAvatarBorder == 1 ? Cyan : Hairline; })
+				.AccentColor_Lambda([this]() { return SelectedAvatarBorder == 1 ? Cyan : FlickMainMenuStyle::Lime; })
 				.CutSize(10.0f).BorderWidth(1.15f).Padding(FMargin(12.0f, 9.0f))
 				[
 					SNew(SHorizontalBox)
@@ -392,6 +397,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			})
 			[
 				SNew(SFlickMainMenuPanel)
+				.Premium(true)
 				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(11, 22, 25, 248)))
 				.AccentColor(Brand)
 				.CutSize(10.0f)
@@ -430,19 +436,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		.VAlign(VAlign_Center)
 		.Padding(0.0f, 0.0f, 34.0f, 0.0f)
 		[
-			SNew(SBox).WidthOverride(344.0f)
+			SNew(SBox).WidthOverride(390.0f)
 			[BuildChallengePreview()]
 		]
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Right)
 		.VAlign(VAlign_Top)
-		.Padding(0.0f, 28.0f, 270.0f, 0.0f)
+		.Padding(0.0f, 24.0f, 276.0f, 0.0f)
 		[
-			SNew(SBox).WidthOverride(390.0f).HeightOverride(72.0f)
+			SNew(SBox).WidthOverride(404.0f).HeightOverride(70.0f)
 			.Visibility_Lambda([this]() { return bSocialPanelOpen ? EVisibility::Collapsed : EVisibility::Visible; })
 			[
 				SNew(SFlickMainMenuPanel)
-				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(14, 23, 25, 242)))
+				.Premium(true)
+				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(5, 13, 19, 246)))
 				.AccentColor(Brand)
 				.CutSize(12.0f)
 				.BorderWidth(1.3f)
@@ -456,7 +463,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						[
 							SNew(SFlickMainMenuIcon)
 							.Icon(EFlickMainMenuIcon::Rank)
-							.Color(Brand)
+							.Color(FlickMainMenuStyle::Lime).Glow(true)
 						]
 						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 						[
@@ -497,13 +504,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Right)
 		.VAlign(VAlign_Top)
-		.Padding(0.0f, 28.0f, 34.0f, 0.0f)
+		.Padding(0.0f, 24.0f, 34.0f, 0.0f)
 		[
-			SNew(SBox).WidthOverride(220.0f).HeightOverride(72.0f)
+			SNew(SBox).WidthOverride(226.0f).HeightOverride(70.0f)
 			.Visibility_Lambda([this]() { return bSocialPanelOpen ? EVisibility::Collapsed : EVisibility::Visible; })
 			[
 				SNew(SFlickMainMenuPanel)
-				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(14, 23, 25, 242)))
+				.Premium(true)
+				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(5, 13, 19, 246)))
 				.AccentColor(Brand)
 				.CutSize(12.0f)
 				.BorderWidth(1.3f)
@@ -532,7 +540,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						[
 							SNew(SFlickMainMenuIcon)
 							.Icon(EFlickMainMenuIcon::Social)
-							.Color(FLinearColor(0.7f, 0.77f, 0.82f, 1.0f))
+							.Color(FLinearColor(0.92f, 0.96f, 0.98f, 1.0f))
 						]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
@@ -541,6 +549,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 							.Font(UiFont(17, true))
 							.ColorAndOpacity(FLinearColor::White)
 						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(15.0f, 0.0f, 0.0f, 0.0f)
+						[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(18)).ColorAndOpacity(Paper)]
 					]
 				]
 			]
@@ -636,7 +646,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 			.AccentColor(Hairline)
 			.CutSize(9.0f)
 			.BorderWidth(0.9f)
-			.Padding(FMargin(18.0f, 11.0f))
+			.Padding(FMargin(18.0f, 8.0f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
@@ -674,7 +684,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 						default: return FText::AsNumber(0);
 						}
 					})
-					.Font(DisplayFont(38))
+					.Font(DisplayFont(30))
 					.ColorAndOpacity(Paper)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
@@ -736,7 +746,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 				+ SHorizontalBox::Slot().AutoWidth()
 				[MakeMenuButton(TEXT("COMPETITIVE"), FOnClicked::CreateLambda([this]() { SelectedProfileStatsView = 2; return FReply::Handled(); }))]
 			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 11.0f, 0.0f, 0.0f)
+			+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 11.0f, 0.0f, 0.0f)
 			[
 				SNew(SUniformGridPanel)
 				.SlotPadding(FMargin(6.0f))
@@ -798,9 +808,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			.OnClicked_Lambda([this, Category]() { SelectedLockerCategory = Category; return FReply::Handled(); })
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor_Lambda([this, Category]() { return SelectedLockerCategory == Category ? FLinearColor(0.06f, 0.17f, 0.19f, 1.0f) : Panel; })
+				.BackgroundColor_Lambda([this, Category]() { return SelectedLockerCategory == Category ? PanelRaised : Panel; })
 				.AccentColor_Lambda([this, Category]() { return SelectedLockerCategory == Category ? Brand : Hairline; })
-				.CutSize(6.0f).BorderWidth(1.0f).Padding(FMargin(13.0f, 8.0f))
+				.CutSize(6.0f).BorderWidth(1.0f).UseAccentForOutline(true).Padding(FMargin(13.0f, 8.0f))
 				[
 					SNew(STextBlock).Text(FText::FromString(CategoryName)).Font(UiFont(10, true))
 					.ColorAndOpacity_Lambda([this, Category]() { return SelectedLockerCategory == Category ? Brand : Paper; })
@@ -879,7 +889,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 					const TSharedPtr<SButton> Pinned = WeakButton.Pin();
 					const int32 Selected = Category == 0 ? SelectedBannerStyle : Category == 1 ? SelectedBannerTag
 						: Category == 2 ? SelectedAvatarBorder : SelectedPuckSkins[Category - FlickCosmeticCatalog::PuckCategoryStart];
-					return Selected == Index ? FLinearColor(0.06f, 0.17f, 0.19f, 1.0f)
+					return Selected == Index ? PanelRaised
 						: Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus()) ? PanelRaised : Panel;
 				})
 				.AccentColor_Lambda([this, Category, Index]()
@@ -888,7 +898,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 						: Category == 2 ? SelectedAvatarBorder : SelectedPuckSkins[Category - FlickCosmeticCatalog::PuckCategoryStart];
 					return Selected == Index ? Brand : Hairline;
 				})
-				.CutSize(8.0f).BorderWidth(1.0f).Padding(FMargin(10.0f, 8.0f))
+				.CutSize(8.0f).BorderWidth(1.0f).UseAccentForOutline(true).Padding(FMargin(10.0f, 8.0f))
 				[
 					SNew(SBox).WidthOverride(CardWidth).HeightOverride(CardHeight)
 					[
@@ -1004,8 +1014,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		TSharedRef<SButton> Button = SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0.0f)
 			.OnClicked_Lambda([this, Tab]() { SelectedProfileTab = Tab; return FReply::Handled(); });
 		const TWeakPtr<SButton> WeakButton = Button;
-		Button->SetContent(SNew(SBorder).BorderImage(WhiteBrush()).Padding(FMargin(18.0f, 9.0f))
-			.BorderBackgroundColor_Lambda([this, Tab, WeakButton]()
+		Button->SetContent(SNew(SFlickAngularBorder).CutSize(6.0f).Padding(FMargin(18.0f, 9.0f))
+			.AccentColor_Lambda([this, Tab]() { return SelectedProfileTab == Tab ? Brand : Hairline; })
+			.BackgroundColor_Lambda([this, Tab, WeakButton]()
 			{
 				const auto Pinned = WeakButton.Pin();
 				return SelectedProfileTab == Tab ? Brand : Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus()) ? PanelRaised : Panel;

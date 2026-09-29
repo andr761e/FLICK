@@ -4,10 +4,13 @@
 #include "FlickTestArena.generated.h"
 
 class AFlickPiece;
+class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UPhysicalMaterial;
 class UPrimitiveComponent;
 class UStaticMeshComponent;
+class UInstancedStaticMeshComponent;
+class UStaticMesh;
 
 /**
  * Switchyard arena presentation and divider mechanics used by Knockout playlists.
@@ -55,6 +58,25 @@ public:
 	void BeginReplayPresentation();
 	void ApplyReplayDividerState(uint16 DividerMask);
 	void EndReplayPresentation();
+	// Local presentation overrides; imported assets and gameplay materials remain untouched.
+	void SetMenuPresentationEnabled(bool bEnabled);
+
+	// Historical OneVsOne property/subobject names are retained for saved asset
+	// compatibility; these presentation settings now serve 1v1, 2v2 and 3v3.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (ClampMin = "12", ClampMax = "40"))
+	int32 RimLensCount = 28;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (ClampMin = "10.0", ClampMax = "120.0"))
+	float RimLensEmission = 55.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Metallic", ClampMin = "0.0", ClampMax = "1.0"))
+	float OneVsOneDeckMetallic = 0.78f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Roughness", ClampMin = "0.12", ClampMax = "0.45"))
+	float OneVsOneDeckRoughness = 0.24f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Menu Deck Roughness", ClampMin = "0.12", ClampMax = "0.45"))
+	float OneVsOneMenuDeckRoughness = 0.20f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "24.0", ClampMax = "70.0"))
 	float ControlZoneRadius = 40.0f;
@@ -85,6 +107,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "0.88", ClampMax = "0.95"))
 	float OuterDividerRadiusFraction = 0.935f;
 
+	// Move every modular divider and socket inward together. A radius-relative
+	// inset preserves rim clearance across 1v1, 2v2 and 3v3 without resizing them.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "0.0", ClampMax = "0.10"))
+	float DividerRadialInsetFraction = 0.035f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "0.0", ClampMax = "30.0"))
 	float DividerDeploymentClearance = 8.0f;
 
@@ -107,12 +134,43 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	void CreateOneVsOnePresentationComponents(UStaticMesh* Box, UStaticMesh* Cylinder);
+	void UpdateOneVsOnePresentation();
+	void BuildOneVsOneRim();
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
+	TObjectPtr<UInstancedStaticMeshComponent> RimLensBodies;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
+	TObjectPtr<UInstancedStaticMeshComponent> RimLensCaps;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
+	TObjectPtr<UInstancedStaticMeshComponent> RimHousingBodies;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
+	TObjectPtr<UInstancedStaticMeshComponent> RimHousingCaps;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInterface>> OneVsOneOriginalMaterials;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> OneVsOneMaterials;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> RimLensMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> RimHousingMaterial;
+	bool bOneVsOnePresentationEnabled = false;
+
 	// All presentation additions are non-colliding and read the authoritative state.
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TObjectPtr<UStaticMeshComponent> InstrumentDeckMesh;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TObjectPtr<UStaticMeshComponent> WorkshopArenaMesh;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInterface>> MenuOriginalMaterials;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> MenuPresentationMaterials;
+
+	bool bMenuMaterialsEnabled = false;
 
 	// The surrounding stadium is presentation-only. Keeping its shell and
 	// emissive details separate lets us tune visibility and lighting without

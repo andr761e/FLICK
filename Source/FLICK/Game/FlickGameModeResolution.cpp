@@ -297,6 +297,24 @@ void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 	const EFlickTeam ReplayTeam = ResolutionShootingTeam != EFlickTeam::None
 		? ResolutionShootingTeam
 		: Outcome == EFlickMatchOutcome::Player1Wins ? EFlickTeam::Player1 : EFlickTeam::Player2;
+	if (AFlickGameState* State = GetFlickGameState())
+	{
+		++State->ReplaySerial;
+		State->ReplaySkipVotes.Reset();
+		State->bReplaySelfKnockout = bSelfKnockout;
+		State->ReplayShootingTeam = ReplayTeam;
+		State->ReplayShootingPlayerSlot = State->GetLastShootingPlayerSlot(ReplayTeam);
+		for (const AFlickPiece* Piece : Pieces)
+		{
+			if (IsValid(Piece) && Piece->GetPieceId() == ReplayPrimaryFocusPieceId)
+			{
+				State->ReplayShootingTeam = Piece->GetTeam();
+				State->ReplayShootingPlayerSlot = Piece->GetOwningPlayerSlot();
+				break;
+			}
+		}
+		State->ForceNetUpdate();
+	}
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		if (AFlickPlayerController* Controller = Cast<AFlickPlayerController>(It->Get()))
@@ -309,7 +327,7 @@ void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 		AudioDirector->PlayReplayMusic(CinematicReplayPlaybackDuration, ReplayTeam);
 	}
 	ClearControllerAiming();
-	PushHudEvent(TEXT("REPLAY  //  ROUND-WINNING SHOT"), FLinearColor::White, CinematicReplayPlaybackDuration);
+	PushHudEvent(bSelfKnockout ? TEXT("REPLAY  //  SELF-KNOCKOUT") : TEXT("REPLAY  //  ROUND-WINNING SHOT"), FLinearColor::White, CinematicReplayPlaybackDuration);
 	UE_LOG(LogFlick, Log, TEXT("Test arena replay started: %.2f second pullback and %.2f seconds of shot playback"),
 		ReplayPullbackDuration, CinematicReplayMotionDuration);
 	UE_LOG(LogFlick, Log, TEXT("Replay camera narrative: primary=%d knockout=%d switch=%.2f self_ko=%d"),
@@ -317,6 +335,13 @@ void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 		ReplayKnockoutFocusPieceId,
 		ReplayFocusSwitchSourceTime,
 		bSelfKnockout ? 1 : 0);
+}
+
+void AFlickGameMode::RequestReplaySkip(APlayerController* Player, const int32 ReplaySerial)
+{
+	AFlickGameState* State = GetFlickGameState();
+	APlayerState* Voter = Player ? Player->PlayerState.Get() : nullptr;
+	if (bCinematicReplayActive && State) State->RegisterReplaySkipVote(Voter, ReplaySerial);
 }
 
 void AFlickGameMode::UpdateCinematicRoundReplay(const float DeltaSeconds)
@@ -327,6 +352,14 @@ void AFlickGameMode::UpdateCinematicRoundReplay(const float DeltaSeconds)
 	}
 
 	CinematicReplayElapsed += FMath::Max(0.0f, DeltaSeconds);
+	if (const AFlickGameState* State = GetFlickGameState())
+	{
+		if (State->HasReplaySkipConsensus())
+		{
+			FinishCinematicRoundReplay(true);
+			return;
+		}
+	}
 	if (CinematicReplayElapsed < ReplayPullbackDuration)
 	{
 		ApplyCinematicReplayTime(CinematicReplaySourceStart);

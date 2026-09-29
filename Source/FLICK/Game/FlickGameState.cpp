@@ -2,6 +2,7 @@
 
 #include "Core/FlickSeriesRules.h"
 #include "Core/FlickTeamRules.h"
+#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 AFlickGameState::AFlickGameState()
@@ -9,9 +10,46 @@ AFlickGameState::AFlickGameState()
 	bReplicates = true;
 }
 
+bool AFlickGameState::RegisterReplaySkipVote(APlayerState* Player, const int32 Serial)
+{
+	if (Serial != ReplaySerial || ReplaySerial <= 0 || !IsValid(Player)
+		|| Player->IsABot() || Player->IsInactive() || !PlayerArray.Contains(Player)) return false;
+	ReplaySkipVotes.AddUnique(Player);
+	ForceNetUpdate();
+	return true;
+}
+
+TArray<APlayerState*> AFlickGameState::GetPendingReplayPlayers() const
+{
+	TArray<APlayerState*> Pending;
+	for (APlayerState* Player : PlayerArray)
+	{
+		if (IsValid(Player) && !Player->IsABot() && !Player->IsInactive() && !ReplaySkipVotes.Contains(Player))
+			Pending.Add(Player);
+	}
+	return Pending;
+}
+
+bool AFlickGameState::HasReplaySkipConsensus() const
+{
+	bool bHasHuman = false;
+	for (const APlayerState* Player : PlayerArray)
+	{
+		if (!IsValid(Player) || Player->IsABot() || Player->IsInactive()) continue;
+		bHasHuman = true;
+		if (!ReplaySkipVotes.Contains(Player)) return false;
+	}
+	return bHasHuman;
+}
+
 void AFlickGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AFlickGameState, ReplaySerial);
+	DOREPLIFETIME(AFlickGameState, ReplayShootingTeam);
+	DOREPLIFETIME(AFlickGameState, ReplayShootingPlayerSlot);
+	DOREPLIFETIME(AFlickGameState, bReplaySelfKnockout);
+	DOREPLIFETIME(AFlickGameState, ReplaySkipVotes);
 	DOREPLIFETIME(AFlickGameState, MatchPhase);
 	DOREPLIFETIME(AFlickGameState, CurrentTeam);
 	DOREPLIFETIME(AFlickGameState, PlayersPerTeam);

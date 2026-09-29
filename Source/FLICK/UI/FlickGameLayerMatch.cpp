@@ -123,6 +123,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 
 TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 {
+	const auto ReplayTeam = [this]() { const AFlickGameState* State = GetScoreboardGameState(); return State && State->ReplayShootingTeam != EFlickTeam::None ? State->ReplayShootingTeam : EFlickTeam::Player1; };
+	const auto ReplaySlot = [this]() { const AFlickGameState* State = GetScoreboardGameState(); return State ? State->ReplayShootingPlayerSlot : 0; };
+	const auto ReplayLabel = [this]() { const AFlickGameState* State = GetScoreboardGameState(); return FText::FromString(State && State->bReplaySelfKnockout ? TEXT("SELF-KNOCKOUT") : TEXT("ROUND-WINNING SHOT")); };
 	return SNew(SOverlay)
 		.Visibility(EVisibility::HitTestInvisible)
 		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Top)
@@ -154,7 +157,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 24.0f, 30.0f, 0.0f)
 		[
-			SNew(STextBlock).Text(FText::FromString(TEXT("ROUND-WINNING SHOT"))).Font(UiFont(10, true)).ColorAndOpacity(Muted)
+			SNew(STextBlock).Text_Lambda(ReplayLabel).Font(UiFont(10, true)).ColorAndOpacity(Muted)
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(30.0f, 0.0f, 30.0f, 31.0f)
 		[
@@ -173,9 +176,62 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 				.FillColorAndOpacity(Orange)
 			]
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 30.0f, 46.0f)
+		+ SOverlay::Slot()
 		[
-			SNew(STextBlock).Text(FText::FromString(TEXT("SLOW MOTION  //  PLAYBACK"))).Font(UiFont(9, true)).ColorAndOpacity(Orange)
+			SNew(SConstraintCanvas)
+			+ SConstraintCanvas::Slot().Anchors(FAnchors(0.5f, 0.79f)).Alignment(FVector2D(0.5f, 0.5f)).AutoSize(true)
+			[
+				SNew(SBox).WidthOverride(370.0f).HeightOverride(78.0f)
+				[
+					SNew(SFlickMainMenuPanel)
+					.BackgroundColor(Panel.CopyWithNewOpacity(0.95f))
+					.AccentColor_Lambda([this, ReplayTeam]() { return GetTeamAccent(ReplayTeam()); })
+					.CutSize(10.0f).BorderWidth(1.4f).Padding(FMargin(12.0f, 9.0f))
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 16.0f, 0.0f)
+						[
+							SNew(SBox).WidthOverride(58.0f).HeightOverride(58.0f)
+							[
+								SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(8.0f).Padding(2.0f)
+								[
+									SNew(SOverlay)
+									+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerAvatarBrush(ReplayTeam(), ReplaySlot()); })]
+									+ SOverlay::Slot().Padding(14.0f)
+									[SNew(SFlickStatusGlobe).Color(Cyan).Visibility_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerAvatarBrush(ReplayTeam(), ReplaySlot()) ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })]
+								]
+							]
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda(ReplayLabel).Font(UiFont(9, true)).ColorAndOpacity_Lambda([this, ReplayTeam]() { return GetTeamAccent(ReplayTeam()); })]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)[SNew(STextBlock).Text_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerName(ReplayTeam(), ReplaySlot()); }).Font(UiFont(17, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+						]
+					]
+				]
+			]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 30.0f, 92.0f)
+		[
+			SNew(SBox).WidthOverride(300.0f)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda([]() { return FText::FromString(FlickControlBindings::GetKey(TEXT("ReplaySkip")).GetDisplayName().ToString() + TEXT("  //  VOTE TO SKIP")); }).Font(UiFont(11, true)).ColorAndOpacity(Brand).Justification(ETextJustify::Right)]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+				[
+					SNew(STextBlock).Text_Lambda([this]()
+					{
+						TArray<FString> Pending;
+						if (const AFlickGameState* State = GetScoreboardGameState())
+						{
+							for (const APlayerState* Player : State->GetPendingReplayPlayers())
+								Pending.Add(Player->GetPlayerName().IsEmpty() ? TEXT("PLAYER") : Player->GetPlayerName());
+							}
+						return FText::FromString(Pending.IsEmpty() ? TEXT("ALL PLAYERS READY TO SKIP") : TEXT("WAITING FOR: ") + FString::Join(Pending, TEXT(", ")));
+					}).Font(UiFont(9)).ColorAndOpacity(Paper).Justification(ETextJustify::Right).AutoWrapText(true)
+				]
+			]
 		];
 }
 
@@ -192,15 +248,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardOverlay()
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24.0f)
 		[
 			SNew(SBox)
-			.WidthOverride_Lambda([this]() { return FMath::Min(1060.0f, FMath::Max(1.0f, LayerLocalSize.X - 48.0f)); })
+			.WidthOverride_Lambda([this]() { return FMath::Min(900.0f, FMath::Max(1.0f, LayerLocalSize.X - 48.0f)); })
 			[
 				SNew(SScaleBox).Stretch(EStretch::ScaleToFit)
 				[
-				SNew(SBox).WidthOverride(1060.0f)
+				SNew(SBox).WidthOverride(900.0f)
 				[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.003f, 0.012f, 0.019f, 0.86f))
-				.AccentColor(Hairline.CopyWithNewOpacity(0.72f))
+				.BackgroundColor(Panel.CopyWithNewOpacity(0.97f))
+				.AccentColor(Cyan.CopyWithNewOpacity(0.65f))
 				.CutSize(11.0f)
 				.BorderWidth(0.9f)
 				.Padding(FMargin(19.0f, 15.0f, 19.0f, 13.0f))
@@ -288,7 +344,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardTeamSection(const EFlickTeam
 			SNew(SBox).HeightOverride(67.0f)
 			[
 				SNew(SFlickAngularBorder)
-				.BackgroundColor(Accent.CopyWithNewOpacity(0.16f))
+				.BackgroundColor(FMath::Lerp(PanelRaised, Accent, 0.055f))
 				.AccentColor(Accent.CopyWithNewOpacity(0.48f))
 				.CutSize(5.0f)
 				.BorderWidth(0.8f)
@@ -419,9 +475,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 				const AFlickPlayerState* RowPlayer = FindScoreboardPlayerState(Team, PlayerSlot);
 				const bool bLocalPlayer = RowPlayer && PlayerController.IsValid()
 					&& RowPlayer == PlayerController->PlayerState;
-				return bActive ? Accent.CopyWithNewOpacity(0.24f)
-					: bLocalPlayer ? Accent.CopyWithNewOpacity(0.17f)
-					: Accent.CopyWithNewOpacity(0.095f);
+				return FMath::Lerp(Panel, Accent, bActive ? 0.10f : bLocalPlayer ? 0.07f : 0.025f);
 			})
 			.AccentColor_Lambda([this, Team, PlayerSlot, Accent]()
 			{

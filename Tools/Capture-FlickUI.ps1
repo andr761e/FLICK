@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Settings', 'Video', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'AimArrow', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -25,10 +25,12 @@ param(
     [int]$PlayersPerTeam = 1,
     [ValidateRange(0, 11)]
     [int]$LockerCategory = 0,
-    [ValidateRange(0, 6)]
+    [ValidateRange(0, 7)]
     [int]$SettingsTab = 0,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
+    [ValidateRange(1, 30)]
+    [float]$CaptureDelaySeconds = 2,
     [string]$EngineRoot = $(if ($env:FLICK_UNREAL_ENGINE_ROOT) { $env:FLICK_UNREAL_ENGINE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.8' })
 )
 
@@ -49,6 +51,8 @@ $previewFlags = @{
     Party = @('-FlickPartyTrayPreview')
     Challenges = @('-FlickChallengesPreview')
     TestArena = @('-FlickTestArenaPreview')
+    Bob = @('-FlickBobPreview')
+    BobPocket = @('-FlickBobPocketTest')
     TestArenaSettings = @('-FlickTestArenaSettingsPreview')
     TestArenaStates = @('-FlickTestArenaPreview', '-FlickTestArenaStatePreview')
     Play = @('-FlickModeSelectPreview')
@@ -59,15 +63,18 @@ $previewFlags = @{
     PrivateMatch = @('-FlickPrivateMatchPreview')
     Settings = @('-FlickSettingsPreview')
     Video = @('-FlickSettingsPreview')
+    Lighting = @('-FlickSettingsPreview')
+    LightingPreview = @('-FlickSettingsPreview', '-FlickLightingPreview')
     Lineup = @('-Flick4v4LoadoutPreview')
     Class = @('-FlickClassSelectPreview')
     Shop = @('-FlickItemShopPreview')
     Social = @('-FlickSocialPreview')
     Match = @('-Flick4v4Preview')
+    Replay = @('-Flick4v4Preview', '-FlickReplayPreview', '-FlickFpsPreview')
     AimArrow = @('-Flick4v4Preview', '-FlickAimArrowPreview')
     Training = @('-FlickTrainingPreview')
     Pause = @('-FlickPausePreview')
-    Result = @('-FlickMatchResultPreview')
+    Result = @('-FlickMatchResultPreview', '-FlickRoundOverPreview')
     Scoreboard = @('-Flick4v4Preview', '-FlickScoreboardPreview')
 }
 $runName = '{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), ([guid]::NewGuid().ToString('N').Substring(0, 6))
@@ -77,7 +84,7 @@ $captures = @()
 
 foreach ($screenName in $Screen) {
     $selectedLockerCategory = if ($screenName -eq 'CustomizePuck') { 3 } else { $LockerCategory }
-    $selectedSettingsTab = if ($screenName -eq 'Video') { 4 } else { $SettingsTab }
+    $selectedSettingsTab = if ($screenName -eq 'Video') { 4 } elseif ($screenName -in @('Lighting', 'LightingPreview')) { 7 } else { $SettingsTab }
     $captureName = '{0}-{1}x{2}' -f $screenName.ToLowerInvariant(), $Width, $Height
     $userDir = Join-Path $captureRoot $captureName
     New-Item -ItemType Directory -Path $userDir -Force | Out-Null
@@ -90,7 +97,7 @@ foreach ($screenName in $Screen) {
         '-game', '-windowed', '-RenderOffscreen', '-unattended', '-nosplash',
         '-ddc=InstalledNoZenLocalFallback',
         '-nosound', '-nosteam', '-NoScreenMessages', '-ForceRes',
-        "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame',
+        "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame', "-FlickCaptureDelaySeconds=$CaptureDelaySeconds",
         "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),

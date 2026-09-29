@@ -1289,10 +1289,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 		return FText::FromString(Labels[FMath::Clamp(Level, 0, 3)]);
 	};
 	const TSharedRef<SWidget> ShakeSelector = SNew(SComboBox<TSharedPtr<int32>>)
+		.ComboBoxStyle(&DropdownStyle).ItemStyle(&DropdownRowStyle)
 		.OptionsSource(&CameraShakeOptions)
 		.OnGenerateWidget_Lambda([ShakeLabel](TSharedPtr<int32> Option)
 		{
-			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(8.0f, 5.0f))
+			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Transparent).Padding(FMargin(8.0f, 5.0f))
 			[SNew(STextBlock).Text(ShakeLabel(Option.IsValid() ? *Option : 0)).Font(UiFont(10)).ColorAndOpacity(Paper)];
 		})
 		.OnSelectionChanged_Lambda([this](TSharedPtr<int32> Option, ESelectInfo::Type)
@@ -1328,6 +1329,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 				SNew(SBox).WidthOverride(210.0f)
 				[
 					SNew(SInputKeySelector)
+					.ButtonStyle(&CompactMenuButtonStyle)
 					.SelectedKey_Lambda([Id]() { return FInputChord(FlickControlBindings::GetKey(*Id)); })
 					.Font(UiFont(12, true)).AllowModifierKeys(false).AllowGamepadKeys(false)
 					.EscapeCancelsSelection(false)
@@ -1467,11 +1469,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 		];
 	};
 	const TSharedRef<SWidget> ResolutionSelector = SNew(SComboBox<TSharedPtr<FIntPoint>>)
+		.ComboBoxStyle(&DropdownStyle).ItemStyle(&DropdownRowStyle)
 		.OptionsSource(&ResolutionOptions).MaxListHeight(330.0f)
 		.IsEnabled_Lambda([this]() { return PendingWindowMode != 1; })
 		.OnGenerateWidget_Lambda([ResolutionLabel](TSharedPtr<FIntPoint> Option)
 		{
-			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(8.0f, 5.0f))
+			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Transparent).Padding(FMargin(8.0f, 5.0f))
 			[SNew(STextBlock).Text(Option.IsValid() ? ResolutionLabel(*Option) : FText::GetEmpty()).Font(UiFont(10)).ColorAndOpacity(Paper)];
 		})
 		.OnSelectionChanged_Lambda([this](TSharedPtr<FIntPoint> Option, ESelectInfo::Type)
@@ -1484,10 +1487,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 			return ResolutionLabel(PendingWindowMode == 1 && Settings ? Settings->GetDesktopResolution() : PendingResolution);
 		}).Font(UiFont(10, true)).ColorAndOpacity(Paper)];
 	const TSharedRef<SWidget> ModeSelector = SNew(SComboBox<TSharedPtr<int32>>)
+		.ComboBoxStyle(&DropdownStyle).ItemStyle(&DropdownRowStyle)
 		.OptionsSource(&WindowModeOptions)
 		.OnGenerateWidget_Lambda([ModeLabel](TSharedPtr<int32> Option)
 		{
-			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(8.0f, 5.0f))
+			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Transparent).Padding(FMargin(8.0f, 5.0f))
 			[SNew(STextBlock).Text(Option.IsValid() ? ModeLabel(*Option) : FText::GetEmpty()).Font(UiFont(10)).ColorAndOpacity(Paper)];
 		})
 		.OnSelectionChanged_Lambda([this](TSharedPtr<int32> Option, ESelectInfo::Type)
@@ -1496,10 +1500,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 		})
 		[SNew(STextBlock).Text_Lambda([this, ModeLabel]() { return ModeLabel(PendingWindowMode); }).Font(UiFont(10, true)).ColorAndOpacity(Paper)];
 	const TSharedRef<SWidget> FrameLimitSelector = SNew(SComboBox<TSharedPtr<int32>>)
+		.ComboBoxStyle(&DropdownStyle).ItemStyle(&DropdownRowStyle)
 		.OptionsSource(&FrameLimitOptions).MaxListHeight(330.0f)
 		.OnGenerateWidget_Lambda([LimitLabel](TSharedPtr<int32> Option)
 		{
-			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(8.0f, 5.0f))
+			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Transparent).Padding(FMargin(8.0f, 5.0f))
 			[SNew(STextBlock).Text(Option.IsValid() ? LimitLabel(*Option) : FText::GetEmpty()).Font(UiFont(10)).ColorAndOpacity(Paper)];
 		})
 		.OnSelectionChanged_Lambda([this](TSharedPtr<int32> Option, ESelectInfo::Type)
@@ -1526,20 +1531,27 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 			.OnClicked_Lambda([this, Tab]()
 			{
 				SelectedSettingsTab = Tab;
+				bLightingPreview = false;
+				if (Tab == EFlickSettingsTab::Lighting)
+					bEditMenuLighting = !GameMode.IsValid() || GameMode->GetSettingsReturnScreen() == EFlickFrontendScreen::MainMenu;
 				if (GameMode.IsValid()) GameMode->PlayMenuSound(true);
 				return FReply::Handled();
 			});
 		const TWeakPtr<SButton> WeakButton = Button;
 		Button->SetContent(
-			SNew(SBorder)
-			.BorderImage(WhiteBrush())
-			.Padding(FMargin(24.0f, 12.0f))
-			.BorderBackgroundColor_Lambda([this, Tab, WeakButton]()
+			SNew(SFlickAngularBorder).CutSize(6.0f)
+			.Padding(FMargin(16.0f, 12.0f))
+			.AccentColor_Lambda([this, Tab, WeakButton]()
+			{
+				const TSharedPtr<SButton> Pinned = WeakButton.Pin();
+				return SelectedSettingsTab == Tab || (Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus())) ? Brand : Hairline;
+			})
+			.BackgroundColor_Lambda([this, Tab, WeakButton]()
 			{
 				const TSharedPtr<SButton> Pinned = WeakButton.Pin();
 				return SelectedSettingsTab == Tab
 					? Brand
-					: Pinned.IsValid() && Pinned->IsHovered() ? PanelRaised : Panel;
+					: Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus()) ? PanelRaised : Panel;
 			})
 			[
 				SNew(STextBlock)
@@ -1551,13 +1563,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 		return Button;
 	};
 	return SNew(SOverlay)
-		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Ink.CopyWithNewOpacity(0.88f))]
-		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility(EVisibility::HitTestInvisible).Opacity(0.35f)]
+		+ SOverlay::Slot()[SNew(SBorder).Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::HitTestInvisible; }).BorderImage(WhiteBrush()).BorderBackgroundColor(Ink.CopyWithNewOpacity(0.88f))]
+		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::HitTestInvisible; }).Opacity(0.35f)]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Center).Padding(24.0f)
+		[SNew(SBox).WidthOverride(560.0f).Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Visible : EVisibility::Collapsed; })[BuildLightingSettings()]]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
-			SNew(SBox).WidthOverride(1320.0f).HeightOverride(820.0f)
+			SNew(SBox).WidthOverride(1320.0f).HeightOverride(820.0f).Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::Visible; })
 			[
-				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Panel).Padding(FMargin(36.0f, 24.0f))
+				SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(Cyan.CopyWithNewOpacity(0.65f)).CutSize(14.0f).Padding(FMargin(36.0f, 24.0f))
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 20.0f)
@@ -1580,6 +1594,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Interface, TEXT("INTERFACE"))]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::StreamSafe, TEXT("STREAM SAFE"))]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Display, TEXT("VIDEO"))]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Lighting, TEXT("LIGHTING"))]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Sound, TEXT("AUDIO"))]
 						+ SHorizontalBox::Slot().AutoWidth()[MakeSettingsTab(EFlickSettingsTab::Controls, TEXT("CONTROLS"))]
 					]
@@ -1589,6 +1604,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 						+ SScrollBox::Slot()
 						[
 							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[
+								SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Lighting ? EVisibility::Visible : EVisibility::Collapsed; })
+								[BuildLightingSettings()]
+							]
 							+ SOverlay::Slot()
 							[
 								SNew(SBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Controls ? EVisibility::Visible : EVisibility::Collapsed; })
@@ -1615,7 +1635,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 								.Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel || SelectedSettingsTab == EFlickSettingsTab::Camera || SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })
 								+ SVerticalBox::Slot().FillHeight(1.0f)
 								[
-									SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
+									SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 									[
 										SNew(SVerticalBox)
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("01"), TEXT("GAMEPLAY"), TEXT("Tune aiming and the physical feedback of every shot."))]]
@@ -1640,7 +1660,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 								SNew(SVerticalBox)
 								+ SVerticalBox::Slot().FillHeight(1.0f)
 								[
-									SNew(SBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Sound ? EVisibility::Visible : EVisibility::Collapsed; }).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
+									SNew(SFlickAngularBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Sound ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 									[
 										SNew(SVerticalBox)
 										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("02"), TEXT("SOUND"), TEXT("Set the balance of the arena and the interface."))]
@@ -1651,7 +1671,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 								]
 								+ SVerticalBox::Slot().FillHeight(1.0f)
 								[
-									SNew(SBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::StreamSafe ? EVisibility::Visible : EVisibility::Collapsed; }).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
+									SNew(SFlickAngularBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::StreamSafe ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 									[
 										SNew(SVerticalBox)
 										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT(""), TEXT("STREAM SAFE"), TEXT("Keep replay music out of a broadcast without muting shot and interface feedback."))]
@@ -1661,7 +1681,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 								]
 								+ SVerticalBox::Slot().FillHeight(1.0f)
 								[
-									SNew(SBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Display ? EVisibility::Visible : EVisibility::Collapsed; }).BorderImage(WhiteBrush()).BorderBackgroundColor(PanelRaised).Padding(FMargin(24.0f, 18.0f))
+									SNew(SFlickAngularBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Display ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 									[
 										SNew(SVerticalBox)
 										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT(""), TEXT("VIDEO"), TEXT("Choose a supported display mode, then apply it. Graphics quality saves immediately."))]
@@ -1679,6 +1699,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 												+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
 												[MakeToggleRow(TEXT("VERTICAL SYNC"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { return Checked(bPendingVSync); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState State) { bPendingVSync = State == ECheckBoxState::Checked; }))]
 												+ SVerticalBox::Slot().AutoHeight()[MakeOptionRow(TEXT("FRAME RATE LIMIT"), FrameLimitSelector)]
+												+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("DISPLAY CURRENT FPS"), TAttribute<ECheckBoxState>::CreateLambda([Checked]() { return Checked(FlickVisualSettings::IsFpsVisible()); }), FOnCheckStateChanged::CreateLambda([](ECheckBoxState State) { FlickVisualSettings::SetFpsVisible(State == ECheckBoxState::Checked); }))]
 												+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 15.0f, 0.0f, 7.0f)
 												[SNew(STextBlock).Text(FText::FromString(TEXT("BASIC QUALITY"))).Font(UiFont(12, true)).ColorAndOpacity(Cyan)]
 												+ SVerticalBox::Slot().AutoHeight()[BasicGraphicsRows]

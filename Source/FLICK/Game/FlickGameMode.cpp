@@ -564,10 +564,11 @@ void AFlickGameMode::BeginPlay()
 
 				const TWeakObjectPtr<AFlickPiece> PocketTestPiece(ObjectivePiece);
 				FTimerHandle BobPocketVerificationTimer;
-				GetWorldTimerManager().SetTimer(BobPocketVerificationTimer, [PocketTestPiece]()
+				GetWorldTimerManager().SetTimer(BobPocketVerificationTimer, [PocketTestPiece, PocketLocation]()
 				{
 					const AFlickPiece* TestedPiece = PocketTestPiece.Get();
-					const bool bPassed = TestedPiece && TestedPiece->IsEliminated();
+					const bool bPassed = TestedPiece && TestedPiece->IsEliminated()
+						&& TestedPiece->GetActorLocation().Z < PocketLocation.Z - 30.0f;
 					if (bPassed)
 					{
 						UE_LOG(
@@ -586,7 +587,7 @@ void AFlickGameMode::BeginPlay()
 					}
 				}, 1.0f, false);
 			}
-		}, 0.6f, false);
+		}, 3.0f, false);
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickBobPreview")))
 	{
@@ -760,6 +761,8 @@ void AFlickGameMode::BeginPlay()
 
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCaptureFrame")))
 	{
+		float CaptureDelaySeconds = 2.0f;
+		FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureDelaySeconds="), CaptureDelaySeconds);
 		const TWeakObjectPtr<AFlickGameMode> WeakThis(this);
 		FTimerHandle CaptureTimer;
 		GetWorldTimerManager().SetTimer(CaptureTimer, [WeakThis]()
@@ -782,7 +785,7 @@ void AFlickGameMode::BeginPlay()
 					ValidGameMode->QuitGame();
 				}
 			}, 1.0f, false);
-		}, 2.0f, false);
+		}, FMath::Clamp(CaptureDelaySeconds, 1.0f, 30.0f), false);
 	}
 
 	int32 CameraViewPreview = 0;

@@ -10,6 +10,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Pieces/FlickPiece.h"
 #include "Player/FlickCameraPawn.h"
+#include "Arena/FlickTestArena.h"
 #include "Core/FlickPieceArchetypeRules.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickWorkshopPuckTest, "FLICK.Visuals.WorkshopPucks",
@@ -20,6 +21,103 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPlayerIdentityPuckTest, "FLICK.Visuals.Pl
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickTestArenaExposureTest, "FLICK.Visuals.TestArenaExposure",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickMenuPresentationTest, "FLICK.Visuals.MenuPresentationIsolation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickMenuArenaTest, "FLICK.Visuals.MenuArenaIsolation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickMenuArenaTest::RunTest(const FString& Parameters)
+{
+	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Settings);
+	if (!TestNotNull(TEXT("Test world"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	AFlickTestArena* Arena = World->SpawnActor<AFlickTestArena>();
+	if (!TestNotNull(TEXT("Test arena"), Arena))
+	{
+		World->DestroyWorld(false);
+		GEngine->DestroyWorldContext(World);
+		return false;
+	}
+	Arena->InitializeTestArena(650.0f, 50.0f, 250.0f);
+	UStaticMeshComponent* Art = nullptr;
+	TInlineComponentArray<UStaticMeshComponent*> Components(Arena);
+	for (UStaticMeshComponent* Component : Components)
+		if (Component->GetFName() == TEXT("WorkshopArenaMesh")) Art = Component;
+	if (TestNotNull(TEXT("Arena visual mesh"), Art))
+	{
+		TArray<UMaterialInterface*> Originals;
+		for (int32 Index = 0; Index < Art->GetNumMaterials(); ++Index) Originals.Add(Art->GetMaterial(Index));
+		Arena->SetMenuPresentationEnabled(true);
+		bool bCheckedFloor = false;
+		bool bCheckedLight = false;
+		for (int32 Index = 0; Index < Originals.Num(); ++Index)
+		{
+			UMaterialInterface* Original = Originals[Index];
+			UMaterialInterface* MenuMaterial = Art->GetMaterial(Index);
+			TestTrue(TEXT("Menu uses a transient material, not an asset edit"), MenuMaterial != Original);
+			if (auto* Dynamic = Cast<UMaterialInstanceDynamic>(MenuMaterial))
+			{
+				TestNotNull(TEXT("Menu material has a renderable authored parent"), Dynamic->Parent.Get());
+				TestFalse(TEXT("Menu never parents a dynamic material to another dynamic material"),
+					Dynamic->Parent && Dynamic->Parent->IsA<UMaterialInstanceDynamic>());
+			}
+			if (!Original || !MenuMaterial) continue;
+			float Emission = 0.0f;
+			Original->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), Emission);
+			if (Emission > 0.1f)
+			{
+				float MenuEmission = 0.0f;
+				MenuMaterial->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), MenuEmission);
+				TestEqual(TEXT("Menu increases authored arena LEDs"), MenuEmission, Emission * 4.0f);
+				bCheckedLight = true;
+			}
+			if (Original->GetName().Contains(TEXT("Arena_Surface")))
+			{
+				float Roughness = 0.0f;
+				MenuMaterial->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Roughness")), Roughness);
+				TestEqual(TEXT("Menu deck has a restrained specular finish"), Roughness, Arena->OneVsOneMenuDeckRoughness);
+				bCheckedFloor = true;
+			}
+		}
+		TestTrue(TEXT("Checked the actual deck material"), bCheckedFloor);
+		TestTrue(TEXT("Checked actual emissive material"), bCheckedLight);
+		Arena->SetMenuPresentationEnabled(false);
+		for (int32 Index = 0; Index < Originals.Num(); ++Index)
+			TestTrue(TEXT("Leaving menu restores each original material"), Art->GetMaterial(Index) == Originals[Index]);
+		TestEqual(TEXT("Menu finish cannot add collision"), Art->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+	}
+	World->DestroyWorld(false);
+	GEngine->DestroyWorldContext(World);
+	return true;
+}
+
+bool FFlickMenuPresentationTest::RunTest(const FString& Parameters)
+{
+	AFlickCameraPawn* Pawn = NewObject<AFlickCameraPawn>();
+	UCameraComponent* Camera = Pawn->FindComponentByClass<UCameraComponent>();
+	if (!TestNotNull(TEXT("Camera component"), Camera)) return false;
+	Pawn->SetTestArenaPresentation(true);
+	const float GameplayBloom = Camera->PostProcessSettings.BloomIntensity;
+	const FVector4 GameplayContrast = Camera->PostProcessSettings.ColorContrast;
+	Pawn->SetMenuPresentation(true);
+	Pawn->SetMenuOrbitEnabled(true);
+	TestEqual(TEXT("Main menu uses its tuned bloom"), Camera->PostProcessSettings.BloomIntensity, Pawn->MenuBloomIntensity);
+	TestTrue(TEXT("Main menu enables restrained depth of field"), Camera->PostProcessSettings.bOverride_DepthOfFieldFstop);
+	TestTrue(TEXT("Main menu has richer color"), Camera->PostProcessSettings.ColorSaturation.X > 1.02f);
+	Pawn->SetMenuOrbitEnabled(false);
+	TestEqual(TEXT("Other frontend screens restore bloom"), Camera->PostProcessSettings.BloomIntensity, GameplayBloom);
+	TestFalse(TEXT("Other frontend screens do not inherit menu blur"), Camera->PostProcessSettings.bOverride_DepthOfFieldFstop);
+	Pawn->SetMenuOrbitEnabled(true);
+	Pawn->SetMenuPresentation(false);
+	TestEqual(TEXT("Gameplay restores bloom"), Camera->PostProcessSettings.BloomIntensity, GameplayBloom);
+	TestEqual(TEXT("Gameplay restores contrast"), Camera->PostProcessSettings.ColorContrast, GameplayContrast);
+	TestFalse(TEXT("Gameplay disables menu depth of field"), Camera->PostProcessSettings.bOverride_DepthOfFieldFocalDistance);
+	return true;
+}
 
 bool FFlickTestArenaExposureTest::RunTest(const FString& Parameters)
 {

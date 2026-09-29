@@ -25,6 +25,7 @@ public:
 	virtual void SetupInputComponent() override;
 	void RefreshControlBindings();
 	virtual void PlayerTick(float DeltaTime) override;
+	void RefreshLocalLighting();
 
 	void ClearAiming();
 	bool IsAimingShot() const { return bAimingShot; }
@@ -95,6 +96,10 @@ public:
 	void UpdateCinematicReplayFromServer(const FVector& Focus, float NormalizedProgress, float PullbackAlpha);
 	void EndCinematicReplayFromServer();
 	bool IsCinematicReplayPresentationActive() const { return bCinematicReplayPresentationActive; }
+	void HandleReplaySkipPressed();
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestReplaySkip(int32 ReplaySerial);
 	float GetCinematicReplayPresentationProgress() const { return CinematicReplayPresentationProgress; }
 	float GetCinematicReplayPresentationPullbackAlpha() const { return CinematicReplayPresentationPullbackAlpha; }
 
@@ -277,6 +282,8 @@ private:
 	bool bHasPredictedContact = false;
 	bool bScoreboardVisible = false;
 	bool bInitializedNetworkCamera = false;
+	int32 LocalLightingContext = INDEX_NONE;
+	float LocalLightingArenaScale = -1.0f;
 	bool bNetworkAutoShotRequested = false;
 	bool bNetworkAutoShotSubmitted = false;
 	bool bCinematicReplayPresentationActive = false;
