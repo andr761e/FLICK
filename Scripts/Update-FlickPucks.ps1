@@ -21,11 +21,11 @@ foreach ($name in @('Standard','Toppler','Bouncer','Compact','Blocker','Slider',
     }
 }
 $logFile = Join-Path $projectRoot 'Saved\Logs\FlickPuckUpdate.log'
-Write-Host 'Importing nine base puck meshes and their orange cosmetic materials...'
+Write-Host 'Importing nine base puck meshes and Orange cosmetic materials...'
 & $UnrealEditor (Join-Path $projectRoot 'FLICK.uproject') -run=pythonscript `
     "-script=$(Join-Path $projectRoot 'Tools\Update-FlickPucks.py')" `
     -unattended -nop4 -nosplash -NullRHI "-abslog=$logFile"
 if ($LASTEXITCODE -ne 0 -or -not (Select-String -LiteralPath $logFile -SimpleMatch 'FLICK_PUCK_UPDATE_COMPLETE' -Quiet)) {
     throw "Puck import failed. See $logFile"
 }
-Write-Host 'Pucks updated: nine meshes with Classic Blue and Classic Orange skins. No player variants or arena imports.'
+Write-Host 'Pucks updated: nine shared meshes with Classic Blue and Classic Orange skins. No player variants or arena imports.'

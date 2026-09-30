@@ -36,8 +36,11 @@ public:
 	bool HasAimCursorPoint() const { return bHasAimCursorPoint; }
 	AFlickPiece* GetInspectedPiece() const { return InspectedPiece.Get(); }
 	void SubmitLocalPuckSkins();
+	void SubmitLocalPuckEffects();
 	UFUNCTION(Server, Reliable)
 	void ServerSetPuckSkins(const TArray<int32>& Skins);
+	UFUNCTION(Server, Reliable)
+	void ServerSetPuckEffects(const TArray<int32>& Effects);
 	FVector GetAimCursorWorldPoint() const { return AimCursorWorldPoint; }
 	bool HasPredictedContact() const { return bHasPredictedContact; }
 	FVector GetPredictedContactWorldPoint() const { return PredictedContactWorldPoint; }

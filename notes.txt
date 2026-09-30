@@ -16,6 +16,6 @@ Til OH;
 -  
 
 Til André;
--
+- Fix locker width (Not enough space for calling cards, banners etc)
 -
 -

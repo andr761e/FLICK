@@ -17,4 +17,6 @@ namespace FlickVisualSettings
 	FLICK_API void SetPuckHoverSize(int32 Size);
 	FLICK_API int32 GetPuckHoverDetail(); // 0 off, 1 name, 2 type, 3 name + type.
 	FLICK_API void SetPuckHoverDetail(int32 Detail);
+	FLICK_API bool IsColorBlindAssistEnabled();
+	FLICK_API void SetColorBlindAssistEnabled(bool bEnabled);
 }

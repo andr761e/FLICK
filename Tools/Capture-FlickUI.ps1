@@ -23,14 +23,20 @@ param(
     [int]$CameraView = 0,
     [ValidateRange(1, 3)]
     [int]$PlayersPerTeam = 1,
-    [ValidateRange(0, 11)]
+    [ValidateRange(0, 14)]
     [int]$LockerCategory = 0,
+    [ValidateRange(-1, 2)]
+    [int]$LockerItem = -1,
+    [ValidateRange(0, 4)]
+    [int]$ProfilePage = 0,
     [ValidateRange(0, 7)]
     [int]$SettingsTab = 0,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
     [ValidateRange(1, 30)]
     [float]$CaptureDelaySeconds = 2,
+    [ValidateSet('Default', 'D3D11')]
+    [string]$GraphicsAPI = 'Default',
     [string]$EngineRoot = $(if ($env:FLICK_UNREAL_ENGINE_ROOT) { $env:FLICK_UNREAL_ENGINE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.8' })
 )
 
@@ -99,11 +105,11 @@ foreach ($screenName in $Screen) {
         '-ddc=InstalledNoZenLocalFallback',
         '-nosound', '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame', "-FlickCaptureDelaySeconds=$CaptureDelaySeconds",
-        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
+        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickLockerItem=$LockerItem", "-FlickProfilePage=$ProfilePage", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),
         ('-abslog="{0}"' -f $logPath)
-    ) + $previewFlags[$screenName]
+    ) + $(if ($GraphicsAPI -eq 'D3D11') { @('-d3d11') } else { @() }) + $previewFlags[$screenName]
     Write-Host "Capturing $screenName at ${Width}x${Height}..."
     $previousCachePath = [Environment]::GetEnvironmentVariable('UE-LocalDataCachePath', 'Process')
     try {

@@ -38,6 +38,8 @@ public:
 	void EnableTestArenaVisuals();
 	void SetPuckSkin(int32 Skin);
 	int32 GetPuckSkin() const { return PuckSkin; }
+	void SetPuckEffects(const TArray<int32>& Effects);
+	int32 GetPuckEffect(int32 EffectIndex) const;
 	bool HasTestArenaVisuals() const;
 	void Launch(const FVector& Direction, float NormalizedPower, float MaxLaunchSpeed);
 	void Eliminate();
@@ -102,6 +104,9 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FFlickPuckInspectionTest;
+#endif
 	UFUNCTION()
 	void OnRep_PieceConfiguration();
 
@@ -130,12 +135,21 @@ private:
 	bool UsesLocalOwnershipRing() const;
 	// Per-view presentation only; deliberately not replicated.
 	bool bLocalOwnershipRing = false;
+	bool bLastColorBlindAssist = false;
 	void UpdateTestArenaVisuals();
 	void UpdateArrivalVisuals();
+	void UpdateCosmeticTrail(float DeltaSeconds);
 	void ApplyPregamePreview();
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> WorkshopMesh;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> CosmeticTrailSegments;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> CosmeticTrailMaterial;
+	TArray<FVector> TrailPoints;
+	FVector LastTrailPosition = FVector::ZeroVector;
+	float TrailSampleElapsed = 0.0f;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> WorkshopTeamMaterials;
@@ -297,6 +311,12 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_PuckSkin)
 	int32 PuckSkin = 0;
+	UPROPERTY(Replicated)
+	int32 PuckTrail = 0;
+	UPROPERTY(Replicated)
+	int32 PuckSpawnEffect = 0;
+	UPROPERTY(Replicated)
+	int32 PuckKnockoutEffect = 0;
 	UFUNCTION()
 	void OnRep_PuckSkin();
 

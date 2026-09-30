@@ -1149,7 +1149,27 @@ void AFlickPlayerController::SubmitLocalPuckSkins()
 {
 	if (!IsLocalController()) return;
 	ServerSetPuckSkins(FlickCosmeticCatalog::LoadPuckSkins());
+	SubmitLocalPuckEffects();
 	bPuckSkinsSubmitted = GetPlayerState<AFlickPlayerState>() != nullptr;
+}
+
+void AFlickPlayerController::SubmitLocalPuckEffects()
+{
+	if (IsLocalController()) ServerSetPuckEffects(FlickCosmeticCatalog::LoadPuckEffects());
+}
+
+void AFlickPlayerController::ServerSetPuckEffects_Implementation(const TArray<int32>& Effects)
+{
+	AFlickPlayerState* State = GetPlayerState<AFlickPlayerState>();
+	if (!State || !State->SetPuckEffects(Effects)) return;
+	for (TActorIterator<AFlickPiece> It(GetWorld()); It; ++It)
+	{
+		if (State->ControlsPrivateSlot(It->GetTeam(), It->GetOwningPlayerSlot())
+			|| (State->GetTeam() == It->GetTeam() && State->GetTeamPlayerSlot() == It->GetOwningPlayerSlot()))
+		{
+			It->SetPuckEffects(Effects);
+		}
+	}
 }
 
 void AFlickPlayerController::ServerSetPuckSkins_Implementation(const TArray<int32>& Skins)

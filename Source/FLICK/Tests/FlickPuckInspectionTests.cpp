@@ -20,6 +20,8 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 {
 	const int32 SavedHoverSize = FlickVisualSettings::GetPuckHoverSize();
 	const int32 SavedHoverDetail = FlickVisualSettings::GetPuckHoverDetail();
+	const bool bSavedColorBlindAssist = FlickVisualSettings::IsColorBlindAssistEnabled();
+	FlickVisualSettings::SetColorBlindAssistEnabled(false);
 	FlickVisualSettings::SetPuckHoverDetail(3);
 	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
 		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false);
@@ -60,20 +62,27 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Own puck identified regardless of turn"), Controller->OwnsPieceLocally(Own));
 		TestFalse(TEXT("Teammate is not locally owned"), Controller->OwnsPieceLocally(Teammate));
 		TestFalse(TEXT("Opponent is not locally owned"), Controller->OwnsPieceLocally(Other));
-		const FLinearColor OwnColour = RingColour(Own);
+		RingColour(Own);
 		const FLinearColor TeammateColour = RingColour(Teammate);
-		TestTrue(TEXT("Own team-match ring is lime"), OwnColour.G > OwnColour.R && OwnColour.G > OwnColour.B);
+		TestFalse(TEXT("Own puck has no ownership ring"), Own->SelectionHalo->IsVisible());
 		TestTrue(TEXT("Teammate retains blue team ring"), TeammateColour.B > TeammateColour.G);
 	}
 	GameState->PlayersPerTeam = 1;
-	const FLinearColor SoloColour = RingColour(Own);
-	TestTrue(TEXT("1v1 retains normal team colour"), SoloColour.B > SoloColour.G);
+	RingColour(Own);
+	TestFalse(TEXT("1v1 also hides the local ownership ring"), Own->SelectionHalo->IsVisible());
+	FlickVisualSettings::SetColorBlindAssistEnabled(true);
+	RingColour(Teammate);
+	RingColour(Other);
+	TestTrue(TEXT("Assistance distinguishes enemy ring by width"),
+		Other->SelectionHalo->GetRelativeScale3D().X
+		> Teammate->SelectionHalo->GetRelativeScale3D().X + 0.06f);
+	FlickVisualSettings::SetColorBlindAssistEnabled(false);
 	GameState->PlayersPerTeam = 3;
 	Player->SetTeamPlayerSlot(1);
 	TestTrue(TEXT("Ownership follows reassigned player slot"), Controller->OwnsPieceLocally(Teammate));
 	TestFalse(TEXT("Previous slot no longer locally owned"), Controller->OwnsPieceLocally(Own));
-	const FLinearColor ReassignedColour = RingColour(Teammate);
-	TestTrue(TEXT("Local ring follows reassignment on the next frame"), ReassignedColour.G > ReassignedColour.B);
+	RingColour(Teammate);
+	TestFalse(TEXT("Ring removal follows reassignment on the next frame"), Teammate->SelectionHalo->IsVisible());
 	Player->SetTeamPlayerSlot(0);
 
 	Controller->ApplyHoveredPiece(Other);
@@ -86,6 +95,11 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 		.OwnerName([](const AFlickPiece*) { return FString(TEXT("Test player")); });
 	Widget->Tick(FGeometry(), 0, .016f);
 	TestEqual(TEXT("Exact hover format uses the player's name and type"), Widget->GetLabelText(Other), FString(TEXT("Test player - Heavy")));
+	FlickVisualSettings::SetColorBlindAssistEnabled(true);
+	TestEqual(TEXT("Assistance spells out opponent relationship"), Widget->GetLabelText(Other), FString(TEXT("OPPONENT | Test player - Heavy")));
+	TestEqual(TEXT("Assistance spells out local ownership"), Widget->GetLabelText(Own), FString(TEXT("YOU | Test player - Standard")));
+	TestEqual(TEXT("Assistance spells out teammate relationship"), Widget->GetLabelText(Teammate), FString(TEXT("TEAMMATE | Test player - Standard")));
+	FlickVisualSettings::SetColorBlindAssistEnabled(false);
 	FlickVisualSettings::SetPuckHoverDetail(1);
 	TestEqual(TEXT("Name-only preference"), Widget->GetLabelText(Other), FString(TEXT("Test player")));
 	FlickVisualSettings::SetPuckHoverDetail(2);
@@ -98,6 +112,7 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Hover size clamps at maximum"), FlickVisualSettings::GetPuckHoverSize(), 18);
 	FlickVisualSettings::SetPuckHoverSize(SavedHoverSize);
 	FlickVisualSettings::SetPuckHoverDetail(SavedHoverDetail);
+	FlickVisualSettings::SetColorBlindAssistEnabled(bSavedColorBlindAssist);
 	TestTrue(TEXT("Hover appears in the first frame, without a dwell timer"), Widget->Alpha > 0);
 	Widget->Tick(FGeometry(), 0, .04f);
 	TestEqual(TEXT("Short entrance fade completes within 56 ms"), Widget->Alpha, 1.0f);
@@ -129,6 +144,18 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Owner's choice updates own puck"), Own->GetPuckSkin(), 1);
 	TestEqual(TEXT("Choice cannot change opponent cosmetics"), Other->GetPuckSkin(), 0);
 	TestEqual(TEXT("Choice cannot change teammate cosmetics"), Teammate->GetPuckSkin(), 0);
+	TArray<int32> Effects = {1, 2, 1};
+	Controller->ServerSetPuckEffects_Implementation(Effects);
+	TestEqual(TEXT("Owner's trail updates own puck"), Own->GetPuckEffect(0), 1);
+	TestEqual(TEXT("Owner's arrival updates own puck"), Own->GetPuckEffect(1), 2);
+	TestEqual(TEXT("Owner's knockout updates own puck"), Own->GetPuckEffect(2), 1);
+	TestEqual(TEXT("Opponent keeps default effects"), Other->GetPuckEffect(0), 0);
+	TestEqual(TEXT("Teammate keeps default effects"), Teammate->GetPuckEffect(0), 0);
+	Effects[1] = 99;
+	TestFalse(TEXT("Unknown effect IDs are rejected"), Player->SetPuckEffects(Effects));
+	TestEqual(TEXT("Invalid update preserves accepted effects"), Player->GetPuckEffect(1), 2);
+	Effects.Reset();
+	TestFalse(TEXT("Incomplete effect selections are rejected"), Player->SetPuckEffects(Effects));
 	Skins[0] = 99;
 	TestFalse(TEXT("Unknown skin IDs rejected"), Player->SetPuckSkins(Skins));
 	TestEqual(TEXT("Invalid update preserves accepted appearance"), Player->GetPuckSkin(EFlickPieceArchetype::Standard), 1);
@@ -138,6 +165,9 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 	Skins.Init(1, FlickPieceArchetypeRules::ArchetypeCount);
 	Controller->ServerSetPuckSkins_Implementation(Skins);
 	TestEqual(TEXT("Private controlled seat receives owner's skin"), Other->GetPuckSkin(), 1);
+	Effects = {2, 1, 2};
+	Controller->ServerSetPuckEffects_Implementation(Effects);
+	TestEqual(TEXT("Private controlled seat receives owner's trail"), Other->GetPuckEffect(0), 2);
 	Own->SetPuckSkin(0);
 	TestEqual(TEXT("Switching orange back to blue is supported"), Own->GetPuckSkin(), 0);
 	TestTrue(TEXT("Changing cosmetics never changes ownership"), Own->GetTeam() == EFlickTeam::Player1);

@@ -1,5 +1,6 @@
 #include "Game/FlickGameModePrivate.h"
 #include "Core/FlickLineupRules.h"
+#include "Core/FlickCosmeticCatalog.h"
 
 using namespace FlickGameModePrivate;
 
@@ -578,6 +579,7 @@ void AFlickGameMode::CloseProfile()
 {
 	if (FrontendScreen == EFlickFrontendScreen::Profile)
 	{
+		SetLockerPreview(INDEX_NONE);
 		// Refresh the showcase's equipped appearance even if its puck type and
 		// party roster stayed the same while the locker was open.
 		bMenuPartyDisplayInitialized = false;
@@ -731,6 +733,137 @@ void AFlickGameMode::StartTrainingMode()
 {
 	bTutorialMode = false;
 	BeginTrainingActivity(false);
+}
+
+void AFlickGameMode::SetLockerPreview(const int32 Category)
+{
+	if (FrontendScreen != EFlickFrontendScreen::Profile) return;
+	const bool bShowArena = Category >= FlickCosmeticCatalog::PuckCategoryStart
+		&& Category < FlickCosmeticCatalog::CategoryCount;
+	if (!bShowArena)
+	{
+		if (LockerPreviewCategory != INDEX_NONE)
+		{
+			LockerPreviewCategory = INDEX_NONE;
+			if (CameraPawn) CameraPawn->SetLockerPreviewMode(0);
+			DestroyPieces();
+			bMenuPartyDisplayInitialized = false;
+			SetCameraForFrontend();
+		}
+		return;
+	}
+	const bool bCategoryChanged = LockerPreviewCategory != Category;
+	LockerPreviewCategory = Category;
+	if (bCategoryChanged || Pieces.IsEmpty() || !IsValid(Pieces[0]))
+	{
+		DestroyPieces();
+		const EFlickPieceArchetype Archetype = FlickCosmeticCatalog::IsPuckCategory(Category)
+			? FlickCosmeticCatalog::GetPuckArchetype(Category) : EFlickPieceArchetype::Standard;
+		const FFlickPieceArchetypeRules& Rules = FlickPieceArchetypeRules::Get(Archetype);
+		const float PreviewX = Category == FlickCosmeticCatalog::KnockoutCategory
+			? (ArenaActor ? ArenaActor->GetRadius() : ArenaRadius) - 400.0f : 0.0f;
+		AFlickPiece* Preview = SpawnPiece(EFlickTeam::Player1, 1,
+			FVector(PreviewX, 0.0f, ArenaSurfaceZ + PieceThickness * Rules.ThicknessMultiplier * 0.5f + 3.0f), Archetype);
+		if (Preview && Category != FlickCosmeticCatalog::KnockoutCategory)
+			Preview->BeginReplayPresentation();
+		LockerPreviewElapsed = 0.0f;
+		LockerPreviewCycle = Category == FlickCosmeticCatalog::KnockoutCategory ? 0 : INDEX_NONE;
+		if (Preview && Category == FlickCosmeticCatalog::KnockoutCategory)
+			Preview->Launch(FVector::ForwardVector, 0.38f, MaxLaunchSpeed);
+		bMenuPartyDisplayInitialized = false;
+	}
+	if (Pieces.IsValidIndex(0) && IsValid(Pieces[0]))
+	{
+		const TArray<int32> Skins = FlickCosmeticCatalog::LoadPuckSkins();
+		const TArray<int32> Effects = FlickCosmeticCatalog::LoadPuckEffects();
+		const int32 SelectedEffectIndex = Category - FlickCosmeticCatalog::TrailCategory;
+		const bool bEffectChanged = SelectedEffectIndex >= 0 && SelectedEffectIndex < 3
+			&& Pieces[0]->GetPuckEffect(SelectedEffectIndex) != Effects[SelectedEffectIndex];
+		Pieces[0]->SetPuckSkin(Skins[static_cast<int32>(Pieces[0]->GetArchetype())]);
+		Pieces[0]->SetPuckEffects(Effects);
+		if (bEffectChanged && !bCategoryChanged)
+		{
+			// The knockout preview respawns and launches with the newly selected
+			// effect on the next tick; spawn effects restart immediately below.
+			LockerPreviewElapsed = 0.0f;
+			LockerPreviewCycle = INDEX_NONE;
+			if (Category == FlickCosmeticCatalog::SpawnCategory)
+			{
+				Pieces[0]->BeginArrival(1.0f);
+				LockerPreviewCycle = 0;
+				if (Effects[1] > 0) SpawnWorldFeedback(
+					FVector(0.0f, 0.0f, ArenaSurfaceZ + 20.0f), GetTeamColor(EFlickTeam::Player1),
+					EFlickFeedbackKind::Spawn, 0.8f, FVector::ZeroVector, Effects[1]);
+			}
+		}
+	}
+	if (CameraPawn) CameraPawn->SetLockerPreviewMode(Category == FlickCosmeticCatalog::KnockoutCategory ? 2 : 1);
+	if (bCategoryChanged) SetCameraForFrontend();
+}
+
+void AFlickGameMode::UpdateLockerPreview(const float DeltaSeconds)
+{
+	if (FrontendScreen != EFlickFrontendScreen::Profile || LockerPreviewCategory == INDEX_NONE
+		|| !Pieces.IsValidIndex(0) || !IsValid(Pieces[0])) return;
+	AFlickPiece* Preview = Pieces[0];
+	LockerPreviewElapsed += FMath::Max(0.0f, DeltaSeconds);
+	const float SurfaceZ = ArenaSurfaceZ + Preview->GetPieceThickness() * 0.5f + 3.0f;
+	FVector Location(0.0f, 0.0f, SurfaceZ);
+	if (LockerPreviewCategory == FlickCosmeticCatalog::TrailCategory)
+	{
+		const float Angle = LockerPreviewElapsed * 2.7f;
+		Location = FVector(70.0f * FMath::Cos(Angle), 70.0f * FMath::Sin(Angle), SurfaceZ);
+	}
+	else if (LockerPreviewCategory == FlickCosmeticCatalog::KnockoutCategory)
+	{
+		const float TableRadius = ArenaActor ? ArenaActor->GetRadius() : ArenaRadius;
+		const int32 Cycle = FMath::FloorToInt(LockerPreviewElapsed / 2.7f);
+		if (LockerPreviewCycle != Cycle)
+		{
+			Preview->Destroy();
+			Pieces.Empty();
+			Preview = SpawnPiece(EFlickTeam::Player1, 1,
+				FVector(TableRadius - 400.0f, 0.0f, SurfaceZ), EFlickPieceArchetype::Standard);
+			LockerPreviewCycle = Cycle;
+			if (!Preview) return;
+			Preview->Launch(FVector::ForwardVector, 0.38f, MaxLaunchSpeed);
+		}
+		if (!Preview->IsActive()) return;
+		const FVector PieceLocation = Preview->GetActorLocation();
+		const FVector ArenaLocation = ArenaActor ? ArenaActor->GetActorLocation() : FVector::ZeroVector;
+		if (PieceLocation.Z <= KillZ || (ArenaActor && FlickModeRules::IsPieceOutsideCircularTabletop(
+			PieceLocation, Preview->GetActorUpVector(), Preview->GetPieceRadius(),
+			Preview->GetPieceThickness(), ArenaLocation, TableRadius, ArenaSurfaceZ,
+			KnockoutBoundsTolerance)))
+		{
+			// Match the normal edge check and knockout effect, but do not award
+			// points or advance turns for this isolated cosmetic preview.
+			SpawnWorldFeedback(ArenaLocation + FVector(TableRadius - 20.0f, 0.0f,
+				ArenaSurfaceZ + 22.0f - ArenaLocation.Z), GetTeamColor(EFlickTeam::Player1),
+				EFlickFeedbackKind::Elimination, 1.0f, FVector::ForwardVector,
+				Preview->GetPuckEffect(2));
+			Preview->Eliminate();
+		}
+		return;
+	}
+	else if (LockerPreviewCategory == FlickCosmeticCatalog::SpawnCategory)
+	{
+		const int32 Cycle = FMath::FloorToInt(LockerPreviewElapsed / 2.4f);
+		if (LockerPreviewCycle != Cycle)
+		{
+			LockerPreviewCycle = Cycle;
+			Preview->BeginArrival(1.0f);
+			if (Preview->GetPuckEffect(1) > 0)
+				SpawnWorldFeedback(Location + FVector(0.0f, 0.0f, 16.0f),
+					GetTeamColor(EFlickTeam::Player1), EFlickFeedbackKind::Spawn, 0.8f,
+					FVector::ZeroVector, Preview->GetPuckEffect(1));
+		}
+	}
+	// A location-only FTransform has unit scale. The physics puck's root cylinder
+	// uses a much smaller scale, so preserve it while moving the locker preview.
+	const FVector PreviewScale(Preview->GetPieceRadius() / 50.0f,
+		Preview->GetPieceRadius() / 50.0f, Preview->GetPieceThickness() / 100.0f);
+	Preview->ApplyReplayPresentation(FTransform(FQuat::Identity, Location, PreviewScale), true);
 }
 
 void AFlickGameMode::PreparePrivatePlayerClass(AFlickPlayerState* PlayerState)

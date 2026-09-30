@@ -13,7 +13,20 @@ enum class EFlickFeedbackKind : uint8
 {
 	Launch,
 	Impact,
-	Elimination
+	Elimination,
+	Spawn
+};
+
+USTRUCT()
+struct FFlickFeedbackAppearance
+{
+	GENERATED_BODY()
+
+	UPROPERTY() EFlickFeedbackKind Kind = EFlickFeedbackKind::Impact;
+	UPROPERTY() FLinearColor Color = FLinearColor::White;
+	UPROPERTY() float Strength = 0.0f;
+	UPROPERTY() FVector BiasDirection = FVector::ZeroVector;
+	UPROPERTY() int32 Style = 0;
 };
 
 UCLASS(NotBlueprintable)
@@ -25,13 +38,20 @@ public:
 	AFlickWorldFeedback();
 
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void InitializeFeedback(
 		EFlickFeedbackKind InKind,
 		const FLinearColor& InColor,
 		float Strength,
-		const FVector& InBiasDirection = FVector::ZeroVector);
+		const FVector& InBiasDirection = FVector::ZeroVector,
+		int32 InStyle = 0);
 
 private:
+	UFUNCTION()
+	void OnRep_Appearance();
+	void ApplyFeedbackAppearance();
+	UPROPERTY(ReplicatedUsing = OnRep_Appearance)
+	FFlickFeedbackAppearance Appearance;
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Feedback")
 	TObjectPtr<USceneComponent> SceneRoot;
 
@@ -48,6 +68,7 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> CoreMaterial;
 
 	EFlickFeedbackKind Kind = EFlickFeedbackKind::Impact;
+	int32 Style = 0;
 	FVector BiasDirection = FVector::ZeroVector;
 	float Age = 0.0f;
 	float Duration = 0.4f;

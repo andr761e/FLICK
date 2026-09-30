@@ -325,15 +325,25 @@ bool FFlickPuckSkinTest::RunTest(const FString& Parameters)
 		AFlickPiece* Piece = World->SpawnActor<AFlickPiece>();
 		Piece->InitializePiece(Team, 1, 45, 20, static_cast<EFlickPieceArchetype>(Type), false, PlayerSlot);
 		Piece->SetPuckSkin(Skin);
+		if (PlayerSlot == 0 && Type == 0 && Skin == 0)
+		{
+			Piece->SetPuckEffects({1, 2, 1});
+			TestEqual(TEXT("Trail style is independent of puck skin"), Piece->GetPuckEffect(0), 1);
+		}
 		Piece->EnableTestArenaVisuals();
 		TestTrue(TEXT("Ownership independent of skin"), Piece->GetTeam() == Team);
 		TestEqual(TEXT("Requested cosmetic applied"), Piece->GetPuckSkin(), Skin);
 		TInlineComponentArray<UStaticMeshComponent*> Components(Piece);
 		for (UStaticMeshComponent* Visual : Components)
 		{
+			if (Visual->GetName().StartsWith(TEXT("CosmeticTrail_")))
+			{
+				TestTrue(TEXT("Trail visuals never add collision"), Visual->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+				continue;
+			}
 			if (Visual->GetFName() == TEXT("SelectionHalo"))
 			{
-				TestTrue(TEXT("Team marker remains visible without selection"), Visual->IsVisible());
+					TestTrue(TEXT("Unowned test puck retains its team marker"), Visual->IsVisible());
 				if (auto* Marker = Cast<UMaterialInstanceDynamic>(Visual->GetMaterial(0)))
 				{
 					const FLinearColor Colour = Marker->K2_GetVectorParameterValue(TEXT("Color"));

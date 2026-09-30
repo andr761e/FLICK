@@ -39,6 +39,7 @@ enum class EFlickTrainingActivity : uint8
 
 enum class EFlickProfileTab : uint8
 {
+	Overview,
 	Stats,
 	Leaderboards,
 	MatchHistory,
@@ -298,13 +299,19 @@ private:
 	EFlickPlayPlaylist SelectedPlayPlaylist = EFlickPlayPlaylist::None;
 	int32 SelectedPlayFormat = 0;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;
-	EFlickProfileTab SelectedProfileTab = EFlickProfileTab::Stats;
+	EFlickProfileTab SelectedProfileTab = EFlickProfileTab::Overview;
+	EFlickProfileTab AnimatedProfileTab = EFlickProfileTab::Overview;
+	float ProfileEntranceElapsed = 0.0f;
+	bool bProfileWasVisible = false;
 	int32 SelectedProfileStatsView = 0; // Total, Casual, Competitive.
 	int32 SelectedBannerStyle = 0;
 	int32 SelectedBannerTag = 0;
 	int32 SelectedAvatarBorder = 0;
 	int32 SelectedLockerCategory = 0;
 	TArray<int32> SelectedPuckSkins;
+	TArray<int32> SelectedPuckEffects;
+	int32 GetSelectedCosmeticIndex(int32 Category) const;
+	int32 LastLockerPreviewCategory = INDEX_NONE;
 	EFlickSettingsTab SelectedSettingsTab = EFlickSettingsTab::GameFeel;
 	bool bEditMenuLighting = true;
 	bool bLightingPreview = false;

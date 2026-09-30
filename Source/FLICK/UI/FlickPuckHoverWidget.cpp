@@ -31,12 +31,16 @@ FString SFlickPuckHoverWidget::GetLabelText(const AFlickPiece* Piece) const
 {
 	FString Type = GetPieceArchetypeName(Piece->GetArchetype()).ToLower();
 	if (!Type.IsEmpty()) Type[0] = FChar::ToUpper(Type[0]);
+	const FString Relationship = FlickVisualSettings::IsColorBlindAssistEnabled() && Controller.IsValid()
+		? (Controller->OwnsPieceLocally(Piece) ? TEXT("YOU | ")
+			: Controller->GetLocalTeam() == Piece->GetTeam() ? TEXT("TEAMMATE | ") : TEXT("OPPONENT | "))
+		: FString();
 	switch (FlickVisualSettings::GetPuckHoverDetail())
 	{
 	case 0: return FString();
-	case 1: return OwnerName(Piece).Left(48);
-	case 2: return Type;
-	default: return OwnerName(Piece).Left(48) + TEXT(" - ") + Type;
+	case 1: return Relationship + OwnerName(Piece).Left(48);
+	case 2: return Relationship + Type;
+	default: return Relationship + OwnerName(Piece).Left(48) + TEXT(" - ") + Type;
 	}
 }
 

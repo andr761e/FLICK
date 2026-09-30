@@ -24,10 +24,10 @@ The editable art is separate from Unreal's imported `.uasset` files under
 
 Close Unreal Editor and run `.\update-flick-pucks.cmd` from the project root.
 The command reads only the nine base files in `exports/`, reimports their existing
-Unreal meshes in place and refreshes the Classic Orange material swap. It does
+Unreal meshes in place and refreshes the Classic Orange materials. It does
 not generate player-number variants, require Blender, modify the base FBXs or
 import arenas/stadiums. Every player shares these nine meshes and can equip
-either starter skin on either team from the locker. Set `FLICK_UNREAL_EDITOR`
+either skin on either team from the locker. Set `FLICK_UNREAL_EDITOR`
 if Unreal is installed elsewhere.
 
 Import reports are written to `Saved/` and the commandlet log is

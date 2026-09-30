@@ -1,6 +1,7 @@
 #include "Game/FlickGameModePrivate.h"
 #include "Arena/FlickArenaLighting.h"
 #include "Core/FlickVisualSettings.h"
+#include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickPlaylistRules.h"
 
 using namespace FlickGameModePrivate;
@@ -1248,6 +1249,9 @@ void AFlickGameMode::SetCameraForFrontend()
 		|| (FrontendScreen == EFlickFrontendScreen::Settings && SettingsReturnScreen == EFlickFrontendScreen::MainMenu);
 	if (CameraPawn)
 	{
+		CameraPawn->SetLockerPreviewMode(FrontendScreen == EFlickFrontendScreen::Profile
+			&& LockerPreviewCategory != INDEX_NONE
+			? LockerPreviewCategory == FlickCosmeticCatalog::KnockoutCategory ? 2 : 1 : 0);
 		const bool bSettingsOverMatch = FrontendScreen == EFlickFrontendScreen::Settings
 			&& SettingsReturnScreen == EFlickFrontendScreen::Paused;
 		const bool bClassSelectionOverMatch = FrontendScreen == EFlickFrontendScreen::ClassSelect
@@ -1262,7 +1266,8 @@ void AFlickGameMode::SetCameraForFrontend()
 	// whenever presentation state changes so showcase exposure cannot leak into
 	// a live match (or vice versa).
 	SpawnLightingIfNeeded();
-	if (TestArenaActor) TestArenaActor->SetMenuPresentationEnabled(bMenuContext);
+	if (TestArenaActor) TestArenaActor->SetMenuPresentationEnabled(bMenuContext
+		|| (FrontendScreen == EFlickFrontendScreen::Profile && LockerPreviewCategory != INDEX_NONE));
 }
 
 void AFlickGameMode::SetCameraViewForTeam(const EFlickTeam Team, const bool bSnap)

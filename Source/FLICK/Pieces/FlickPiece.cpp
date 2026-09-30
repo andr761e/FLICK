@@ -1,5 +1,6 @@
 #include "Pieces/FlickPiece.h"
 #include "Core/FlickCosmeticCatalog.h"
+#include "Core/FlickVisualSettings.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -42,6 +43,22 @@ AFlickPiece::AFlickPiece()
 	WorkshopMesh->SetGenerateOverlapEvents(false);
 	WorkshopMesh->SetCanEverAffectNavigation(false);
 	WorkshopMesh->SetVisibility(false);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> TrailSphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TrailEmissive(TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
+	for (int32 Index = 0; Index < 10; ++Index)
+	{
+		UStaticMeshComponent* Segment = CreateDefaultSubobject<UStaticMeshComponent>(
+			*FString::Printf(TEXT("CosmeticTrail_%02d"), Index));
+		Segment->SetupAttachment(PieceMesh);
+		Segment->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Segment->SetGenerateOverlapEvents(false);
+		Segment->SetCanEverAffectNavigation(false);
+		Segment->SetCastShadow(false);
+		Segment->SetVisibility(false);
+		if (TrailSphere.Succeeded()) Segment->SetStaticMesh(TrailSphere.Object);
+		if (TrailEmissive.Succeeded()) Segment->SetMaterial(0, TrailEmissive.Object);
+		CosmeticTrailSegments.Add(Segment);
+	}
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	if (CylinderMesh.Succeeded())
@@ -255,6 +272,9 @@ void AFlickPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AFlickPiece, PieceId);
 	DOREPLIFETIME(AFlickPiece, OwningPlayerSlot);
 	DOREPLIFETIME(AFlickPiece, PuckSkin);
+	DOREPLIFETIME(AFlickPiece, PuckTrail);
+	DOREPLIFETIME(AFlickPiece, PuckSpawnEffect);
+	DOREPLIFETIME(AFlickPiece, PuckKnockoutEffect);
 	DOREPLIFETIME(AFlickPiece, bEliminated);
 	DOREPLIFETIME(AFlickPiece, bBobStriker);
 	DOREPLIFETIME(AFlickPiece, bHighDetailVisualsEnabled);
@@ -284,12 +304,19 @@ void AFlickPiece::BeginPlay()
 	ApplyVisuals();
 	ApplyPregamePreview();
 	UpdateArrivalVisuals();
+	if (!CosmeticTrailSegments.IsEmpty())
+	{
+		CosmeticTrailMaterial = CosmeticTrailSegments[0]->CreateAndSetMaterialInstanceDynamic(0);
+		for (int32 Index = 1; Index < CosmeticTrailSegments.Num(); ++Index)
+			CosmeticTrailSegments[Index]->SetMaterial(0, CosmeticTrailMaterial);
+	}
 }
 
 void AFlickPiece::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateArrivalVisuals();
+	UpdateCosmeticTrail(DeltaSeconds);
 
 	VisualTime += DeltaSeconds;
 	const bool bWasFlashing = HitFlashRemaining > 0.0f;
@@ -297,13 +324,61 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 	const bool bOwnRing = UsesLocalOwnershipRing();
 	const bool bOwnershipChanged = bOwnRing != bLocalOwnershipRing;
 	bLocalOwnershipRing = bOwnRing;
-	if (bSelected || bHovered || bWasFlashing || bOwnershipChanged)
+	const bool bAssist = FlickVisualSettings::IsColorBlindAssistEnabled();
+	const bool bAccessibilityChanged = bAssist != bLastColorBlindAssist;
+	bLastColorBlindAssist = bAssist;
+	if (bSelected || bHovered || bWasFlashing || bOwnershipChanged || bAccessibilityChanged)
 	{
 		ApplyVisuals();
 	}
 	if (bWasFlashing && HitFlashRemaining <= 0.0f)
 	{
 		HitFlashStrength = 0.0f;
+	}
+}
+
+void AFlickPiece::UpdateCosmeticTrail(const float DeltaSeconds)
+{
+	if (CosmeticTrailSegments.IsEmpty()) return;
+	const FVector Position = GetActorLocation();
+	const bool bMoving = !LastTrailPosition.IsZero() && FVector::DistSquared2D(Position, LastTrailPosition) > 9.0f;
+	TrailSampleElapsed += DeltaSeconds;
+	if (TrailSampleElapsed >= 0.06f)
+	{
+		TrailSampleElapsed = 0.0f;
+		if (bMoving && !bEliminated)
+		{
+			TrailPoints.Insert(Position - FVector(0.0f, 0.0f, PieceThickness * 0.38f), 0);
+			TrailPoints.SetNum(FMath::Min(TrailPoints.Num(), CosmeticTrailSegments.Num()));
+			TrailPoints.RemoveAll([&Position](const FVector& Point)
+			{
+				return FVector::DistSquared2D(Point, Position) > FMath::Square(180.0f);
+			});
+		}
+		else if (!TrailPoints.IsEmpty()) TrailPoints.Pop(EAllowShrinking::No);
+		LastTrailPosition = Position;
+	}
+	if (PuckTrail == 0 || bEliminated)
+	{
+		for (UStaticMeshComponent* Segment : CosmeticTrailSegments) Segment->SetVisibility(false);
+		return;
+	}
+	if (CosmeticTrailMaterial)
+	{
+		const FLinearColor Color = PuckTrail == 1 ? FLinearColor(0.02f, 2.7f, 6.0f) : FLinearColor(6.0f, 0.38f, 0.01f);
+		CosmeticTrailMaterial->SetVectorParameterValue(TEXT("Color"), Color);
+	}
+	for (int32 Index = 0; Index < CosmeticTrailSegments.Num(); ++Index)
+	{
+		const bool bVisible = TrailPoints.IsValidIndex(Index);
+		const float Scale = bVisible ? FMath::Lerp(0.19f, 0.055f, static_cast<float>(Index) / 9.0f) : 0.0f;
+		UStaticMeshComponent* Segment = CosmeticTrailSegments[Index];
+		Segment->SetVisibility(bVisible);
+		if (bVisible)
+		{
+			Segment->SetWorldLocation(TrailPoints[Index]);
+			Segment->SetWorldScale3D(FVector(Scale, Scale, 0.025f));
+		}
 	}
 }
 
@@ -378,6 +453,10 @@ void AFlickPiece::InitializePiece(
 	bSelected = false;
 	bHovered = false;
 	HitFlashRemaining = 0.0f;
+	TrailPoints.Reset();
+	LastTrailPosition = FVector::ZeroVector;
+	TrailSampleElapsed = 0.0f;
+	for (UStaticMeshComponent* Segment : CosmeticTrailSegments) Segment->SetVisibility(false);
 
 	SetActorHiddenInGame(false);
 	SetActorEnableCollision(true);
@@ -588,6 +667,7 @@ void AFlickPiece::Eliminate()
 	}
 
 	bEliminated = true;
+	TrailPoints.Reset();
 	bSelected = false;
 	bHovered = false;
 	ApplyEliminatedState();
@@ -607,11 +687,37 @@ void AFlickPiece::OnRep_PieceConfiguration()
 void AFlickPiece::SetPuckSkin(const int32 Skin)
 {
 	if (!HasAuthority()) return;
-	const int32 ValidSkin = FMath::Clamp(Skin, 0, 1);
+	const int32 ValidSkin = FMath::Clamp(Skin, 0,
+		FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart).Num() - 1);
 	if (PuckSkin == ValidSkin) return;
 	PuckSkin = ValidSkin;
 	OnRep_PuckSkin();
 	ForceNetUpdate();
+}
+
+void AFlickPiece::SetPuckEffects(const TArray<int32>& Effects)
+{
+	if (!HasAuthority() || Effects.Num() != 3) return;
+	for (int32 Index = 0; Index < Effects.Num(); ++Index)
+	{
+		if (!FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::TrailCategory + Index).IsValidIndex(Effects[Index])) return;
+	}
+	if (PuckTrail == Effects[0] && PuckSpawnEffect == Effects[1] && PuckKnockoutEffect == Effects[2]) return;
+	PuckTrail = Effects[0];
+	PuckSpawnEffect = Effects[1];
+	PuckKnockoutEffect = Effects[2];
+	ForceNetUpdate();
+}
+
+int32 AFlickPiece::GetPuckEffect(const int32 EffectIndex) const
+{
+	switch (EffectIndex)
+	{
+	case 0: return PuckTrail;
+	case 1: return PuckSpawnEffect;
+	case 2: return PuckKnockoutEffect;
+	default: return 0;
+	}
 }
 
 void AFlickPiece::OnRep_PuckSkin()
@@ -1306,8 +1412,7 @@ void AFlickPiece::UpdateTestArenaVisuals()
 	WorkshopMesh->SetVisibility(!bEliminated);
 	if (!WorkshopTeamMaterials.IsEmpty())
 	{
-		const FLinearColor Color = PuckSkin == 1
-			? FLinearColor(1.0f, 0.18f, 0.003f) : FLinearColor(0.0f, 0.5f, 1.0f);
+		const FLinearColor Color = FlickCosmeticCatalog::GetPuckSkinColor(PuckSkin);
 		const FLinearColor DiffuserBaseColor = PuckSkin == 1
 			? FLinearColor(0.125f, 0.022f, 0.002f) : FLinearColor(0.004f, 0.080f, 0.125f);
 		const float Flash = FMath::Clamp(HitFlashRemaining / 0.2f, 0.0f, 1.0f) * HitFlashStrength;
@@ -1338,7 +1443,7 @@ bool AFlickPiece::UsesLocalOwnershipRing() const
 {
 	if (!GetWorld() || GetNetMode() == NM_DedicatedServer || bPregamePreview) return false;
 	const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
-	if (!State || State->PlayersPerTeam < 2) return false;
+	if (!State) return false;
 	const AFlickPlayerController* Local = Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController());
 	return Local && Local->IsLocalController() && Local->OwnsPieceLocally(this);
 }
@@ -1376,8 +1481,7 @@ void AFlickPiece::ApplyVisuals()
 		VisualAccent,
 		ArchetypeMix);
 	// Saturated ownership colours stay distinct even beneath a mismatched skin.
-	const FLinearColor HaloColor = bLocalOwnershipRing
-		? FLinearColor(0.45f, 1.0f, 0.015f) : Team == EFlickTeam::Player2
+	const FLinearColor HaloColor = Team == EFlickTeam::Player2
 		? FLinearColor(1.0f, 0.10f, 0.01f) : Team == EFlickTeam::Player1
 			? FLinearColor(0.0f, 0.38f, 1.0f) : GetTeamColor(Team);
 	FLinearColor PipColor = FMath::Lerp(
@@ -1485,13 +1589,18 @@ void AFlickPiece::ApplyVisuals()
 	AccentLight->SetLightColor(TeamColor);
 	AccentLight->SetIntensity(0.0f);
 
-	SelectionHalo->SetVisibility(!bEliminated && !bPregamePreview);
+	SelectionHalo->SetVisibility(!bEliminated && !bPregamePreview && !bLocalOwnershipRing);
+	const AFlickPlayerController* Viewer = GetWorld()
+		? Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController()) : nullptr;
+	const bool bTeammate = Viewer && Viewer->GetLocalTeam() == Team;
+	const float Width = FlickVisualSettings::IsColorBlindAssistEnabled()
+		? (bTeammate ? 1.12f : 1.25f) : 1.15f;
 	const float Pulse = bSelected
 		? 1.0f + 0.055f * FMath::Sin(VisualTime * 7.0f)
 		: 1.0f;
 	SelectionHalo->SetRelativeScale3D(FVector(
-		BaseHaloRelativeScale.X * Pulse,
-		BaseHaloRelativeScale.Y * Pulse,
+		BaseHaloRelativeScale.X * Pulse * Width / 1.15f,
+		BaseHaloRelativeScale.Y * Pulse * Width / 1.15f,
 		BaseHaloRelativeScale.Z));
 
 	Label->SetText(FText::FromString(bBobStriker ? TEXT("B") : GetPieceArchetypeMark(Archetype)));

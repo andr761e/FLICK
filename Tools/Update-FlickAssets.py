@@ -40,7 +40,8 @@ for importer in importers:
         continue
     u.log("FLICK_ASSET_UPDATE_START: " + importer)
     force_group = selection.changed is None or "Tools/" + importer in selection.changed or any(
-        name.endswith(".json") and name.startswith(prefix) and not name.endswith("/ClassicOrange/set.json")
+        name.endswith(".json") and name.startswith(prefix)
+        and not name.endswith("/ClassicOrange/set.json")
         for name in selection.changed for prefix in prefixes)
     runpy.run_path(str(path), run_name="__main__", init_globals={
         "asset_selected": (lambda _project, _source: True) if force_group else selection.selected})

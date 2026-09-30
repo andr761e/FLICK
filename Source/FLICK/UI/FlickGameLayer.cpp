@@ -94,10 +94,12 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	SelectedPuckSkins.SetNumZeroed(FlickPieceArchetypeRules::ArchetypeCount);
 	for (int32 Category = FlickCosmeticCatalog::PuckCategoryStart; Category < FlickCosmeticCatalog::CategoryCount; ++Category)
 	{
+		if (!FlickCosmeticCatalog::IsPuckCategory(Category)) continue;
 		int32& Skin = SelectedPuckSkins[Category - FlickCosmeticCatalog::PuckCategoryStart];
 		GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), *FlickCosmeticCatalog::GetConfigKey(Category), Skin, GGameUserSettingsIni);
 		Skin = FMath::Clamp(Skin, 0, FlickCosmeticCatalog::GetItems(Category).Num() - 1);
 	}
+	SelectedPuckEffects = FlickCosmeticCatalog::LoadPuckEffects();
 	if (const UFlickGameInstance* FlickGameInstance = PlayerController.IsValid()
 		? Cast<UFlickGameInstance>(PlayerController->GetGameInstance())
 		: nullptr)
@@ -121,6 +123,11 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	}
 	bLightingPreview = SelectedSettingsTab == EFlickSettingsTab::Lighting
 		&& FParse::Param(FCommandLine::Get(), TEXT("FlickLightingPreview"));
+	int32 ProfilePreviewPage = 0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("FlickProfilePage="), ProfilePreviewPage))
+	{
+		SelectedProfileTab = static_cast<EFlickProfileTab>(FMath::Clamp(ProfilePreviewPage, 0, 4));
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickProfileCustomizePreview")))
 	{
 		SelectedProfileTab = EFlickProfileTab::Customization;
@@ -128,6 +135,21 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		if (FParse::Value(FCommandLine::Get(), TEXT("FlickLockerCategory="), PreviewCategory))
 		{
 			SelectedLockerCategory = FMath::Clamp(PreviewCategory, 0, FlickCosmeticCatalog::CategoryCount - 1);
+		}
+		int32 PreviewItem = -1;
+		if (FParse::Value(FCommandLine::Get(), TEXT("FlickLockerItem="), PreviewItem)
+			&& FlickCosmeticCatalog::GetItems(SelectedLockerCategory).IsValidIndex(PreviewItem))
+		{
+			const int32 Category = SelectedLockerCategory;
+			if (Category == 0) SelectedBannerStyle = PreviewItem;
+			else if (Category == 1) SelectedBannerTag = PreviewItem;
+			else if (Category == 2) SelectedAvatarBorder = PreviewItem;
+			else if (FlickCosmeticCatalog::IsPuckCategory(Category))
+				SelectedPuckSkins[Category - FlickCosmeticCatalog::PuckCategoryStart] = PreviewItem;
+			else if (Category >= FlickCosmeticCatalog::TrailCategory)
+				SelectedPuckEffects[Category - FlickCosmeticCatalog::TrailCategory] = PreviewItem;
+			GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), *FlickCosmeticCatalog::GetConfigKey(Category), PreviewItem, GGameUserSettingsIni);
+			GConfig->Flush(false, GGameUserSettingsIni);
 		}
 	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickPlayFormatPreview")))
@@ -436,6 +458,20 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 
 }
 
+int32 SFlickGameLayer::GetSelectedCosmeticIndex(const int32 Category) const
+{
+	if (Category == 0) return SelectedBannerStyle;
+	if (Category == 1) return SelectedBannerTag;
+	if (Category == 2) return SelectedAvatarBorder;
+	if (FlickCosmeticCatalog::IsPuckCategory(Category))
+	{
+		const int32 Index = Category - FlickCosmeticCatalog::PuckCategoryStart;
+		return SelectedPuckSkins.IsValidIndex(Index) ? SelectedPuckSkins[Index] : 0;
+	}
+	const int32 EffectIndex = Category - FlickCosmeticCatalog::TrailCategory;
+	return SelectedPuckEffects.IsValidIndex(EffectIndex) ? SelectedPuckEffects[EffectIndex] : 0;
+}
+
 TSharedRef<SWidget> SFlickGameLayer::BuildPartyInvitePrompt()
 {
 	return SNew(SFlickMainMenuPanel)
@@ -593,6 +629,24 @@ void SFlickGameLayer::Tick(
 	const float InDeltaTime)
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+	const bool bProfileVisible = GetScreenVisibility(EFlickFrontendScreen::Profile) == EVisibility::Visible;
+	if (bProfileVisible)
+	{
+		ProfileEntranceElapsed = !bProfileWasVisible || AnimatedProfileTab != SelectedProfileTab
+			? 0.0f : ProfileEntranceElapsed + FMath::Max(0.0f, InDeltaTime);
+		AnimatedProfileTab = SelectedProfileTab;
+	}
+	else ProfileEntranceElapsed = 0.0f;
+	bProfileWasVisible = bProfileVisible;
+	const int32 PreviewCategory = GameMode.IsValid()
+		&& GameMode->GetFrontendScreen() == EFlickFrontendScreen::Profile
+		&& SelectedProfileTab == EFlickProfileTab::Customization
+		? SelectedLockerCategory : INDEX_NONE;
+	if (GameMode.IsValid() && PreviewCategory != LastLockerPreviewCategory)
+	{
+		GameMode->SetLockerPreview(PreviewCategory);
+		LastLockerPreviewCategory = PreviewCategory;
+	}
 	if (InDeltaTime > 0.0f)
 	{
 		SmoothedFrameSeconds = FMath::Lerp(SmoothedFrameSeconds, InDeltaTime, 1.0f - FMath::Exp(-InDeltaTime * 4.0f));

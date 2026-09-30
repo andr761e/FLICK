@@ -110,6 +110,18 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	}
 	FVector TargetLocation = bMenuPresentation ? MenuTargetLocation : GetGameplayTargetLocation();
 	FRotator TargetRotation = bMenuPresentation ? MenuTargetRotation : GetGameplayTargetRotation();
+	if (bMenuPresentation && LockerPreviewMode > 0)
+	{
+		const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
+		const float SurfaceZ = State ? State->ArenaSurfaceZ : 250.0f;
+		const float EdgePreviewFocus = FlickModeRules::GetArenaRadius(
+			EFlickMatchVariant::Classic, State ? State->PlayersPerTeam : 1) - 130.0f;
+		const FVector Focus = LockerPreviewMode == 2
+			? FVector(EdgePreviewFocus, 0.0f, SurfaceZ) : FVector(0.0f, 0.0f, SurfaceZ);
+		TargetLocation = Focus + FVector(-300.0f, -680.0f, 480.0f) * ArenaFramingScale;
+		TargetRotation = UKismetMathLibrary::FindLookAtRotation(TargetLocation, Focus
+			+ (LockerPreviewMode == 2 ? FVector(500.0f, 0.0f, -110.0f) : FVector(200.0f, 0.0f, -110.0f)));
+	}
 	float TargetFieldOfView = bMenuPresentation
 		? MenuFieldOfView
 		: bAimPresentation && bTestArenaPresentation
@@ -123,6 +135,8 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 		TargetFieldOfView = FMath::RadiansToDegrees(2.0f * FMath::Atan(
 			FMath::Tan(FMath::DegreesToRadians(MenuFieldOfView * 0.5f)) * AspectExpansion));
 	}
+	if (bMenuPresentation && LockerPreviewMode > 0)
+		TargetFieldOfView = LockerPreviewMode == 2 ? 46.0f : 38.0f;
 	if (!bMenuPresentation && !bCinematicReplay)
 	{
 		if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())

@@ -608,7 +608,8 @@ bool AFlickGameMode::ExecuteValidatedLaunch(
 		GetTeamColor(ShootingTeam),
 		EFlickFeedbackKind::Launch,
 		NormalizedPower,
-		-Direction);
+		-Direction,
+		Piece->GetPuckEffect(0));
 	AddCameraFeedback(FMath::Lerp(0.035f, 0.095f, NormalizedPower));
 	AddControllerFeedback(FMath::Lerp(0.08f, 0.28f, NormalizedPower), 0.09f);
 
@@ -796,7 +797,8 @@ void AFlickGameMode::ReleaseKickoffShots()
 			GetTeamColor(Shot.Team),
 			EFlickFeedbackKind::Launch,
 			Shot.Power,
-			-Shot.Direction);
+			-Shot.Direction,
+			Piece->GetPuckEffect(0));
 		StrongestPower = FMath::Max(StrongestPower, Shot.Power);
 	}
 

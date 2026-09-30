@@ -500,7 +500,8 @@ void AFlickGameMode::ApplyCinematicReplayTime(const float SourceTime)
 			GetTeamColor(EliminatedPiece->GetTeam()),
 			EFlickFeedbackKind::Elimination,
 			1.0f,
-			EdgeDirection);
+			EdgeDirection,
+			EliminatedPiece->GetPuckEffect(2));
 		ReplayPresentedEliminationPieceIds.Add(Elimination.Key);
 	}
 	if (!bFoundFocusPiece && VisiblePieceCount > 0)
@@ -832,7 +833,8 @@ void AFlickGameMode::UpdateEliminations()
 				GetTeamColor(EliminatedTeam),
 				EFlickFeedbackKind::Elimination,
 				1.0f,
-				EdgeDirection);
+				EdgeDirection,
+				Piece->GetPuckEffect(2));
 			if (AFlickGameState* FlickGameState = GetFlickGameState())
 			{
 				FlickGameState->RecordElimination(EliminatedTeam);
@@ -933,7 +935,9 @@ void AFlickGameMode::UpdateBobPockets()
 			PocketLocation,
 			Piece->IsBobStriker() ? FLinearColor::White : GetTeamColor(Piece->GetTeam()),
 			EFlickFeedbackKind::Elimination,
-			0.82f);
+			0.82f,
+			FVector::ZeroVector,
+			Piece->GetPuckEffect(2));
 		if (AudioDirector)
 		{
 			AudioDirector->PlayRingOut(PocketLocation);
@@ -1654,7 +1658,8 @@ void AFlickGameMode::SpawnWorldFeedback(
 	const FLinearColor& Color,
 	const EFlickFeedbackKind FeedbackKind,
 	const float Strength,
-	const FVector& BiasDirection) const
+	const FVector& BiasDirection,
+	const int32 Style) const
 {
 	if (!GetWorld() || !AreImpactEffectsEnabled())
 	{
@@ -1665,7 +1670,7 @@ void AFlickGameMode::SpawnWorldFeedback(
 		AFlickWorldFeedback::StaticClass(), Location, FRotator::ZeroRotator);
 	if (Feedback)
 	{
-		Feedback->InitializeFeedback(FeedbackKind, Color, Strength, BiasDirection);
+		Feedback->InitializeFeedback(FeedbackKind, Color, Strength, BiasDirection, Style);
 	}
 }
 
@@ -1726,6 +1731,9 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 	}
 	int32 Skin = GetNetMode() == NM_Standalone && Team == EFlickTeam::Player1
 		? FlickCosmeticCatalog::LoadPuckSkins()[static_cast<int32>(Archetype)] : 0;
+	TArray<int32> Effects;
+	Effects.SetNumZeroed(3);
+	if (GetNetMode() == NM_Standalone && Team == EFlickTeam::Player1) Effects = FlickCosmeticCatalog::LoadPuckEffects();
 	if (const AFlickGameState* SkinState = GetFlickGameState())
 	{
 		for (APlayerState* BaseState : SkinState->PlayerArray)
@@ -1735,11 +1743,13 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 				|| (SkinOwner->GetTeam() == Team && SkinOwner->GetTeamPlayerSlot() == OwningPlayerSlot)))
 			{
 				Skin = SkinOwner->GetPuckSkin(Archetype);
+				for (int32 Index = 0; Index < 3; ++Index) Effects[Index] = SkinOwner->GetPuckEffect(Index);
 				break;
 			}
 		}
 	}
 	Piece->SetPuckSkin(Skin);
+	Piece->SetPuckEffects(Effects);
 	const AFlickGameState* State = GetFlickGameState();
 	if (bPregamePreviewActive && !(State && State->bPuckArrivalActive))
 	{
@@ -1748,6 +1758,12 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 	if (bPregamePreviewActive || (State && State->bPuckArrivalActive))
 	{
 		Piece->BeginArrival(PuckArrivalDuration);
+		if (Piece->GetPuckEffect(1) > 0)
+		{
+			SpawnWorldFeedback(Location + FVector(0.0f, 0.0f, 18.0f),
+				GetTeamColor(Team), EFlickFeedbackKind::Spawn, 0.75f,
+				FVector::ZeroVector, Piece->GetPuckEffect(1));
+		}
 	}
 	Pieces.Add(Piece);
 	return Piece;

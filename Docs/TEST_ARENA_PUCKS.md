@@ -8,15 +8,16 @@ friction, restitution, impulses and ring-out detection are unchanged.
 Geometry is shared by all players. Classic Blue and Classic Orange are freely
 equippable starter skins, not team assignments. Only the emissive rim/type-symbol
 materials change; authored graphite, silver and recessed materials are retained.
-Team ownership is shown by a narrow base ring and a quick, team-coloured
+Team ownership is shown by a base ring and a quick, team-coloured
 `Name - Puck type` hover label, independent of cosmetic colours. There are no
 baked player-number variants. Missing art logs a warning and falls back to the
 procedural visual.
 
-In 2v2 and 3v3, the local viewer's own pucks use a lime ownership ring.
-Teammates and opponents retain blue/orange rings. This cue is local-only,
-independent of turn order, cosmetic skin and selection; private controlled seats
-are respected. 1v1 keeps the normal team rings.
+The local viewer's own pucks have no ownership ring. Teammates and opponents
+retain blue/orange rings. This cue is local-only, independent of turn order,
+cosmetic skin and selection; private controlled seats are respected. The
+Interface colour-blind assistance option makes opponent rings wider and adds
+YOU / TEAMMATE / OPPONENT text to puck hover labels.
 
 ## Rebuild and import
 

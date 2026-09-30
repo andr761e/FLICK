@@ -10,8 +10,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FFlickCosmeticCatalogTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Locker contains three profile categories and all puck types"),
-		FlickCosmeticCatalog::CategoryCount, 3 + FlickPieceArchetypeRules::ArchetypeCount);
+	TestEqual(TEXT("Locker contains profile, puck, and effect categories"),
+		FlickCosmeticCatalog::CategoryCount, 6 + FlickPieceArchetypeRules::ArchetypeCount);
 	TestEqual(TEXT("Existing banner config key remains compatible"), FlickCosmeticCatalog::GetConfigKey(0), FString(TEXT("BannerStyle")));
 	TestEqual(TEXT("Existing tag config key remains compatible"), FlickCosmeticCatalog::GetConfigKey(1), FString(TEXT("BannerTag")));
 	TestEqual(TEXT("Existing border config key remains compatible"), FlickCosmeticCatalog::GetConfigKey(2), FString(TEXT("AvatarBorder")));
@@ -23,6 +23,9 @@ bool FFlickCosmeticCatalogTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Four imported avatar borders follow the original three"), FlickCosmeticCatalog::GetItems(2).Num(), 7);
 	TestEqual(TEXT("Original banner index is stable"), FlickCosmeticCatalog::GetItems(0)[0], FString(TEXT("CARBON")));
 	TestEqual(TEXT("Original border index is stable"), FlickCosmeticCatalog::GetItems(2)[0], FString(TEXT("STANDARD")));
+	TestEqual(TEXT("Default trail preserves the original look"), FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::TrailCategory)[0], FString(TEXT("NONE")));
+	TestEqual(TEXT("Default spawn preserves the original drop"), FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::SpawnCategory)[0], FString(TEXT("BASIC DROP")));
+	TestEqual(TEXT("Default knockout preserves the original burst"), FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::KnockoutCategory)[0], FString(TEXT("BASIC BURST")));
 	for (int32 Category = 0; Category < FlickCosmeticCatalog::CategoryCount; ++Category)
 	{
 		TestFalse(TEXT("Every category has a name"), FlickCosmeticCatalog::GetCategoryName(Category).IsEmpty());
@@ -33,7 +36,7 @@ bool FFlickCosmeticCatalogTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Puck category maps to its archetype"),
 				static_cast<int32>(FlickCosmeticCatalog::GetPuckArchetype(Category)),
 				Category - FlickCosmeticCatalog::PuckCategoryStart);
-			TestEqual(TEXT("Each puck has two starter skins"), FlickCosmeticCatalog::GetItems(Category).Num(), 2);
+			TestEqual(TEXT("Each puck has two freely selectable skins"), FlickCosmeticCatalog::GetItems(Category).Num(), 2);
 			TestEqual(TEXT("Existing saved skin index is still Classic Blue"), FlickCosmeticCatalog::GetItems(Category)[0], FString(TEXT("CLASSIC BLUE")));
 			TestEqual(TEXT("Orange is freely selectable"), FlickCosmeticCatalog::GetItems(Category)[1], FString(TEXT("CLASSIC ORANGE")));
 		}

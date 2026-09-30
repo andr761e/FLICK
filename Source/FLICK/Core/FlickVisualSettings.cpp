@@ -8,6 +8,20 @@ namespace FlickVisualSettings
 	static constexpr int32 DefaultRenderScale = 110;
 	static const TCHAR* InterfaceSection = TEXT("FLICK.InterfaceSettings");
 
+	bool IsColorBlindAssistEnabled()
+	{
+		bool bEnabled = false;
+		if (GConfig) GConfig->GetBool(InterfaceSection, TEXT("ColorBlindAssist"), bEnabled, GGameUserSettingsIni);
+		return bEnabled;
+	}
+
+	void SetColorBlindAssistEnabled(bool bEnabled)
+	{
+		if (!GConfig) return;
+		GConfig->SetBool(InterfaceSection, TEXT("ColorBlindAssist"), bEnabled, GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+
 	int32 GetPuckHoverSize()
 	{
 		int32 Value = 12;

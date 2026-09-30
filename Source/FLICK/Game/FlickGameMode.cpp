@@ -1285,6 +1285,7 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateMainMenuPresentation();
+	UpdateLockerPreview(DeltaSeconds);
 
 	AFlickGameState* FlickGameState = GetFlickGameState();
 	if (FrontendScreen == EFlickFrontendScreen::NetworkLobby

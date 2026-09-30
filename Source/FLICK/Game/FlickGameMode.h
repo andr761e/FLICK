@@ -118,6 +118,8 @@ public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 	void RefreshLightingSettings();
+	void SetLockerPreview(int32 Category);
+	void UpdateLockerPreview(float DeltaSeconds);
 
 	bool CanSelectPiece(const AFlickPiece* Piece) const;
 	bool CanSelectPieceForController(const APlayerController* RequestingPlayer, const AFlickPiece* Piece) const;
@@ -710,7 +712,8 @@ private:
 		const FLinearColor& Color,
 		EFlickFeedbackKind FeedbackKind,
 		float Strength,
-		const FVector& BiasDirection = FVector::ZeroVector) const;
+		const FVector& BiasDirection = FVector::ZeroVector,
+		int32 Style = 0) const;
 	void PushHudEvent(const FString& Message, const FLinearColor& Color, float Duration = 1.8f) const;
 	AFlickPiece* SpawnPiece(
 		EFlickTeam Team,
@@ -760,6 +763,9 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<AFlickPiece>> Pieces;
+	int32 LockerPreviewCategory = INDEX_NONE;
+	float LockerPreviewElapsed = 0.0f;
+	int32 LockerPreviewCycle = INDEX_NONE;
 
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> Player1BobStriker;

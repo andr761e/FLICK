@@ -2,6 +2,7 @@
 
 #include "Core/FlickLineupRules.h"
 #include "Core/FlickPieceArchetypeRules.h"
+#include "Core/FlickCosmeticCatalog.h"
 
 #include "Net/UnrealNetwork.h"
 
@@ -15,6 +16,7 @@ void AFlickPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AFlickPlayerState, Team);
 	DOREPLIFETIME(AFlickPlayerState, PuckSkins);
+	DOREPLIFETIME(AFlickPlayerState, PuckEffects);
 	DOREPLIFETIME(AFlickPlayerState, TeamPlayerSlot);
 	DOREPLIFETIME(AFlickPlayerState, bLobbyReady);
 	DOREPLIFETIME(AFlickPlayerState, NetworkSelectedClass);
@@ -46,7 +48,7 @@ void AFlickPlayerState::ResetNetworkClassSelection(const EFlickLineupPreset InCl
 bool AFlickPlayerState::SetPuckSkins(const TArray<int32>& Skins)
 {
 	if (!HasAuthority() || Skins.Num() != FlickPieceArchetypeRules::ArchetypeCount) return false;
-	for (int32 Skin : Skins) if (Skin < 0 || Skin > 1) return false;
+	for (int32 Skin : Skins) if (Skin < 0 || Skin >= FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart).Num()) return false;
 	PuckSkins = Skins;
 	ForceNetUpdate();
 	return true;
@@ -56,6 +58,23 @@ int32 AFlickPlayerState::GetPuckSkin(const EFlickPieceArchetype Archetype) const
 {
 	const int32 Index = static_cast<int32>(Archetype);
 	return PuckSkins.IsValidIndex(Index) ? PuckSkins[Index] : 0;
+}
+
+bool AFlickPlayerState::SetPuckEffects(const TArray<int32>& Effects)
+{
+	if (!HasAuthority() || Effects.Num() != 3) return false;
+	for (int32 Index = 0; Index < Effects.Num(); ++Index)
+	{
+		if (!FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::TrailCategory + Index).IsValidIndex(Effects[Index])) return false;
+	}
+	PuckEffects = Effects;
+	ForceNetUpdate();
+	return true;
+}
+
+int32 AFlickPlayerState::GetPuckEffect(const int32 EffectIndex) const
+{
+	return PuckEffects.IsValidIndex(EffectIndex) ? PuckEffects[EffectIndex] : 0;
 }
 
 void AFlickPlayerState::SetNetworkSelectedClass(const EFlickLineupPreset InClass)

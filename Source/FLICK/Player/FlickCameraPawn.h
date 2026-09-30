@@ -22,6 +22,7 @@ public:
 	void AddCameraImpulse(float Strength);
 	void SetMenuPresentation(bool bInMenuPresentation);
 	void SetMenuOrbitEnabled(bool bEnabled);
+	void SetLockerPreviewMode(int32 InMode) { LockerPreviewMode = InMode; }
 	void SetBobGameplayFraming(bool bInBobGameplayFraming);
 	void SetTestArenaPresentation(bool bInTestArenaPresentation);
 	void SetOneVsOneArenaPresentation(bool bEnabled);
@@ -255,6 +256,7 @@ private:
 	bool bGameplayElevationLocked = false;
 	bool bMenuPresentation = false;
 	bool bMenuOrbitEnabled = false;
+	int32 LockerPreviewMode = 0;
 	TWeakObjectPtr<class ARectLight> MenuKeyLight;
 	TWeakObjectPtr<class ARectLight> MenuRimLight;
 	bool bMenuOrbitInitialized = false;
