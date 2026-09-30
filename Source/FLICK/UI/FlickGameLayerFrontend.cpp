@@ -828,12 +828,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				: Category == 2 ? (Index == 1 ? Cyan : Index == 2 ? Brand : Hairline)
 				: Category == 0 ? (Index == 1 ? Orange : Index == 2 ? Cyan : Brand) : Brand;
 			const bool bWide = Category == 0 || Category == 1;
-			const int32 Columns = Category >= FlickCosmeticCatalog::TrailCategory ? 3
-				: bWide || FlickCosmeticCatalog::IsPuckCategory(Category) ? 2 : 4;
-			const float CardWidth = bWide ? 340.0f
-				: Category >= FlickCosmeticCatalog::TrailCategory ? 106.0f : 166.0f;
-			const float CardHeight = bWide ? 132.0f
-				: Category >= FlickCosmeticCatalog::TrailCategory ? 140.0f : 168.0f;
+			const bool bPuck = FlickCosmeticCatalog::IsPuckCategory(Category);
+			// The locker keeps one width. Use two substantial cards for banners and
+			// puck skins, or three compact cards for avatar borders and effects.
+			// Including border and grid padding, either row fits the 508-unit item pane.
+			const int32 Columns = bWide || bPuck ? 2 : 3;
+			const float CardWidth = bWide || bPuck ? 220.0f : 140.0f;
+			const float CardHeight = bWide ? 132.0f : bPuck ? 170.0f
+				: Category == 2 ? 150.0f : 140.0f;
 			TSharedRef<SWidget> Preview = SNew(SBox);
 			if (Category == 0)
 			{
@@ -852,7 +854,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 					SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(PreviewAccent)
 					.CutSize(8.0f).BorderWidth(1.0f).Padding(FMargin(12.0f, 11.0f))
 					[SNew(STextBlock).Text(FText::FromString(Names[Index]))
-					.Font(GetBannerTagFont(Index, 17)).ColorAndOpacity(PreviewAccent)]
+					.Font(GetBannerTagFont(Index, 15)).ColorAndOpacity(PreviewAccent)
+					.OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
 				];
 			}
 			else if (Category == 2)
@@ -871,9 +874,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			}
 			else if (FlickCosmeticCatalog::IsPuckCategory(Category))
 			{
-				Preview = SNew(SFlickPuckDisc)
+				Preview = SNew(SBox).WidthOverride(132.0f).HeightOverride(132.0f)
+				[
+					SNew(SFlickPuckDisc)
 					.Archetype(FlickCosmeticCatalog::GetPuckArchetype(Category))
-					.TeamColor(FlickCosmeticCatalog::GetPuckSkinColor(Index)).AccentColor(Brand).Selected(true);
+					.TeamColor(FlickCosmeticCatalog::GetPuckSkinColor(Index)).AccentColor(Brand)
+					.Selected(true).RadiusScale(1.05f)
+				];
 			}
 			else
 			{
@@ -921,7 +928,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 						+ SVerticalBox::Slot().FillHeight(1.0f).HAlign(bWide ? HAlign_Fill : HAlign_Center).VAlign(VAlign_Center)
 						[Preview]
 						+ SVerticalBox::Slot().AutoHeight()
-						[SNew(STextBlock).Text(FText::FromString(Names[Index])).Font(UiFont(11, true)).ColorAndOpacity(Paper)]
+						[SNew(STextBlock).Text(FText::FromString(Names[Index])).Font(UiFont(11, true))
+							.ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
 						+ SVerticalBox::Slot().AutoHeight()
 						[SNew(STextBlock).Text_Lambda([this, Category, Index]()
 						{
@@ -1119,6 +1127,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			SNew(SBox).HeightOverride_Lambda([this]()
 			{
 				if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 520.0f;
+				if (SelectedProfileTab == EFlickProfileTab::Customization) return 720.0f;
 				if (SelectedProfileTab == EFlickProfileTab::MatchHistory)
 				{
 					const UFlickGameInstance* Instance = PlayerController.IsValid()
@@ -1149,11 +1158,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				if (SelectedProfileTab == EFlickProfileTab::Stats) return 1180.0f;
 				if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 1240.0f;
 				if (SelectedProfileTab == EFlickProfileTab::MatchHistory) return 1100.0f;
-				return SelectedLockerCategory >= FlickCosmeticCatalog::PuckCategoryStart ? 820.0f : 1015.0f;
+				return 900.0f;
 			})
 			.HeightOverride_Lambda([this]()
 			{
 				if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 520.0f;
+				if (SelectedProfileTab == EFlickProfileTab::Customization) return 720.0f;
 				if (SelectedProfileTab == EFlickProfileTab::MatchHistory)
 				{
 					const UFlickGameInstance* Instance = PlayerController.IsValid()
@@ -1201,7 +1211,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 							? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr;
 						return !Instance || Instance->GetRecentMatches().IsEmpty() ? 250.0f : 530.0f;
 					}
-					return 530.0f;
+					return SelectedProfileTab == EFlickProfileTab::Customization ? 490.0f : 530.0f;
 				})
 				[
 				SNew(SOverlay)
