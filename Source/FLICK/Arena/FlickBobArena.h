@@ -9,6 +9,7 @@ class UMaterialInstanceDynamic;
 class UPhysicalMaterial;
 class USceneComponent;
 class UStaticMeshComponent;
+class UProceduralMeshComponent;
 
 UCLASS()
 class FLICK_API AFlickBobArena : public AActor
@@ -71,6 +72,7 @@ private:
 
 	void ApplyArenaShape();
 	void ApplyPhysicsMaterials();
+	void BuildFloorCollision();
 	void SetLegacyArenaPresentationVisible(bool bVisible);
 	void SetLegacyVenuePresentationVisible(bool bVisible);
 
@@ -80,15 +82,13 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> BoardBase;
 
-	/** Hidden simple compound floor collider with round pocket openings. */
+	/** Welded planar physics surface; artwork and UCX seams never collide with pucks. */
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
-	TObjectPtr<UStaticMeshComponent> PocketedTabletop;
+	TObjectPtr<UProceduralMeshComponent> FloorCollision;
 
-	/** Fallback pocket-cutout support, disabled when the imported compound floor is available. */
-	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
-	TArray<TObjectPtr<UStaticMeshComponent>> BoardCollisionTiles;
+	FVector4 LastFloorShape = FVector4(0, 0, 0, 0);
 
-	/** Blender-authored presentation; gameplay uses its UCX floor through PocketedTabletop and separate Rails. */
+	/** Blender-authored presentation; gameplay uses FloorCollision and separate Rails. */
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> HighDetailArenaMesh;
 

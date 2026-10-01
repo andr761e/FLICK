@@ -7,8 +7,8 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
-#include "PhysicsEngine/BodySetup.h"
 #include "Engine/StaticMesh.h"
+#include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -57,17 +57,17 @@ AFlickBobArena::AFlickBobArena()
 	};
 
 	BoardBase = CreateMesh(TEXT("BoardBase"), CubeMesh.Object);
-	PocketedTabletop = CreateMesh(TEXT("PocketedTabletop"), nullptr);
-	PocketedTabletop->SetVisibility(false);
-	PocketedTabletop->SetHiddenInGame(true);
-	PocketedTabletop->SetCastShadow(false);
-	if (HighDetailArenaAsset.Succeeded())
-		PocketedTabletop->SetStaticMesh(HighDetailArenaAsset.Object);
-	for (int32 Index = 0; Index < 9; ++Index)
-	{
-		BoardCollisionTiles.Add(CreateMesh(
-			*FString::Printf(TEXT("BoardCollision_%d"), Index), CubeMesh.Object));
-	}
+	FloorCollision = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("FloorCollision"));
+	FloorCollision->SetupAttachment(SceneRoot);
+	FloorCollision->bUseComplexAsSimpleCollision = true;
+	FloorCollision->bUseAsyncCooking = false;
+	FloorCollision->SetVisibility(false);
+	FloorCollision->SetHiddenInGame(true);
+	FloorCollision->SetCastShadow(false);
+	FloorCollision->SetCanEverAffectNavigation(false);
+	FloorCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	FloorCollision->SetCollisionObjectType(ECC_WorldStatic);
+	FloorCollision->SetCollisionResponseToAllChannels(ECR_Block);
 	HighDetailArenaMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HighDetailArenaMesh"));
 	HighDetailArenaMesh->SetupAttachment(SceneRoot);
 	HighDetailArenaMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -144,23 +144,11 @@ AFlickBobArena::AFlickBobArena()
 		FloorGridSegments.Add(CreateMesh(*FString::Printf(TEXT("FloorGrid_%02d"), Index), CubeMesh.Object));
 	}
 
-	// Keep one uninterrupted collider under the entire tabletop. The old nine-tile
-	// pocket cutout produced coplanar collision seams whose contact normals could
-	// redirect a puck even though no obstruction was visible.
+	// Presentation never collides. Only the welded floor and rails support pucks.
 	BoardBase->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	PocketedTabletop->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	PocketedTabletop->SetCollisionObjectType(ECC_WorldStatic);
-	PocketedTabletop->SetCollisionResponseToAllChannels(ECR_Block);
 	BoardBase->SetCollisionObjectType(ECC_WorldStatic);
 	BoardBase->SetCollisionResponseToAllChannels(ECR_Block);
 	BoardBase->SetGenerateOverlapEvents(false);
-	for (UStaticMeshComponent* Tile : BoardCollisionTiles)
-	{
-		Tile->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Tile->SetGenerateOverlapEvents(false);
-		Tile->SetVisibility(false, true);
-		Tile->SetHiddenInGame(true, true);
-	}
 	for (UStaticMeshComponent* Rail : Rails)
 	{
 		Rail->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -354,52 +342,7 @@ void AFlickBobArena::ApplyArenaShape()
 	const float PedestalHeight = FMath::Max(80.0f, BottomZ);
 	BoardBase->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - BoardThickness * 0.5f));
 	BoardBase->SetRelativeScale3D(FVector(BoardHalfExtent / 50.0f, BoardHalfExtent / 50.0f, BoardThickness / 100.0f));
-	const bool bHasPocketCollision = PocketedTabletop && PocketedTabletop->GetStaticMesh()
-		&& PocketedTabletop->GetStaticMesh()->GetBodySetup()
-		&& PocketedTabletop->GetStaticMesh()->GetBodySetup()->AggGeom.ConvexElems.Num() >= 9;
-	if (PocketedTabletop)
-	{
-		PocketedTabletop->SetRelativeScale3D(FVector(BoardHalfExtent / 620.0f, BoardHalfExtent / 620.0f, BoardThickness / 50.0f));
-		// Z scaling must keep the top plane at SurfaceZ.
-		PocketedTabletop->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 250.0f * BoardThickness / 50.0f));
-		PocketedTabletop->SetCollisionEnabled(bHasPocketCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-	}
-	// Older/missing exports degrade to the pocket-cutout tiles, never a solid slab.
-	for (UStaticMeshComponent* Tile : BoardCollisionTiles)
-		Tile->SetCollisionEnabled(bHasPocketCollision ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
-	// Keep the fallback pocket-cutout components aligned for older exports.
-	if (BoardCollisionTiles.Num() == 9)
-	{
-		const float HoleCenter = BoardHalfExtent - PocketInset;
-		const float HoleMin = HoleCenter - PocketRadius;
-		const float HoleMax = HoleCenter + PocketRadius;
-		const float CollisionZ = SurfaceZ - BoardThickness * 0.5f;
-		const float SeamOverlap = 0.5f;
-		const auto ConfigureTile = [this, CollisionZ, SeamOverlap](
-			UStaticMeshComponent* Tile, const float MinX, const float MaxX,
-			const float MinY, const float MaxY)
-		{
-			const float Width = MaxX - MinX;
-			const float Height = MaxY - MinY;
-			Tile->SetRelativeLocation(FVector((MinX + MaxX) * 0.5f, (MinY + MaxY) * 0.5f, CollisionZ));
-			Tile->SetRelativeScale3D(FVector(
-				(Width + SeamOverlap) / 100.0f,
-				(Height + SeamOverlap) / 100.0f,
-				BoardThickness / 100.0f));
-		};
-
-		int32 TileIndex = 0;
-		ConfigureTile(BoardCollisionTiles[TileIndex++], -BoardHalfExtent, -HoleMax, -BoardHalfExtent, BoardHalfExtent);
-		ConfigureTile(BoardCollisionTiles[TileIndex++], -HoleMin, HoleMin, -BoardHalfExtent, BoardHalfExtent);
-		ConfigureTile(BoardCollisionTiles[TileIndex++], HoleMax, BoardHalfExtent, -BoardHalfExtent, BoardHalfExtent);
-		for (const float MinX : { -HoleMax, HoleMin })
-		{
-			const float MaxX = MinX + PocketRadius * 2.0f;
-			ConfigureTile(BoardCollisionTiles[TileIndex++], MinX, MaxX, -BoardHalfExtent, -HoleMax);
-			ConfigureTile(BoardCollisionTiles[TileIndex++], MinX, MaxX, -HoleMin, HoleMin);
-			ConfigureTile(BoardCollisionTiles[TileIndex++], MinX, MaxX, HoleMax, BoardHalfExtent);
-		}
-	}
+	BuildFloorCollision();
 	if (HighDetailArenaMesh)
 	{
 		HighDetailArenaMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ - 250.0f));
@@ -697,6 +640,100 @@ void AFlickBobArena::SetLegacyVenuePresentationVisible(const bool bVisible)
 	}
 }
 
+void AFlickBobArena::BuildFloorCollision()
+{
+	const FVector4 Shape(BoardHalfExtent, BoardThickness, PocketRadius, PocketInset);
+	FloorCollision->SetRelativeLocation(FVector(0, 0, SurfaceZ));
+	if (Shape == LastFloorShape) return;
+	LastFloorShape = Shape;
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	TMap<FIntVector, int32> WeldedVertices;
+	const auto VertexIndex = [&](const FVector& Point)
+	{
+		const FIntVector Key(FMath::RoundToInt(Point.X * 1000),
+			FMath::RoundToInt(Point.Y * 1000), FMath::RoundToInt(Point.Z * 1000));
+		if (const int32* Existing = WeldedVertices.Find(Key)) return *Existing;
+		const int32 Index = Vertices.Add(FVector(Key) / 1000.0);
+		WeldedVertices.Add(Key, Index);
+		return Index;
+	};
+	const auto Triangle = [&](const FVector& A, const FVector& B, const FVector& C)
+	{
+		const int32 IA = VertexIndex(A), IB = VertexIndex(B), IC = VertexIndex(C);
+		if (IA == IB || IB == IC || IC == IA) return;
+		// Unreal procedural collision flips winding. Clockwise faces point up.
+		Triangles.Append({IA, IC, IB});
+	};
+	const auto FloorPatch = [&](const TArray<FVector>& Polygon)
+	{
+		FVector Center = FVector::ZeroVector;
+		for (const FVector& Point : Polygon) Center += Point;
+		Center /= Polygon.Num();
+		for (int32 I = 0; I < Polygon.Num(); ++I)
+		{
+			const FVector A = Polygon[I], B = Polygon[(I + 1) % Polygon.Num()];
+			Triangle(Center, A, B);
+			const FVector Depth(0, 0, -BoardThickness);
+			Triangle(Center + Depth, B + Depth, A + Depth);
+		}
+	};
+	const float Center = BoardHalfExtent - PocketInset;
+	const float Low = Center - PocketRadius, High = Center + PocketRadius;
+	// Split the rectangle boundaries at the same vertices as the pocket fans.
+	// This avoids T-junctions as well as the old independent-convex seams.
+	TArray<float> Cuts;
+	for (const float Sign : {-1.0f, 1.0f})
+	for (int32 I = 0; I < PocketRimSegmentCount; ++I)
+	{
+		const float Angle = 2 * PI * I / PocketRimSegmentCount;
+		const float X = FMath::Cos(Angle), Y = FMath::Sin(Angle);
+		Cuts.Add(Sign * Center + PocketRadius * X / FMath::Max(FMath::Abs(X), FMath::Abs(Y)));
+	}
+	Cuts.Sort();
+	const auto Rectangle = [&](float X0, float X1, float Y0, float Y1)
+	{
+		TArray<FVector> Polygon;
+		Polygon.Add(FVector(X0, Y0, 0));
+		for (float Cut : Cuts) if (Cut > X0 + .001f && Cut < X1 - .001f) Polygon.Add(FVector(Cut, Y0, 0));
+		Polygon.Add(FVector(X1, Y0, 0));
+		for (float Cut : Cuts) if (Cut > Y0 + .001f && Cut < Y1 - .001f) Polygon.Add(FVector(X1, Cut, 0));
+		Polygon.Add(FVector(X1, Y1, 0));
+		for (int32 I = Cuts.Num() - 1; I >= 0; --I) if (Cuts[I] > X0 + .001f && Cuts[I] < X1 - .001f) Polygon.Add(FVector(Cuts[I], Y1, 0));
+		Polygon.Add(FVector(X0, Y1, 0));
+		for (int32 I = Cuts.Num() - 1; I >= 0; --I) if (Cuts[I] > Y0 + .001f && Cuts[I] < Y1 - .001f) Polygon.Add(FVector(X0, Cuts[I], 0));
+		FloorPatch(Polygon);
+	};
+	Rectangle(-BoardHalfExtent, -High, -BoardHalfExtent, BoardHalfExtent);
+	Rectangle(-Low, Low, -BoardHalfExtent, BoardHalfExtent);
+	Rectangle(High, BoardHalfExtent, -BoardHalfExtent, BoardHalfExtent);
+	for (float X0 : {-High, Low})
+	{
+		Rectangle(X0, X0 + 2 * PocketRadius, -BoardHalfExtent, -High);
+		Rectangle(X0, X0 + 2 * PocketRadius, -Low, Low);
+		Rectangle(X0, X0 + 2 * PocketRadius, High, BoardHalfExtent);
+	}
+	for (float CX : {-Center, Center})
+	for (float CY : {-Center, Center})
+	for (int32 I = 0; I < PocketRimSegmentCount; ++I)
+	{
+		FVector Inner[2], Outer[2];
+		for (int32 J = 0; J < 2; ++J)
+		{
+			const float Angle = 2 * PI * (I + J) / PocketRimSegmentCount;
+			const float X = FMath::Cos(Angle), Y = FMath::Sin(Angle);
+			const FVector Offset(PocketRadius * X, PocketRadius * Y, 0);
+			Inner[J] = FVector(CX, CY, 0) + Offset;
+			Outer[J] = FVector(CX, CY, 0) + Offset / FMath::Max(FMath::Abs(X), FMath::Abs(Y));
+		}
+		FloorPatch({Inner[0], Outer[0], Outer[1], Inner[1]});
+		const FVector Depth(0, 0, -BoardThickness);
+		Triangle(Inner[0], Inner[1], Inner[1] + Depth);
+		Triangle(Inner[0], Inner[1] + Depth, Inner[0] + Depth);
+	}
+	FloorCollision->CreateMeshSection(0, Vertices, Triangles, {}, {}, {}, {}, true);
+}
+
 void AFlickBobArena::ApplyPhysicsMaterials()
 {
 	if (!BoardBase)
@@ -724,11 +761,7 @@ void AFlickBobArena::ApplyPhysicsMaterials()
 	RailPhysicalMaterial->bOverrideRestitutionCombineMode = true;
 	RailPhysicalMaterial->RestitutionCombineMode = EFrictionCombineMode::Average;
 	BoardBase->SetPhysMaterialOverride(BoardPhysicalMaterial);
-	PocketedTabletop->SetPhysMaterialOverride(BoardPhysicalMaterial);
-	for (UStaticMeshComponent* Tile : BoardCollisionTiles)
-	{
-		Tile->SetPhysMaterialOverride(BoardPhysicalMaterial);
-	}
+	FloorCollision->SetPhysMaterialOverride(BoardPhysicalMaterial);
 	for (UStaticMeshComponent* Rail : Rails)
 	{
 		Rail->SetPhysMaterialOverride(RailPhysicalMaterial);

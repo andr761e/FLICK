@@ -4,6 +4,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Components/StaticMeshComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInstance.h"
 #include "Arena/FlickBobArena.h"
 #include "Arena/FlickTestArena.h"
@@ -260,8 +261,7 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	UStaticMeshComponent* StadiumLights = nullptr;
 	UStaticMeshComponent* LegacyVenue = nullptr;
 	UStaticMeshComponent* BoardCollider = nullptr;
-	UStaticMeshComponent* PocketFloor = nullptr;
-	UStaticMeshComponent* PocketedBoardCollider = nullptr;
+	UProceduralMeshComponent* PocketFloor = Arena->FindComponentByClass<UProceduralMeshComponent>();
 	UStaticMeshComponent* RailCollider = nullptr;
 	TInlineComponentArray<UStaticMeshComponent*> Components(Arena);
 	for (UStaticMeshComponent* Component : Components)
@@ -271,8 +271,6 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 		if (Component->GetFName() == TEXT("HighDetailStadiumLights")) StadiumLights = Component;
 		if (Component->GetFName() == TEXT("VenueBackWall")) LegacyVenue = Component;
 		if (Component->GetFName() == TEXT("BoardBase")) BoardCollider = Component;
-		if (Component->GetFName() == TEXT("PocketedTabletop")) PocketFloor = Component;
-		if (Component->GetFName() == TEXT("BoardCollision_0")) PocketedBoardCollider = Component;
 		if (Component->GetFName() == TEXT("Rail_0")) RailCollider = Component;
 	}
 
@@ -280,7 +278,7 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Imported BOB Pocket Foundry structure"), StadiumStructure);
 	TestNotNull(TEXT("Imported BOB Pocket Foundry lights"), StadiumLights);
 	TestNotNull(TEXT("Original BOB board presentation"), BoardCollider);
-	TestNotNull(TEXT("Pocketed BOB board collider"), PocketedBoardCollider);
+	TestNotNull(TEXT("Welded BOB board collider"), PocketFloor);
 	TestNotNull(TEXT("Original BOB rail collider"), RailCollider);
 	if (HighDetailArt && HighDetailArt->GetStaticMesh())
 	{
@@ -340,7 +338,7 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 	}
 	if (TestNotNull(TEXT("Pocketed tabletop collision"), PocketFloor))
 	{
-		TestEqual(TEXT("Compound floor supports physical falling"), PocketFloor->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+		TestEqual(TEXT("Welded floor supports physical falling"), PocketFloor->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
 		TestFalse(TEXT("Hidden collision mesh cannot cover the centre ring"), PocketFloor->IsVisible());
 		FHitResult Hit;
 		for (int32 PocketIndex = 0; PocketIndex < 4; ++PocketIndex)
@@ -365,11 +363,6 @@ bool FFlickHighDetailBobArenaTest::RunTest(const FString& Parameters)
 		}
 		TestTrue(TEXT("The tabletop still supports pucks outside openings"), World->LineTraceSingleByChannel(Hit,
 			FVector(0,0,330), FVector(0,0,170), ECC_Visibility));
-	}
-	if (PocketedBoardCollider)
-	{
-		TestEqual(TEXT("Legacy pocket-cutout tiles cannot create collision seams"),
-			PocketedBoardCollider->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 	}
 	if (RailCollider)
 	{
