@@ -662,3 +662,17 @@ bool UFlickMatchmakingCoordinatorSubsystem::ParseAllocation(
 	return !OutAllocation.MatchId.IsEmpty() && !OutAllocation.Address.IsEmpty()
 		&& OutAllocation.Reservations.Num() > 0;
 }
+
+void UFlickMatchmakingCoordinatorSubsystem::RequestServerRematch(const FString& NewMatchId, TFunction<void(bool, const FString&)> Callback)
+{
+ if (HeartbeatMatchId.IsEmpty()) { Callback(false, TEXT("No server allocation is available.")); return; }
+ const TSharedRef<FJsonObject> Json = MakeShared<FJsonObject>();
+ Json->SetStringField(TEXT("server_id"), ServerId);
+ Json->SetStringField(TEXT("new_match_id"), NewMatchId);
+ SendJsonRequest(TEXT("POST"), FString::Printf(TEXT("/v1/servers/matches/%s/rematch"), *FGenericPlatformHttp::UrlEncode(HeartbeatMatchId)),
+  Json, true, [this, NewMatchId, Callback = MoveTemp(Callback)](bool bSuccess, const TSharedPtr<FJsonObject>&, const FString& Error)
+  {
+   if (bSuccess) BeginServerHeartbeat(NewMatchId);
+   Callback(bSuccess, bSuccess ? FString() : TEXT("Rematch unavailable: ") + Error);
+  });
+}

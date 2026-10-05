@@ -7,6 +7,7 @@
 class UMaterialInstanceDynamic;
 class USceneComponent;
 class UStaticMeshComponent;
+class UProceduralMeshComponent;
 
 UENUM()
 enum class EFlickFeedbackKind : uint8
@@ -27,6 +28,7 @@ struct FFlickFeedbackAppearance
 	UPROPERTY() float Strength = 0.0f;
 	UPROPERTY() FVector BiasDirection = FVector::ZeroVector;
 	UPROPERTY() int32 Style = 0;
+	UPROPERTY() float ArrivalDuration = 1.2f;
 };
 
 UCLASS(NotBlueprintable)
@@ -44,12 +46,30 @@ public:
 		const FLinearColor& InColor,
 		float Strength,
 		const FVector& InBiasDirection = FVector::ZeroVector,
-		int32 InStyle = 0);
+		int32 InStyle = 0,
+		float InArrivalDuration = 1.2f);
 
 private:
 	UFUNCTION()
 	void OnRep_Appearance();
 	void ApplyFeedbackAppearance();
+	void UpdateCollectionEffect(float Alpha);
+	void InitializeSpawnEffect();
+	void UpdateSpawnEffect();
+	void InitializeKnockoutEffect();
+	void UpdateKnockoutEffect();
+	UPROPERTY(Transient)
+	TObjectPtr<UProceduralMeshComponent> KnockoutGeometry;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> KnockoutMaterials;
+	UPROPERTY(Transient)
+	TObjectPtr<UProceduralMeshComponent> SpawnGeometry;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> SpawnMaterials;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UProceduralMeshComponent>> HaloRings;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> HaloMaterials;
 	UPROPERTY(ReplicatedUsing = OnRep_Appearance)
 	FFlickFeedbackAppearance Appearance;
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Feedback")

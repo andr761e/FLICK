@@ -122,7 +122,14 @@ void AFlickGameMode::TrackTestArenaControlZones(const float DeltaSeconds)
 	if (bTestArenaMode && IsValid(TestArenaActor))
 	{
 		uint16 DeployedMechanisms = 0;
-		ResolutionActivatedSwitchMask |= TestArenaActor->TrackControlZoneCrossings(Pieces, DeltaSeconds, DeployedMechanisms);
+		ResolutionActivatedSwitchMask |= TestArenaActor->TrackControlZoneCrossings(Pieces, DeltaSeconds, DeployedMechanisms,
+   [this](int32 PieceId)
+   {
+    for (const AFlickPiece* Piece : Pieces)
+     if (Piece && Piece->GetPieceId() == PieceId)
+      if (AFlickGameState* State = GetFlickGameState())
+       State->RecordPlayerSwitchActivation(Piece->GetTeam(), Piece->GetOwningPlayerSlot());
+   });
 		for (int32 Index = 0; Index < TestArenaActor->GetMechanismCount(); ++Index)
 		{
 			const uint16 Bit = static_cast<uint16>(1 << Index);
@@ -838,8 +845,13 @@ void AFlickGameMode::UpdateEliminations()
 			if (AFlickGameState* FlickGameState = GetFlickGameState())
 			{
 				FlickGameState->RecordElimination(EliminatedTeam);
+				// Own losses belong to the shooter, including losses of a teammate's puck.
+				if (!bResolvingKickoff && FlickGameState->LastShotTeam == EliminatedTeam)
+					FlickGameState->RecordPlayerSelfKnockout(EliminatedTeam, FlickGameState->GetLastShootingPlayerSlot(EliminatedTeam));
+				else if (bResolvingKickoff && !ResolutionFirstOpponentImpactTimes.Contains(Piece->GetPieceId()))
+					FlickGameState->RecordPlayerSelfKnockout(EliminatedTeam, FlickGameState->GetLastShootingPlayerSlot(EliminatedTeam));
 				const EFlickTeam CreditingTeam = GetOpposingTeam(EliminatedTeam);
-				if (bResolvingKickoff || FlickGameState->LastShotTeam == CreditingTeam)
+				if ((bResolvingKickoff && ResolutionFirstOpponentImpactTimes.Contains(Piece->GetPieceId())) || FlickGameState->LastShotTeam == CreditingTeam)
 				{
 					FlickGameState->RecordPlayerKnockout(
 						CreditingTeam,
@@ -895,6 +907,8 @@ void AFlickGameMode::UpdateBobPockets()
 		{
 			const bool bShooterPocketedOwnStriker = GetFlickGameState()
 				&& GetFlickGameState()->CurrentTeam == Piece->GetTeam();
+			if (bShooterPocketedOwnStriker)
+				GetFlickGameState()->RecordPlayerSelfKnockout(Piece->GetTeam(), GetFlickGameState()->GetLastShootingPlayerSlot(Piece->GetTeam()));
 			if (Piece->GetTeam() == EFlickTeam::Player1)
 			{
 				bPlayer1BobStrikerPocketed = true;
@@ -1461,6 +1475,12 @@ void AFlickGameMode::CompleteRoundForOutcome(const EFlickMatchOutcome Outcome)
 			: FlickGameState->WinnerTeam == EFlickTeam::Player2
 				? EFlickMatchOutcome::Player2Wins
 				: EFlickMatchOutcome::Draw;
+		FlickGameState->DecisiveShotTeam = bResolutionWasSimultaneous ? FlickGameState->ReplayShootingTeam : FlickGameState->LastShotTeam;
+		FlickGameState->DecisiveShotPlayerSlot = FlickGameState->GetLastShootingPlayerSlot(FlickGameState->DecisiveShotTeam);
+		// A simultaneous kickoff is a shared moment, not one player's decisive shot.
+		FlickGameState->DecisiveShotTurn = bResolutionWasSimultaneous ? 0 : FlickGameState->TurnNumber;
+		FlickGameState->bDecisiveShotSelfKnockout = !IsBobMode() && FlickGameState->DecisiveShotTeam != FlickGameState->WinnerTeam;
+		FlickGameState->RematchDeadlineServerTime = CoordinatorMatchId.IsEmpty() ? 0.0f : FlickGameState->GetServerWorldTimeSeconds() + FMath::Clamp(PublicRematchTimeLimit, 5.0f, 80.0f);
 		FlickGameState->FinalizeAuthoritativeMatch(FinalOutcome);
 		DispatchRankedMatchResults();
 		if (UFlickMatchmakingCoordinatorSubsystem* Coordinator = GetFlickMatchmakingCoordinatorSubsystem())
@@ -1670,7 +1690,19 @@ void AFlickGameMode::SpawnWorldFeedback(
 		AFlickWorldFeedback::StaticClass(), Location, FRotator::ZeroRotator);
 	if (Feedback)
 	{
-		Feedback->InitializeFeedback(FeedbackKind, Color, Strength, BiasDirection, Style);
+		if (FeedbackKind == EFlickFeedbackKind::Elimination && FrontendScreen == EFlickFrontendScreen::Profile
+			&& LockerPreviewCategory == FlickCosmeticCatalog::KnockoutCategory)
+		{
+			if (LockerKnockoutFeedback.IsValid()) LockerKnockoutFeedback->Destroy();
+			LockerKnockoutFeedback = Feedback;
+		}
+		if (FeedbackKind == EFlickFeedbackKind::Spawn && FrontendScreen == EFlickFrontendScreen::Profile
+			&& LockerPreviewCategory == FlickCosmeticCatalog::SpawnCategory)
+		{
+			if (LockerSpawnFeedback.IsValid()) LockerSpawnFeedback->Destroy();
+			LockerSpawnFeedback = Feedback;
+		}
+		Feedback->InitializeFeedback(FeedbackKind, Color, Strength, BiasDirection, Style, PuckArrivalDuration);
 	}
 }
 
@@ -1760,7 +1792,7 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 		Piece->BeginArrival(PuckArrivalDuration);
 		if (Piece->GetPuckEffect(1) > 0)
 		{
-			SpawnWorldFeedback(Location + FVector(0.0f, 0.0f, 18.0f),
+			SpawnWorldFeedback(FVector(Location.X, Location.Y, ArenaSurfaceZ + 2.0f),
 				GetTeamColor(Team), EFlickFeedbackKind::Spawn, 0.75f,
 				FVector::ZeroVector, Piece->GetPuckEffect(1));
 		}

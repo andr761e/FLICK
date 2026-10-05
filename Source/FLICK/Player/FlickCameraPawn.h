@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "Core/FlickSpectatorView.h"
 #include "FlickCameraPawn.generated.h"
 
 class UCameraComponent;
@@ -42,10 +43,16 @@ public:
 	void BeginCinematicReplay(const FVector& InitialFocus, EFlickTeam ShootingTeam);
 	void UpdateCinematicReplay(const FVector& Focus, float NormalizedProgress, float PullbackAlpha);
 	void EndCinematicReplay();
+	void SetPostMatchPresentation(bool bEnabled, float Pullback, int32 WinnerCount, float SurfaceZ);
 	void SetFreeCameraEnabled(bool bEnabled);
 	void AddFreeCameraInput(float Forward, float Right, float Up, const FVector2D& LookDelta, bool bBoost, float DeltaSeconds);
 	void SetFreeCameraSensitivity(float LookSensitivity, float MoveSensitivity);
 	bool IsFreeCameraEnabled() const { return bFreeCameraEnabled; }
+	FFlickSpectatorView CaptureSpectatorView() const;
+	void SetSpectatorView(const FFlickSpectatorView& View);
+	void ClearSpectatorView() { bSpectatorView = false; }
+	UPROPERTY(EditAnywhere, Category = "FLICK|Spectator", meta = (ClampMin = "1.0", ClampMax = "30.0"))
+	float SpectatorViewBlendSpeed = 14.0f;
 	float GetGameplayOrbitAngle() const { return GameplayOrbitAngle; }
 	float GetGameplayElevationAngle() const { return GameplayElevationAngle; }
 	bool IsGameplayViewTransitioning() const { return bGameplayViewTransitioning; }
@@ -267,7 +274,13 @@ private:
 	bool bAimPresentation = false;
 	bool bCompactGameplayFraming = false;
 	bool bCinematicReplay = false;
+	bool bPostMatchPresentation = false;
+	float PostMatchPullback = 0.0f;
+	int32 PostMatchWinnerCount = 1;
+	float PostMatchSurfaceZ = 250.0f;
 	bool bFreeCameraEnabled = false;
+	bool bSpectatorView = false;
+	FFlickSpectatorView SpectatorView;
 	bool bTopDownView = false;
 	float TopDownOrbitAngle = 0.0f;
 	float SavedGameplayOrbitAngle = 0.0f;

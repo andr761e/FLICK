@@ -330,7 +330,8 @@ void AFlickTestArena::BeginControlZoneTracking(const TArray<TObjectPtr<AFlickPie
 uint16 AFlickTestArena::TrackControlZoneCrossings(
 	const TArray<TObjectPtr<AFlickPiece>>& Pieces,
 	const float DeltaSeconds,
-	uint16& OutDeployedMechanisms)
+	uint16& OutDeployedMechanisms,
+	TFunction<void(int32)> OnSwitchActivated)
 {
 	OutDeployedMechanisms = 0;
 	if (!HasAuthority() || !bTrackingShot)
@@ -378,14 +379,19 @@ uint16 AFlickTestArena::TrackControlZoneCrossings(
 
 		bool bCurrentlyOverlapped = false;
 		bool bCrossedThisFrame = false;
+		int32 CrossingPieceId = INDEX_NONE;
 		const FVector2D ZoneCenter = GetZoneLocalCenter(ZoneIndex);
 		for (const FTrackedPiece& Piece : TrackedPieces)
 		{
 			const float DetectionRadius = Piece.Radius + SwitchDetectionPadding;
 			bCurrentlyOverlapped |= FlickArenaControlRules::DoCirclesOverlap(
 				Piece.Current, DetectionRadius, ZoneCenter, SwitchActivationDotRadius);
-			bCrossedThisFrame |= FlickArenaControlRules::DoesSweptCircleCrossCircle(
-				Piece.Previous, Piece.Current, DetectionRadius, ZoneCenter, SwitchActivationDotRadius);
+			if (FlickArenaControlRules::DoesSweptCircleCrossCircle(
+				Piece.Previous, Piece.Current, DetectionRadius, ZoneCenter, SwitchActivationDotRadius))
+			{
+				bCrossedThisFrame = true;
+				if (CrossingPieceId == INDEX_NONE || Piece.PieceId < CrossingPieceId) CrossingPieceId = Piece.PieceId;
+			}
 		}
 
 		if ((ArmedZoneMask & ZoneBit) == 0)
@@ -398,6 +404,7 @@ uint16 AFlickTestArena::TrackControlZoneCrossings(
 		}
 		if (bCrossedThisFrame)
 		{
+			if (OnSwitchActivated) OnSwitchActivated(CrossingPieceId);
 			PendingToggleMask |= ZoneBit;
 			TriggeredThisShotMask |= ZoneBit;
 			ArmedZoneMask &= ~ZoneBit;

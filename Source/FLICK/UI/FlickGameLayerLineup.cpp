@@ -1311,6 +1311,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 		FlickVisualSettings::GetPuckHoverSize, FlickVisualSettings::SetPuckHoverSize, HoverSizeLabel);
 	const TSharedRef<SWidget> HoverDetailSelector = MakeHoverSelector(PuckHoverDetailOptions,
 		FlickVisualSettings::GetPuckHoverDetail, FlickVisualSettings::SetPuckHoverDetail, HoverDetailLabel);
+	if (PuckIndicatorOptions.IsEmpty())
+		for (int32 Style = 0; Style < 3; ++Style) PuckIndicatorOptions.Add(MakeShared<int32>(Style));
+	const TSharedRef<SWidget> IndicatorSelector = MakeHoverSelector(PuckIndicatorOptions,
+		FlickVisualSettings::GetPuckIndicatorStyle, FlickVisualSettings::SetPuckIndicatorStyle,
+		[](int32 Style) { static const TCHAR* Labels[] = {TEXT("COLOUR RINGS"), TEXT("SOLID ALLY / DASHED FOE"), TEXT("PATTERNS + ALLY / FOE LABELS")}; return FText::FromString(Labels[FMath::Clamp(Style, 0, 2)]); });
 	if (CameraShakeOptions.IsEmpty())
 	{
 		for (int32 Level = 0; Level < 4; ++Level) CameraShakeOptions.Add(MakeShared<int32>(Level));
@@ -1673,6 +1678,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::GameFeel ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("01"), TEXT("GAMEPLAY"), TEXT("Tune aiming and the physical feedback of every shot."))]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("02"), TEXT("CAMERA"), TEXT("Adjust camera motion, orbit response, and free-camera control."))]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("03"), TEXT("INTERFACE"), TEXT("Choose the guides and information shown during play."))]]
+										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeOptionRow(TEXT("OTHER PUCK INDICATORS"), IndicatorSelector)]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeOptionRow(TEXT("PUCK HOVER TEXT SIZE"), HoverSizeSelector)]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeOptionRow(TEXT("PUCK HOVER INFORMATION"), HoverDetailSelector)]]
 										+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeToggleRow(TEXT("COLOUR-BLIND ASSISTANCE"), TAttribute<ECheckBoxState>::CreateLambda([Checked]() { return Checked(FlickVisualSettings::IsColorBlindAssistEnabled()); }), FOnCheckStateChanged::CreateLambda([](ECheckBoxState State) { FlickVisualSettings::SetColorBlindAssistEnabled(State == ECheckBoxState::Checked); }))]]

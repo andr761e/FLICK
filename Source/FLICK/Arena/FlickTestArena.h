@@ -35,7 +35,8 @@ public:
 	uint16 TrackControlZoneCrossings(
 		const TArray<TObjectPtr<AFlickPiece>>& Pieces,
 		float DeltaSeconds,
-		uint16& OutDeployedMechanisms);
+		uint16& OutDeployedMechanisms,
+		TFunction<void(int32)> OnSwitchActivated = nullptr);
 	uint16 CommitPendingControlZoneToggles(const TArray<TObjectPtr<AFlickPiece>>& Pieces);
 	void ResetMechanisms();
 	void SetTrainingBoardEditMode(bool bEnabled);

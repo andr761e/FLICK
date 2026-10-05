@@ -1,4 +1,7 @@
 #include "Core/FlickCosmeticCatalog.h"
+#include "Core/FlickTrailStyle.h"
+#include "Core/FlickSpawnStyle.h"
+#include "Core/FlickKnockoutStyle.h"
 #include "Misc/ConfigCacheIni.h"
 
 bool FlickCosmeticCatalog::IsPuckCategory(const int32 Category)
@@ -49,19 +52,34 @@ const TArray<FString>& FlickCosmeticCatalog::GetItems(const int32 Category)
 {
 	static const TArray<FString> Banners = {TEXT("CARBON"), TEXT("ARENA"), TEXT("GLACIER"),
 		TEXT("BLUE ICE"), TEXT("COLD"), TEXT("CRYSTAL"), TEXT("FIRE RED"),
-		TEXT("RED CRYSTAL"), TEXT("ROBOTIC"), TEXT("ROCK"), TEXT("TUNDRA")};
+		TEXT("RED CRYSTAL"), TEXT("ROBOTIC"), TEXT("ROCK"), TEXT("TUNDRA"),
+		TEXT("CRYO CIRCUIT"), TEXT("SOLAR FORGE"), TEXT("PHASE RIFT")};
 	// Keep the original three indices stable for existing saved profiles.
 	static const TArray<FString> Tags = {
 		TEXT("READY TO FLICK"), TEXT("TABLE TACTICIAN"), TEXT("RIVAL INCOMING"),
 		TEXT("ANGLE ARCHITECT"), TEXT("RIM RUNNER"), TEXT("BANK SHOT ARTIST"),
 		TEXT("LAST PUCK STANDING"), TEXT("POCKET SPECIALIST"), TEXT("NO EASY SHOTS"),
-		TEXT("CALCULATED CHAOS"), TEXT("ONE MORE ROUND"), TEXT("THE CLEAN SWEEP")};
+		TEXT("CALCULATED CHAOS"), TEXT("ONE MORE ROUND"), TEXT("THE CLEAN SWEEP"),
+		TEXT("ICE IN MY VEINS"), TEXT("COLD CALCULATION"), TEXT("FORGED TO WIN"),
+		TEXT("HEAT CHECK"), TEXT("PHASE SHIFT"), TEXT("BEYOND THE RIM")};
 	static const TArray<FString> Borders = {TEXT("STANDARD"), TEXT("CYAN CIRCUIT"), TEXT("LIME CHAMPION"),
-		TEXT("GOLD"), TEXT("ICE"), TEXT("PURPLE CRYSTAL"), TEXT("ROBOTIC")};
+		TEXT("GOLD"), TEXT("ICE"), TEXT("PURPLE CRYSTAL"), TEXT("ROBOTIC"),
+		TEXT("CRYO CIRCUIT"), TEXT("SOLAR FORGE"), TEXT("PHASE RIFT")};
 	static const TArray<FString> OriginalPuck = {TEXT("CLASSIC BLUE"), TEXT("CLASSIC ORANGE")};
-	static const TArray<FString> Trails = {TEXT("NONE"), TEXT("ION WAKE"), TEXT("EMBER WAKE")};
-	static const TArray<FString> Spawns = {TEXT("BASIC DROP"), TEXT("PULSE ARRIVAL"), TEXT("SPARK ARRIVAL")};
-	static const TArray<FString> Knockouts = {TEXT("BASIC BURST"), TEXT("SHOCKWAVE"), TEXT("SPARK SHOWER")};
+	static const TArray<FString> Trails = {TEXT("NONE"), TEXT("ION WAKE"), TEXT("EMBER WAKE"),
+		TEXT("CRYO RIBBON"), TEXT("SOLAR CINDERS"), TEXT("PHASE STREAM"),
+		TEXT("LIGHTNING"), TEXT("PRISM"), TEXT("GOLD RUSH"), TEXT("GALAXY"),
+		TEXT("PIXEL STREAM"), TEXT("HEARTBEAT"), TEXT("SPIRIT WAKE")};
+	static const TArray<FString> Spawns = {TEXT("BASIC DROP"), TEXT("PULSE ARRIVAL"), TEXT("SPARK ARRIVAL"),
+		TEXT("CRYO LOCK"), TEXT("SOLAR FLARE"), TEXT("PHASE GATE"),
+		TEXT("ENERGY BEAM"), TEXT("LIGHTNING STRIKE"), TEXT("PRISM ARRIVAL"), TEXT("GOLDEN ASCENT"),
+		TEXT("HEARTFALL"), TEXT("PIXEL ASSEMBLY"), TEXT("GALAXY GATE"), TEXT("SPIRIT ARRIVAL")};
+	static const TArray<FString> Knockouts = {TEXT("BASIC BURST"), TEXT("SHOCKWAVE"), TEXT("SPARK SHOWER"),
+		TEXT("CRYO SHATTER"), TEXT("SOLAR NOVA"), TEXT("PHASE COLLAPSE"),
+		TEXT("LIGHTNING"), TEXT("TOXIC MELT"), TEXT("GOLD BURST"), TEXT("PIXEL BREAK"),
+		TEXT("HEART POP"), TEXT("WATER SPLASH"), TEXT("SPIRIT RELEASE"), TEXT("GALAXY RIFT"),
+		TEXT("COMIC POW"), TEXT("CONFETTI POP"), TEXT("HOLOGRAPHIC FRACTURE"), TEXT("ARCANE SEAL"),
+		TEXT("PRISM FLASH"), TEXT("SMOKE PUFF")};
 	switch (Category)
 	{
 	case 0: return Banners;
@@ -101,5 +119,46 @@ TArray<int32> FlickCosmeticCatalog::LoadPuckEffects()
 
 FLinearColor FlickCosmeticCatalog::GetPuckSkinColor(const int32 Skin)
 {
-	return Skin == 1 ? FLinearColor(1.0f, .18f, .003f) : FLinearColor(0.0f, .55f, 1.0f);
+	switch (Skin)
+	{
+	case 1: return FLinearColor(1.0f, .18f, .003f);
+	default: return FLinearColor(0.0f, .55f, 1.0f);
+	}
+}
+
+FLinearColor FlickCosmeticCatalog::GetCollectionColor(const int32 Collection)
+{
+	switch (Collection)
+	{
+	case 0: return FLinearColor(0.055f, 0.78f, 1.0f);
+	case 1: return FLinearColor(1.0f, 0.36f, 0.035f);
+	case 2: return FLinearColor(0.64f, 0.12f, 1.0f);
+	default: return FLinearColor::White;
+	}
+}
+
+int32 FlickCosmeticCatalog::GetCollection(const int32 Category, const int32 Item)
+{
+	if (!GetItems(Category).IsValidIndex(Item)) return INDEX_NONE;
+	if (Category == 0 && Item >= 11) return Item - 11;
+	if (Category == 1 && Item >= 12) return (Item - 12) / 2;
+	if (Category == 2 && Item >= 7) return Item - 7;
+	if (Category >= TrailCategory && Category <= KnockoutCategory && Item >= 3 && Item <= 5) return Item - 3;
+	return INDEX_NONE;
+}
+
+FString FlickCosmeticCatalog::GetDescription(const int32 Category, const int32 Item)
+{
+	if (Category == TrailCategory && GetItems(Category).IsValidIndex(Item)) return FlickTrailStyle::Get(Item).Description;
+	if (Category == SpawnCategory && GetItems(Category).IsValidIndex(Item)) return FlickSpawnStyle::Get(Item).Description;
+	if (Category == KnockoutCategory && GetItems(Category).IsValidIndex(Item)) return FlickKnockoutStyle::Get(Item).Description;
+	const int32 Collection = GetCollection(Category, Item);
+	if (Collection == INDEX_NONE) return GetItems(Category).IsValidIndex(Item) ? GetItems(Category)[Item] : FString();
+	static const TCHAR* Descriptions[3][3] = {
+		{TEXT("Twin icy filaments, a silver core and a tapered cyan wake."), TEXT("A molten ribbon shedding golden cinders."), TEXT("Interwoven violet and cyan ribbons that ripple behind the puck.")},
+		{TEXT("Concentric scanner rings lock into place beneath an orbit of ice shards."), TEXT("A rising crown of embers and two expanding amber halos."), TEXT("Counter-rotating portals spiral inward as the puck arrives.")},
+		{TEXT("A crystalline fracture fans outward through a double frost shockwave."), TEXT("A hot white core releases a golden shock ring and falling embers."), TEXT("An inward spiral collapses, then releases a violet aftershock.")}};
+	if (Category >= TrailCategory && Category <= KnockoutCategory) return Descriptions[Category - TrailCategory][Collection];
+	return FString::Printf(TEXT("%s collection // mix and match freely"),
+		Collection == 0 ? TEXT("Cryo Circuit") : Collection == 1 ? TEXT("Solar Forge") : TEXT("Phase Rift"));
 }

@@ -26,6 +26,12 @@ struct FFlickPlayerMatchStats
 	int32 DoubleKnockouts = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
+	int32 SelfKnockouts = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
+	int32 SwitchActivations = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
 	int32 Shots = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FLICK|Scoreboard")
@@ -77,6 +83,10 @@ public:
 	void RecordPlayerShot(EFlickTeam Team, int32 PlayerSlot);
 	void RecordPlayerImpact(EFlickTeam Team, int32 PlayerSlot);
 	void RecordPlayerKnockout(EFlickTeam Team, int32 PlayerSlot);
+	void RecordPlayerSelfKnockout(EFlickTeam Team, int32 PlayerSlot);
+	void RecordPlayerSwitchActivation(EFlickTeam Team, int32 PlayerSlot);
+	bool RegisterRematchVote(APlayerState* Player, bool bChangeLineup);
+	bool HasRematchConsensus() const;
 	void RecordPlayerDoubleKnockout(EFlickTeam Team, int32 PlayerSlot);
 	void RecordPlayerAccolade(EFlickTeam Team, int32 PlayerSlot, EFlickAccolade Accolade, int32 BonusPoints = 0);
 	void RecordPlayerBonus(EFlickTeam Team, int32 PlayerSlot, int32 BonusPoints);
@@ -119,6 +129,27 @@ public:
 	bool RegisterReplaySkipVote(APlayerState* Player, int32 Serial);
 	TArray<APlayerState*> GetPendingReplayPlayers() const;
 	bool HasReplaySkipConsensus() const;
+
+	UPROPERTY(Replicated)
+	TArray<TObjectPtr<APlayerState>> RematchVotes;
+	UPROPERTY(Replicated)
+	bool bRematchChangeLineup = false;
+	UPROPERTY(Replicated)
+	bool bRematchStarting = false;
+	UPROPERTY(Replicated)
+	FString RematchStatus;
+	UPROPERTY(Replicated)
+	float PostMatchStartServerTime = 0.0f;
+	UPROPERTY(Replicated)
+	float RematchDeadlineServerTime = 0.0f;
+	UPROPERTY(Replicated)
+	EFlickTeam DecisiveShotTeam = EFlickTeam::None;
+	UPROPERTY(Replicated)
+	int32 DecisiveShotPlayerSlot = 0;
+	UPROPERTY(Replicated)
+	int32 DecisiveShotTurn = 0;
+	UPROPERTY(Replicated)
+	bool bDecisiveShotSelfKnockout = false;
 
 	UPROPERTY(Replicated)
 	int32 ReplaySerial = 0;

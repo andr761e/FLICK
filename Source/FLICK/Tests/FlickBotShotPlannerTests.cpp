@@ -171,4 +171,28 @@ bool FFlickBotShotPlannerBobTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickBotSelfPreservationTest, "FLICK.Bot.ShotPlanner.SelfPreservation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickBotSelfPreservationTest::RunTest(const FString& Parameters)
+{
+	const TArray<FFlickBotPieceState> Pieces = {
+		{1, EFlickTeam::Player2, FVector2D(500, 60), 45},
+		{2, EFlickTeam::Player2, FVector2D(200, -250), 45},
+		{3, EFlickTeam::Player1, FVector2D(590, 0), 45}};
+	FFlickBotShotTuning Tuning;
+	Tuning.AimErrorDegrees = 0;
+	Tuning.PowerVariation = 0;
+	Tuning.DecisionNoise = 0;
+	FRandomStream RiskyRandom(123), SafeRandom(123);
+	const auto Risky = FlickBotShotPlanner::PlanShot(Pieces, EFlickTeam::Player2, Tuning, RiskyRandom);
+	Tuning.SelfPreservation = 1;
+	const auto Safe = FlickBotShotPlanner::PlanShot(Pieces, EFlickTeam::Player2, Tuning, SafeRandom);
+	TestTrue(TEXT("Both difficulties produce legal shots"), Risky.IsValid() && Safe.IsValid());
+	TestEqual(TEXT("Low awareness prefers the shortest outward shot"), Risky.ShooterPieceId, 1);
+	TestEqual(TEXT("High awareness chooses the safer central shooter"), Safe.ShooterPieceId, 2);
+	TestTrue(TEXT("Decision tuning preserves legal power limits"), Safe.NormalizedPower >= Tuning.MinimumPower && Safe.NormalizedPower <= Tuning.MaximumPower);
+	return true;
+}
+
 #endif

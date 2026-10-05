@@ -1964,6 +1964,7 @@ void AFlickGameMode::DispatchRankedMatchResults()
 		return;
 	}
 	bRankedResultsDispatched = true;
+	bRankedSettlementPending = true;
 	FFlickRankedMatchResultRequest ResultRequest;
 	ResultRequest.Match = ActiveRankedMatchRequest;
 	ResultRequest.Outcome = State->FinalMatchOutcome;
@@ -2001,6 +2002,7 @@ void AFlickGameMode::DispatchRankedMatchResults()
 				}
 				return;
 			}
+			GameMode->bRankedSettlementPending = false;
 			for (const FFlickRankedPlayerUpdate& PlayerUpdate : Result.PlayerUpdates)
 			{
 				for (FConstPlayerControllerIterator It = GameMode->GetWorld()->GetPlayerControllerIterator(); It; ++It)
@@ -2025,6 +2027,132 @@ void AFlickGameMode::DispatchRankedMatchResults()
 				*MatchId,
 				Result.PlayerUpdates.Num(),
 				Result.bDuplicate ? 1 : 0);
+			if (GameMode->GetFlickGameState() && !GameMode->GetFlickGameState()->RematchVotes.IsEmpty()) GameMode->TryStartRematch();
 		});
 }
 
+
+// Public matches need every original seat. Private games retain roles/bots and are host-led.
+void AFlickGameMode::RequestRematch(APlayerController* Player, const bool bChangeLineup)
+{
+ AFlickGameState* State = GetFlickGameState();
+ if (!State || !State->bSeriesComplete || State->MatchPhase != EFlickMatchPhase::RoundOver
+  || State->bRematchStarting || !Player || bCinematicReplayActive || (bNetworkMatchRequested && State->bMatchEndedByForfeit)) return;
+ if (bPrivateMatchActive)
+ {
+  const AFlickPlayerState* Host = Player->GetPlayerState<AFlickPlayerState>();
+  if (!Player->IsLocalController() || (bPartyRequested && (!Host || !Host->IsPartyLeader()))) return;
+  State->bRematchChangeLineup = bChangeLineup;
+ }
+ else if (bNetworkMatchRequested)
+ {
+  if (!State->RegisterRematchVote(Player->PlayerState, bChangeLineup)) return;
+ }
+ else State->bRematchChangeLineup = bChangeLineup && !IsBobMode();
+ TryStartRematch();
+}
+
+void AFlickGameMode::TryStartRematch()
+{
+ AFlickGameState* State = GetFlickGameState();
+ if (!State || !State->bSeriesComplete || State->bRematchStarting || bRematchRegistrationPending) return;
+ if (State->RematchDeadlineServerTime > 0.0f && State->GetServerWorldTimeSeconds() >= State->RematchDeadlineServerTime)
+ { State->RematchStatus = TEXT("Rematch window ended. Return to the menu to find a match."); State->ForceNetUpdate(); return; }
+ if (bNetworkMatchRequested && !bPrivateMatchActive && !State->HasRematchConsensus()) return;
+ if (bRankedSettlementPending)
+ {
+  State->RematchStatus = TEXT("Waiting for the competitive result to sync...");
+  State->ForceNetUpdate();
+  return;
+ }
+ const bool bAllocationReady = !CoordinatorMatchId.IsEmpty() && CoordinatorMatchId != State->MatchId;
+ if (PendingRematchId.IsEmpty()) PendingRematchId = bAllocationReady ? CoordinatorMatchId : FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphens);
+ const FString NewMatchId = PendingRematchId;
+ const bool bChangeLineup = State->bRematchChangeLineup;
+ State->bRematchStarting = true;
+ State->RematchStatus = TEXT("Preparing rematch...");
+ State->ForceNetUpdate();
+ bRematchRegistrationPending = true;
+ const auto RegisterAndStart = [WeakThis = TWeakObjectPtr<AFlickGameMode>(this), NewMatchId, bChangeLineup](bool bAccepted, const FString& Error)
+ {
+  AFlickGameMode* Mode = WeakThis.Get();
+  if (!Mode) return;
+  const auto Finish = [WeakThis, NewMatchId, bChangeLineup](bool bRegistered, const FString& RegistrationError)
+  {
+   AFlickGameMode* Game = WeakThis.Get();
+   if (!Game) return;
+   Game->bRematchRegistrationPending = false;
+   AFlickGameState* Match = Game->GetFlickGameState();
+   if (!Match || !Match->bSeriesComplete || Match->MatchPhase != EFlickMatchPhase::RoundOver || Game->PendingRematchId != NewMatchId) return;
+   if (!bRegistered || (Game->bNetworkMatchRequested && !Game->bPrivateMatchActive && !Match->HasRematchConsensus()))
+   {
+    Match->bRematchStarting = false;
+    Match->RematchStatus = bRegistered ? TEXT("A player left. Return to the menu to find a match.") : RegistrationError;
+    Match->RematchVotes.Reset();
+    Match->ForceNetUpdate();
+    return;
+   }
+   Game->StartRematchWithId(NewMatchId, bChangeLineup);
+  };
+  if (!bAccepted) { Finish(false, Error); return; }
+  if (!Mode->CoordinatorMatchId.IsEmpty()) Mode->CoordinatorMatchId = NewMatchId;
+  if (Mode->bRankedRequested)
+  {
+   UFlickRankedBackendSubsystem* Backend = Mode->GetFlickRankedBackendSubsystem();
+   if (!Backend) { Finish(false, TEXT("Competitive backend unavailable. Try again.")); return; }
+   const FFlickRankedMatchRequest Request = Mode->BuildRankedMatchRequest(NewMatchId);
+   Backend->RegisterMatch(Request, [WeakThis, Request, Finish](bool bRegistered, const FString& RegistrationError)
+   {
+    if (AFlickGameMode* Game = WeakThis.Get(); Game && bRegistered)
+    { Game->ActiveRankedMatchRequest = Request; Game->bHasActiveRankedMatchRequest = true; }
+    Finish(bRegistered, RegistrationError);
+   });
+  }
+  else Finish(true, FString());
+ };
+ if (!CoordinatorMatchId.IsEmpty() && !bAllocationReady)
+ {
+  if (UFlickMatchmakingCoordinatorSubsystem* Coordinator = GetFlickMatchmakingCoordinatorSubsystem())
+   Coordinator->RequestServerRematch(NewMatchId, RegisterAndStart);
+  else RegisterAndStart(false, TEXT("Match coordinator unavailable. Try again."));
+ }
+ else RegisterAndStart(true, FString());
+}
+
+void AFlickGameMode::StartRematchWithId(const FString& MatchId, const bool bChangeLineup)
+{
+ AFlickGameState* State = GetFlickGameState();
+ if (!State) return;
+ PendingRematchId.Reset();
+ State->BeginAuthoritativeMatch(MatchId);
+ State->RematchVotes.Reset();
+ State->bRematchStarting = false;
+ State->RematchStatus.Reset();
+ UGameplayStatics::SetGamePaused(this, false);
+ if (bChangeLineup && bPrivateMatchActive)
+ {
+  BeginPrivateMatchAssignment();
+ }
+ else if (bChangeLineup && !IsBobMode())
+ {
+  if (bNetworkMatchRequested) BeginNetworkClassSelection();
+  else
+  {
+   PrepareClassSelection(false);
+   bLocalRematchClassSelection = true;
+   ClassSelectionReturnScreen = EFlickFrontendScreen::Playing;
+  }
+ }
+ else
+ {
+  FrontendScreen = EFlickFrontendScreen::Playing;
+  ApplyPendingPlayerClasses();
+  SetCameraForFrontend();
+  ApplySelectedMatchConfiguration();
+  RebuildMatch();
+  if (!CoordinatorMatchId.IsEmpty())
+   if (UFlickMatchmakingCoordinatorSubsystem* Coordinator = GetFlickMatchmakingCoordinatorSubsystem()) Coordinator->NotifyServerMatchStarted();
+  BeginRankedMatchForPlayers();
+ }
+ State->ForceNetUpdate();
+}

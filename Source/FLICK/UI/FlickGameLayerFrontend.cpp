@@ -1,6 +1,7 @@
 // main menu, profile, social, shop
 #include "UI/FlickGameLayerPrivate.h"
 #include "Misc/Paths.h"
+#include "UI/FlickCosmeticWidgets.h"
 
 static TAutoConsoleVariable<int32> CVarFlickMainMenuBackdrop(
 	TEXT("flick.MainMenuBackdrop"), 0,
@@ -13,7 +14,8 @@ namespace
 	{
 		static const TCHAR* BannerFiles[] = {
 			TEXT("Blue ice.png"), TEXT("cold.png"), TEXT("Crystal.png"), TEXT("Fire red.png"),
-			TEXT("Red crystal.png"), TEXT("Robotic.png"), TEXT("rock.png"), TEXT("tundra.png")};
+			TEXT("Red crystal.png"), TEXT("Robotic.png"), TEXT("rock.png"), TEXT("tundra.png"),
+			TEXT("CryoCircuit.png"), TEXT("SolarForge.png"), TEXT("PhaseRift.png")};
 		static const TCHAR* BorderFiles[] = {
 			TEXT("gold.png"), TEXT("ice.png"), TEXT("purple crystal.png"), TEXT("robotic.png")};
 		const int32 AssetIndex = Index - 3; // The original three procedural styles retain their save indices.
@@ -34,6 +36,8 @@ namespace
 
 	FLinearColor GetBannerTagColor(const int32 Index)
 	{
+		const int32 Collection = FlickCosmeticCatalog::GetCollection(1, Index);
+		if (Collection != INDEX_NONE) return FMath::Lerp(FlickCosmeticCatalog::GetCollectionColor(Collection), FLinearColor::White, 0.3f);
 		const FLinearColor Colors[] = {
 			Brand, Cyan, Orange, FLinearColor(0.82f, 0.58f, 1.0f),
 			FLinearColor(1.0f, 0.78f, 0.25f), Cyan, Paper, Orange,
@@ -52,6 +56,12 @@ namespace
 		return Index == 2 ? FLinearColor(0.018f, 0.075f, 0.105f, 0.97f)
 			: Index == 1 ? FLinearColor(0.045f, 0.065f, 0.04f, 0.97f)
 			: FLinearColor::FromSRGBColor(FColor(14, 23, 25, 247));
+	}
+	FLinearColor GetAvatarFrameColor(const int32 Index)
+	{
+		const int32 Collection = FlickCosmeticCatalog::GetCollection(2, Index);
+		return Collection != INDEX_NONE ? FlickCosmeticCatalog::GetCollectionColor(Collection)
+			: Index == 2 ? Brand : Index == 1 ? Cyan : Hairline;
 	}
 }
 
@@ -337,7 +347,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						[
 						SNew(SFlickAngularBorder)
 						.BackgroundColor(PanelRaised)
-						.AccentColor_Lambda([this]() { return SelectedAvatarBorder == 2 ? Brand : SelectedAvatarBorder == 1 ? Cyan : Hairline; })
+						.AccentColor_Lambda([this]() { return GetAvatarFrameColor(SelectedAvatarBorder); })
 						.CutSize(8.0f).BorderWidth(1.4f).Padding(FMargin(3.0f))
 						[
 							SNew(SOverlay)
@@ -358,6 +368,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						[
 							SNew(SImage).Image_Lambda([this]() { return GetCosmeticImageBrush(2, SelectedAvatarBorder); })
 						]
+						+ SOverlay::Slot()[SNew(SFlickCosmeticSwatch).Category(2).Item_Lambda([this]() { return SelectedAvatarBorder; }).Visibility(EVisibility::HitTestInvisible)]
 						]
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
@@ -825,7 +836,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		for (int32 Index = 0; Index < Names.Num(); ++Index)
 		{
 			const FLinearColor PreviewAccent = Category == 1 ? GetBannerTagColor(Index)
-				: Category == 2 ? (Index == 1 ? Cyan : Index == 2 ? Brand : Hairline)
+				: Category == 2 ? GetAvatarFrameColor(Index)
+				: FlickCosmeticCatalog::GetCollection(Category, Index) != INDEX_NONE
+					? FlickCosmeticCatalog::GetCollectionColor(FlickCosmeticCatalog::GetCollection(Category, Index))
 				: Category == 0 ? (Index == 1 ? Orange : Index == 2 ? Cyan : Brand) : Brand;
 			const bool bWide = Category == 0 || Category == 1;
 			const bool bPuck = FlickCosmeticCatalog::IsPuckCategory(Category);
@@ -835,7 +848,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			const int32 Columns = bWide || bPuck ? 2 : 3;
 			const float CardWidth = bWide || bPuck ? 220.0f : 140.0f;
 			const float CardHeight = bWide ? 132.0f : bPuck ? 170.0f
-				: Category == 2 ? 150.0f : 140.0f;
+				: Category == 2 ? 150.0f : 112.0f;
 			TSharedRef<SWidget> Preview = SNew(SBox);
 			if (Category == 0)
 			{
@@ -844,7 +857,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 					SNew(SFlickMainMenuPanel).BackgroundColor(GetBannerBackground(Index))
 					.ImageBrush(GetCosmeticImageBrush(0, Index))
 					.AccentColor(PreviewAccent).CutSize(10.0f).BorderWidth(1.5f).Padding(FMargin(15.0f, 10.0f))
-					[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK  //  KNOCKOUT"))).Font(DisplayFont(17)).ColorAndOpacity(Paper)]
+					[SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
+					[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK  //  KNOCKOUT"))).Font(DisplayFont(17)).ColorAndOpacity(Paper)]]
 				];
 			}
 			else if (Category == 1)
@@ -853,9 +867,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				[
 					SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(PreviewAccent)
 					.CutSize(8.0f).BorderWidth(1.0f).Padding(FMargin(12.0f, 11.0f))
+					[SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
 					[SNew(STextBlock).Text(FText::FromString(Names[Index]))
 					.Font(GetBannerTagFont(Index, 15)).ColorAndOpacity(PreviewAccent)
-					.OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+					.OverflowPolicy(ETextOverflowPolicy::Clip)]]
 				];
 			}
 			else if (Category == 2)
@@ -870,6 +885,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 						[SNew(SFlickStatusGlobe).Color(Cyan)]
 					]
 					+ SOverlay::Slot()[SNew(SImage).Image(GetCosmeticImageBrush(2, Index))]
+					+ SOverlay::Slot()[SNew(SFlickCosmeticSwatch).Category(2).Item(Index).Visibility(EVisibility::HitTestInvisible)]
 				];
 			}
 			else if (FlickCosmeticCatalog::IsPuckCategory(Category))
@@ -884,12 +900,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			}
 			else
 			{
-				Preview = SNew(SBox).HeightOverride(88.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
+				Preview = SNew(SBox).HeightOverride(65.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
 				[
-					SNew(SFlickStatusGlobe).Color(Index == 2 ? Orange : Index == 1 ? Cyan : Muted)
+					SNew(SFlickCosmeticSwatch).Category(Category).Item(Index)
 				];
 			}
 			TSharedRef<SButton> Button = SNew(SButton).ButtonStyle(&TransparentButtonStyle)
+				.ToolTipText(FText::FromString(FlickCosmeticCatalog::GetDescription(Category, Index)))
 				.ContentPadding(0.0f).Cursor(EMouseCursor::Hand)
 				.OnClicked_Lambda([this, Category, Index]()
 				{
@@ -929,7 +946,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 						[Preview]
 						+ SVerticalBox::Slot().AutoHeight()
 						[SNew(STextBlock).Text(FText::FromString(Names[Index])).Font(UiFont(11, true))
-							.ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+							.ColorAndOpacity(Paper).AutoWrapText(true)]
 						+ SVerticalBox::Slot().AutoHeight()
 						[SNew(STextBlock).Text_Lambda([this, Category, Index]()
 						{
@@ -941,6 +958,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			Items->AddSlot(Index % Columns, Index / Columns)
 				.Padding(0.0f, 0.0f, 8.0f, 8.0f)[Button];
 		}
+		TSharedRef<SScrollBox> ItemScroller = SNew(SScrollBox) + SScrollBox::Slot()[Items];
+		const int32 Columns = Category <= 1 || FlickCosmeticCatalog::IsPuckCategory(Category) ? 2 : 3;
+		const float RowStep = Category <= 1 ? 156.0f : Category == 2 ? 174.0f
+			: FlickCosmeticCatalog::IsPuckCategory(Category) ? 194.0f : 136.0f;
+		ItemScroller->SetScrollOffset((GetSelectedCosmeticIndex(Category) / Columns) * RowStep);
 		LockerContents->AddSlot()
 		[
 			SNew(SBox).Visibility_Lambda([this, Category]() { return SelectedLockerCategory == Category ? EVisibility::Visible : EVisibility::Collapsed; })
@@ -951,8 +973,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				[SNew(STextBlock).Text(FText::FromString(FString::Printf(TEXT("OWNED  %d  //  SELECT AN ITEM TO EQUIP"), Names.Num()))).Font(UiFont(10, true)).ColorAndOpacity(Muted)]
 				+ SVerticalBox::Slot().FillHeight(1.0f)
 				[
-					SNew(SScrollBox)
-					+ SScrollBox::Slot()[Items]
+					ItemScroller
 				]
 			]
 		];
@@ -1072,12 +1093,16 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		return Button;
 	};
 	return SNew(SOverlay)
-		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor_Lambda([this]()
+		// Keep the locker arena preview free of the other profile pages' screen-wide scrims.
+		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.004f, 0.012f, 0.02f, 0.82f))
+		.Visibility_Lambda([this]()
 		{
-			return FLinearColor(0.004f, 0.012f, 0.02f,
-				SelectedProfileTab == EFlickProfileTab::Customization ? 0.34f : 0.82f);
+			return SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
 		})]
-		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Visibility(EVisibility::HitTestInvisible).Opacity(0.22f)]
+		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Opacity(0.22f).Visibility_Lambda([this]()
+		{
+			return SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
+		})]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
 			SNew(SBox).WidthOverride(1360.0f).HeightOverride(680.0f)
@@ -1371,7 +1396,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 											+ SOverlay::Slot()
 											[
 												SNew(SFlickAngularBorder).BackgroundColor(PanelRaised)
-												.AccentColor_Lambda([this]() { return SelectedAvatarBorder == 2 ? Brand : SelectedAvatarBorder == 1 ? Cyan : Hairline; })
+												.AccentColor_Lambda([this]() { return GetAvatarFrameColor(SelectedAvatarBorder); })
 												.CutSize(7.0f).BorderWidth(1.2f).Padding(FMargin(3.0f))
 												[
 													SNew(SOverlay)
@@ -1381,6 +1406,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 												]
 											]
 											+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this]() { return GetCosmeticImageBrush(2, SelectedAvatarBorder); })]
+											+ SOverlay::Slot()[SNew(SFlickCosmeticSwatch).Category(2).Item_Lambda([this]() { return SelectedAvatarBorder; }).Visibility(EVisibility::HitTestInvisible)]
 										]
 									]
 									+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)

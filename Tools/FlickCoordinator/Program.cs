@@ -96,6 +96,15 @@ app.MapPost("/v1/servers/matches/{matchId}/complete", (HttpRequest http, string 
         : Results.NotFound(new { error = "Allocated match was not found." });
 });
 
+app.MapPost("/v1/servers/matches/{matchId}/rematch", (HttpRequest http, string matchId, ServerRematchRequest request) =>
+{
+    if (!coordinator.IsServerAuthorized(http, matchId, request.ServerId))
+        return Results.Json(new { error = "Invalid game-server credential." }, statusCode: 401);
+    return coordinator.CreateRematch(matchId, request)
+        ? Results.Ok(new { accepted = true, match_id = request.NewMatchId })
+        : Results.Json(new { error = "The previous result must be accepted before rematching." }, statusCode: 409);
+});
+
 app.MapPost("/v1/auth/steam", async (HttpRequest http, RankedAuthRequest request, CancellationToken cancellationToken) =>
 {
     if (!coordinator.IsServerAuthorized(http))
@@ -438,6 +447,39 @@ sealed class CoordinatorState
         }
     }
 
+    public bool CreateRematch(string matchId, ServerRematchRequest request)
+    {
+        lock (gate)
+        {
+            if (!Guid.TryParse(request.NewMatchId, out _) || request.NewMatchId == matchId
+                || !matches.TryGetValue(matchId, out var previous) || previous.ServerId != request.ServerId
+                || previous.Failed || !previous.Completed || previous.CompletionForfeit
+                || !previous.CompletedUtc.HasValue || DateTimeOffset.UtcNow - previous.CompletedUtc.Value >= TimeSpan.FromSeconds(90)
+                || previous.Process is { HasExited: true }
+                || previous.Lifecycle != "result_accepted" || previous.CredentialExpiresUtc <= DateTimeOffset.UtcNow)
+                return false;
+            if (previous.RematchId is not null) return previous.RematchId == request.NewMatchId;
+            if (matches.ContainsKey(request.NewMatchId)) return false;
+            var expiry = DateTimeOffset.UtcNow.AddSeconds(settings.ServerCredentialLifetimeSeconds);
+            var roster = previous.Reservations.Select(player => new ReservationState(
+                request.NewMatchId, player.AccountId, player.Token, player.Team, player.PlayerSlot, expiry)
+                { LastVerifiedUtc = DateTimeOffset.UtcNow, ReconnectDeadlineUtc = expiry }).ToList();
+            var next = new MatchAllocationState(request.NewMatchId, previous.ServerId, previous.Address, previous.Port,
+                previous.Variant, previous.PlayersPerTeam, previous.Ranked, roster, [], previous.CredentialHash,
+                DateTimeOffset.UtcNow.AddSeconds(settings.ServerStartupTimeoutSeconds), expiry)
+            {
+                Process = previous.Process, Ready = true, FirstHeartbeatUtc = DateTimeOffset.UtcNow,
+                Lifecycle = "waiting_for_players"
+            };
+            next.VerifiedAccounts.UnionWith(previous.VerifiedAccounts);
+            previous.RematchId = request.NewMatchId;
+            previous.Process = null; // Ownership moves so retirement of the old result cannot kill the rematch.
+            foreach (var player in roster) reservations[player.Token] = player;
+            matches.Add(next.MatchId, next);
+            return true;
+        }
+    }
+
     public bool CompleteServerMatch(string matchId, ServerMatchCompleteRequest request)
     {
         MatchAllocationState? match;
@@ -451,7 +493,7 @@ sealed class CoordinatorState
 			{
 				return match.CompletionOutcome == request.Outcome && match.CompletionForfeit == request.Forfeit;
 			}
-			if (match.Lifecycle != "playing") return false;
+			if (match.Lifecycle != "playing" && !(match.Ranked && settledMatches.ContainsKey(matchId))) return false;
 			if (!match.Ranked)
 			{
 				UpdateCasualRatings(match, request.Outcome);
@@ -462,7 +504,7 @@ sealed class CoordinatorState
             match.Completed = true;
             match.CompletedUtc = DateTimeOffset.UtcNow;
             match.CredentialExpiresUtc = DateTimeOffset.UtcNow.AddSeconds(120);
-			if (!match.Ranked)
+			if (!match.Ranked || settledMatches.ContainsKey(matchId))
 			{
 				match.Lifecycle = "result_accepted";
 			}
@@ -1367,6 +1409,7 @@ sealed class MatchAllocationState(
     public byte[] CredentialHash { get; } = credentialHash;
     public DateTimeOffset StartupDeadlineUtc { get; } = startupDeadlineUtc;
     public DateTimeOffset CredentialExpiresUtc { get; set; } = credentialExpiresUtc;
+    public string? RematchId { get; set; }
     public Process? Process { get; set; }
     public DateTimeOffset LastHeartbeatUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? FirstHeartbeatUtc { get; set; }
@@ -1561,3 +1604,5 @@ sealed record RankedResultRequest(string MatchId, string ServerId, string Season
 sealed record RankedPlayerUpdate(string AccountId, int OldRating, int NewRating, int MatchesPlayed, int OldTier, int NewTier, int OldDivision, int NewDivision);
 sealed record RankedSettlementResponse(bool Accepted, bool Duplicate, string MatchId, List<RankedPlayerUpdate> Updates);
 sealed record MatchCandidate(IReadOnlyList<QueueTicket> TeamOne, IReadOnlyList<QueueTicket> TeamTwo, double Score);
+
+sealed record ServerRematchRequest(string ServerId, string NewMatchId);

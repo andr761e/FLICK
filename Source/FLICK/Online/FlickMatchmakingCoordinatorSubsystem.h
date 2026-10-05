@@ -52,6 +52,7 @@ public:
 	void BeginServerHeartbeat(const FString& MatchId);
 	void NotifyServerMatchStarted();
 	void NotifyServerMatchComplete(EFlickMatchOutcome Outcome, bool bForfeit);
+	void RequestServerRematch(const FString& NewMatchId, TFunction<void(bool, const FString&)> Callback);
 
 	FOnFlickCoordinatorChanged OnCoordinatorChanged;
 	FOnFlickCoordinatorAllocated OnAllocated;

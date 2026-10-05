@@ -239,6 +239,13 @@ void AFlickGameMode::ConfirmClassSelection()
 		return;
 	}
 	bInitialClassSelectionTimerActive = false;
+	if (bLocalRematchClassSelection)
+	{
+		bLocalRematchClassSelection = false;
+		if (Player1ClassDraft.IsValidIndex(0)) Player1ActiveClasses[0] = Player1ClassDraft[0];
+		StartRematchWithId(GetFlickGameState()->MatchId, false);
+		return;
+	}
 
 	if (bClassSelectionForNextRound)
 	{
@@ -302,13 +309,14 @@ void AFlickGameMode::BeginNetworkClassSelection()
 		const EFlickLineupPreset ExistingClass = GetPlayerClass(
 			PlayerState->GetTeam(),
 			PlayerState->GetTeamPlayerSlot());
+		const TArray<EFlickPieceArchetype> ExistingLineup = PlayerState->GetNetworkSelectedLineup();
 		PlayerState->ResetNetworkClassSelection(ExistingClass);
 		TArray<EFlickPieceArchetype> DefaultLineup;
 		for (int32 PieceSlot = 0; PieceSlot < FlickLineupRules::PiecesPerLineup; ++PieceSlot)
 		{
 			DefaultLineup.Add(GetClassLoadoutPiece(ExistingClass, PieceSlot));
 		}
-		PlayerState->SetNetworkSelectedLineup(DefaultLineup);
+		PlayerState->SetNetworkSelectedLineup(FlickLineupRules::IsValid(ExistingLineup) ? ExistingLineup : DefaultLineup);
 	}
 
 	FrontendScreen = EFlickFrontendScreen::ClassSelect;
@@ -441,9 +449,18 @@ void AFlickGameMode::CancelClassSelection()
 	{
 		return;
 	}
+	if (bLocalRematchClassSelection)
+	{
+		// The rematch has already been accepted; cancel only the lineup edit.
+		bLocalRematchClassSelection = false;
+		bInitialClassSelectionTimerActive = false;
+		StartRematchWithId(GetFlickGameState()->MatchId, false);
+		return;
+	}
 	bInitialClassSelectionTimerActive = false;
 	bClassSelectionStartsTrainingBotMatch = false;
 	bTestArenaMode = false;
+	bLocalRematchClassSelection = false;
 	FrontendScreen = ClassSelectionReturnScreen;
 	SetCameraForFrontend();
 	PlayMenuSound(false);
@@ -675,6 +692,7 @@ void AFlickGameMode::StartSelectedMatch()
 
 void AFlickGameMode::BeginSelectedMatch()
 {
+	PendingRematchId.Reset();
 	if (bNetworkMatchStarted && !CoordinatorMatchId.IsEmpty())
 	{
 		if (UFlickMatchmakingCoordinatorSubsystem* Coordinator = GetFlickMatchmakingCoordinatorSubsystem())
@@ -738,6 +756,13 @@ void AFlickGameMode::StartTrainingMode()
 void AFlickGameMode::SetLockerPreview(const int32 Category)
 {
 	if (FrontendScreen != EFlickFrontendScreen::Profile) return;
+	if (Category != LockerPreviewCategory)
+	{
+		if (LockerKnockoutFeedback.IsValid()) LockerKnockoutFeedback->Destroy();
+		LockerKnockoutFeedback.Reset();
+		if (LockerSpawnFeedback.IsValid()) LockerSpawnFeedback->Destroy();
+		LockerSpawnFeedback.Reset();
+	}
 	const bool bShowArena = Category >= FlickCosmeticCatalog::PuckCategoryStart
 		&& Category < FlickCosmeticCatalog::CategoryCount;
 	if (!bShowArena)
@@ -783,21 +808,26 @@ void AFlickGameMode::SetLockerPreview(const int32 Category)
 		Pieces[0]->SetPuckEffects(Effects);
 		if (bEffectChanged && !bCategoryChanged)
 		{
+			if (LockerKnockoutFeedback.IsValid()) LockerKnockoutFeedback->Destroy();
+			LockerKnockoutFeedback.Reset();
+			if (LockerSpawnFeedback.IsValid()) LockerSpawnFeedback->Destroy();
+			LockerSpawnFeedback.Reset();
 			// The knockout preview respawns and launches with the newly selected
 			// effect on the next tick; spawn effects restart immediately below.
 			LockerPreviewElapsed = 0.0f;
 			LockerPreviewCycle = INDEX_NONE;
 			if (Category == FlickCosmeticCatalog::SpawnCategory)
 			{
-				Pieces[0]->BeginArrival(1.0f);
+				Pieces[0]->BeginArrival(PuckArrivalDuration);
 				LockerPreviewCycle = 0;
 				if (Effects[1] > 0) SpawnWorldFeedback(
-					FVector(0.0f, 0.0f, ArenaSurfaceZ + 20.0f), GetTeamColor(EFlickTeam::Player1),
+					FVector(0.0f, 0.0f, ArenaSurfaceZ + 2.0f), GetTeamColor(EFlickTeam::Player1),
 					EFlickFeedbackKind::Spawn, 0.8f, FVector::ZeroVector, Effects[1]);
 			}
 		}
 	}
-	if (CameraPawn) CameraPawn->SetLockerPreviewMode(Category == FlickCosmeticCatalog::KnockoutCategory ? 2 : 1);
+	if (CameraPawn) CameraPawn->SetLockerPreviewMode(Category == FlickCosmeticCatalog::KnockoutCategory ? 2
+		: Category == FlickCosmeticCatalog::TrailCategory ? 3 : Category == FlickCosmeticCatalog::SpawnCategory ? 4 : 1);
 	if (bCategoryChanged) SetCameraForFrontend();
 }
 
@@ -811,7 +841,7 @@ void AFlickGameMode::UpdateLockerPreview(const float DeltaSeconds)
 	FVector Location(0.0f, 0.0f, SurfaceZ);
 	if (LockerPreviewCategory == FlickCosmeticCatalog::TrailCategory)
 	{
-		const float Angle = LockerPreviewElapsed * 2.7f;
+		const float Angle = LockerPreviewElapsed * 3.8f;
 		Location = FVector(70.0f * FMath::Cos(Angle), 70.0f * FMath::Sin(Angle), SurfaceZ);
 	}
 	else if (LockerPreviewCategory == FlickCosmeticCatalog::KnockoutCategory)
@@ -848,13 +878,13 @@ void AFlickGameMode::UpdateLockerPreview(const float DeltaSeconds)
 	}
 	else if (LockerPreviewCategory == FlickCosmeticCatalog::SpawnCategory)
 	{
-		const int32 Cycle = FMath::FloorToInt(LockerPreviewElapsed / 2.4f);
+		const int32 Cycle = FMath::FloorToInt(LockerPreviewElapsed / FMath::Max(2.4f, PuckArrivalDuration + .95f));
 		if (LockerPreviewCycle != Cycle)
 		{
 			LockerPreviewCycle = Cycle;
-			Preview->BeginArrival(1.0f);
+			Preview->BeginArrival(PuckArrivalDuration);
 			if (Preview->GetPuckEffect(1) > 0)
-				SpawnWorldFeedback(Location + FVector(0.0f, 0.0f, 16.0f),
+				SpawnWorldFeedback(FVector(Location.X, Location.Y, ArenaSurfaceZ + 2.0f),
 					GetTeamColor(EFlickTeam::Player1), EFlickFeedbackKind::Spawn, 0.8f,
 					FVector::ZeroVector, Preview->GetPuckEffect(1));
 		}
@@ -1132,7 +1162,7 @@ FString AFlickGameMode::GetTutorialObjective() const
 {
 	static const TCHAR* Objectives[TutorialStageTotal] =
 	{
-		TEXT("Hit the orange puck with your blue Standard puck."),
+		TEXT("Hit the opposing Standard puck with your own Standard puck."),
 		TEXT("Release a controlled shot and stop inside the center circle."),
 		TEXT("Use the Striker to knock the Compact puck out of the arena."),
 		TEXT("Pass the Bouncer over the bright dot to activate its divider.")
@@ -1144,6 +1174,7 @@ FString AFlickGameMode::GetTutorialObjective() const
 
 FString AFlickGameMode::GetTutorialHint() const
 {
+	if (IsTutorialTransitioning() && !TutorialFeedback.IsEmpty()) return TutorialFeedback;
 	static const TCHAR* Hints[TutorialStageTotal] =
 	{
 		TEXT("LMB aim  /  drag for power  /  release to shoot"),
@@ -1168,6 +1199,7 @@ void AFlickGameMode::SetupTutorialStage(const int32 StageIndex)
 	bTutorialAdvancePending = false;
 	TutorialTransitionRemaining = 0.0f;
 	TutorialShotPieceId = INDEX_NONE;
+	TutorialFeedback.Reset();
 	TutorialTargetPieceId = INDEX_NONE;
 	ResetTrainingBotThinking();
 	ResetShotClock();
@@ -1263,6 +1295,7 @@ void AFlickGameMode::ResolveTutorialShot()
 	}
 
 	bool bSucceeded = false;
+	TutorialFeedback = TEXT("Aim through the opposing puck and try again.");
 	switch (TutorialStageIndex)
 	{
 	case 0:
@@ -1279,9 +1312,19 @@ void AFlickGameMode::ResolveTutorialShot()
 			const FVector Location = (*Entry)->GetActorLocation();
 			bSucceeded = (*Entry)->IsActive()
 				&& FVector2D::Distance(FVector2D(Location.X, Location.Y), FVector2D(Center.X, Center.Y)) <= 165.0f;
+			TutorialFeedback = !(*Entry)->IsActive()
+				? TEXT("Your puck left the board. Use less power to stay on the arena.")
+				: FMath::Abs(Location.X - Center.X) > 165.0f
+					? TEXT("Aim toward the center circle; your shot went wide.")
+					: Location.Y < Center.Y
+						? TEXT("Your shot stopped short. Try a little more power.")
+						: TEXT("Your shot went past the circle. Try a little less power.");
 		}
 		break;
 	case 2:
+		TutorialFeedback = ResolutionEliminatedPieceIds.Contains(TutorialShotPieceId)
+			? TEXT("Keep your Striker on the board. Try a little less power.")
+			: TEXT("Aim through the Compact puck to push it over the edge.");
 		bSucceeded = TutorialTargetPieceId != INDEX_NONE
 			&& ResolutionEliminatedPieceIds.Contains(TutorialTargetPieceId)
 			&& TutorialShotPieceId != INDEX_NONE
@@ -1289,11 +1332,14 @@ void AFlickGameMode::ResolveTutorialShot()
 		break;
 	default:
 		bSucceeded = ResolutionActivatedSwitchMask != 0;
+		TutorialFeedback = TEXT("Aim across the bright switch dot, not directly at the divider.");
 		break;
 	}
 
 	bTutorialAdvancePending = bSucceeded;
-	TutorialTransitionRemaining = bSucceeded ? 1.8f : 1.25f;
+	if (bSucceeded) TutorialFeedback = TutorialStageIndex + 1 < TutorialStageTotal
+		? TEXT("Nice shot! Moving to the next lesson...") : TEXT("Nice shot! Tutorial complete.");
+	TutorialTransitionRemaining = bSucceeded ? 1.8f : 2.5f;
 	if (AFlickGameState* State = GetFlickGameState())
 	{
 		State->SetMatchPhase(EFlickMatchPhase::WaitingToStart);

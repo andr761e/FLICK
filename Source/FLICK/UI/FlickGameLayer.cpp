@@ -369,7 +369,17 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			SNew(SBox)
 			.Visibility_Lambda([this]() { return GetRoundOverVisibility(); })
 			[
-				BuildRoundOverOverlay()
+                SNew(SOverlay)
+                + SOverlay::Slot()
+                [
+                    SNew(SBox).Visibility_Lambda([this]() { const AFlickGameState* State = GetScoreboardGameState(); return State && State->bSeriesComplete ? EVisibility::Collapsed : EVisibility::Visible; })
+                    [BuildRoundOverOverlay()]
+                ]
+                + SOverlay::Slot()
+                [
+                    SNew(SBox).Visibility_Lambda([this]() { const AFlickGameState* State = GetScoreboardGameState(); return State && State->bSeriesComplete ? EVisibility::Visible : EVisibility::Collapsed; })
+                    [BuildPostMatchOverlay()]
+                ]
 			]
 		]
 

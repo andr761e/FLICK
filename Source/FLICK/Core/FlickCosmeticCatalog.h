@@ -21,4 +21,8 @@ namespace FlickCosmeticCatalog
 	FLICK_API TArray<int32> LoadPuckSkins();
 	FLICK_API TArray<int32> LoadPuckEffects();
 	FLICK_API FLinearColor GetPuckSkinColor(int32 Skin);
+	// Shared by world effects, locker swatches and identity framing.
+	FLICK_API FLinearColor GetCollectionColor(int32 Collection);
+	FLICK_API int32 GetCollection(int32 Category, int32 Item);
+	FLICK_API FString GetDescription(int32 Category, int32 Item);
 }

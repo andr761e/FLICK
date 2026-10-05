@@ -2,6 +2,7 @@
 
 #include "Core/FlickSeriesRules.h"
 #include "Core/FlickTeamRules.h"
+#include "Player/FlickPlayerState.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 
@@ -45,6 +46,16 @@ bool AFlickGameState::HasReplaySkipConsensus() const
 void AFlickGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AFlickGameState, RematchVotes);
+	DOREPLIFETIME(AFlickGameState, bRematchChangeLineup);
+	DOREPLIFETIME(AFlickGameState, bRematchStarting);
+	DOREPLIFETIME(AFlickGameState, RematchStatus);
+	DOREPLIFETIME(AFlickGameState, PostMatchStartServerTime);
+	DOREPLIFETIME(AFlickGameState, RematchDeadlineServerTime);
+	DOREPLIFETIME(AFlickGameState, DecisiveShotTeam);
+	DOREPLIFETIME(AFlickGameState, DecisiveShotPlayerSlot);
+	DOREPLIFETIME(AFlickGameState, DecisiveShotTurn);
+	DOREPLIFETIME(AFlickGameState, bDecisiveShotSelfKnockout);
 	DOREPLIFETIME(AFlickGameState, ReplaySerial);
 	DOREPLIFETIME(AFlickGameState, ReplayShootingTeam);
 	DOREPLIFETIME(AFlickGameState, ReplayShootingPlayerSlot);
@@ -136,6 +147,15 @@ void AFlickGameState::ResetMatchState()
 
 void AFlickGameState::ResetSeriesState(const int32 InRoundsToWin)
 {
+	RematchVotes.Reset();
+	bRematchChangeLineup = false;
+	bRematchStarting = false;
+	RematchStatus.Reset();
+	PostMatchStartServerTime = 0.0f;
+	RematchDeadlineServerTime = 0.0f;
+	DecisiveShotTeam = EFlickTeam::None;
+	DecisiveShotTurn = 0;
+	bDecisiveShotSelfKnockout = false;
 	RoundNumber = 1;
 	RoundsToWin = FMath::Max(1, InRoundsToWin);
 	Player1RoundsWon = 0;
@@ -729,9 +749,11 @@ void AFlickGameState::FinalizeAuthoritativeMatch(
 		return;
 	}
 	bMatchResultFinalized = true;
+	bPuckArrivalActive = false;
 	FinalMatchOutcome = Outcome;
 	bMatchEndedByForfeit = bInForfeit;
 	MatchCompletedUnixTime = FDateTime::UtcNow().ToUnixTimestamp();
+	PostMatchStartServerTime = GetServerWorldTimeSeconds();
 	ForceNetUpdate();
 }
 
@@ -758,4 +780,49 @@ void AFlickGameState::CompleteMatchByForfeit(const EFlickTeam ForfeitingTeam)
 			? EFlickMatchOutcome::Player1Wins
 			: EFlickMatchOutcome::Player2Wins,
 		true);
+}
+
+void AFlickGameState::RecordPlayerSelfKnockout(EFlickTeam Team, int32 PlayerSlot)
+{
+ if (!HasAuthority()) return;
+ if (FFlickPlayerMatchStats* Stats = FindMutablePlayerMatchStats(Team, PlayerSlot))
+ { ++Stats->SelfKnockouts; ForceNetUpdate(); }
+}
+
+void AFlickGameState::RecordPlayerSwitchActivation(EFlickTeam Team, int32 PlayerSlot)
+{
+ if (!HasAuthority()) return;
+ if (FFlickPlayerMatchStats* Stats = FindMutablePlayerMatchStats(Team, PlayerSlot))
+ { ++Stats->SwitchActivations; ForceNetUpdate(); }
+}
+
+bool AFlickGameState::RegisterRematchVote(APlayerState* Player, bool bChangeLineup)
+{
+ const AFlickPlayerState* Participant = Cast<AFlickPlayerState>(Player);
+ if (!HasAuthority() || !bSeriesComplete || MatchPhase != EFlickMatchPhase::RoundOver
+  || bRematchStarting || !IsValid(Participant) || Participant->IsInactive()
+  || Participant->IsABot() || Participant->GetTeam() == EFlickTeam::None || !PlayerArray.Contains(Player)) return false;
+ RematchVotes.AddUnique(Player);
+ bRematchChangeLineup |= bChangeLineup && ActiveMatchVariant == EFlickMatchVariant::Classic;
+ RematchStatus.Reset();
+ ForceNetUpdate();
+ return true;
+}
+
+bool AFlickGameState::HasRematchConsensus() const
+{
+ for (EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+ {
+  for (int32 Slot = 0; Slot < PlayersPerTeam; ++Slot)
+  {
+   const TObjectPtr<APlayerState>* Player = PlayerArray.FindByPredicate([Team, Slot](const APlayerState* Entry)
+   {
+    const AFlickPlayerState* Participant = Cast<AFlickPlayerState>(Entry);
+    return IsValid(Participant) && !Participant->IsInactive() && Participant->GetTeam() == Team
+     && Participant->GetTeamPlayerSlot() == Slot;
+   });
+   if (!Player || !RematchVotes.Contains(*Player)) return false;
+  }
+ }
+ return true;
 }

@@ -15,6 +15,8 @@ AFlickGameMode::AFlickGameMode()
 	TrainingBotEasySettings.DecisionNoise = 1.9f;
 	TrainingBotEasySettings.DividerAwareness = 0.05f;
 	TrainingBotEasySettings.BankShotSkill = 0.0f;
+	TrainingBotEasySettings.BlockerAwareness = 0.15f;
+	TrainingBotEasySettings.SelfPreservation = 0.1f;
 
 	TrainingBotNormalSettings.ThinkDelay = 1.1f;
 	TrainingBotNormalSettings.MinimumPower = 0.48f;
@@ -24,6 +26,8 @@ AFlickGameMode::AFlickGameMode()
 	TrainingBotNormalSettings.DecisionNoise = 0.32f;
 	TrainingBotNormalSettings.DividerAwareness = 0.42f;
 	TrainingBotNormalSettings.BankShotSkill = 0.1f;
+	TrainingBotNormalSettings.BlockerAwareness = 0.5f;
+	TrainingBotNormalSettings.SelfPreservation = 0.45f;
 
 	TrainingBotHardSettings.ThinkDelay = 0.9f;
 	TrainingBotHardSettings.MinimumPower = 0.52f;
@@ -33,6 +37,8 @@ AFlickGameMode::AFlickGameMode()
 	TrainingBotHardSettings.DecisionNoise = 0.08f;
 	TrainingBotHardSettings.DividerAwareness = 0.82f;
 	TrainingBotHardSettings.BankShotSkill = 0.52f;
+	TrainingBotHardSettings.BlockerAwareness = 0.85f;
+	TrainingBotHardSettings.SelfPreservation = 0.8f;
 
 	TrainingBotExpertSettings.ThinkDelay = 0.72f;
 	TrainingBotExpertSettings.MinimumPower = 0.55f;
@@ -42,6 +48,8 @@ AFlickGameMode::AFlickGameMode()
 	TrainingBotExpertSettings.DecisionNoise = 0.004f;
 	TrainingBotExpertSettings.DividerAwareness = 1.0f;
 	TrainingBotExpertSettings.BankShotSkill = 1.0f;
+	TrainingBotExpertSettings.BlockerAwareness = 1.0f;
+	TrainingBotExpertSettings.SelfPreservation = 1.0f;
 
 	GameStateClass = AFlickGameState::StaticClass();
 	PlayerControllerClass = AFlickPlayerController::StaticClass();
@@ -239,6 +247,34 @@ void AFlickGameMode::BeginPlay()
 	{
 		OpenModeSelect();
 		OpenOnlineBrowser();
+	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickPostMatchPreview")))
+	{
+		int32 PreviewPlayers = 3;
+		FParse::Value(FCommandLine::Get(), TEXT("FlickClassPlayers="), PreviewPlayers);
+		SelectMatchVariant(FParse::Param(FCommandLine::Get(), TEXT("FlickPostMatchBob")) ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic);
+		SetMatchmakingPlayersPerTeam(PreviewPlayers);
+		BeginSelectedMatch();
+		if (AFlickGameState* State = GetFlickGameState())
+		{
+			State->SetPuckArrivalState(false);
+			State->BeginAuthoritativeMatch(TEXT("post-match-preview"));
+			State->bPrivateMatchActive = FParse::Param(FCommandLine::Get(), TEXT("FlickPostMatchPrivate"));
+			State->bRankedMatch = FParse::Param(FCommandLine::Get(), TEXT("FlickPostMatchRanked"));
+			State->bMatchmakingLobby = !State->bPrivateMatchActive;
+			State->SetRoundAdvanceTimerState(false);
+			for (int32 Round = 0; Round < State->RoundsToWin; ++Round) State->CompleteRound(EFlickMatchOutcome::Player1Wins);
+			for (int32 Slot = 0; Slot < State->PlayersPerTeam; ++Slot)
+			{
+				for (int32 KO = 0; KO < 4 - Slot; ++KO) State->RecordPlayerKnockout(EFlickTeam::Player1, Slot);
+				State->RecordPlayerSwitchActivation(EFlickTeam::Player1, Slot);
+				State->RecordPlayerSelfKnockout(EFlickTeam::Player2, Slot);
+			}
+			State->DecisiveShotTeam = EFlickTeam::Player1;
+			State->DecisiveShotPlayerSlot = 0;
+			State->DecisiveShotTurn = 7;
+			State->FinalizeAuthoritativeMatch(EFlickMatchOutcome::Player1Wins);
+		}
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickClassSelectPreview")))
 	{
@@ -657,6 +693,31 @@ void AFlickGameMode::BeginPlay()
 				}
 				QuitGame();
 			}, 14.0f, false);
+		}
+	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickPrivateSpectatorPreview")))
+	{
+		bPrivateMatchActive = true;
+		PrivateMatchSettings.PlayersPerTeam = MatchmakingPlayersPerTeam;
+		SelectedMatchVariant = EFlickMatchVariant::Classic;
+		BeginSelectedMatch();
+		if (auto* State = GetFlickGameState())
+		{
+			State->bPrivateMatchActive = true;
+			State->bPrivateMatchAssignmentActive = false;
+			State->bNetworkClassSelectionActive = false;
+			State->PrivateMatchSettings = PrivateMatchSettings;
+			State->MatchPhase = EFlickMatchPhase::Aiming;
+		}
+		if (auto* Controller = Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController()))
+		{
+			if (auto* Player = Controller->GetPlayerState<AFlickPlayerState>())
+			{
+				Player->ClearPrivateControlledSlots();
+				Player->SetTeam(EFlickTeam::None);
+				Player->SetPrivateRoleChosen(true);
+			}
+			Controller->CyclePrivateSpectatorPlayer(1);
 		}
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickTestArenaPreview"))
@@ -1127,7 +1188,13 @@ void AFlickGameMode::PostLogin(APlayerController* NewPlayer)
 
 void AFlickGameMode::Logout(AController* Exiting)
 {
-	const AFlickPlayerState* ExitingState = Exiting ? Exiting->GetPlayerState<AFlickPlayerState>() : nullptr;
+	AFlickPlayerState* ExitingState = Exiting ? Exiting->GetPlayerState<AFlickPlayerState>() : nullptr;
+	if (AFlickGameState* State = GetFlickGameState(); State && State->bSeriesComplete && ExitingState)
+	{
+		State->RematchVotes.Remove(ExitingState);
+		if (!bPrivateMatchActive) State->RematchStatus = TEXT("A player left. Return to the menu to find another match.");
+		State->ForceNetUpdate();
+	}
 	const FString ExitingAccountId = GetPlayerOnlineId(ExitingState);
 	const EFlickTeam ExitingTeam = ExitingState ? ExitingState->GetTeam() : EFlickTeam::None;
 	const bool bMatchmakingForfeit = bNetworkMatchRequested

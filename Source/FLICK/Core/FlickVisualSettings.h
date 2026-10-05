@@ -19,4 +19,7 @@ namespace FlickVisualSettings
 	FLICK_API void SetPuckHoverDetail(int32 Detail);
 	FLICK_API bool IsColorBlindAssistEnabled();
 	FLICK_API void SetColorBlindAssistEnabled(bool bEnabled);
+	// 0 colour rings, 1 solid ally/dashed enemy, 2 patterns plus relationship labels.
+	FLICK_API int32 GetPuckIndicatorStyle();
+	FLICK_API void SetPuckIndicatorStyle(int32 Style);
 }

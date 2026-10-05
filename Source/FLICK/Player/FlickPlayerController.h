@@ -10,6 +10,10 @@
 class AFlickGameMode;
 class AFlickGameState;
 class AFlickPiece;
+class UFlickPhysicsDiagnosticsComponent;
+class UFlickPostMatchPresentationComponent;
+class UFlickPrivateSpectatorComponent;
+class UFlickTeamPingComponent;
 
 UCLASS()
 class FLICK_API AFlickPlayerController : public APlayerController
@@ -52,6 +56,7 @@ public:
 	// Cosmetic ownership only: independent of whose turn it is.
 	bool OwnsPieceLocally(const AFlickPiece* Piece) const;
 	void RequestRestartMatch();
+	void RequestRematch(bool bChangeLineup = false);
 	void RequestNextRound();
 	void ToggleLobbyReady();
 	void RequestStartNetworkMatch();
@@ -65,6 +70,9 @@ public:
 	void OpenPrivateTeamMenu() { bPrivateTeamMenuOpen = true; }
 	void CyclePrivateSpectatorPlayer(int32 Direction);
 	FString GetPrivateSpectatorTargetName() const;
+	bool IsPrivateMatchSpectator() const;
+	bool IsFollowingPrivatePlayer() const;
+	EFlickTeam GetPrivateSpectatorTargetTeam() const;
 	void TogglePrivateSpectatorFreeCamera();
 	void LeaveNetworkSession();
 	void ReturnToFrontendFromServer(bool bClearPartyIdentity = false);
@@ -120,6 +128,7 @@ private:
 	friend class FFlickPuckInspectionTest;
 #endif
 	void HandlePrimaryPressed();
+	void HandleTeamPingPressed();
 	void HandlePrimaryReleased();
 	void HandleCameraElevationUpPressed();
 	void HandleCameraElevationDownPressed();
@@ -136,6 +145,8 @@ private:
 	void HandleTrainingRemovePressed();
 	void HandleFreeCameraTogglePressed();
 	void HandleTopDownViewPressed();
+	void HandleSpectatorPreviousPressed();
+	void HandleSpectatorNextPressed();
 	void ApplyFrontendInputMode();
 	void SetFreeCameraInputMode(bool bEnabled);
 	bool UpdateFreeCamera(float DeltaSeconds);
@@ -164,6 +175,9 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerRequestRestartMatch();
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestRematch(bool bChangeLineup);
 
 	UFUNCTION(Server, Reliable)
 	void ServerRequestNextRound();
@@ -277,6 +291,15 @@ private:
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> SelectedPiece;
 
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Debug")
+	TObjectPtr<UFlickPhysicsDiagnosticsComponent> PhysicsDiagnostics;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Presentation")
+	TObjectPtr<UFlickPostMatchPresentationComponent> PostMatchPresentation;
+	UPROPERTY()
+	TObjectPtr<UFlickPrivateSpectatorComponent> PrivateSpectator;
+	UPROPERTY()
+	TObjectPtr<UFlickTeamPingComponent> TeamPings;
+
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> HoveredPiece;
 	TWeakObjectPtr<AFlickPiece> InspectedPiece;
@@ -311,7 +334,6 @@ private:
 	bool bNetworkClassLineupSubmitted = false;
 	bool bPrivateTeamMenuOpen = false;
 	bool bPrivateSpectateChosen = false;
-	int32 PrivateSpectatorTargetPlayerId = INDEX_NONE;
 	bool bObservedPrivateMatchActive = false;
 	bool bCareerStatsRecordedForCurrentSeries = false;
 	float NetworkGameplayElapsed = 0.0f;

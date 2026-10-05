@@ -9,6 +9,7 @@ namespace FlickControlBindings
 	{
 		static const TArray<FControl> Controls = {
 			{TEXT("Shoot"), TEXT("AIM / SHOOT"), TEXT("MATCH"), EKeys::LeftMouseButton},
+			{TEXT("TeamPing"), TEXT("PING ENEMY PUCK"), TEXT("MATCH"), EKeys::MiddleMouseButton},
 			{TEXT("Secondary"), TEXT("SECONDARY ACTION"), TEXT("MATCH"), EKeys::RightMouseButton},
 			{TEXT("Menu"), TEXT("PAUSE / BACK"), TEXT("MATCH"), EKeys::Escape},
 			{TEXT("Scoreboard"), TEXT("SHOW SCOREBOARD"), TEXT("MATCH"), EKeys::Tab},

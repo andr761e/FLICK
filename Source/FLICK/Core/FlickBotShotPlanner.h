@@ -31,6 +31,9 @@ struct FFlickBotShotTuning
 	float DecisionNoise = 0.015f;
 	float DividerAwareness = 1.0f;
 	float BankShotSkill = 0.8f;
+	float BlockerAwareness = 1.0f;
+	float SelfPreservation = 0.0f;
+	float PocketRadius = 66.0f;
 	TArray<FFlickBotDividerState> Dividers;
 };
 

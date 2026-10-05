@@ -97,6 +97,12 @@ struct FFlickBotDifficultySettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float BankShotSkill = 0.12f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float BlockerAwareness = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Training|Bot", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float SelfPreservation = 0.5f;
 };
 
 UCLASS()
@@ -264,6 +270,7 @@ public:
 	void StartTrainingBotMatch();
 	void StartTutorialMode();
 	void ToggleTrainingEditMode();
+	bool CanEditTrainingBoard() const;
 	void SetTrainingPlacementTeam(EFlickTeam Team);
 	void CycleTrainingPlacementArchetype(int32 Direction);
 	bool PlaceTrainingPuck(const FVector& WorldLocation);
@@ -316,6 +323,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "FLICK|Match")
 	void RestartMatch();
+	void RequestRematch(APlayerController* Player, bool bChangeLineup);
+	void TryStartRematch();
+	void StartRematchWithId(const FString& MatchId, bool bChangeLineup);
+	UPROPERTY(EditDefaultsOnly, Category = "FLICK|Match", meta = (ClampMin = "5.0", ClampMax = "80.0"))
+	float PublicRematchTimeLimit = 75.0f;
+	FString PendingRematchId;
+	bool bRematchRegistrationPending = false;
+	bool bRankedSettlementPending = false;
+	bool bLocalRematchClassSelection = false;
 
 	AFlickGameState* GetFlickGameState() const;
 	float GetArenaSurfaceZ() const { return ArenaSurfaceZ; }
@@ -566,6 +582,8 @@ public:
 private:
 	friend class FFlickOneVsOneLightingTest;
 	friend class FFlickBobGameplayTest;
+	friend class FFlickRematchFlowTest;
+	friend class FFlickTrainingFeedbackTest;
 
 	void SpawnCameraIfNeeded();
 	void SpawnAudioIfNeeded();
@@ -693,7 +711,6 @@ private:
 	void ResetTrainingBoard();
 	void CaptureTrainingResetSnapshot();
 	void RestoreTrainingResetSnapshot();
-	bool CanEditTrainingBoard() const;
 	bool ResolveTrainingPlacement(
 		const FVector& RequestedWorldLocation,
 		float Radius,
@@ -766,6 +783,8 @@ private:
 	int32 LockerPreviewCategory = INDEX_NONE;
 	float LockerPreviewElapsed = 0.0f;
 	int32 LockerPreviewCycle = INDEX_NONE;
+	mutable TWeakObjectPtr<AFlickWorldFeedback> LockerSpawnFeedback;
+	mutable TWeakObjectPtr<AFlickWorldFeedback> LockerKnockoutFeedback;
 
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> Player1BobStriker;
@@ -841,6 +860,7 @@ private:
 	int32 TutorialShotPieceId = INDEX_NONE;
 	int32 TutorialTargetPieceId = INDEX_NONE;
 	float TutorialTransitionRemaining = 0.0f;
+	FString TutorialFeedback;
 	bool bClassSelectionStartsTrainingBotMatch = false;
 	bool bTestArenaMode = false;
 	bool bPrivateMatchSetupActive = false;

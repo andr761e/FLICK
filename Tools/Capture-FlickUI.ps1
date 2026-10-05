@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Pause', 'Result', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -25,7 +25,7 @@ param(
     [int]$PlayersPerTeam = 1,
     [ValidateRange(0, 14)]
     [int]$LockerCategory = 0,
-    [ValidateRange(-1, 2)]
+    [ValidateRange(-1, 64)]
     [int]$LockerItem = -1,
     [ValidateRange(0, 4)]
     [int]$ProfilePage = 0,
@@ -53,6 +53,10 @@ if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
 
 $previewFlags = @{
     Home = @()
+    PostMatch = @('-FlickPostMatchPreview')
+    PostMatchPrivate = @('-FlickPostMatchPreview', '-FlickPostMatchPrivate')
+    PostMatchBob = @('-FlickPostMatchPreview', '-FlickPostMatchBob')
+    PostMatchRanked = @('-FlickPostMatchPreview', '-FlickPostMatchRanked')
     Invite = @('-FlickPartyInvitePreview')
     Party = @('-FlickPartyTrayPreview')
     Challenges = @('-FlickChallengesPreview')
@@ -67,6 +71,7 @@ $previewFlags = @{
     Customize = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
     CustomizePuck = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
     PrivateMatch = @('-FlickPrivateMatchPreview')
+    Spectator = @('-FlickPrivateSpectatorPreview')
     Settings = @('-FlickSettingsPreview')
     Video = @('-FlickSettingsPreview')
     Lighting = @('-FlickSettingsPreview')

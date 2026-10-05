@@ -41,6 +41,7 @@ public:
 	void SetPuckEffects(const TArray<int32>& Effects);
 	int32 GetPuckEffect(int32 EffectIndex) const;
 	bool HasTestArenaVisuals() const;
+	UStaticMeshComponent* GetPresentationMesh() const { return bHighDetailVisualsEnabled ? WorkshopMesh.Get() : PieceMesh.Get(); }
 	void Launch(const FVector& Direction, float NormalizedPower, float MaxLaunchSpeed);
 	void Eliminate();
 	void SetSelected(bool bInSelected);
@@ -136,17 +137,28 @@ private:
 	// Per-view presentation only; deliberately not replicated.
 	bool bLocalOwnershipRing = false;
 	bool bLastColorBlindAssist = false;
+	int32 LastIndicatorStyle = INDEX_NONE;
+	EFlickTeam LastIndicatorViewerTeam = EFlickTeam::None;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> TeamIndicatorDashes;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UTextRenderComponent> TeamIndicatorLabel;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> TeamIndicatorMaterial;
 	void UpdateTestArenaVisuals();
 	void UpdateArrivalVisuals();
 	void UpdateCosmeticTrail(float DeltaSeconds);
+	void UpdateCollectionTrail(float DeltaSeconds);
+	UPROPERTY(Transient)
+	TObjectPtr<class UProceduralMeshComponent> CosmeticRibbon;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> RibbonMaterials;
+	TArray<float> TrailPointAges;
+	float TrailClock = 0.0f;
 	void ApplyPregamePreview();
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> WorkshopMesh;
-	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
-	TArray<TObjectPtr<UStaticMeshComponent>> CosmeticTrailSegments;
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> CosmeticTrailMaterial;
 	TArray<FVector> TrailPoints;
 	FVector LastTrailPosition = FVector::ZeroVector;
 	float TrailSampleElapsed = 0.0f;

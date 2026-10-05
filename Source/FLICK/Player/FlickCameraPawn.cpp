@@ -84,6 +84,17 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	}
 
 	ShakeTime += DeltaSeconds;
+	if (bSpectatorView && !bMenuPresentation && !bCinematicReplay && !bPostMatchPresentation)
+	{
+		SetActorLocation(FMath::VInterpTo(GetActorLocation(), SpectatorView.Location, DeltaSeconds, SpectatorViewBlendSpeed));
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), SpectatorView.Rotation, DeltaSeconds, SpectatorViewBlendSpeed));
+		CurrentFieldOfView = FMath::FInterpTo(CurrentFieldOfView, SpectatorView.FieldOfView, DeltaSeconds, SpectatorViewBlendSpeed);
+		Camera->SetRelativeLocation(FVector::ZeroVector);
+		Camera->SetRelativeRotation(FRotator::ZeroRotator);
+		Camera->SetFieldOfView(CurrentFieldOfView);
+		bGameplayViewTransitioning = false;
+		return;
+	}
 	FVector MenuTargetLocation = MenuCameraLocation * ArenaFramingScale;
 	FRotator MenuTargetRotation = MenuCameraRotation;
 	if (bMenuPresentation && bMenuOrbitEnabled)
@@ -118,9 +129,12 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 			EFlickMatchVariant::Classic, State ? State->PlayersPerTeam : 1) - 130.0f;
 		const FVector Focus = LockerPreviewMode == 2
 			? FVector(EdgePreviewFocus, 0.0f, SurfaceZ) : FVector(0.0f, 0.0f, SurfaceZ);
-		TargetLocation = Focus + FVector(-300.0f, -680.0f, 480.0f) * ArenaFramingScale;
+		TargetLocation = Focus + FVector(-300.0f, -680.0f, 480.0f) * ArenaFramingScale
+			* (LockerPreviewMode == 2 ? 1.35f : LockerPreviewMode == 3 ? 1.15f : LockerPreviewMode == 4 ? 1.1f : 1.0f);
 		TargetRotation = UKismetMathLibrary::FindLookAtRotation(TargetLocation, Focus
-			+ (LockerPreviewMode == 2 ? FVector(500.0f, 0.0f, -110.0f) : FVector(200.0f, 0.0f, -110.0f)));
+			+ (LockerPreviewMode == 2 ? FVector(500.0f, 0.0f, -110.0f)
+				: LockerPreviewMode == 4 ? FVector(240.0f, 0.0f, -20.0f)
+				: LockerPreviewMode == 3 ? FVector(300.0f, 0.0f, -110.0f) : FVector(200.0f, 0.0f, -110.0f)));
 	}
 	float TargetFieldOfView = bMenuPresentation
 		? MenuFieldOfView
@@ -136,7 +150,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 			FMath::Tan(FMath::DegreesToRadians(MenuFieldOfView * 0.5f)) * AspectExpansion));
 	}
 	if (bMenuPresentation && LockerPreviewMode > 0)
-		TargetFieldOfView = LockerPreviewMode == 2 ? 46.0f : 38.0f;
+		TargetFieldOfView = LockerPreviewMode == 2 ? 46.0f : LockerPreviewMode == 3 ? 44.0f : LockerPreviewMode == 4 ? 42.0f : 38.0f;
 	if (!bMenuPresentation && !bCinematicReplay)
 	{
 		if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
@@ -159,6 +173,18 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 		const float EstablishedFieldOfView = FMath::Lerp(33.0f, 39.0f, ReplayPullbackAlpha);
 		TargetFieldOfView = EstablishedFieldOfView - 3.5f * FMath::Sin(ReplayProgress * PI);
 		BlendSpeed = 5.5f;
+	}
+	if (bPostMatchPresentation && !bCinematicReplay)
+	{
+		const float Alpha = FMath::SmoothStep(0.0f, 1.0f, PostMatchPullback);
+		const FVector Focus(0.0f, 0.0f, PostMatchSurfaceZ + 22.0f);
+		const float ShowcaseDistance = 480.0f + PostMatchWinnerCount * 170.0f;
+		TargetLocation = Focus + FVector(0.0f, -FMath::Lerp(ShowcaseDistance, 1850.0f * ArenaFramingScale, Alpha),
+			FMath::Lerp(ShowcaseDistance * 0.52f, 1250.0f * ArenaFramingScale, Alpha));
+		TargetRotation = UKismetMathLibrary::FindLookAtRotation(TargetLocation, Focus);
+		TargetFieldOfView = FMath::Lerp(38.0f, 49.0f, Alpha);
+		BlendSpeed = 4.5f;
+		ShakeTrauma = 0.0f;
 	}
 	const FVector NewLocation = FMath::VInterpTo(GetActorLocation(), TargetLocation, DeltaSeconds, BlendSpeed);
 	const FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, BlendSpeed);
@@ -242,6 +268,14 @@ void AFlickCameraPawn::SetMenuOrbitEnabled(const bool bEnabled)
 {
 	bMenuOrbitEnabled = bEnabled;
 	ApplyArenaPostProcess();
+}
+
+void AFlickCameraPawn::SetPostMatchPresentation(bool bEnabled, float Pullback, int32 WinnerCount, float SurfaceZ)
+{
+	bPostMatchPresentation = bEnabled;
+	PostMatchPullback = FMath::Clamp(Pullback, 0.0f, 1.0f);
+	PostMatchWinnerCount = FMath::Clamp(WinnerCount, 1, 3);
+	PostMatchSurfaceZ = SurfaceZ;
 }
 
 void AFlickCameraPawn::SetBobGameplayFraming(const bool bInBobGameplayFraming)
@@ -559,12 +593,35 @@ void AFlickCameraPawn::SetFreeCameraEnabled(const bool bEnabled)
 		return;
 	}
 	bFreeCameraEnabled = bEnabled;
+	if (bEnabled) ClearSpectatorView();
 	bAimPresentation = false;
 	ShakeTrauma = 0.0f;
 	if (!bFreeCameraEnabled)
 	{
 		bGameplayViewTransitioning = true;
 	}
+}
+
+FFlickSpectatorView AFlickCameraPawn::CaptureSpectatorView() const
+{
+	FFlickSpectatorView View;
+	if (Camera)
+	{
+		View.Location = Camera->GetComponentLocation();
+		View.Rotation = Camera->GetComponentRotation();
+		View.FieldOfView = Camera->FieldOfView;
+		View.bValid = true;
+	}
+	return View;
+}
+
+void AFlickCameraPawn::SetSpectatorView(const FFlickSpectatorView& View)
+{
+	if (!View.bValid || !View.IsSafe()) return;
+	SpectatorView = View;
+	bSpectatorView = true;
+	bAimPresentation = false;
+	ShakeTrauma = 0.0f;
 }
 
 void AFlickCameraPawn::AddFreeCameraInput(

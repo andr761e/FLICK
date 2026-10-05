@@ -1,6 +1,7 @@
 #include "Pieces/FlickPiece.h"
 #include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickVisualSettings.h"
+#include "ProceduralMeshComponent.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -43,22 +44,6 @@ AFlickPiece::AFlickPiece()
 	WorkshopMesh->SetGenerateOverlapEvents(false);
 	WorkshopMesh->SetCanEverAffectNavigation(false);
 	WorkshopMesh->SetVisibility(false);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> TrailSphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TrailEmissive(TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
-	for (int32 Index = 0; Index < 10; ++Index)
-	{
-		UStaticMeshComponent* Segment = CreateDefaultSubobject<UStaticMeshComponent>(
-			*FString::Printf(TEXT("CosmeticTrail_%02d"), Index));
-		Segment->SetupAttachment(PieceMesh);
-		Segment->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Segment->SetGenerateOverlapEvents(false);
-		Segment->SetCanEverAffectNavigation(false);
-		Segment->SetCastShadow(false);
-		Segment->SetVisibility(false);
-		if (TrailSphere.Succeeded()) Segment->SetStaticMesh(TrailSphere.Object);
-		if (TrailEmissive.Succeeded()) Segment->SetMaterial(0, TrailEmissive.Object);
-		CosmeticTrailSegments.Add(Segment);
-	}
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	if (CylinderMesh.Succeeded())
@@ -170,6 +155,19 @@ AFlickPiece::AFlickPiece()
 	OuterTrim->SetCastShadow(false);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	for (int32 Index = 0; Index < 12; ++Index)
+	{
+		UStaticMeshComponent* Dash = CreateDefaultSubobject<UStaticMeshComponent>(*FString::Printf(TEXT("TeamIndicatorDash_%02d"), Index));
+		Dash->SetupAttachment(VisualRoot);
+		Dash->SetStaticMesh(CubeMesh.Object);
+		if (EmissiveMaterial.Succeeded()) Dash->SetMaterial(0, EmissiveMaterial.Object);
+		Dash->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Dash->SetGenerateOverlapEvents(false);
+		Dash->SetCanEverAffectNavigation(false);
+		Dash->SetCastShadow(false);
+		Dash->SetVisibility(false);
+		TeamIndicatorDashes.Add(Dash);
+	}
 	constexpr int32 DetailCount = 16;
 	TopTicks.Reserve(DetailCount);
 	SideLugs.Reserve(DetailCount);
@@ -257,10 +255,20 @@ AFlickPiece::AFlickPiece()
 	Label->SetCastShadow(false);
 	Label->SetAbsolute(false, false, true);
 	Label->SetVisibility(false);
+	TeamIndicatorLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("TeamIndicatorLabel"));
+	TeamIndicatorLabel->SetupAttachment(VisualRoot);
+	TeamIndicatorLabel->SetHorizontalAlignment(EHTA_Center);
+	TeamIndicatorLabel->SetVerticalAlignment(EVRTA_TextCenter);
+	TeamIndicatorLabel->SetRelativeRotation(FRotator(90, 0, 0));
+	TeamIndicatorLabel->SetAbsolute(false, false, true);
+	TeamIndicatorLabel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	TeamIndicatorLabel->SetCastShadow(false);
+	TeamIndicatorLabel->SetVisibility(false);
 	static ConstructorHelpers::FObjectFinder<UFont> LabelFont(TEXT("/Engine/EngineFonts/RobotoDistanceField.RobotoDistanceField"));
 	if (LabelFont.Succeeded())
 	{
 		Label->SetFont(LabelFont.Object);
+		TeamIndicatorLabel->SetFont(LabelFont.Object);
 	}
 }
 
@@ -304,12 +312,6 @@ void AFlickPiece::BeginPlay()
 	ApplyVisuals();
 	ApplyPregamePreview();
 	UpdateArrivalVisuals();
-	if (!CosmeticTrailSegments.IsEmpty())
-	{
-		CosmeticTrailMaterial = CosmeticTrailSegments[0]->CreateAndSetMaterialInstanceDynamic(0);
-		for (int32 Index = 1; Index < CosmeticTrailSegments.Num(); ++Index)
-			CosmeticTrailSegments[Index]->SetMaterial(0, CosmeticTrailMaterial);
-	}
 }
 
 void AFlickPiece::Tick(const float DeltaSeconds)
@@ -327,7 +329,15 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 	const bool bAssist = FlickVisualSettings::IsColorBlindAssistEnabled();
 	const bool bAccessibilityChanged = bAssist != bLastColorBlindAssist;
 	bLastColorBlindAssist = bAssist;
-	if (bSelected || bHovered || bWasFlashing || bOwnershipChanged || bAccessibilityChanged)
+	const int32 IndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
+	const bool bIndicatorChanged = IndicatorStyle != LastIndicatorStyle;
+	LastIndicatorStyle = IndicatorStyle;
+	const AFlickPlayerController* IndicatorViewer = GetWorld()
+		? Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController()) : nullptr;
+	const EFlickTeam ViewerTeam = IndicatorViewer ? IndicatorViewer->GetLocalTeam() : EFlickTeam::None;
+	const bool bViewerChanged = ViewerTeam != LastIndicatorViewerTeam;
+	LastIndicatorViewerTeam = ViewerTeam;
+	if (bSelected || bHovered || bWasFlashing || bOwnershipChanged || bAccessibilityChanged || bIndicatorChanged || bViewerChanged)
 	{
 		ApplyVisuals();
 	}
@@ -339,47 +349,14 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 
 void AFlickPiece::UpdateCosmeticTrail(const float DeltaSeconds)
 {
-	if (CosmeticTrailSegments.IsEmpty()) return;
-	const FVector Position = GetActorLocation();
-	const bool bMoving = !LastTrailPosition.IsZero() && FVector::DistSquared2D(Position, LastTrailPosition) > 9.0f;
-	TrailSampleElapsed += DeltaSeconds;
-	if (TrailSampleElapsed >= 0.06f)
+	if (PuckTrail > 0)
 	{
-		TrailSampleElapsed = 0.0f;
-		if (bMoving && !bEliminated)
-		{
-			TrailPoints.Insert(Position - FVector(0.0f, 0.0f, PieceThickness * 0.38f), 0);
-			TrailPoints.SetNum(FMath::Min(TrailPoints.Num(), CosmeticTrailSegments.Num()));
-			TrailPoints.RemoveAll([&Position](const FVector& Point)
-			{
-				return FVector::DistSquared2D(Point, Position) > FMath::Square(180.0f);
-			});
-		}
-		else if (!TrailPoints.IsEmpty()) TrailPoints.Pop(EAllowShrinking::No);
-		LastTrailPosition = Position;
-	}
-	if (PuckTrail == 0 || bEliminated)
-	{
-		for (UStaticMeshComponent* Segment : CosmeticTrailSegments) Segment->SetVisibility(false);
+		UpdateCollectionTrail(DeltaSeconds);
 		return;
 	}
-	if (CosmeticTrailMaterial)
-	{
-		const FLinearColor Color = PuckTrail == 1 ? FLinearColor(0.02f, 2.7f, 6.0f) : FLinearColor(6.0f, 0.38f, 0.01f);
-		CosmeticTrailMaterial->SetVectorParameterValue(TEXT("Color"), Color);
-	}
-	for (int32 Index = 0; Index < CosmeticTrailSegments.Num(); ++Index)
-	{
-		const bool bVisible = TrailPoints.IsValidIndex(Index);
-		const float Scale = bVisible ? FMath::Lerp(0.19f, 0.055f, static_cast<float>(Index) / 9.0f) : 0.0f;
-		UStaticMeshComponent* Segment = CosmeticTrailSegments[Index];
-		Segment->SetVisibility(bVisible);
-		if (bVisible)
-		{
-			Segment->SetWorldLocation(TrailPoints[Index]);
-			Segment->SetWorldScale3D(FVector(Scale, Scale, 0.025f));
-		}
-	}
+	if (CosmeticRibbon) CosmeticRibbon->SetVisibility(false);
+	TrailPoints.Reset(); TrailPointAges.Reset();
+	LastTrailPosition = FVector::ZeroVector; TrailSampleElapsed = 0;
 }
 
 void AFlickPiece::UpdateArrivalVisuals()
@@ -456,7 +433,6 @@ void AFlickPiece::InitializePiece(
 	TrailPoints.Reset();
 	LastTrailPosition = FVector::ZeroVector;
 	TrailSampleElapsed = 0.0f;
-	for (UStaticMeshComponent* Segment : CosmeticTrailSegments) Segment->SetVisibility(false);
 
 	SetActorHiddenInGame(false);
 	SetActorEnableCollision(true);
@@ -688,7 +664,7 @@ void AFlickPiece::SetPuckSkin(const int32 Skin)
 {
 	if (!HasAuthority()) return;
 	const int32 ValidSkin = FMath::Clamp(Skin, 0,
-		FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart).Num() - 1);
+		FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart + static_cast<int32>(Archetype)).Num() - 1);
 	if (PuckSkin == ValidSkin) return;
 	PuckSkin = ValidSkin;
 	OnRep_PuckSkin();
@@ -704,6 +680,10 @@ void AFlickPiece::SetPuckEffects(const TArray<int32>& Effects)
 	}
 	if (PuckTrail == Effects[0] && PuckSpawnEffect == Effects[1] && PuckKnockoutEffect == Effects[2]) return;
 	PuckTrail = Effects[0];
+	TrailPoints.Reset();
+	TrailPointAges.Reset();
+	TrailSampleElapsed = 0.0f;
+	LastTrailPosition = FVector::ZeroVector;
 	PuckSpawnEffect = Effects[1];
 	PuckKnockoutEffect = Effects[2];
 	ForceNetUpdate();
@@ -1403,7 +1383,8 @@ void AFlickPiece::UpdateTestArenaVisuals()
 	PieceMesh->SetVisibility(false);
 	for (USceneComponent* Child : VisualRoot->GetAttachChildren())
 	{
-		if (Child != WorkshopMesh && Child != SelectionHalo && Child != AccentLight)
+		if (Child != WorkshopMesh && Child != SelectionHalo && Child != AccentLight
+			&& Child != TeamIndicatorLabel && !TeamIndicatorDashes.Contains(Cast<UStaticMeshComponent>(Child)))
 		{
 			Child->SetVisibility(false);
 		}
@@ -1589,10 +1570,41 @@ void AFlickPiece::ApplyVisuals()
 	AccentLight->SetLightColor(TeamColor);
 	AccentLight->SetIntensity(0.0f);
 
-	SelectionHalo->SetVisibility(!bEliminated && !bPregamePreview && !bLocalOwnershipRing);
 	const AFlickPlayerController* Viewer = GetWorld()
 		? Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController()) : nullptr;
-	const bool bTeammate = Viewer && Viewer->GetLocalTeam() == Team;
+	const bool bHasLocalTeam = Viewer && Viewer->GetLocalTeam() != EFlickTeam::None;
+	const bool bTeammate = bHasLocalTeam ? Viewer->GetLocalTeam() == Team : Team == EFlickTeam::Player1;
+	const int32 IndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
+	const bool bShowIndicator = !bEliminated && !bPregamePreview && !bLocalOwnershipRing;
+	const bool bDashed = IndicatorStyle > 0 && !bTeammate;
+	SelectionHalo->SetVisibility(bShowIndicator && !bDashed);
+	if (!TeamIndicatorMaterial && !TeamIndicatorDashes.IsEmpty())
+	{
+		TeamIndicatorMaterial = TeamIndicatorDashes[0]->CreateAndSetMaterialInstanceDynamic(0);
+		for (UStaticMeshComponent* Dash : TeamIndicatorDashes) Dash->SetMaterial(0, TeamIndicatorMaterial);
+	}
+	SetGlowColor(TeamIndicatorMaterial, HaloColor, bSelected ? 1.8f : 1.45f);
+	const FVector ParentScale = PieceMesh->GetComponentScale();
+	const float XYScale = FMath::Max(static_cast<float>(ParentScale.X), .01f);
+	const float ZScale = FMath::Max(static_cast<float>(ParentScale.Z), .01f);
+	for (int32 Index = 0; Index < TeamIndicatorDashes.Num(); ++Index)
+	{
+		const float Angle = 2 * PI * Index / TeamIndicatorDashes.Num();
+		UStaticMeshComponent* Dash = TeamIndicatorDashes[Index];
+		Dash->SetRelativeLocation(FVector(FMath::Cos(Angle) * PieceRadius * 1.18f / XYScale,
+			FMath::Sin(Angle) * PieceRadius * 1.18f / XYScale, (-PieceThickness * .5f + .8f) / ZScale));
+		Dash->SetRelativeRotation(FRotator(0, FMath::RadiansToDegrees(Angle) + 90, 0));
+		Dash->SetRelativeScale3D(FVector(PieceRadius * .32f / (100 * XYScale),
+			PieceRadius * .12f / (100 * XYScale), 1.2f / (100 * ZScale)));
+		Dash->SetVisibility(bShowIndicator && bDashed);
+	}
+	TeamIndicatorLabel->SetRelativeLocation(FVector(0, -PieceRadius * 1.55f / XYScale,
+		(-PieceThickness * .5f + 2) / ZScale));
+	TeamIndicatorLabel->SetWorldSize(14);
+	TeamIndicatorLabel->SetTextRenderColor(FColor::White);
+	TeamIndicatorLabel->SetText(FText::FromString(bHasLocalTeam ? (bTeammate ? TEXT("ALLY") : TEXT("FOE"))
+		: Team == EFlickTeam::Player1 ? TEXT("BLUE") : TEXT("ORANGE")));
+	TeamIndicatorLabel->SetVisibility(bShowIndicator && IndicatorStyle == 2);
 	const float Width = FlickVisualSettings::IsColorBlindAssistEnabled()
 		? (bTeammate ? 1.12f : 1.25f) : 1.15f;
 	const float Pulse = bSelected

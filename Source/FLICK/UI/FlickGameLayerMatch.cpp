@@ -1,5 +1,6 @@
 // HUD, scoreboard, tutorial, pause/results and state
 #include "UI/FlickGameLayerPrivate.h"
+#include "Debug/FlickPhysicsDiagnosticsComponent.h"
 
 namespace FlickScoreboardLayout
 {
@@ -14,6 +15,23 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 {
 	return SNew(SOverlay)
 		.Visibility(EVisibility::SelfHitTestInvisible)
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24, 130, 0, 0)[BuildTeamPingFeed()]
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(24, 0, 0, 100)
+		[
+			SNew(SBox).WidthOverride(480)
+			.Visibility_Lambda([]() { return UFlickPhysicsDiagnosticsComponent::IsEnabled() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			[
+				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.003f, .012f, .018f, .95f)).Padding(14)
+				[
+					SNew(STextBlock).Font(UiFont(11)).ColorAndOpacity(Paper).AutoWrapText(true)
+					.Text_Lambda([this]()
+					{
+						const auto* Diagnostics = PlayerController.IsValid() ? PlayerController->FindComponentByClass<UFlickPhysicsDiagnosticsComponent>() : nullptr;
+						return FText::FromString(Diagnostics ? Diagnostics->GetSummary() : FString());
+					})
+				]
+			]
+		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(18.0f, 14.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
@@ -118,6 +136,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 24.0f, 36.0f)[BuildControlHintPanel(true)]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 0.0f, 36.0f)[BuildCameraOrbitHint()]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 0.0f, 36.0f)[BuildPrivateSpectatorCard()]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 86.0f, 18.0f, 0.0f)[BuildEventFeed()];
 }
 
@@ -235,20 +254,21 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 		];
 }
 
-TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardOverlay()
+TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardOverlay(const bool bEmbedded)
 {
 	return SNew(SOverlay)
 		.Visibility(EVisibility::HitTestInvisible)
 		+ SOverlay::Slot()
 		[
 			SNew(SBorder)
+			.Visibility(bEmbedded ? EVisibility::Collapsed : EVisibility::HitTestInvisible)
 			.BorderImage(WhiteBrush())
 			.BorderBackgroundColor(FLinearColor(0.0f, 0.003f, 0.008f, 0.42f))
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24.0f)
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(bEmbedded ? 0.0f : 24.0f)
 		[
 			SNew(SBox)
-			.WidthOverride_Lambda([this]() { return FMath::Min(900.0f, FMath::Max(1.0f, LayerLocalSize.X - 48.0f)); })
+			.WidthOverride_Lambda([this, bEmbedded]() { return bEmbedded ? 900.0f : FMath::Min(900.0f, FMath::Max(1.0f, LayerLocalSize.X - 48.0f)); })
 			[
 				SNew(SScaleBox).Stretch(EStretch::ScaleToFit)
 				[
@@ -293,7 +313,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardOverlay()
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
 							SNew(STextBlock)
-							.Text(FText::FromString(TEXT("HOLD TAB")))
+							.Text(FText::FromString(bEmbedded ? TEXT("FINAL RESULT") : TEXT("HOLD TAB")))
 							.Font(UiFont(9, true))
 							.ColorAndOpacity(Muted)
 						]
@@ -303,7 +323,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardOverlay()
 					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, 11.0f, 2.0f, 0.0f)
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("FLICK  //  LIVE MATCH DATA")))
+						.Text_Lambda([this]() { const auto* State = GetScoreboardGameState(); return FText::FromString(State && State->bSeriesComplete ? TEXT("TEAM RESULTS FIRST  //  SELF-KOS AND SWITCHES GIVE NO POINTS") : TEXT("FLICK  //  LIVE MATCH DATA")); })
 						.Font(UiFont(8, true))
 						.ColorAndOpacity(Muted.CopyWithNewOpacity(0.72f))
 					]
@@ -401,7 +421,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardTeamSection(const EFlickTeam
 							.ColorAndOpacity(FLinearColor(0.7f, 0.79f, 0.84f, 1.0f))
 						]
 					]
-					+ SHorizontalBox::Slot().AutoWidth()[MakeHeading(TEXT("SHOTS"), FlickScoreboardLayout::Shots)]
+					+ SHorizontalBox::Slot().AutoWidth()
+					[SNew(SBox).WidthOverride(FlickScoreboardLayout::Shots).VAlign(VAlign_Bottom).Padding(0, 0, 0, 10)
+					 [SNew(STextBlock).Font(UiFont(8, true)).Justification(ETextJustify::Center).ColorAndOpacity(Muted)
+					  .Text_Lambda([this]() { const auto* State = GetScoreboardGameState(); return FText::FromString(State && State->bSeriesComplete ? (State->ActiveMatchVariant == EFlickMatchVariant::Bob ? TEXT("PENALTIES") : TEXT("SELF-KOS")) : TEXT("SHOTS")); })]]
 					+ SHorizontalBox::Slot().AutoWidth()
 					[
 						SNew(SBox).WidthOverride(FlickScoreboardLayout::FinalStat).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 0.0f, 10.0f)
@@ -410,6 +433,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardTeamSection(const EFlickTeam
 							.Text_Lambda([this]()
 							{
 								const AFlickGameState* State = GetScoreboardGameState();
+								if (State && State->bSeriesComplete) return FText::FromString(TEXT("SWITCHES"));
 								return FText::FromString(State && State->ActiveMatchVariant == EFlickMatchVariant::Bob ? TEXT("IMPACTS") : TEXT("SURVIVORS"));
 							})
 							.Font(UiFont(8, true)).Justification(ETextJustify::Center)
@@ -741,11 +765,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 		.Visibility_Lambda([this]()
 		{
 			return GameMode.IsValid() && GameMode->IsFreePlayTraining()
-				? EVisibility::HitTestInvisible
+				&& GameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing
+				? EVisibility::SelfHitTestInvisible
 				: EVisibility::Collapsed;
 		})
 		.WidthOverride(320.0f)
-		.HeightOverride(128.0f)
+		.MinDesiredHeight(128.0f)
 		[
 			SNew(SFlickAngularBorder)
 			.BackgroundColor(FLinearColor(0.002f, 0.01f, 0.018f, 0.95f))
@@ -800,12 +825,32 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 								? TEXT("1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  DEL REMOVE NON-STRIKERS")
 								: TEXT("WHEEL TYPE  |  LMB PLACE/DRAG PUCK OR TOGGLE DIVIDER  |  DEL REMOVE"));
 						}
-						return FText::FromString(TEXT("Aim and shoot normally   |   R restores your saved setup"));
+						return FText::FromString(TEXT("Aim and shoot normally. Reset restores your saved setup, not a new board."));
 					})
 					.Font(UiFont(8, true))
 					.AutoWrapText(true)
 					.WrapTextAt(272.0f)
 					.ColorAndOpacity(FLinearColor(0.68f, 0.76f, 0.82f, 1.0f))
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 8, 0, 0)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1).Padding(0, 0, 6, 0)
+					[
+						SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).IsFocusable(false)
+						.IsEnabled_Lambda([this]() { return GameMode.IsValid() && GameMode->CanEditTrainingBoard(); })
+						.OnClicked_Lambda([this]() { if (GameMode.IsValid()) GameMode->ToggleTrainingEditMode(); return FReply::Handled(); })
+						[
+							SNew(STextBlock).Font(UiFont(10, true)).ColorAndOpacity(Paper)
+							.Text_Lambda([this]() { return FText::FromString(GameMode.IsValid() && GameMode->IsTrainingEditMode() ? TEXT("SAVE / DONE") : TEXT("EDIT BOARD")); })
+						]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1)
+					[
+						SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).IsFocusable(false)
+						.OnClicked_Lambda([this]() { if (GameMode.IsValid()) GameMode->RestartMatch(); return FReply::Handled(); })
+						[SNew(STextBlock).Text(FText::FromString(TEXT("RESET SETUP"))).Font(UiFont(10, true)).ColorAndOpacity(Paper)]
+					]
 				]
 			]
 		];
@@ -817,7 +862,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTutorialOverlay()
 		.Visibility_Lambda([this]()
 		{
 			return GameMode.IsValid() && GameMode->IsTutorialMode()
-				? EVisibility::HitTestInvisible
+				&& GameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing
+				? EVisibility::SelfHitTestInvisible
 				: EVisibility::Collapsed;
 		})
 		.WidthOverride(430.0f)
@@ -850,10 +896,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTutorialOverlay()
 					]
 					+ SHorizontalBox::Slot().AutoWidth()
 					[
-						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("R  RETRY")))
-						.Font(UiFont(9, true))
-						.ColorAndOpacity(Muted)
+						SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).IsFocusable(false)
+						.OnClicked_Lambda([this]() { if (GameMode.IsValid()) GameMode->RestartMatch(); return FReply::Handled(); })
+						[
+							SNew(STextBlock).Font(UiFont(9, true)).ColorAndOpacity(Paper)
+							.Text_Lambda([this]() { return FText::FromString(GameMode.IsValid() && GameMode->IsTutorialComplete() ? TEXT("PLAY AGAIN") : TEXT("RETRY")); })
+						]
 					]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
@@ -994,7 +1042,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 		.HeightOverride(66.0f)
 		.Visibility_Lambda([this]()
 		{
-			return ShouldShowGameplayControls() && (!GameMode.IsValid() || GameMode->IsControlOverviewEnabled())
+			return ShouldShowGameplayControls() && !(PlayerController.IsValid() && PlayerController->IsPrivateMatchSpectator())
+				&& (!GameMode.IsValid() || GameMode->IsControlOverviewEnabled())
 				? EVisibility::HitTestInvisible
 				: EVisibility::Collapsed;
 		})
@@ -1118,7 +1167,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 		.HeightOverride(66.0f)
 		.Visibility_Lambda([this]()
 		{
-			return ShouldShowGameplayControls() && GameMode.IsValid()
+			return ShouldShowGameplayControls() && !(PlayerController.IsValid() && PlayerController->IsPrivateMatchSpectator()) && GameMode.IsValid()
 				&& GameMode->IsControlOverviewEnabled()
 				&& GameMode->CanChangeCameraView()
 				? EVisibility::HitTestInvisible

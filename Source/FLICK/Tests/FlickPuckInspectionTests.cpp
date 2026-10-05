@@ -3,6 +3,7 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Game/FlickGameState.h"
@@ -21,6 +22,8 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 	const int32 SavedHoverSize = FlickVisualSettings::GetPuckHoverSize();
 	const int32 SavedHoverDetail = FlickVisualSettings::GetPuckHoverDetail();
 	const bool bSavedColorBlindAssist = FlickVisualSettings::IsColorBlindAssistEnabled();
+	const int32 SavedIndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
+	FlickVisualSettings::SetPuckIndicatorStyle(0);
 	FlickVisualSettings::SetColorBlindAssistEnabled(false);
 	FlickVisualSettings::SetPuckHoverDetail(3);
 	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
@@ -78,6 +81,29 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 		> Teammate->SelectionHalo->GetRelativeScale3D().X + 0.06f);
 	FlickVisualSettings::SetColorBlindAssistEnabled(false);
 	GameState->PlayersPerTeam = 3;
+	Own->EnableTestArenaVisuals();
+	Teammate->EnableTestArenaVisuals();
+	Other->EnableTestArenaVisuals();
+	for (int32 Style : {1, 2})
+	{
+		FlickVisualSettings::SetPuckIndicatorStyle(Style);
+		RingColour(Own);
+		RingColour(Teammate);
+		RingColour(Other);
+		TestTrue(TEXT("Ally keeps a continuous ring"), Teammate->SelectionHalo->IsVisible());
+		TestFalse(TEXT("Enemy uses dashes instead of a continuous ring"), Other->SelectionHalo->IsVisible());
+		for (UStaticMeshComponent* Dash : Other->TeamIndicatorDashes)
+		{
+			TestTrue(TEXT("Enemy dashes are visible"), Dash->IsVisible());
+			TestEqual(TEXT("Indicators cannot affect physics"), Dash->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		}
+		TestFalse(TEXT("Own puck has no label"), Own->TeamIndicatorLabel->IsVisible());
+		TestFalse(TEXT("Own puck has no patterned ring"), Own->TeamIndicatorDashes[0]->IsVisible());
+		TestEqual(TEXT("Labels follow the chosen style"), Other->TeamIndicatorLabel->IsVisible(), Style == 2);
+		TestEqual(TEXT("Ally relationship label"), Teammate->TeamIndicatorLabel->Text.ToString(), FString(TEXT("ALLY")));
+		TestEqual(TEXT("Enemy relationship label"), Other->TeamIndicatorLabel->Text.ToString(), FString(TEXT("FOE")));
+	}
+	FlickVisualSettings::SetPuckIndicatorStyle(0);
 	Player->SetTeamPlayerSlot(1);
 	TestTrue(TEXT("Ownership follows reassigned player slot"), Controller->OwnsPieceLocally(Teammate));
 	TestFalse(TEXT("Previous slot no longer locally owned"), Controller->OwnsPieceLocally(Own));
@@ -113,6 +139,7 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 	FlickVisualSettings::SetPuckHoverSize(SavedHoverSize);
 	FlickVisualSettings::SetPuckHoverDetail(SavedHoverDetail);
 	FlickVisualSettings::SetColorBlindAssistEnabled(bSavedColorBlindAssist);
+	FlickVisualSettings::SetPuckIndicatorStyle(SavedIndicatorStyle);
 	TestTrue(TEXT("Hover appears in the first frame, without a dwell timer"), Widget->Alpha > 0);
 	Widget->Tick(FGeometry(), 0, .04f);
 	TestEqual(TEXT("Short entrance fade completes within 56 ms"), Widget->Alpha, 1.0f);

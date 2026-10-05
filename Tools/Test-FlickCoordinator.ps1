@@ -13,6 +13,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Coordinator build failed.' }
 
 $LogDirectory = Join-Path $Root 'Saved\Coordinator'
 New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
+$env:FLICK_COORDINATOR_RATINGS_PATH = Join-Path $LogDirectory 'postmatch-smoke-ratings.json'
+[IO.File]::WriteAllText($env:FLICK_COORDINATOR_RATINGS_PATH, '{}')
 $Process = Start-Process -FilePath 'dotnet' -ArgumentList @($Dll, '--urls', $BaseUrl) -WorkingDirectory $Root -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput (Join-Path $LogDirectory 'coordinator-smoke.stdout.log') `
     -RedirectStandardError (Join-Path $LogDirectory 'coordinator-smoke.stderr.log')
@@ -32,7 +34,7 @@ try {
     $Readiness = Invoke-RestMethod -Uri "$BaseUrl/health/ready"
     if ($Liveness.status -ne 'alive' -or $Readiness.status -ne 'ok') { throw 'Coordinator health endpoints failed.' }
 
-    function Add-QueueTicket([string]$AccountId, [int]$ClaimedRating) {
+    function Add-QueueTicket([string]$AccountId, [int]$ClaimedRating, [bool]$Ranked = $false) {
         $Body = @{
             request_id = "request-$AccountId"
             build_id = 'smoke-build'
@@ -40,7 +42,7 @@ try {
             region = 'local'
             variant = 0
             players_per_team = 1
-            ranked = $false
+            ranked = $Ranked
             members = @(@{
                 account_id = $AccountId
                 display_name = $AccountId
@@ -109,6 +111,70 @@ try {
     } | ConvertTo-Json
     $Complete = Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$($StatusOne.allocation.match_id)/complete" -Headers $Headers -ContentType 'application/json' -Body $CompleteBody
     if (-not $Complete.accepted) { throw 'Server completion report failed.' }
+
+
+    $NextMatchId = [guid]::NewGuid().ToString()
+    $RematchBody = @{ server_id = $StatusOne.allocation.server_id; new_match_id = $NextMatchId } | ConvertTo-Json
+    $RematchUrl = "$BaseUrl/v1/servers/matches/$($StatusOne.allocation.match_id)/rematch"
+    $Rematch = Invoke-RestMethod -Method Post -Uri $RematchUrl -Headers $Headers -ContentType 'application/json' -Body $RematchBody
+    if (-not $Rematch.accepted -or $Rematch.match_id -ne $NextMatchId) { throw 'Rematch allocation failed.' }
+    $Duplicate = Invoke-RestMethod -Method Post -Uri $RematchUrl -Headers $Headers -ContentType 'application/json' -Body $RematchBody
+    if ($Duplicate.match_id -ne $NextMatchId) { throw 'Rematch retry was not idempotent.' }
+    foreach ($Previous in @($StatusOne.allocation.reservations[0], $StatusTwo.allocation.reservations[0])) {
+        $Verify = @{ match_id = $NextMatchId; account_id = $Previous.account_id; reservation_token = $Previous.token } | ConvertTo-Json
+        $Verified = Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/matchmaking/reservations/verify" -Headers $Headers -ContentType 'application/json' -Body $Verify
+        if (-not $Verified.accepted -or $Verified.team -ne $Previous.team -or $Verified.player_slot -ne $Previous.player_slot) { throw 'Rematch changed a reserved player seat.' }
+    }
+    $NextStartedBody = @{ match_id = $NextMatchId; server_id = $StatusOne.allocation.server_id; started_unix_time = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() } | ConvertTo-Json
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$NextMatchId/started" -Headers $Headers -ContentType 'application/json' -Body $NextStartedBody | Out-Null
+    $NextCompleteBody = @{ match_id = $NextMatchId; server_id = $StatusOne.allocation.server_id; outcome = 2; forfeit = $false; completed_unix_time = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() } | ConvertTo-Json
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$NextMatchId/complete" -Headers $Headers -ContentType 'application/json' -Body $NextCompleteBody | Out-Null
+    Write-Host 'PASS: same-server rematch retained seats and completed with a fresh match ID.'
+
+
+    # Competitive rematches require settlement and register a new authoritative roster.
+    $RankedOne = Add-QueueTicket 'RematchRankedOne' 1000 $true
+    $RankedTwo = Add-QueueTicket 'RematchRankedTwo' 1000 $true
+    $RankedStatus = Invoke-RestMethod -Uri "$BaseUrl/v1/matchmaking/tickets/$($RankedOne.ticket_id)"
+    $RankedOther = Invoke-RestMethod -Uri "$BaseUrl/v1/matchmaking/tickets/$($RankedTwo.ticket_id)"
+    $RankedAllocation = $RankedStatus.allocation
+    $RankedHeaders = @{ Authorization = 'Bearer flick-local-development-key'; 'X-Flick-Server-Id' = $RankedAllocation.server_id }
+    $Roster = @()
+    foreach ($Reservation in @($RankedAllocation.reservations[0], $RankedOther.allocation.reservations[0])) {
+        $Verify = @{ match_id = $RankedAllocation.match_id; account_id = $Reservation.account_id; reservation_token = $Reservation.token } | ConvertTo-Json
+        Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/matchmaking/reservations/verify" -Headers $RankedHeaders -ContentType 'application/json' -Body $Verify | Out-Null
+        $Roster += @{ account_id = $Reservation.account_id; team = $Reservation.team; player_slot = $Reservation.player_slot; authenticated_rating = 1000 }
+    }
+    $RankedMatch = @{ match_id = $RankedAllocation.match_id; server_id = $RankedAllocation.server_id; season_id = 'PRESEASON'; playlist = 'ranked-0-1'; variant = 0; players_per_team = 1; started_unix_time = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds(); participants = $Roster }
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/ranked/matches" -Headers $RankedHeaders -ContentType 'application/json' -Body ($RankedMatch | ConvertTo-Json -Depth 5) | Out-Null
+    $Started = @{ match_id = $RankedMatch.match_id; server_id = $RankedMatch.server_id; started_unix_time = $RankedMatch.started_unix_time } | ConvertTo-Json
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$($RankedMatch.match_id)/started" -Headers $RankedHeaders -ContentType 'application/json' -Body $Started | Out-Null
+    $RankedResult = $RankedMatch.Clone()
+    $RankedResult.outcome = 1; $RankedResult.forfeit = $false; $RankedResult.completed_unix_time = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    # Result and completion requests can arrive in either order.
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/ranked/matches/$($RankedMatch.match_id)/result" -Headers $RankedHeaders -ContentType 'application/json' -Body ($RankedResult | ConvertTo-Json -Depth 5) | Out-Null
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$($RankedMatch.match_id)/complete" -Headers $RankedHeaders -ContentType 'application/json' -Body ($RankedResult | ConvertTo-Json -Depth 5) | Out-Null
+    $NextRankedId = [guid]::NewGuid().ToString()
+    $NextRankedBody = @{ server_id = $RankedMatch.server_id; new_match_id = $NextRankedId } | ConvertTo-Json
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$($RankedMatch.match_id)/rematch" -Headers $RankedHeaders -ContentType 'application/json' -Body $NextRankedBody | Out-Null
+    $RankedMatch.match_id = $NextRankedId
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/ranked/matches" -Headers $RankedHeaders -ContentType 'application/json' -Body ($RankedMatch | ConvertTo-Json -Depth 5) | Out-Null
+    $StartedNext = @{ match_id = $NextRankedId; server_id = $RankedMatch.server_id; started_unix_time = $RankedMatch.started_unix_time } | ConvertTo-Json
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$NextRankedId/started" -Headers $RankedHeaders -ContentType 'application/json' -Body $StartedNext | Out-Null
+    $RankedResult.match_id = $NextRankedId
+    $RankedResult.outcome = 2
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$NextRankedId/complete" -Headers $RankedHeaders -ContentType 'application/json' -Body ($RankedResult | ConvertTo-Json -Depth 5) | Out-Null
+    $ThirdId = [guid]::NewGuid().ToString()
+    $ThirdBody = @{ server_id = $RankedMatch.server_id; new_match_id = $ThirdId } | ConvertTo-Json
+    try {
+        Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$NextRankedId/rematch" -Headers $RankedHeaders -ContentType 'application/json' -Body $ThirdBody | Out-Null
+        throw 'Competitive rematch started before the result settled.'
+    } catch {
+        if ($_.Exception.Response.StatusCode.value__ -ne 409) { throw }
+    }
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/ranked/matches/$NextRankedId/result" -Headers $RankedHeaders -ContentType 'application/json' -Body ($RankedResult | ConvertTo-Json -Depth 5) | Out-Null
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/servers/matches/$NextRankedId/rematch" -Headers $RankedHeaders -ContentType 'application/json' -Body $ThirdBody | Out-Null
+    Write-Host 'PASS: competitive result/completion ordering and fresh rematch registration.'
 
 	function Add-BuildTicket([string]$AccountId, [string]$BuildId) {
 		$Body = @{

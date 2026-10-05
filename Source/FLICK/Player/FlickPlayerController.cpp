@@ -6,6 +6,10 @@
 
 #include "Core/FlickLog.h"
 #include "DrawDebugHelpers.h"
+#include "Debug/FlickPhysicsDiagnosticsComponent.h"
+#include "Player/FlickPostMatchPresentationComponent.h"
+#include "Player/FlickPrivateSpectatorComponent.h"
+#include "Player/FlickTeamPingComponent.h"
 #include "Engine/EngineTypes.h"
 #include "EngineUtils.h"
 #include "Game/FlickGameInstance.h"
@@ -35,6 +39,10 @@ AFlickPlayerController::AFlickPlayerController()
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
 	PrimaryActorTick.bCanEverTick = true;
+	PhysicsDiagnostics = CreateDefaultSubobject<UFlickPhysicsDiagnosticsComponent>(TEXT("PhysicsDiagnostics"));
+	PostMatchPresentation = CreateDefaultSubobject<UFlickPostMatchPresentationComponent>(TEXT("PostMatchPresentation"));
+	PrivateSpectator = CreateDefaultSubobject<UFlickPrivateSpectatorComponent>(TEXT("PrivateSpectator"));
+	TeamPings = CreateDefaultSubobject<UFlickTeamPingComponent>(TEXT("TeamPings"));
 	bShouldPerformFullTickWhenPaused = true;
 }
 
@@ -154,6 +162,7 @@ void AFlickPlayerController::RefreshControlBindings()
 	const auto Key = [](const TCHAR* Id) { return FlickControlBindings::GetKey(Id); };
 	InputComponent->BindKey(Key(TEXT("ReplaySkip")), IE_Pressed, this, &AFlickPlayerController::HandleReplaySkipPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Shoot")), IE_Pressed, this, &AFlickPlayerController::HandlePrimaryPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("TeamPing")), IE_Pressed, this, &AFlickPlayerController::HandleTeamPingPressed);
 	InputComponent->BindKey(Key(TEXT("Shoot")), IE_Released, this, &AFlickPlayerController::HandlePrimaryReleased).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Secondary")), IE_Pressed, this, &AFlickPlayerController::HandleSecondaryPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Menu")), IE_Pressed, this, &AFlickPlayerController::HandleCancelPressed).bExecuteWhenPaused = true;
@@ -170,6 +179,8 @@ void AFlickPlayerController::RefreshControlBindings()
 	InputComponent->BindKey(Key(TEXT("CameraReset")), IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Scoreboard")), IE_Pressed, this, &AFlickPlayerController::HandleScoreboardPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Scoreboard")), IE_Released, this, &AFlickPlayerController::HandleScoreboardReleased).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("OrbitLeft")), IE_Pressed, this, &AFlickPlayerController::HandleSpectatorPreviousPressed);
+	InputComponent->BindKey(Key(TEXT("OrbitRight")), IE_Pressed, this, &AFlickPlayerController::HandleSpectatorNextPressed);
 }
 
 void AFlickPlayerController::RefreshLocalLighting()
@@ -229,6 +240,27 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 	}
 	bObservedPrivateMatchActive = bPrivateMatchNowActive;
 	UpdateCareerStatsTracking(NetworkState);
+	const AFlickGameMode* PresentationMode = GetFlickGameMode();
+	if (IsLocalController() && NetworkState && NetworkState->bSeriesComplete
+		&& NetworkState->MatchPhase == EFlickMatchPhase::RoundOver
+		&& !bCinematicReplayPresentationActive
+		&& (!PresentationMode || PresentationMode->GetFrontendScreen() == EFlickFrontendScreen::Playing))
+	{
+		// A private spectator may finish the match in free-camera/game-only input.
+		// Restore the pointer before the post-match actions appear, on every client.
+		if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()); Camera && Camera->IsFreeCameraEnabled())
+		{
+			Camera->SetFreeCameraEnabled(false);
+			SetFreeCameraInputMode(false);
+		}
+		bPrivateTeamMenuOpen = false;
+		bScoreboardVisible = false;
+		ClearAiming();
+		ClearHoveredPiece();
+		bShowMouseCursor = true;
+		CurrentMouseCursor = EMouseCursor::Default;
+		return;
+	}
 	if (bNetworkAutoReadyRequested && NetworkState && NetworkState->bNetworkLobbyActive)
 	{
 		const AFlickPlayerState* FlickPlayerState = GetPlayerState<AFlickPlayerState>();
@@ -301,6 +333,16 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 		return;
 	}
 	UpdateLocalCameraOrbit(DeltaTime);
+	if (IsFollowingPrivatePlayer())
+	{
+		if (auto* Camera = Cast<AFlickCameraPawn>(GetPawn())) Camera->SetMenuPresentation(false);
+		bInitializedNetworkCamera = true;
+		ClearAiming();
+		ClearHoveredPiece();
+		bShowMouseCursor = true;
+		CurrentMouseCursor = EMouseCursor::Default;
+		return;
+	}
 
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
 	if (TrainingDraggedPiece && (!FlickGameMode || !FlickGameMode->IsTrainingEditMode()))
@@ -483,6 +525,11 @@ void AFlickPlayerController::ClearAiming()
 	bHasPredictedContact = false;
 }
 
+void AFlickPlayerController::HandleTeamPingPressed()
+{
+	if (TeamPings) TeamPings->TryPing(FindPieceUnderCursor());
+}
+
 void AFlickPlayerController::HandlePrimaryPressed()
 {
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
@@ -607,6 +654,7 @@ void AFlickPlayerController::HandleCameraElevationDownPressed()
 
 void AFlickPlayerController::HandleCameraResetPressed()
 {
+	if (IsFollowingPrivatePlayer()) return;
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
 	if (!IsGameplayActive()
 		|| !FlickGameMode
@@ -636,6 +684,7 @@ void AFlickPlayerController::HandleCameraResetPressed()
 
 void AFlickPlayerController::HandleTopDownViewPressed()
 {
+	if (IsFollowingPrivatePlayer()) return;
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
 	if (!IsGameplayActive() || (FlickGameMode && (!FlickGameMode->CanChangeCameraView()
 		|| FlickGameMode->IsCinematicReplayActive()))) return;
@@ -676,6 +725,7 @@ void AFlickPlayerController::HandleCancelPressed()
 	{
 		CameraPawn->SetFreeCameraEnabled(false);
 		SetFreeCameraInputMode(false);
+		if (IsPrivateMatchSpectator() && PrivateSpectator) PrivateSpectator->CycleTarget(0);
 		return;
 	}
 	if (TrainingDraggedPiece)
@@ -1249,6 +1299,17 @@ void AFlickPlayerController::SubmitLaunch(
 	ServerTryLaunchPiece(Piece ? Piece->GetPieceId() : INDEX_NONE, Direction.GetSafeNormal(), NormalizedPower);
 }
 
+void AFlickPlayerController::RequestRematch(const bool bChangeLineup)
+{
+ if (AFlickGameMode* Mode = GetFlickGameMode()) Mode->RequestRematch(this, bChangeLineup);
+ else ServerRequestRematch(bChangeLineup);
+}
+
+void AFlickPlayerController::ServerRequestRematch_Implementation(const bool bChangeLineup)
+{
+ if (AFlickGameMode* Mode = GetFlickGameMode()) Mode->RequestRematch(this, bChangeLineup);
+}
+
 void AFlickPlayerController::RequestRestartMatch()
 {
 	if (!IsGameplayActive())
@@ -1257,7 +1318,8 @@ void AFlickPlayerController::RequestRestartMatch()
 	}
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
-		FlickGameMode->RestartMatch();
+		if (GetFlickGameState() && GetFlickGameState()->bSeriesComplete) FlickGameMode->RequestRematch(this, false);
+		else FlickGameMode->RestartMatch();
 	}
 	else
 	{
@@ -1392,73 +1454,75 @@ void AFlickPlayerController::RequestPrivateMatchSpectate()
 	{
 		ServerSetPrivateMatchSpectating();
 	}
+	// On remote clients the role update may arrive later; the component starts
+	// following once the chosen spectator role has replicated.
 }
 
 bool AFlickPlayerController::ShouldShowPrivateTeamMenu() const
 {
 	const AFlickGameState* State = GetFlickGameState();
 	if (!State || !State->bPrivateMatchActive) return false;
+	if (State->bSeriesComplete && State->MatchPhase == EFlickMatchPhase::RoundOver) return false;
 	const AFlickPlayerState* LocalState = GetPlayerState<AFlickPlayerState>();
 	return bPrivateTeamMenuOpen || (LocalState && !LocalState->HasChosenPrivateRole());
 }
 
 void AFlickPlayerController::CyclePrivateSpectatorPlayer(const int32 Direction)
 {
-	const AFlickGameState* State = GetFlickGameState();
-	if (!State || !State->bPrivateMatchActive || GetLocalTeam() != EFlickTeam::None) return;
-	TArray<const AFlickPlayerState*> Players;
-	for (const APlayerState* BasePlayer : State->PlayerArray)
-	{
-		const AFlickPlayerState* CandidateState = Cast<AFlickPlayerState>(BasePlayer);
-		if (CandidateState && CandidateState->GetTeam() != EFlickTeam::None) Players.Add(CandidateState);
-	}
-	Players.Sort([](const AFlickPlayerState& A, const AFlickPlayerState& B)
-	{
-		return A.GetPlayerId() < B.GetPlayerId();
-	});
-	if (Players.IsEmpty()) return;
-	int32 Index = Players.IndexOfByPredicate([this](const AFlickPlayerState* CandidateState)
-	{
-		return CandidateState && CandidateState->GetPlayerId() == PrivateSpectatorTargetPlayerId;
-	});
-	Index = Index == INDEX_NONE ? 0 : (Index + (Direction >= 0 ? 1 : -1) + Players.Num()) % Players.Num();
-	const AFlickPlayerState* Target = Players[Index];
-	PrivateSpectatorTargetPlayerId = Target->GetPlayerId();
+	if (!PrivateSpectator || !IsPrivateMatchSpectator() || IsCinematicReplayPresentationActive()) return;
+	PrivateSpectator->CycleTarget(Direction);
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		bPrivateSpectateChosen = true;
 		CameraPawn->SetFreeCameraEnabled(false);
 		SetFreeCameraInputMode(false);
-		CameraPawn->ResetGameplayView(Target->GetTeam() == EFlickTeam::Player2 ? 2 : 0, true);
 		bPrivateTeamMenuOpen = false;
 	}
 }
 
 FString AFlickPlayerController::GetPrivateSpectatorTargetName() const
 {
-	const AFlickGameState* State = GetFlickGameState();
-	if (!State || PrivateSpectatorTargetPlayerId == INDEX_NONE) return TEXT("SELECT PLAYER");
-	for (const APlayerState* BasePlayer : State->PlayerArray)
-	{
-		if (BasePlayer && BasePlayer->GetPlayerId() == PrivateSpectatorTargetPlayerId)
-		{
-			return BasePlayer->GetPlayerName();
-		}
-	}
-	return TEXT("SELECT PLAYER");
+	return PrivateSpectator ? PrivateSpectator->GetTargetName() : TEXT("SELECT PLAYER OR BOT");
+}
+
+bool AFlickPlayerController::IsPrivateMatchSpectator() const
+{
+	return PrivateSpectator && PrivateSpectator->IsSpectator();
+}
+
+bool AFlickPlayerController::IsFollowingPrivatePlayer() const
+{
+	return PrivateSpectator && PrivateSpectator->IsFollowing();
+}
+
+EFlickTeam AFlickPlayerController::GetPrivateSpectatorTargetTeam() const
+{
+	return PrivateSpectator ? PrivateSpectator->GetTargetTeam() : EFlickTeam::None;
+}
+
+void AFlickPlayerController::HandleSpectatorPreviousPressed()
+{
+	if (IsPrivateMatchSpectator() && !ShouldShowPrivateTeamMenu() && !IsScoreboardVisible()) CyclePrivateSpectatorPlayer(-1);
+}
+
+void AFlickPlayerController::HandleSpectatorNextPressed()
+{
+	if (IsPrivateMatchSpectator() && !ShouldShowPrivateTeamMenu() && !IsScoreboardVisible()) CyclePrivateSpectatorPlayer(1);
 }
 
 void AFlickPlayerController::TogglePrivateSpectatorFreeCamera()
 {
 	const AFlickGameState* State = GetFlickGameState();
-	if (!State || !State->bPrivateMatchActive || GetLocalTeam() != EFlickTeam::None) return;
+	if (!State || !State->bPrivateMatchActive || State->bSeriesComplete || GetLocalTeam() != EFlickTeam::None) return;
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		bPrivateSpectateChosen = true;
 		const bool bEnable = !CameraPawn->IsFreeCameraEnabled();
+		if (PrivateSpectator && bEnable) PrivateSpectator->StopFollowing();
 		CameraPawn->SetFreeCameraEnabled(bEnable);
 		SetFreeCameraInputMode(bEnable);
 		bPrivateTeamMenuOpen = false;
+		if (!bEnable && PrivateSpectator) PrivateSpectator->CycleTarget(0);
 	}
 }
 
@@ -1612,7 +1676,7 @@ void AFlickPlayerController::ApplyTrustedRankedUpdateFromServer(const FFlickRati
 
 void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 {
-	if (DeltaSeconds <= 0.0f || !IsGameplayActive())
+	if (DeltaSeconds <= 0.0f || !IsGameplayActive() || IsFollowingPrivatePlayer())
 	{
 		return;
 	}
@@ -1646,7 +1710,7 @@ void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 
 void AFlickPlayerController::AdjustLocalCameraElevation(const int32 Direction)
 {
-	if (Direction == 0 || !IsGameplayActive())
+	if (Direction == 0 || !IsGameplayActive() || IsFollowingPrivatePlayer())
 	{
 		return;
 	}
@@ -1676,7 +1740,8 @@ void AFlickPlayerController::ServerRequestRestartMatch_Implementation()
 {
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
-		FlickGameMode->RestartMatch();
+		if (GetFlickGameState() && GetFlickGameState()->bSeriesComplete) FlickGameMode->RequestRematch(this, false);
+		else if (GetNetMode() == NM_Standalone) FlickGameMode->RestartMatch();
 	}
 }
 

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/FlickTypes.h"
+#include "Core/FlickSpectatorView.h"
 #include "GameFramework/PlayerState.h"
 #include "FlickPlayerState.generated.h"
 
@@ -48,8 +49,14 @@ public:
 	int32 GetPuckEffect(int32 EffectIndex) const;
 	void SetPrivateRoleChosen(bool bInChosen);
 	bool HasChosenPrivateRole() const { return bPrivateRoleChosen; }
+	bool SetPrivateCameraView(const FFlickSpectatorView& View);
+	const FFlickSpectatorView& GetPrivateCameraView() const { return PrivateCameraView; }
 
 private:
+	UPROPERTY(Replicated)
+	FFlickSpectatorView PrivateCameraView;
+	double LastPrivateCameraUpdate = -1.0;
+
 	UPROPERTY(Replicated)
 	TArray<int32> PuckSkins;
 	UPROPERTY(Replicated)

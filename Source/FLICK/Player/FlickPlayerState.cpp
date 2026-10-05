@@ -3,6 +3,7 @@
 #include "Core/FlickLineupRules.h"
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Core/FlickCosmeticCatalog.h"
+#include "Game/FlickGameState.h"
 
 #include "Net/UnrealNetwork.h"
 
@@ -30,6 +31,21 @@ void AFlickPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AFlickPlayerState, VerifiedOnlineAccountId);
 	DOREPLIFETIME(AFlickPlayerState, PrivateControlledSlots);
 	DOREPLIFETIME(AFlickPlayerState, bPrivateRoleChosen);
+	DOREPLIFETIME_CONDITION(AFlickPlayerState, PrivateCameraView, COND_SkipOwner);
+}
+
+bool AFlickPlayerState::SetPrivateCameraView(const FFlickSpectatorView& View)
+{
+	const AFlickGameState* State = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (!HasAuthority() || !State || !State->bPrivateMatchActive || !State->IsGameplayActive()
+		|| State->bSeriesComplete || Team == EFlickTeam::None || !View.IsSafe()
+		|| (LastPrivateCameraUpdate >= 0.0 && Now - LastPrivateCameraUpdate < 0.045)) return false;
+	PrivateCameraView = View;
+	PrivateCameraView.bValid = true;
+	LastPrivateCameraUpdate = Now;
+	ForceNetUpdate();
+	return true;
 }
 
 void AFlickPlayerState::ResetNetworkClassSelection(const EFlickLineupPreset InClass)
@@ -48,7 +64,10 @@ void AFlickPlayerState::ResetNetworkClassSelection(const EFlickLineupPreset InCl
 bool AFlickPlayerState::SetPuckSkins(const TArray<int32>& Skins)
 {
 	if (!HasAuthority() || Skins.Num() != FlickPieceArchetypeRules::ArchetypeCount) return false;
-	for (int32 Skin : Skins) if (Skin < 0 || Skin >= FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart).Num()) return false;
+	for (int32 Index = 0; Index < Skins.Num(); ++Index)
+	{
+		if (!FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart + Index).IsValidIndex(Skins[Index])) return false;
+	}
 	PuckSkins = Skins;
 	ForceNetUpdate();
 	return true;
@@ -195,6 +214,7 @@ void AFlickPlayerState::SetTeam(const EFlickTeam InTeam)
 {
 	if (HasAuthority())
 	{
+		if (Team != InTeam) { PrivateCameraView = FFlickSpectatorView(); LastPrivateCameraUpdate = -1.0; }
 		Team = InTeam;
 	}
 }

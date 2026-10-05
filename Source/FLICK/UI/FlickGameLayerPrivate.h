@@ -1241,8 +1241,8 @@ namespace
 			}
 			const FLinearColor DarkMetal(0.014f, 0.023f, 0.035f, 1.0f);
 			const FLinearColor MidMetal(0.065f, 0.083f, 0.105f, 1.0f);
-			const FLinearColor Silver(0.52f, 0.62f, 0.7f, 1.0f);
-			const FLinearColor SilverHighlight(0.86f, 0.93f, 0.98f, 1.0f);
+			const FLinearColor Silver(.52f, .62f, .7f);
+			const FLinearColor SilverHighlight(.86f, .93f, .98f);
 			const FLinearColor TeamLight = FMath::Lerp(Team, FLinearColor::White, 0.1f);
 			const float DetailScale = FMath::Clamp(BaseRadius / 34.0f, 0.42f, 1.6f);
 			const float FineLine = FMath::Clamp(1.25f * DetailScale, 0.65f, 2.0f);
@@ -1280,10 +1280,10 @@ namespace
 						DarkMetal, FineLine * 5.7f);
 				}
 			}
-			DrawRing(LayerId + 9, BaseRadius * (TopScale - 0.06f), Silver.CopyWithNewOpacity(0.85f), FineLine * 0.9f);
+			DrawRing(LayerId + 9, BaseRadius * (TopScale - 0.06f), Silver.CopyWithNewOpacity(0.85f), FineLine * .9f);
 			DrawDisc(LayerId + 10, BaseRadius * (TopScale - 0.14f), FVector2f::ZeroVector, MidMetal, DarkMetal);
-			DrawRing(LayerId + 11, BaseRadius * (TopScale - 0.14f), TeamLight.CopyWithNewOpacity(0.98f), FineLine * 1.45f);
-
+			DrawRing(LayerId + 11, BaseRadius * (TopScale - 0.14f),
+				TeamLight.CopyWithNewOpacity(.98f), FineLine * 1.45f);
 			const FVector2D SymbolCenter(Center.X, Center.Y);
 			const float SymbolRadius = BaseRadius * 0.26f;
 			switch (VisualArchetype)

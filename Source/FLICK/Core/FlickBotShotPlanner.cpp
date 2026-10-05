@@ -2,6 +2,12 @@
 
 namespace
 {
+	// Decision heuristic only: no simulated forces, masses or friction are changed.
+	float SelfKnockoutRisk(const FFlickBotPieceState& Shooter, const FVector2D& Direction, float ArenaRadius)
+	{
+		const float EdgeExposure = FMath::Clamp((Shooter.Position.Size() / FMath::Max(ArenaRadius, 1.0f) - .65f) / .35f, 0.0f, 1.0f);
+		return EdgeExposure * FMath::Max(0.0f, static_cast<float>(FVector2D::DotProduct(Shooter.Position.GetSafeNormal(), Direction)));
+	}
 	float DistanceToSegment(const FVector2D& Point, const FVector2D& Start, const FVector2D& End)
 	{
 		const FVector2D Segment = End - Start;
@@ -306,7 +312,8 @@ FFlickBotShotPlan FlickBotShotPlanner::PlanShot(
 			const float Score = OutwardAlignment * 2.45f
 				+ TargetEdgeProgress * 1.35f
 				- DistanceFraction * 0.42f
-				- BlockerPenalty * 1.7f
+				- BlockerPenalty * 1.7f * Tuning.BlockerAwareness
+				- SelfKnockoutRisk(Shooter, ShotDirection, SafeArenaRadius) * 3.0f * Tuning.SelfPreservation
 				- ApproachDividerPenalty * 5.2f * Tuning.DividerAwareness
 				- ExitDividerPenalty * 2.1f * Tuning.DividerAwareness
 				- SwitchRisk * 3.2f * Tuning.DividerAwareness;
@@ -361,7 +368,8 @@ FFlickBotShotPlan FlickBotShotPlanner::PlanShot(
 				const float BankScore = BankOutwardAlignment * 2.45f
 					+ TargetEdgeProgress * 1.35f
 					- BankDistanceFraction * 0.62f
-					- BankBlockerPenalty * 1.7f
+					- BankBlockerPenalty * 1.7f * Tuning.BlockerAwareness
+					- SelfKnockoutRisk(Shooter, BankDirection, SafeArenaRadius) * 3.0f * Tuning.SelfPreservation
 					+ 0.45f * Tuning.BankShotSkill
 					- (1.0f - Tuning.BankShotSkill) * 2.4f;
 				ConsiderCandidate(
@@ -439,10 +447,16 @@ FFlickBotShotPlan FlickBotShotPlanner::PlanBobShot(
 				ShotDistance,
 				Pieces,
 				BotTeam);
+			float PocketRisk = 0.0f;
+			for (const FVector2D& Opening : PocketPositions)
+				if (DistanceToSegment(Opening, Striker->Position, ContactPoint) < Tuning.PocketRadius + Striker->Radius)
+					PocketRisk += 1.0f;
+			const float ExitBlockers = GetBlockerPenalty(Target, Target, PocketDirection, PocketDistance, Pieces, BotTeam);
 			const float Score = ApproachAlignment * 3.0f
 				- ShotDistanceFraction * 0.55f
 				- PocketDistanceFraction * 0.9f
-				- BlockerPenalty * 1.4f
+				- (BlockerPenalty + ExitBlockers) * 1.4f * Tuning.BlockerAwareness
+				- PocketRisk * 3.0f * Tuning.SelfPreservation
 				+ RandomStream.FRandRange(-Tuning.DecisionNoise, Tuning.DecisionNoise);
 			if (Score <= BestPlan.Score)
 			{

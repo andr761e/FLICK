@@ -92,6 +92,70 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchTeamPicker()
 		];
 }
 
+TSharedRef<SWidget> SFlickGameLayer::BuildPrivateSpectatorCard()
+{
+	const auto CycleButton = [this](const FString& Label, const int32 Direction) -> TSharedRef<SWidget>
+	{
+		return SNew(SBox).WidthOverride(42).HeightOverride(40)
+		[SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Cyan).CutSize(5).Padding(0)
+		 [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0).HAlign(HAlign_Center).VAlign(VAlign_Center)
+		  .OnClicked_Lambda([this, Direction]()
+		{
+			if (PlayerController.IsValid()) PlayerController->CyclePrivateSpectatorPlayer(Direction);
+			return FReply::Handled();
+		})[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(19, true)).ColorAndOpacity(Paper)]]];
+	};
+	return SNew(SBox).WidthOverride(450)
+		.Visibility_Lambda([this]()
+		{
+			return ShouldShowGameplayControls() && PlayerController.IsValid() && PlayerController->IsPrivateMatchSpectator()
+				? EVisibility::Visible : EVisibility::Collapsed;
+		})
+		[SNew(SFlickAngularBorder).BackgroundColor(Panel.CopyWithNewOpacity(.95f)).AccentColor(Cyan).CutSize(9).Padding(FMargin(12, 9))
+		 [SNew(SVerticalBox)
+		  + SVerticalBox::Slot().AutoHeight()
+		  [SNew(SHorizontalBox)
+		   + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[CycleButton(TEXT("<"), -1)]
+		   + SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center).Padding(10, 0)
+		   [SNew(SVerticalBox)
+		    + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+		    [SNew(STextBlock).Text_Lambda([this]()
+		     { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("FREE CAMERA") : TEXT("SPECTATING")); })
+		     .Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+		    + SVerticalBox::Slot().AutoHeight().Padding(0, 3)
+		    [SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
+		     [SNew(STextBlock).Text_Lambda([this]()
+		      {
+		       FString Name = PlayerController.IsValid() && PlayerController->IsFollowingPrivatePlayer()
+		        ? PlayerController->GetPrivateSpectatorTargetName() : TEXT("CHOOSE A PLAYER OR BOT");
+		       Name.ReplaceInline(TEXT("\r"), TEXT(" ")); Name.ReplaceInline(TEXT("\n"), TEXT(" "));
+		       return FText::FromString(Name.Len() > 28 ? Name.Left(25) + TEXT("...") : Name);
+		      }).Font(UiFont(15, true)).ColorAndOpacity_Lambda([this]()
+		      { return PlayerController.IsValid() && PlayerController->GetPrivateSpectatorTargetTeam() == EFlickTeam::Player2 ? Orange : Cyan; })]]]
+		   + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[CycleButton(TEXT(">"), 1)]
+		  ]
+		  + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 6, 0, 0)
+		  [SNew(SHorizontalBox)
+		   + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 12, 0)
+		   [SNew(STextBlock).Text_Lambda([]()
+		    { return FText::FromString(FlickControlBindings::GetKey(TEXT("OrbitLeft")).GetDisplayName().ToString() + TEXT(" / ")
+		      + FlickControlBindings::GetKey(TEXT("OrbitRight")).GetDisplayName().ToString() + TEXT("  SWITCH VIEW")); })
+		    .Font(UiFont(8, true)).ColorAndOpacity(Muted)]
+		   + SHorizontalBox::Slot().AutoWidth()
+		   [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(7, 3))
+		    .OnClicked_Lambda([this]() { if (PlayerController.IsValid()) PlayerController->TogglePrivateSpectatorFreeCamera(); return FReply::Handled(); })
+		    [SNew(STextBlock).Text_Lambda([]()
+		     { return FText::FromString(TEXT("FREE CAMERA  [") + FlickControlBindings::GetKey(TEXT("FreeCamera")).GetDisplayName().ToString() + TEXT("]")); })
+		     .Font(UiFont(8, true)).ColorAndOpacity(Brand)]]
+		  ]
+		  + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 4, 0, 0)
+		  [SNew(STextBlock).Text_Lambda([]()
+		   { return FText::FromString(FlickControlBindings::GetKey(TEXT("Scoreboard")).GetDisplayName().ToString() + TEXT("  SCOREBOARD  /  ")
+		     + FlickControlBindings::GetKey(TEXT("Menu")).GetDisplayName().ToString() + TEXT("  MENU")); })
+		   .Font(UiFont(7, true)).ColorAndOpacity(Muted)]
+		 ]];
+}
+
 TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 {
 	auto MakePauseButton = [this](
@@ -876,6 +940,8 @@ int32 SFlickGameLayer::GetDisplayedPartyMemberCount() const
 
 EVisibility SFlickGameLayer::GetMatchHudVisibility() const
 {
+	const AFlickGameState* PostMatchState = GetScoreboardGameState();
+	if (PostMatchState && PostMatchState->bSeriesComplete) return EVisibility::Collapsed;
 	const AFlickGameState* MenuState = GetScoreboardGameState();
 	if (MenuState && (MenuState->bPrivateMatchAssignmentActive || MenuState->bNetworkClassSelectionActive))
 		return EVisibility::Collapsed;
@@ -1154,6 +1220,12 @@ FText SFlickGameLayer::GetScoreboardStatText(
 	{
 		return FText::AsNumber(0);
 	}
+	if (State->bSeriesComplete)
+	{
+		if (StatIndex == 3 && State->ActiveMatchVariant == EFlickMatchVariant::Bob) return FText::FromString(TEXT("—"));
+		return FText::AsNumber(StatIndex == 0 ? Stats->Score : StatIndex == 1 ? Stats->Knockouts
+			: StatIndex == 2 ? Stats->SelfKnockouts : Stats->SwitchActivations);
+	}
 	const int32 Value = StatIndex == 0
 		? Stats->Score
 		: StatIndex == 1
@@ -1172,6 +1244,10 @@ FText SFlickGameLayer::GetScoreboardTeamSummary(const EFlickTeam Team) const
 	if (!State)
 	{
 		return FText::GetEmpty();
+	}
+	if (State->bSeriesComplete && State->WinnerTeam == Team)
+	{
+		return FText::FromString(State->bMatchEndedByForfeit ? TEXT("WINNER  /  FORFEIT") : TEXT("WINNING TEAM"));
 	}
 	if (GameMode.IsValid() && GameMode->IsFreePlayTraining())
 	{

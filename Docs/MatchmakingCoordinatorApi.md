@@ -60,3 +60,9 @@ All server endpoints require `Authorization: Bearer <workload credential>` and `
 `Tools/FlickCoordinator` implements this contract with .NET 8 standard libraries. It forms exact teams without splitting parties, applies an initial MMR-gap policy, launches either `UnrealEditor-Cmd.exe -server` or a packaged server, validates Steam WebAPI tickets when required, verifies reservations, persists ratings, records ranked history, supervises server health, and retires completed processes.
 
 The included deployment profile is a single Windows game-server host. It does not provide autoscaling, regional routing, DDoS protection, a durable multi-node database, or distributed allocation locking. Those belong in the hosting platform before a public release.
+
+## Same-server rematches
+
+`POST /v1/servers/matches/{matchId}/rematch` uses the existing workload bearer credential and `X-Flick-Server-Id`. The body is `{ "server_id": "...", "new_match_id": "<fresh UUID>" }`. The game server requests this only after the complete original roster consents.
+
+The previous match must be completed without a forfeit, its result accepted, and its 90-second retirement window still open. Ranked settlement may arrive before or after the completion report. A successful request returns `{ "accepted": true, "match_id": "..." }`, preserves every account/team/slot and reservation token, transfers process ownership to the fresh allocation, and retains the old immutable result. Repeating the same successor ID is idempotent; a different successor is rejected. The server switches its heartbeat to the new ID and registers a fresh ranked roster before starting gameplay. Existing reservation tokens validate against the new active match. Retiring the old allocation cannot stop the successor process.

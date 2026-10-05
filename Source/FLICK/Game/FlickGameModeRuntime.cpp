@@ -653,6 +653,10 @@ void AFlickGameMode::SpawnBobPieces()
 
 void AFlickGameMode::DestroyPieces()
 {
+	if (LockerKnockoutFeedback.IsValid()) LockerKnockoutFeedback->Destroy();
+	LockerKnockoutFeedback.Reset();
+	if (LockerSpawnFeedback.IsValid()) LockerSpawnFeedback->Destroy();
+	LockerSpawnFeedback.Reset();
 	bMenuPartyDisplayInitialized = false;
 	MenuPartyRosterKey.Reset();
 	if (bCinematicReplayActive)
@@ -1251,7 +1255,9 @@ void AFlickGameMode::SetCameraForFrontend()
 	{
 		CameraPawn->SetLockerPreviewMode(FrontendScreen == EFlickFrontendScreen::Profile
 			&& LockerPreviewCategory != INDEX_NONE
-			? LockerPreviewCategory == FlickCosmeticCatalog::KnockoutCategory ? 2 : 1 : 0);
+			? LockerPreviewCategory == FlickCosmeticCatalog::KnockoutCategory ? 2
+				: LockerPreviewCategory == FlickCosmeticCatalog::TrailCategory ? 3
+				: LockerPreviewCategory == FlickCosmeticCatalog::SpawnCategory ? 4 : 1 : 0);
 		const bool bSettingsOverMatch = FrontendScreen == EFlickFrontendScreen::Settings
 			&& SettingsReturnScreen == EFlickFrontendScreen::Paused;
 		const bool bClassSelectionOverMatch = FrontendScreen == EFlickFrontendScreen::ClassSelect

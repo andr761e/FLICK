@@ -20,6 +20,14 @@ bool FFlickBobGameplayTest::RunTest(const FString& Parameters)
     World->SetGameState(State);
     AFlickGameMode* Mode = World->SpawnActor<AFlickGameMode>();
     Mode->GameState = State;
+    TestTrue(TEXT("Higher difficulties increasingly account for blockers"),
+        Mode->TrainingBotEasySettings.BlockerAwareness < Mode->TrainingBotNormalSettings.BlockerAwareness
+        && Mode->TrainingBotNormalSettings.BlockerAwareness < Mode->TrainingBotHardSettings.BlockerAwareness
+        && Mode->TrainingBotHardSettings.BlockerAwareness < Mode->TrainingBotExpertSettings.BlockerAwareness);
+    TestTrue(TEXT("Higher difficulties increasingly protect their own puck"),
+        Mode->TrainingBotEasySettings.SelfPreservation < Mode->TrainingBotNormalSettings.SelfPreservation
+        && Mode->TrainingBotNormalSettings.SelfPreservation < Mode->TrainingBotHardSettings.SelfPreservation
+        && Mode->TrainingBotHardSettings.SelfPreservation < Mode->TrainingBotExpertSettings.SelfPreservation);
     Mode->ActiveMatchVariant = EFlickMatchVariant::Bob;
     Mode->bTestArenaMode = false;
     Mode->bPregamePreviewActive = false;

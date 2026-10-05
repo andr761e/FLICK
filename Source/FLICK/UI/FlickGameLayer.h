@@ -125,7 +125,7 @@ private:
 	TSharedRef<SWidget> BuildLightingSettings();
 	TSharedRef<SWidget> BuildMatchHud();
 	TSharedRef<SWidget> BuildCinematicReplayOverlay();
-	TSharedRef<SWidget> BuildScoreboardOverlay();
+	TSharedRef<SWidget> BuildScoreboardOverlay(bool bEmbedded = false);
 	TSharedRef<SWidget> BuildScoreboardTeamSection(EFlickTeam Team);
 	TSharedRef<SWidget> BuildScoreboardPlayerRow(EFlickTeam Team, int32 PlayerSlot);
 	TSharedRef<SWidget> BuildTeamPlate(EFlickTeam Team);
@@ -134,9 +134,12 @@ private:
 	TSharedRef<SWidget> BuildControlHintPanel(bool bRightSide);
 	TSharedRef<SWidget> BuildPowerMeter();
 	TSharedRef<SWidget> BuildCameraOrbitHint();
+	TSharedRef<SWidget> BuildPrivateSpectatorCard();
+	TSharedRef<SWidget> BuildTeamPingFeed();
 	TSharedRef<SWidget> BuildEventFeed();
 	TSharedRef<SWidget> BuildPauseOverlay();
 	TSharedRef<SWidget> BuildRoundOverOverlay();
+	TSharedRef<SWidget> BuildPostMatchOverlay();
 	TSharedRef<SWidget> BuildModeCard(EFlickMatchVariant Variant);
 	TSharedRef<SWidget> BuildPlayPlaylistCard(
 		EFlickPlayPlaylist Playlist,
@@ -322,6 +325,7 @@ private:
 	TArray<TSharedPtr<int32>> CameraShakeOptions;
 	TArray<TSharedPtr<int32>> PuckHoverSizeOptions;
 	TArray<TSharedPtr<int32>> PuckHoverDetailOptions;
+	TArray<TSharedPtr<int32>> PuckIndicatorOptions;
 	TArray<TSharedPtr<int32>> FrameLimitOptions;
 	FIntPoint PendingResolution = FIntPoint::ZeroValue;
 	int32 PendingWindowMode = 1; // 0 fullscreen, 1 borderless, 2 windowed.

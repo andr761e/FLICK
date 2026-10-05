@@ -367,6 +367,8 @@ bool AFlickGameMode::TryExecuteTrainingBotShot(const EFlickTeam BotTeam, const i
 	BotTuning.DecisionNoise = FMath::Max(0.0f, DifficultySettings.DecisionNoise);
 	BotTuning.DividerAwareness = FMath::Clamp(DifficultySettings.DividerAwareness, 0.0f, 1.0f);
 	BotTuning.BankShotSkill = FMath::Clamp(DifficultySettings.BankShotSkill, 0.0f, 1.0f);
+	BotTuning.BlockerAwareness = FMath::Clamp(DifficultySettings.BlockerAwareness, 0.0f, 1.0f);
+	BotTuning.SelfPreservation = FMath::Clamp(DifficultySettings.SelfPreservation, 0.0f, 1.0f);
 	if (bTestArenaMode && TestArenaActor && IsValid(TestArenaActor))
 	{
 		BotTuning.Dividers.Reserve(TestArenaActor->GetMechanismCount());
@@ -391,6 +393,7 @@ bool AFlickGameMode::TryExecuteTrainingBotShot(const EFlickTeam BotTeam, const i
 		if (BobArenaActor)
 		{
 			BotTuning.ArenaRadius = BobArenaActor->GetHalfExtent();
+			BotTuning.PocketRadius = BobArenaActor->GetPocketRadius();
 			PocketPositions.Reserve(4);
 			for (int32 PocketIndex = 0; PocketIndex < 4; ++PocketIndex)
 			{
