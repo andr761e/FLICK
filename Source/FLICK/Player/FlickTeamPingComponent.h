@@ -13,7 +13,7 @@ class FLICK_API UFlickTeamPingComponent : public UActorComponent
 	GENERATED_BODY()
 public:
 	UFlickTeamPingComponent();
-	void TryPing(AFlickPiece* Piece);
+	void TryPing(AFlickPiece* Piece, int32 SwitchIndex = INDEX_NONE);
 	FString GetMessage(int32 Row) const;
 	float GetOpacity(int32 Row) const;
 	EFlickTeam GetMessageTeam(int32 Row) const;
@@ -30,7 +30,7 @@ private:
 	friend class FFlickTeamPingTest;
 #endif
 	UFUNCTION(Server, Reliable)
-	void ServerPingEnemy(int32 PieceId);
+	void ServerPingTarget(int32 PieceId, int32 SwitchIndex);
 	UFUNCTION(Client, Reliable)
 	void ClientReceivePing(const FString& MatchId, EFlickTeam Team, const FString& Message);
 	struct FMessage { FString MatchId; EFlickTeam Team; FString Text; double ReceivedAt; };

@@ -48,6 +48,7 @@ public:
 	FVector GetDividerLabelLocation(int32 Index) const;
 	FVector GetDividerWorldCenter(int32 Index) const;
 	FVector GetSwitchWorldCenter(int32 Index) const;
+	int32 FindSwitchAtWorldLocation(const FVector& WorldLocation) const;
 	FVector2D GetDividerWorldTangent(int32 Index) const;
 	float GetDividerLength(int32 Index) const;
 	float GetDividerCollisionThickness() const { return DividerThickness; }

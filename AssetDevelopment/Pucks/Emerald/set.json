@@ -1,0 +1,24 @@
+{
+  "name": "EMERALD",
+  "archetypes": [
+    "Standard"
+  ],
+  "shared_geometry": "../ClassicBlue/exports/Standard.fbx",
+  "accent_color": [
+    0.003,
+    1,
+    0.12
+  ],
+  "base_colors": {
+    "Diffuser": [
+      0.002,
+      0.125,
+      0.015
+    ],
+    "Emblem": [
+      0.0016,
+      0.1,
+      0.012
+    ]
+  }
+}

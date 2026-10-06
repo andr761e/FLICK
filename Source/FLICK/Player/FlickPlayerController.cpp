@@ -1,5 +1,6 @@
 #include "Player/FlickPlayerController.h"
 #include "Arena/FlickArenaLighting.h"
+#include "Arena/FlickTestArena.h"
 #include "Core/FlickModeRules.h"
 #include "Core/FlickControlBindings.h"
 #include "Core/FlickCosmeticCatalog.h"
@@ -527,7 +528,16 @@ void AFlickPlayerController::ClearAiming()
 
 void AFlickPlayerController::HandleTeamPingPressed()
 {
-	if (TeamPings) TeamPings->TryPing(FindPieceUnderCursor());
+	if (!TeamPings) return;
+	if (AFlickPiece* Piece = FindPieceUnderCursor())
+	{
+		TeamPings->TryPing(Piece);
+		return; // Never ping a switch through a puck, including friendly pucks.
+	}
+	FHitResult Hit;
+	if (!GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_Visibility), false, Hit)) return;
+	if (const auto* Arena = Cast<AFlickTestArena>(Hit.GetActor()))
+		TeamPings->TryPing(nullptr, Arena->FindSwitchAtWorldLocation(Hit.ImpactPoint));
 }
 
 void AFlickPlayerController::HandlePrimaryPressed()

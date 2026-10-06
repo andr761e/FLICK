@@ -9,7 +9,7 @@
 
 namespace
 {
-	using EPattern = FlickSpawnStyle::EPattern;
+	using ESpawnPattern = FlickSpawnStyle::EPattern;
 	// Four batched layers: feathered rings, ribbons, shaped motes, crystal facets.
 	// Positions are analytic functions of age, not frame-rate-dependent particles.
 	struct FSpawnBatch
@@ -85,7 +85,7 @@ namespace
 			else Mesh.CreateMeshSection(Section, Vertices, Indices, Normals, UVs, Colors, TArray<FProcMeshTangent>(), false);
 		}
 	};
-	float Seed(float I)
+	float SpawnSeed(float I)
 	{
 		return FMath::Frac(FMath::Abs(FMath::Sin(I*127.1f + 17.7f)*43758.5453f));
 	}
@@ -127,8 +127,8 @@ void AFlickWorldFeedback::InitializeSpawnEffect()
 		// The spawn shader compensates exposure, so use restrained scene-linear energy.
 		SpawnMaterials[Section]->SetScalarParameterValue(TEXT("GlowStrength"), Look.Glow);
 		SpawnMaterials[Section]->SetScalarParameterValue(TEXT("MaskShape"), Section == 2 ? Look.ParticleShape
-			: Section == 3 ? (Look.Pattern == EPattern::Fire || Look.Pattern == EPattern::Spirit ? 7 : 3)
-			: Section == 1 && (Look.Pattern == EPattern::Fire || Look.Pattern == EPattern::Spirit) ? 6 : 0);
+			: Section == 3 ? (Look.Pattern == ESpawnPattern::Fire || Look.Pattern == ESpawnPattern::Spirit ? 7 : 3)
+			: Section == 1 && (Look.Pattern == ESpawnPattern::Fire || Look.Pattern == ESpawnPattern::Spirit) ? 6 : 0);
 	}
 	UpdateSpawnEffect();
 }
@@ -138,7 +138,7 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 	if (!SpawnGeometry || Style == 0 || GetNetMode() == NM_DedicatedServer) return;
 	if (Age >= Duration) { SpawnGeometry->SetVisibility(false); SpawnGeometry->ClearAllMeshSections(); return; }
 	const auto& Look = FlickSpawnStyle::Get(Style);
-	const EPattern Pattern = Look.Pattern;
+	const ESpawnPattern Pattern = Look.Pattern;
 	const float Landing = FMath::Max(.1f, Appearance.ArrivalDuration);
 	const float Progress = FMath::Clamp(Age/Landing,0.f,1.f);
 	const float Fade = 1-Smooth(Landing,Duration,Age);
@@ -148,7 +148,7 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 	const float R = Look.Radius, H = Look.Height;
 	const auto Color = [&](float T, float Opacity)
 	{
-		const FLinearColor C = Pattern == EPattern::Prism ? FlickSpawnStyle::Spectrum(T)
+		const FLinearColor C = Pattern == ESpawnPattern::Prism ? FlickSpawnStyle::Spectrum(T)
 			: FMath::Lerp(Look.Primary,Look.Secondary,FMath::Clamp(T,0.f,1.f));
 		return C.CopyWithNewOpacity(FMath::Clamp(Opacity*Envelope*Strength,0.f,1.f));
 	};
@@ -173,15 +173,15 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 		const FVector D(FMath::Cos(A),FMath::Sin(A),0);
 		Rings.Quad(D*(R+8)+FVector(0,0,2),D,FVector(-D.Y,D.X,0),3.5f,.7f,Color(I/12.f,.35f));
 	}
-	const bool bBeam = Pattern == EPattern::Pulse || Pattern == EPattern::Beam || Pattern == EPattern::Prism || Pattern == EPattern::Gold;
+	const bool bBeam = Pattern == ESpawnPattern::Pulse || Pattern == ESpawnPattern::Beam || Pattern == ESpawnPattern::Prism || Pattern == ESpawnPattern::Gold;
 	if (bBeam)
 	{
-		const int32 Shafts = Pattern == EPattern::Prism ? 7 : Pattern == EPattern::Beam ? 10 : 6;
+		const int32 Shafts = Pattern == ESpawnPattern::Prism ? 7 : Pattern == ESpawnPattern::Beam ? 10 : 6;
 		for (int32 I = 0; I < Shafts; ++I)
 		{
 			const float A = I*2*PI/Shafts;
 			const FVector P(FMath::Cos(A)*R*.78f,FMath::Sin(A)*R*.78f,H*.5f+2);
-			Ribbons.Beam(P,Right,Pattern == EPattern::Prism ? 7 : 3,H*.5f,
+			Ribbons.Beam(P,Right,Pattern == ESpawnPattern::Prism ? 7 : 3,H*.5f,
 				Color(I/float(Shafts),(.18f+.10f*FMath::Sin(Age*4+I))*(1-Smooth(.7f,1.f,Progress))));
 			Ribbons.Beam(P,Right,.6f,H*.5f,Color(I/float(Shafts),.48f*(1-Smooth(.85f,1.f,Progress))));
 		}
@@ -189,7 +189,7 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 			Rings.Ring(R*(.8f+I*.07f),1.6f,(1-Progress)*H*(.35f+I*.25f)+4,Age*.5f,
 				Color(I/3.f,.65f*(1-Smooth(.85f,1.f,Progress))));
 	}
-	if (Pattern == EPattern::Portal)
+	if (Pattern == ESpawnPattern::Portal)
 	{
 		for (int32 I = 0; I < 3; ++I)
 		{
@@ -197,9 +197,9 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 			Rings.Ring(R*(.8f+I*.12f),2.8f,Z,Age*(I%2 ? -2 : 2),Color(I/2.f,.7f),PI*1.75f);
 		}
 	}
-	if (Pattern == EPattern::Fire || Pattern == EPattern::Spirit || Pattern == EPattern::Sparks)
+	if (Pattern == ESpawnPattern::Fire || Pattern == ESpawnPattern::Spirit || Pattern == ESpawnPattern::Sparks)
 	{
-		const int32 Strands = Pattern == EPattern::Sparks ? 2 : 4;
+		const int32 Strands = Pattern == ESpawnPattern::Sparks ? 2 : 4;
 		for (int32 Strand = 0; Strand < Strands; ++Strand)
 		{
 			const int32 Start = Ribbons.Vertices.Num();
@@ -210,36 +210,36 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 				const FVector D(FMath::Cos(A),FMath::Sin(A),0);
 				const FVector P = D*Radius + FVector(0,0,3+T*H);
 				const float Opacity = FMath::Sin(T*PI)*.48f*(1-Smooth(.7f,1,Progress)*.7f);
-				Ribbons.Pair(P,D,Pattern == EPattern::Sparks ? 1.1f : (12-8*T),Color(T,Opacity),T);
+				Ribbons.Pair(P,D,Pattern == ESpawnPattern::Sparks ? 1.1f : (12-8*T),Color(T,Opacity),T);
 			}
 			Ribbons.Join(Start,41);
 		}
-		if (Pattern != EPattern::Sparks)
+		if (Pattern != ESpawnPattern::Sparks)
 		{
 			// Broad, tapered turbulent tongues beneath the finer twisting ribbons.
 			// Camera-facing cards are depth-tested against the puck, not drawn over it.
 			for (int32 I = 0; I < 12; ++I)
 			{
 				const float A = I*2.39996f + Age*.4f;
-				const float Height = H*(.35f+.5f*Seed(I+9));
-				const float Radius = R*(.45f+.4f*Seed(I+3));
+				const float Height = H*(.35f+.5f*SpawnSeed(I+9));
+				const float Radius = R*(.45f+.4f*SpawnSeed(I+3));
 				Facets.Quad(FVector(FMath::Cos(A)*Radius,FMath::Sin(A)*Radius,Height*.5f+3),
-					Right,FVector::UpVector,10+Seed(I)*9,Height*.5f,
-					Color(Pattern == EPattern::Fire ? .2f+Seed(I)*.3f : Seed(I),
+					Right,FVector::UpVector,10+SpawnSeed(I)*9,Height*.5f,
+					Color(Pattern == ESpawnPattern::Fire ? .2f+SpawnSeed(I)*.3f : SpawnSeed(I),
 						.72f*(1-Smooth(.9f,1.f,Progress)*.6f)));
 			}
 		}
 	}
-	if (Pattern == EPattern::Ice)
+	if (Pattern == ESpawnPattern::Ice)
 	{
 		for (int32 I = 0; I < 10; ++I)
 		{
 			const float A = I*2*PI/10, Scale = Smooth(0,.4f,Progress)*(1-Smooth(Landing+.08f,Duration,Age));
 			Facets.Crystal(FVector(FMath::Cos(A)*R,FMath::Sin(A)*R,2),A,7*Scale,
-				H*(.35f+.6f*Seed(I))*Scale,Color(Seed(I+11),.65f));
+				H*(.35f+.6f*SpawnSeed(I))*Scale,Color(SpawnSeed(I+11),.65f));
 		}
 	}
-	if (Pattern == EPattern::Lightning)
+	if (Pattern == ESpawnPattern::Lightning)
 	{
 		const float Flicker = .55f+.45f*FMath::Square(FMath::Sin(Age*16));
 		for (int32 Bolt = 0; Bolt < 5; ++Bolt)
@@ -262,7 +262,7 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 				Ribbons.Quad(Branch,Side,Up,12,.7f,Color(.5f,Flicker*.55f));
 		}
 	}
-	if (Pattern == EPattern::Galaxy)
+	if (Pattern == ESpawnPattern::Galaxy)
 	{
 		Motes.Quad(FVector(0,0,H*.65f),Right,Up,11,11,Color(.4f,.85f));
 		const FVector X(1,0,0), Y(0,.75f,.66f);
@@ -282,17 +282,17 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 	// Motifs are not generic cubes: masks provide diamonds, hearts, stars or voxels.
 	for (int32 I = 0; I < Look.Particles; ++I)
 	{
-		const float S = Seed(I+4), T = Seed(I+17), Local = FMath::Frac(Age*.65f + T);
-		const float A = I*2.39996f+Age*(Pattern == EPattern::Hearts ? .6f : .9f);
+		const float S = SpawnSeed(I+4), T = SpawnSeed(I+17), Local = FMath::Frac(Age*.65f + T);
+		const float A = I*2.39996f+Age*(Pattern == ESpawnPattern::Hearts ? .6f : .9f);
 		float Radius = R*(.55f+.6f*S), Z = 6+Local*H;
-		if (Pattern == EPattern::Pixel) Z = 6+(1-Local)*H;
-		if (Pattern == EPattern::Sparks || Pattern == EPattern::Fire)
+		if (Pattern == ESpawnPattern::Pixel) Z = 6+(1-Local)*H;
+		if (Pattern == ESpawnPattern::Sparks || Pattern == ESpawnPattern::Fire)
 		{
 			const float Burst = FMath::Clamp((Age-Landing)/Look.Afterglow,0.f,1.f);
 			Radius += Burst*40; Z = 8+Local*H*.65f+FMath::Sin(Burst*PI)*25;
 		}
 		const float Opacity = FMath::Sin(Local*PI)*.7f;
-		const float Size = Pattern == EPattern::Hearts ? 5+S*4 : Pattern == EPattern::Pixel ? 2+S*4 : 1.5f+S*2;
+		const float Size = Pattern == ESpawnPattern::Hearts ? 5+S*4 : Pattern == ESpawnPattern::Pixel ? 2+S*4 : 1.5f+S*2;
 		Motes.Quad(FVector(FMath::Cos(A)*Radius,FMath::Sin(A)*Radius,Z),Right,Up,Size,Size,
 			Color(I/float(Look.Particles),Opacity));
 	}

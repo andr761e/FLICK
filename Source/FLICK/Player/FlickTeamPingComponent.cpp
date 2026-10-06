@@ -4,6 +4,7 @@
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameState.h"
 #include "Pieces/FlickPiece.h"
+#include "Arena/FlickTestArena.h"
 #include "EngineUtils.h"
 
 namespace
@@ -19,6 +20,12 @@ namespace
 		Name.ReplaceInline(TEXT("\r"), TEXT(" ")); Name.ReplaceInline(TEXT("\n"), TEXT(" "));
 		return Name.Len() > 28 ? Name.Left(25) + TEXT("...") : Name;
 	}
+	const AFlickTestArena* PingArena(UWorld* World)
+	{
+		if (const auto* Mode = World->GetAuthGameMode<AFlickGameMode>()) return Mode->GetTestArena();
+		for (TActorIterator<AFlickTestArena> It(World); It; ++It) return *It;
+		return nullptr;
+	}
 }
 
 UFlickTeamPingComponent::UFlickTeamPingComponent()
@@ -27,23 +34,31 @@ UFlickTeamPingComponent::UFlickTeamPingComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UFlickTeamPingComponent::TryPing(AFlickPiece* Piece)
+void UFlickTeamPingComponent::TryPing(AFlickPiece* Piece, const int32 SwitchIndex)
 {
 	const auto* Controller = Cast<AFlickPlayerController>(GetOwner());
 	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
 	const auto* Mode = GetWorld()->GetAuthGameMode<AFlickGameMode>();
-	if (!Controller || !Controller->IsLocalController() || !CanPing(State) || !Piece || !Piece->IsActive()
-		|| Controller->GetLocalTeam() == EFlickTeam::None || Piece->GetTeam() == EFlickTeam::None
-		|| Piece->GetTeam() == Controller->GetLocalTeam() || Controller->ShouldShowPrivateTeamMenu()
+	if (!Controller || !Controller->IsLocalController() || !CanPing(State)
+		|| Controller->GetLocalTeam() == EFlickTeam::None || Controller->ShouldShowPrivateTeamMenu()
 		|| Controller->IsCinematicReplayPresentationActive() || Controller->IsFreeCameraActive()
 		|| Controller->IsScoreboardVisible() || (Mode && Mode->GetFrontendScreen() != EFlickFrontendScreen::Playing)) return;
+	if (Piece)
+	{
+		if (!Piece->IsActive() || Piece->GetTeam() == EFlickTeam::None || Piece->GetTeam() == Controller->GetLocalTeam()) return;
+	}
+	else
+	{
+		const auto* Arena = PingArena(GetWorld());
+		if (!Arena || SwitchIndex < 0 || SwitchIndex >= Arena->GetMechanismCount()) return;
+	}
 	const double Now = GetWorld()->GetTimeSeconds();
 	if (Now - LastLocalPing < FMath::Max(.5f, CooldownSeconds)) return;
 	LastLocalPing = Now;
-	ServerPingEnemy(Piece->GetPieceId());
+	ServerPingTarget(Piece ? Piece->GetPieceId() : INDEX_NONE, Piece ? INDEX_NONE : SwitchIndex);
 }
 
-void UFlickTeamPingComponent::ServerPingEnemy_Implementation(const int32 PieceId)
+void UFlickTeamPingComponent::ServerPingTarget_Implementation(const int32 PieceId, const int32 SwitchIndex)
 {
 	auto* Sender = Cast<AFlickPlayerController>(GetOwner());
 	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
@@ -55,24 +70,34 @@ void UFlickTeamPingComponent::ServerPingEnemy_Implementation(const int32 PieceId
 	if (Now - LastServerPing < FMath::Max(.5f, CooldownSeconds)) return;
 	// Also throttle invalid target requests. No client-provided name/team/text is trusted.
 	LastServerPing = Now;
-	AFlickPiece* Target = nullptr;
-	for (TActorIterator<AFlickPiece> It(GetWorld()); It; ++It)
-		if (It->GetPieceId() == PieceId && It->IsActive()) { Target = *It; break; }
 	const EFlickTeam Team = Sender->GetLocalTeam();
-	if (!Target || Target->GetTeam() == EFlickTeam::None || Target->GetTeam() == Team) return;
-	FString TargetName = FString::Printf(TEXT("%s %s %d"), Target->GetTeam() == EFlickTeam::Player1 ? TEXT("Blue") : TEXT("Orange"),
-		State->bPrivateMatchActive ? TEXT("Bot") : TEXT("Player"), Target->GetOwningPlayerSlot() + 1);
-	for (const APlayerState* Base : State->PlayerArray)
+	FString Message;
+	if (SwitchIndex != INDEX_NONE)
 	{
-		const auto* Player = Cast<AFlickPlayerState>(Base);
-		if (Player && ((Player->GetTeam() == Target->GetTeam() && Player->GetTeamPlayerSlot() == Target->GetOwningPlayerSlot())
-			|| Player->ControlsPrivateSlot(Target->GetTeam(), Target->GetOwningPlayerSlot())))
-		{
-			TargetName = Player->GetPlayerName(); break;
-		}
+		const auto* Arena = PingArena(GetWorld());
+		if (PieceId != INDEX_NONE || !Arena || SwitchIndex < 0 || SwitchIndex >= Arena->GetMechanismCount()) return;
+		Message = FString::Printf(TEXT("%s: Switch %s"), *CleanName(SenderState->GetPlayerName()), *Arena->GetDividerLabel(SwitchIndex));
 	}
-	const FString Message = FString::Printf(TEXT("%s: Target %s - %s"), *CleanName(SenderState->GetPlayerName()),
-		*CleanName(TargetName), *GetPieceArchetypeName(Target->GetArchetype()));
+	else
+	{
+		AFlickPiece* Target = nullptr;
+		for (TActorIterator<AFlickPiece> It(GetWorld()); It; ++It)
+			if (It->GetPieceId() == PieceId && It->IsActive()) { Target = *It; break; }
+		if (!Target || Target->GetTeam() == EFlickTeam::None || Target->GetTeam() == Team) return;
+		FString TargetName = FString::Printf(TEXT("%s %s %d"), Target->GetTeam() == EFlickTeam::Player1 ? TEXT("Blue") : TEXT("Orange"),
+			State->bPrivateMatchActive ? TEXT("Bot") : TEXT("Player"), Target->GetOwningPlayerSlot() + 1);
+		for (const APlayerState* Base : State->PlayerArray)
+		{
+			const auto* Player = Cast<AFlickPlayerState>(Base);
+			if (Player && ((Player->GetTeam() == Target->GetTeam() && Player->GetTeamPlayerSlot() == Target->GetOwningPlayerSlot())
+				|| Player->ControlsPrivateSlot(Target->GetTeam(), Target->GetOwningPlayerSlot())))
+			{
+				TargetName = Player->GetPlayerName(); break;
+			}
+		}
+		Message = FString::Printf(TEXT("%s: Target %s - %s"), *CleanName(SenderState->GetPlayerName()),
+			*CleanName(TargetName), *GetPieceArchetypeName(Target->GetArchetype()));
+	}
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		auto* Recipient = Cast<AFlickPlayerController>(It->Get());

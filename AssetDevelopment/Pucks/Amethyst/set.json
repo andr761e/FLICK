@@ -1,0 +1,29 @@
+{
+  "name": "AMETHYST",
+  "archetypes": [
+    "Standard"
+  ],
+  "shared_geometry": "../ClassicBlue/exports/Standard.fbx",
+  "accent_color": [
+    0.30,
+    0.015,
+    1
+  ],
+  "base_colors": {
+    "Diffuser": [
+      0.0375,
+      0.0019,
+      0.125
+    ],
+    "Emblem": [
+      0.030,
+      0.0015,
+      0.1
+    ],
+    "Housing": [
+      0.06,
+      0.045,
+      0.078
+    ]
+  }
+}

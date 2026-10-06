@@ -1,0 +1,39 @@
+{
+  "name": "AMBER",
+  "archetypes": [
+    "Standard"
+  ],
+  "shared_geometry": "../ClassicBlue/exports/Standard.fbx",
+  "accent_color": [
+    1,
+    0.32,
+    0.004
+  ],
+  "base_colors": {
+    "Diffuser": [
+      0.125,
+      0.040,
+      0.0005
+    ],
+    "Emblem": [
+      0.1,
+      0.032,
+      0.0004
+    ],
+    "Housing": [
+      0.075,
+      0.062,
+      0.046
+    ],
+    "Crown": [
+      0.84,
+      0.81,
+      0.74
+    ],
+    "Edges": [
+      0.44,
+      0.42,
+      0.36
+    ]
+  }
+}

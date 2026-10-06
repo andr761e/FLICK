@@ -716,6 +716,20 @@ FVector AFlickTestArena::GetSwitchWorldCenter(const int32 Index) const
 	return GetActorTransform().TransformPosition(FVector(Center, SurfaceZ));
 }
 
+int32 AFlickTestArena::FindSwitchAtWorldLocation(const FVector& WorldLocation) const
+{
+	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
+	if (Local.ContainsNaN()) return INDEX_NONE;
+	int32 Closest = INDEX_NONE;
+	float Distance = FMath::Square(ControlZoneRadius);
+	for (int32 Index = 0; Index < GetMechanismCount() && ZoneCenters.IsValidIndex(Index); ++Index)
+	{
+		const float Candidate = FVector2D::DistSquared(FVector2D(Local.X, Local.Y), ZoneCenters[Index]);
+		if (Candidate <= Distance) { Distance = Candidate; Closest = Index; }
+	}
+	return Closest;
+}
+
 FVector2D AFlickTestArena::GetDividerWorldTangent(const int32 Index) const
 {
 	if (!DividerAngles.IsValidIndex(Index))

@@ -1,0 +1,24 @@
+{
+  "name": "CRIMSON",
+  "archetypes": [
+    "Standard"
+  ],
+  "shared_geometry": "../ClassicBlue/exports/Standard.fbx",
+  "accent_color": [
+    1,
+    0.008,
+    0.035
+  ],
+  "base_colors": {
+    "Diffuser": [
+      0.125,
+      0.001,
+      0.0044
+    ],
+    "Emblem": [
+      0.1,
+      0.0008,
+      0.0035
+    ]
+  }
+}

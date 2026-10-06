@@ -1,4 +1,5 @@
 #include "Pieces/FlickPiece.h"
+#include "Core/FlickPuckPalette.h"
 #include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickVisualSettings.h"
 #include "ProceduralMeshComponent.h"
@@ -1308,6 +1309,16 @@ void AFlickPiece::EnableTestArenaVisuals()
 	for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
 	{
 		const FString SlotName = Mesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString();
+		if (Archetype == EFlickPieceArchetype::Standard)
+		{
+			const FString PalettePath = FlickPuckPalette::MaterialPath(PuckSkin, SlotName);
+			if (!PalettePath.IsEmpty())
+			{
+				if (UMaterialInterface* Palette = LoadObject<UMaterialInterface>(nullptr, *PalettePath))
+					WorkshopMesh->SetMaterial(Slot, Palette);
+				else UE_LOG(LogFlick, Warning, TEXT("Puck palette missing: %s"), *PalettePath);
+			}
+		}
 		const bool bTeamLightSlot = SlotName.Contains(TEXT("05_Team"))
 			|| SlotName.Contains(TEXT("Cyan"));
 		if (bTeamLightSlot)
@@ -1404,7 +1415,7 @@ void AFlickPiece::UpdateTestArenaVisuals()
 		{
 			if (!TeamMaterial) continue;
 			TeamMaterial->SetVectorParameterValue(TEXT("TeamColor"), Color);
-			if (bUsingHighDetailPuck)
+			if (bUsingHighDetailPuck && PuckSkin < 2)
 			{
 				TeamMaterial->SetVectorParameterValue(TEXT("BaseColor"), DiffuserBaseColor);
 			}

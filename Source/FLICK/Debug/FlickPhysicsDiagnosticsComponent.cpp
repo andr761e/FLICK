@@ -18,7 +18,7 @@ namespace
 	TAutoConsoleVariable<int32> Enabled(TEXT("flick.Diagnostics"), 0, TEXT("Local physics diagnostics: 0 off, 1 on."), ECVF_Cheat);
 	TAutoConsoleVariable<int32> Collision(TEXT("flick.Diagnostics.Collision"), 1, TEXT("Draw active collision geometry."), ECVF_Cheat);
 	TAutoConsoleVariable<int32> Velocity(TEXT("flick.Diagnostics.Velocity"), 1, TEXT("Draw puck velocity arrows (0.15 seconds of travel)."), ECVF_Cheat);
-	TAutoConsoleVariable<int32> Normals(TEXT("flick.Diagnostics.Contacts"), 1, TEXT("Draw recent actual hit normals."), ECVF_Cheat);
+	TAutoConsoleVariable<int32> ContactNormals(TEXT("flick.Diagnostics.Contacts"), 1, TEXT("Draw recent actual hit normals."), ECVF_Cheat);
 	TAutoConsoleVariable<int32> Pockets(TEXT("flick.Diagnostics.Pockets"), 1, TEXT("Draw BOB openings and capture depth."), ECVF_Cheat);
 
 	void DrawCollision(UWorld* World, UPrimitiveComponent* Component)
@@ -130,7 +130,7 @@ void UFlickPhysicsDiagnosticsComponent::TickComponent(float DeltaTime, ELevelTic
 	if (Collision.GetValueOnGameThread())
 		for (TActorIterator<AActor> It(World); It; ++It)
 			for (UPrimitiveComponent* Component : TInlineComponentArray<UPrimitiveComponent*>(*It)) DrawCollision(World, Component);
-	if (Normals.GetValueOnGameThread())
+	if (ContactNormals.GetValueOnGameThread())
 		for (const FContact& Contact : Contacts)
 			DrawDebugDirectionalArrow(World, Contact.Point, Contact.Point + Contact.Normal * 45, 10, FColor::Green, false, 0, 0, 2);
 	AFlickBobArena* Bob = nullptr;

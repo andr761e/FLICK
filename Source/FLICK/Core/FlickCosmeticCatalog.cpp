@@ -66,6 +66,8 @@ const TArray<FString>& FlickCosmeticCatalog::GetItems(const int32 Category)
 		TEXT("GOLD"), TEXT("ICE"), TEXT("PURPLE CRYSTAL"), TEXT("ROBOTIC"),
 		TEXT("CRYO CIRCUIT"), TEXT("SOLAR FORGE"), TEXT("PHASE RIFT")};
 	static const TArray<FString> OriginalPuck = {TEXT("CLASSIC BLUE"), TEXT("CLASSIC ORANGE")};
+	static const TArray<FString> StandardPuck = {TEXT("CLASSIC BLUE"), TEXT("CLASSIC ORANGE"),
+		TEXT("EMERALD"), TEXT("AMETHYST"), TEXT("CRIMSON"), TEXT("AMBER")};
 	static const TArray<FString> Trails = {TEXT("NONE"), TEXT("ION WAKE"), TEXT("EMBER WAKE"),
 		TEXT("CRYO RIBBON"), TEXT("SOLAR CINDERS"), TEXT("PHASE STREAM"),
 		TEXT("LIGHTNING"), TEXT("PRISM"), TEXT("GOLD RUSH"), TEXT("GALAXY"),
@@ -85,6 +87,7 @@ const TArray<FString>& FlickCosmeticCatalog::GetItems(const int32 Category)
 	case 0: return Banners;
 	case 1: return Tags;
 	case 2: return Borders;
+	case PuckCategoryStart: return StandardPuck;
 	case TrailCategory: return Trails;
 	case SpawnCategory: return Spawns;
 	case KnockoutCategory: return Knockouts;
@@ -122,6 +125,10 @@ FLinearColor FlickCosmeticCatalog::GetPuckSkinColor(const int32 Skin)
 	switch (Skin)
 	{
 	case 1: return FLinearColor(1.0f, .18f, .003f);
+	case 2: return FLinearColor(.003f, 1.f, .12f);
+	case 3: return FLinearColor(.30f, .015f, 1.f);
+	case 4: return FLinearColor(1.f, .008f, .035f);
+	case 5: return FLinearColor(1.f, .32f, .004f);
 	default: return FLinearColor(0.0f, .55f, 1.0f);
 	}
 }
