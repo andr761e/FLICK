@@ -122,7 +122,7 @@ void AFlickGameMode::TrackTestArenaControlZones(const float DeltaSeconds)
 	if (bTestArenaMode && IsValid(TestArenaActor))
 	{
 		uint16 DeployedMechanisms = 0;
-		ResolutionActivatedSwitchMask |= TestArenaActor->TrackControlZoneCrossings(Pieces, DeltaSeconds, DeployedMechanisms,
+		const uint16 ActivatedSwitches = TestArenaActor->TrackControlZoneCrossings(Pieces, DeltaSeconds, DeployedMechanisms,
    [this](int32 PieceId)
    {
     for (const AFlickPiece* Piece : Pieces)
@@ -130,9 +130,15 @@ void AFlickGameMode::TrackTestArenaControlZones(const float DeltaSeconds)
       if (AFlickGameState* State = GetFlickGameState())
        State->RecordPlayerSwitchActivation(Piece->GetTeam(), Piece->GetOwningPlayerSlot());
    });
+		ResolutionActivatedSwitchMask |= ActivatedSwitches;
 		for (int32 Index = 0; Index < TestArenaActor->GetMechanismCount(); ++Index)
 		{
 			const uint16 Bit = static_cast<uint16>(1 << Index);
+			if (AudioDirector)
+			{
+				if ((ActivatedSwitches & Bit) != 0) AudioDirector->PlaySwitch(TestArenaActor->GetSwitchWorldCenter(Index));
+				if ((DeployedMechanisms & Bit) != 0) AudioDirector->PlayDivider(TestArenaActor->GetDividerWorldCenter(Index));
+			}
 			if ((DeployedMechanisms & Bit) != 0 && TestArenaActor->IsDividerRaised(Index))
 			{
 				ResolutionNewlyRaisedDividerMask |= Bit;
@@ -954,7 +960,7 @@ void AFlickGameMode::UpdateBobPockets()
 			Piece->GetPuckEffect(2));
 		if (AudioDirector)
 		{
-			AudioDirector->PlayRingOut(PocketLocation);
+			AudioDirector->PlayPocket(PocketLocation);
 		}
 		Piece->Eliminate();
 		bPocketedAnyPiece = true;

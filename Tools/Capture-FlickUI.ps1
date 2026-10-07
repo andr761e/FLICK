@@ -29,12 +29,14 @@ param(
     [int]$LockerItem = -1,
     [ValidateRange(0, 4)]
     [int]$ProfilePage = 0,
-    [ValidateRange(0, 7)]
+    [ValidateRange(0, 8)]
     [int]$SettingsTab = 0,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
     [ValidateRange(1, 30)]
     [float]$CaptureDelaySeconds = 2,
+    # Opt in for audio-system checks; ordinary visual captures stay silent.
+    [switch]$EnableAudio,
     [ValidateSet('Default', 'D3D11')]
     [string]$GraphicsAPI = 'Default',
     [string]$EngineRoot = $(if ($env:FLICK_UNREAL_ENGINE_ROOT) { $env:FLICK_UNREAL_ENGINE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.8' })
@@ -108,13 +110,14 @@ foreach ($screenName in $Screen) {
         ('"{0}"' -f $Map),
         '-game', '-windowed', '-RenderOffscreen', '-unattended', '-nosplash',
         '-ddc=InstalledNoZenLocalFallback',
-        '-nosound', '-nosteam', '-NoScreenMessages', '-ForceRes',
+        '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame', "-FlickCaptureDelaySeconds=$CaptureDelaySeconds",
         "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickLockerItem=$LockerItem", "-FlickProfilePage=$ProfilePage", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),
         ('-abslog="{0}"' -f $logPath)
     ) + $(if ($GraphicsAPI -eq 'D3D11') { @('-d3d11') } else { @() }) + $previewFlags[$screenName]
+    if (-not $EnableAudio) { $arguments += '-nosound' }
     Write-Host "Capturing $screenName at ${Width}x${Height}..."
     $previousCachePath = [Environment]::GetEnvironmentVariable('UE-LocalDataCachePath', 'Process')
     try {

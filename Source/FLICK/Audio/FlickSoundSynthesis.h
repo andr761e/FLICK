@@ -4,7 +4,8 @@
 
 enum class EFlickGeneratedSoundKind : uint8
 {
-	UiNavigate, UiConfirm, Launch, Impact, RimImpact, RingOut, Turn, RoundWin, MatchWin, ReplayMusic
+	UiNavigate, UiConfirm, Launch, Impact, RimImpact, RingOut, Turn, RoundWin, MatchWin, ReplayMusic,
+	Switch, Divider, Pocket, TeamPing, OwnTurn
 };
 
 // Pure PCM rendering: independent of world state and gameplay random streams.

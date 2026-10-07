@@ -119,7 +119,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	int32 SettingsPreviewTab = 0;
 	if (FParse::Value(FCommandLine::Get(), TEXT("FlickSettingsTab="), SettingsPreviewTab))
 	{
-		SelectedSettingsTab = static_cast<EFlickSettingsTab>(FMath::Clamp(SettingsPreviewTab, 0, static_cast<int32>(EFlickSettingsTab::Lighting)));
+		SelectedSettingsTab = static_cast<EFlickSettingsTab>(FMath::Clamp(SettingsPreviewTab, 0, static_cast<int32>(EFlickSettingsTab::QuickChat)));
 	}
 	bLightingPreview = SelectedSettingsTab == EFlickSettingsTab::Lighting
 		&& FParse::Param(FCommandLine::Get(), TEXT("FlickLightingPreview"));
@@ -450,6 +450,18 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		.VAlign(VAlign_Bottom)
 		[
 			BuildMainMenuFooter()
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0, 0, 34, 48)
+		[
+			SNew(SBox).Visibility_Lambda([this]()
+			{
+				const auto* Sessions = GetDisplayedSessionSubsystem();
+				return !bStartupOverlayVisible && !bSocialPanelOpen && !bChallengesOpen && !bInvitePromptPreview
+					&& !(Sessions && Sessions->HasPendingPartyInvite())
+					&& GetScreenVisibility(EFlickFrontendScreen::Settings) == EVisibility::Collapsed
+					&& GetScreenVisibility(EFlickFrontendScreen::MainMenu) != EVisibility::Collapsed
+					? EVisibility::Visible : EVisibility::Collapsed;
+			})[BuildMenuRadio()]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(12.0f, 0.0f, 0.0f, 8.0f)
 		[

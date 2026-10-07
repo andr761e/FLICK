@@ -370,6 +370,8 @@ void UFlickGameInstance::Init()
 	GConfig->GetFloat(FlickSettingsSection, TEXT("MasterVolume"), MasterVolume, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("EffectsVolume"), EffectsVolume, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("InterfaceVolume"), InterfaceVolume, GGameUserSettingsIni);
+	GConfig->GetFloat(FlickSettingsSection, TEXT("MusicVolume"), MusicVolume, GGameUserSettingsIni);
+	GConfig->GetBool(FlickSettingsSection, TEXT("MenuRadioEnabled"), bMenuRadioEnabled, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("FreeCameraLookSensitivity"), FreeCameraLookSensitivity, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("FreeCameraMoveSensitivity"), FreeCameraMoveSensitivity, GGameUserSettingsIni);
 	GConfig->GetFloat(FlickSettingsSection, TEXT("ShotMouseSensitivity"), ShotMouseSensitivity, GGameUserSettingsIni);
@@ -380,6 +382,7 @@ void UFlickGameInstance::Init()
 	MasterVolume = FMath::Clamp(MasterVolume, 0.0f, 1.0f);
 	EffectsVolume = FMath::Clamp(EffectsVolume, 0.0f, 1.0f);
 	InterfaceVolume = FMath::Clamp(InterfaceVolume, 0.0f, 1.0f);
+	MusicVolume = FMath::Clamp(MusicVolume, 0.0f, 1.0f);
 	FreeCameraLookSensitivity = FMath::Clamp(FreeCameraLookSensitivity, 0.0f, 1.0f);
 	FreeCameraMoveSensitivity = FMath::Clamp(FreeCameraMoveSensitivity, 0.0f, 1.0f);
 	ShotMouseSensitivity = FMath::Clamp(ShotMouseSensitivity, 0.0f, 1.0f);
@@ -683,6 +686,18 @@ void UFlickGameInstance::SetInterfaceVolume(const float Volume)
 	SaveFrontendSettings();
 }
 
+void UFlickGameInstance::SetMusicVolume(const float Volume)
+{
+	MusicVolume = FMath::Clamp(Volume, 0.0f, 1.0f);
+	SaveFrontendSettings();
+}
+
+void UFlickGameInstance::SetMenuRadioEnabled(const bool bEnabled)
+{
+	bMenuRadioEnabled = bEnabled;
+	SaveFrontendSettings();
+}
+
 void UFlickGameInstance::SetFreeCameraLookSensitivity(const float Sensitivity)
 {
 	FreeCameraLookSensitivity = FMath::Clamp(Sensitivity, 0.0f, 1.0f);
@@ -818,6 +833,8 @@ void UFlickGameInstance::SaveFrontendSettings() const
 	GConfig->SetFloat(FlickSettingsSection, TEXT("MasterVolume"), MasterVolume, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("EffectsVolume"), EffectsVolume, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("InterfaceVolume"), InterfaceVolume, GGameUserSettingsIni);
+	GConfig->SetFloat(FlickSettingsSection, TEXT("MusicVolume"), MusicVolume, GGameUserSettingsIni);
+	GConfig->SetBool(FlickSettingsSection, TEXT("MenuRadioEnabled"), bMenuRadioEnabled, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("FreeCameraLookSensitivity"), FreeCameraLookSensitivity, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("FreeCameraMoveSensitivity"), FreeCameraMoveSensitivity, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("ShotMouseSensitivity"), ShotMouseSensitivity, GGameUserSettingsIni);

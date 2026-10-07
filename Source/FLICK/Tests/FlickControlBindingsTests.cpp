@@ -10,7 +10,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickControlBindingsTest,
 bool FFlickControlBindingsTest::RunTest(const FString& Parameters)
 {
 	const auto& Controls = FlickControlBindings::GetControls();
-	TestEqual(TEXT("All currently active controls are described"), Controls.Num(), 27);
+	TestEqual(TEXT("All currently active controls are described"), Controls.Num(), 32);
 	TSet<FName> Ids;
 	TSet<FKey> Defaults;
 	for (const auto& Control : Controls)

@@ -105,6 +105,10 @@ public:
 	float GetMasterVolume() const { return MasterVolume; }
 	float GetEffectsVolume() const { return EffectsVolume; }
 	float GetInterfaceVolume() const { return InterfaceVolume; }
+	float GetMusicVolume() const { return MusicVolume; }
+	bool IsMenuRadioEnabled() const { return bMenuRadioEnabled; }
+	void SetMusicVolume(float Volume);
+	void SetMenuRadioEnabled(bool bEnabled);
 	float GetFreeCameraLookSensitivity() const { return FreeCameraLookSensitivity; }
 	float GetFreeCameraMoveSensitivity() const { return FreeCameraMoveSensitivity; }
 	float GetShotMouseSensitivity() const { return ShotMouseSensitivity; }
@@ -170,6 +174,8 @@ private:
 	float MasterVolume = 0.85f;
 	float EffectsVolume = 0.85f;
 	float InterfaceVolume = 0.7f;
+	float MusicVolume = 0.45f;
+	bool bMenuRadioEnabled = true;
 	float FreeCameraLookSensitivity = 0.33f;
 	float FreeCameraMoveSensitivity = 0.38f;
 	float ShotMouseSensitivity = 0.5f;

@@ -107,6 +107,30 @@ TArray<int16> FlickSoundSynthesis::Render(const EFlickGeneratedSoundKind Kind,
 				+ 0.42f * Pluck(Time, 0.40f, Root * 2.0f, 6.0f)
 				+ 0.22f * Pluck(Time, 0.40f, Root * 0.5f, 5.0f);
 			break;
+		case EFlickGeneratedSoundKind::Switch:
+			Value = 0.6f * Pluck(Time, 0.0f, Root, 18.0f)
+				+ 0.45f * Pluck(Time, 0.055f, Root * 1.5f, 13.0f)
+				+ 0.1f * Air * FMath::Exp(-Time * 90.0f);
+			break;
+		case EFlickGeneratedSoundKind::Divider:
+			Value = 0.6f * Tone(Root * (1.0f + 0.3f * Alpha), Time) * FMath::Exp(-Time * 7.0f)
+				+ 0.3f * LowNoise * FMath::Exp(-Time * 10.0f)
+				+ 0.28f * Pluck(Time, 0.11f, Root * 2.7f, 18.0f);
+			break;
+		case EFlickGeneratedSoundKind::Pocket:
+			Value = 0.65f * Pluck(Time, 0.0f, Root * 0.5f, 10.0f)
+				+ 0.35f * Pluck(Time, 0.065f, Root, 8.0f)
+				+ 0.3f * Pluck(Time, 0.14f, Root * 1.5f, 7.0f);
+			break;
+		case EFlickGeneratedSoundKind::TeamPing:
+			Value = 0.55f * Pluck(Time, 0.0f, Root, 24.0f)
+				+ 0.24f * Pluck(Time, 0.07f, Root * 1.25f, 25.0f);
+			break;
+		case EFlickGeneratedSoundKind::OwnTurn:
+			Value = 0.45f * Pluck(Time, 0.0f, Root, 11.0f)
+				+ 0.40f * Pluck(Time, 0.09f, Root * 1.25f, 10.0f)
+				+ 0.35f * Pluck(Time, 0.18f, Root * 1.5f, 9.0f);
+			break;
 		case EFlickGeneratedSoundKind::ReplayMusic:
 		{
 			// An intentionally oversized sports-broadcast sting: a low cinematic

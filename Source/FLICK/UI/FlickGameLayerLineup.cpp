@@ -1634,6 +1634,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Lighting, TEXT("LIGHTING"))]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Sound, TEXT("AUDIO"))]
 						+ SHorizontalBox::Slot().AutoWidth()[MakeSettingsTab(EFlickSettingsTab::Controls, TEXT("CONTROLS"))]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(6.0f, 0.0f, 0.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::QuickChat, TEXT("QUICK CHAT"))]
 					]
 					+ SVerticalBox::Slot().FillHeight(1.0f)
 					[
@@ -1641,6 +1642,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 						+ SScrollBox::Slot()
 						[
 							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::QuickChat ? EVisibility::Visible : EVisibility::Collapsed; })[BuildQuickChatSettings()]]
 							+ SOverlay::Slot()
 							[
 								SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Lighting ? EVisibility::Visible : EVisibility::Collapsed; })
@@ -1708,6 +1711,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("MASTER"), TAttribute<float>::CreateLambda([this]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return GameMode.IsValid() ? GameMode->GetMasterVolume() : I ? I->GetMasterVolume() : 1.0f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (GameMode.IsValid()) GameMode->SetMasterVolume(Value); else if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetMasterVolume(Value); }))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("PHYSICS EFFECTS"), TAttribute<float>::CreateLambda([this]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return I ? I->GetEffectsVolume() : 0.85f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetEffectsVolume(Value); }))]
 										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("INTERFACE"), TAttribute<float>::CreateLambda([this]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return I ? I->GetInterfaceVolume() : 0.7f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetInterfaceVolume(Value); }))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeSliderRow(TEXT("MUSIC"), TAttribute<float>::CreateLambda([this]() { const auto* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return I ? I->GetMusicVolume() : 0.45f; }), FOnFloatValueChanged::CreateLambda([this](float Value) { if (auto* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetMusicVolume(Value); }))]
+										+ SVerticalBox::Slot().AutoHeight().Padding(0, 16, 0, 0)[BuildMenuRadio()]
+										+ SVerticalBox::Slot().AutoHeight().Padding(0, 12, 0, 0)[SNew(STextBlock).Text(FText::FromString(TEXT("Music fades out for matches. Interface volume controls your-turn and team-ping cues. Gameplay effects include switches, dividers and BOB pockets."))).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)]
 									]
 								]
 								+ SVerticalBox::Slot().FillHeight(1.0f)
@@ -1715,9 +1721,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 									SNew(SFlickAngularBorder).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::StreamSafe ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 									[
 										SNew(SVerticalBox)
-										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT(""), TEXT("STREAM SAFE"), TEXT("Keep replay music out of a broadcast without muting shot and interface feedback."))]
-										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("MUTE REPLAY MUSIC"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return Checked(I && I->IsReplayMusicMutedForStreaming()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState State) { if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetReplayMusicMutedForStreaming(State == ECheckBoxState::Checked); }))]
-										+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 0.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK generates replay music in-game. This setting does not affect Steam overlays or other system audio."))).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)]
+										+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT(""), TEXT("STREAM SAFE"), TEXT("Mute menu and replay music without muting gameplay or interface feedback."))]
+										+ SVerticalBox::Slot().AutoHeight()[MakeToggleRow(TEXT("MUTE ALL MUSIC"), TAttribute<ECheckBoxState>::CreateLambda([this, Checked]() { const UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; return Checked(I && I->IsReplayMusicMutedForStreaming()); }), FOnCheckStateChanged::CreateLambda([this](ECheckBoxState State) { if (UFlickGameInstance* I = PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr) I->SetReplayMusicMutedForStreaming(State == ECheckBoxState::Checked); }))]
+										+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 0.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK's menu radio and replay music are original procedural instrumentals. This setting does not affect Steam overlays or other system audio."))).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)]
 									]
 								]
 								+ SVerticalBox::Slot().FillHeight(1.0f)

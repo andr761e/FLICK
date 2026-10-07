@@ -8,7 +8,20 @@
 
 AFlickAudioDirector::AFlickAudioDirector()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bTickEvenWhenPaused = true;
+	PrimaryActorTick.TickInterval = 0.1f;
+	bReplicates = true;
+	bAlwaysRelevant = true;
+}
+
+void AFlickAudioDirector::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!bReplayMusicActive || !IsValid(ReplayMusicComponent)) return;
+	const auto* Settings = GetGameInstance<UFlickGameInstance>();
+	ReplayMusicComponent->SetVolumeMultiplier(Settings
+		? (Settings->IsReplayMusicMutedForStreaming() ? 0.0f : 0.72f * Settings->GetMasterVolume() * Settings->GetMusicVolume()) : 0.72f);
 }
 
 void AFlickAudioDirector::PlayUi(const bool bConfirm)
@@ -179,15 +192,57 @@ void AFlickAudioDirector::PlayRoundResult(
 		1.0f);
 }
 
+void AFlickAudioDirector::PlaySwitch(const FVector& Location)
+{
+	PlayGenerated(EFlickGeneratedSoundKind::Switch, 0.28f, 660.0f, 0.55f, 1.0f, &Location);
+}
+
+void AFlickAudioDirector::PlayDivider(const FVector& Location)
+{
+	PlayGenerated(EFlickGeneratedSoundKind::Divider, 0.36f, 125.0f, 0.5f, 1.0f, &Location);
+}
+
+void AFlickAudioDirector::PlayPocket(const FVector& Location)
+{
+	PlayGenerated(EFlickGeneratedSoundKind::Pocket, 0.55f, 392.0f, 0.7f, 1.0f, &Location);
+}
+
+void AFlickAudioDirector::PlayLocalNotification(const bool bOwnTurn)
+{
+	FFlickAudioCue Cue;
+	Cue.Kind = static_cast<uint8>(bOwnTurn ? EFlickGeneratedSoundKind::OwnTurn : EFlickGeneratedSoundKind::TeamPing);
+	Cue.Duration = bOwnTurn ? 0.48f : 0.22f;
+	Cue.Frequency = bOwnTurn ? 523.25f : 880.0f;
+	Cue.Volume = bOwnTurn ? 0.55f : 0.35f;
+	PlayLocalCue(Cue);
+}
+
 void AFlickAudioDirector::PlayReplayMusic(const float Duration, const EFlickTeam WinningTeam)
 {
-	StopReplayMusic();
+	if (HasAuthority()) MulticastReplayMusic(Duration, WinningTeam, false);
+}
+
+void AFlickAudioDirector::MulticastReplayMusic_Implementation(float Duration, EFlickTeam WinningTeam, bool bStop)
+{
+	if (GetNetMode() == NM_DedicatedServer) return;
+	if (bStop)
+	{
+		bReplayMusicActive = false;
+		if (IsValid(ReplayMusicComponent)) ReplayMusicComponent->FadeOut(0.32f, 0.0f);
+	}
+	else PlayReplayMusicLocal(Duration, WinningTeam);
+}
+
+void AFlickAudioDirector::PlayReplayMusicLocal(const float Duration, const EFlickTeam WinningTeam)
+{
+	bReplayMusicActive = false;
+	if (IsValid(ReplayMusicComponent)) ReplayMusicComponent->FadeOut(0.32f, 0.0f);
 	const UFlickGameInstance* Settings = Cast<UFlickGameInstance>(GetGameInstance());
 	if (Settings && Settings->IsReplayMusicMutedForStreaming())
 	{
 		return;
 	}
-	const float MixedVolume = 0.72f * GetEffectsVolume();
+	const float MixedVolume = 0.72f * (Settings ? Settings->GetMasterVolume() * Settings->GetMusicVolume() : 1.0f);
 	if (MixedVolume <= KINDA_SMALL_NUMBER)
 	{
 		return;
@@ -211,17 +266,12 @@ void AFlickAudioDirector::PlayReplayMusic(const float Duration, const EFlickTeam
 	Sound->SoundGroup = SOUNDGROUP_Music;
 	ReplayMusicSound = Sound;
 	ReplayMusicComponent = UGameplayStatics::SpawnSound2D(this, Sound, MixedVolume, 1.0f);
+	bReplayMusicActive = IsValid(ReplayMusicComponent);
 }
 
 void AFlickAudioDirector::StopReplayMusic()
 {
-	if (IsValid(ReplayMusicComponent))
-	{
-		// Keep both the component and its procedural source referenced while the
-		// fade overlaps the round-result sting. They will be replaced safely when
-		// the next replay starts.
-		ReplayMusicComponent->FadeOut(0.32f, 0.0f);
-	}
+	if (HasAuthority()) MulticastReplayMusic(0, EFlickTeam::None, true);
 }
 
 USoundWaveProcedural* AFlickAudioDirector::CreateSound(
@@ -265,21 +315,49 @@ void AFlickAudioDirector::PlayGenerated(
 	const float Timbre,
 	const float Intensity)
 {
+	FFlickAudioCue Cue;
+	Cue.Kind = static_cast<uint8>(Kind);
+	Cue.Duration = Duration;
+	Cue.Frequency = BaseFrequency;
+	Cue.Volume = Volume;
+	Cue.Pitch = Pitch;
+	Cue.bSpatial = Location != nullptr;
+	Cue.Location = Location ? *Location : FVector::ZeroVector;
+	Cue.Timbre = Timbre;
+	Cue.Intensity = Intensity;
+	if (Kind == EFlickGeneratedSoundKind::UiNavigate || Kind == EFlickGeneratedSoundKind::UiConfirm)
+		PlayLocalCue(Cue);
+	else if (HasAuthority())
+	{
+		if (Kind == EFlickGeneratedSoundKind::Impact || Kind == EFlickGeneratedSoundKind::RimImpact)
+			MulticastImpactCue(Cue);
+		else MulticastImportantCue(Cue);
+	}
+}
+
+void AFlickAudioDirector::MulticastImpactCue_Implementation(const FFlickAudioCue& Cue) { PlayLocalCue(Cue); }
+void AFlickAudioDirector::MulticastImportantCue_Implementation(const FFlickAudioCue& Cue) { PlayLocalCue(Cue); }
+
+void AFlickAudioDirector::PlayLocalCue(const FFlickAudioCue& Cue)
+{
+	if (GetNetMode() == NM_DedicatedServer) return;
+	const EFlickGeneratedSoundKind Kind = static_cast<EFlickGeneratedSoundKind>(Cue.Kind);
 	const bool bInterfaceSound = Kind == EFlickGeneratedSoundKind::UiNavigate
-		|| Kind == EFlickGeneratedSoundKind::UiConfirm;
-	const float MixedVolume = Volume * (bInterfaceSound ? GetInterfaceVolume() : GetEffectsVolume());
+		|| Kind == EFlickGeneratedSoundKind::UiConfirm || Kind == EFlickGeneratedSoundKind::TeamPing
+		|| Kind == EFlickGeneratedSoundKind::OwnTurn;
+	const float MixedVolume = Cue.Volume * (bInterfaceSound ? GetInterfaceVolume() : GetEffectsVolume());
 	if (MixedVolume <= KINDA_SMALL_NUMBER)
 	{
 		return;
 	}
 
-	USoundWaveProcedural* Sound = CreateSound(Kind, Duration, BaseFrequency, SoundSeed++, Timbre, Intensity);
+	USoundWaveProcedural* Sound = CreateSound(Kind, Cue.Duration, Cue.Frequency, SoundSeed++, Cue.Timbre, Cue.Intensity);
 	if (!Sound)
 	{
 		return;
 	}
 
-	if (Location)
+	if (Cue.bSpatial)
 	{
 		if (!SpatialAttenuation)
 		{
@@ -297,15 +375,15 @@ void AFlickAudioDirector::PlayGenerated(
 		UGameplayStatics::PlaySoundAtLocation(
 			this,
 			Sound,
-			*Location,
+			Cue.Location,
 			MixedVolume,
-			Pitch,
+			Cue.Pitch,
 			0.0f,
 			SpatialAttenuation);
 	}
 	else
 	{
-		UGameplayStatics::PlaySound2D(this, Sound, MixedVolume, Pitch);
+		UGameplayStatics::PlaySound2D(this, Sound, MixedVolume, Cue.Pitch);
 	}
 }
 

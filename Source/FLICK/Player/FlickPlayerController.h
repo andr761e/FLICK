@@ -14,6 +14,7 @@ class UFlickPhysicsDiagnosticsComponent;
 class UFlickPostMatchPresentationComponent;
 class UFlickPrivateSpectatorComponent;
 class UFlickTeamPingComponent;
+class UFlickMenuRadioComponent;
 
 UCLASS()
 class FLICK_API AFlickPlayerController : public APlayerController
@@ -29,6 +30,7 @@ public:
 	virtual void SetupInputComponent() override;
 	void RefreshControlBindings();
 	virtual void PlayerTick(float DeltaTime) override;
+	UFlickMenuRadioComponent* GetMenuRadio() const { return MenuRadio; }
 	void RefreshLocalLighting();
 
 	void ClearAiming();
@@ -299,6 +301,11 @@ private:
 	TObjectPtr<UFlickPrivateSpectatorComponent> PrivateSpectator;
 	UPROPERTY()
 	TObjectPtr<UFlickTeamPingComponent> TeamPings;
+	UPROPERTY()
+	TObjectPtr<UFlickMenuRadioComponent> MenuRadio;
+	void UpdateLocalTurnAudio();
+	FString LastAudibleTurn;
+	double NextTurnAudioCheck = 0;
 
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> HoveredPiece;

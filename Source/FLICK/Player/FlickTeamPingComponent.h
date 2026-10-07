@@ -18,19 +18,32 @@ public:
 	float GetOpacity(int32 Row) const;
 	EFlickTeam GetMessageTeam(int32 Row) const;
 	bool HasMessages() const;
+	void QuickChatInput(int32 Choice);
+	int32 GetQuickChatGroup() const;
+	bool CancelQuickChat();
+	FString GetCooldownNotice() const;
 	UPROPERTY(EditAnywhere, Category="FLICK|Team Ping", meta=(ClampMin="0.5"))
 	float CooldownSeconds = 2.0f;
 	UPROPERTY(EditAnywhere, Category="FLICK|Team Ping", meta=(ClampMin="2.0"))
 	float MessageLifetime = 7.0f;
 	UPROPERTY(EditAnywhere, Category="FLICK|Team Ping", meta=(ClampMin="0.1"))
 	float FadeSeconds = 2.0f;
-	static constexpr int32 MaximumMessages = 4;
+	static constexpr int32 MaximumMessages = 5;
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FFlickTeamPingTest;
 #endif
 	UFUNCTION(Server, Reliable)
 	void ServerPingTarget(int32 PieceId, int32 SwitchIndex);
+	UFUNCTION(Server, Reliable)
+	void ServerQuickChat(const FString& PhraseId);
+	void DeliverTeamMessage(const FString& Message);
+	bool CanUseQuickChat() const;
+	bool TryStartLocalCooldown();
+	FString CooldownNoticeMatchId;
+	EFlickTeam CooldownNoticeTeam = EFlickTeam::None;
+	int32 QuickChatGroup = INDEX_NONE;
+	double QuickChatOpenedAt = -1000;
 	UFUNCTION(Client, Reliable)
 	void ClientReceivePing(const FString& MatchId, EFlickTeam Team, const FString& Message);
 	struct FMessage { FString MatchId; EFlickTeam Team; FString Text; double ReceivedAt; };

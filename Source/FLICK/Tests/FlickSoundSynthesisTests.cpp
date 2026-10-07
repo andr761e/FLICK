@@ -25,7 +25,12 @@ bool FFlickSoundSynthesisTest::RunTest(const FString& Parameters)
 		{EFlickGeneratedSoundKind::Turn, TEXT("07-turn"), 0.30f, 587.33f},
 		{EFlickGeneratedSoundKind::RoundWin, TEXT("08-round-win"), 0.78f, 587.33f},
 		{EFlickGeneratedSoundKind::MatchWin, TEXT("09-match-win"), 1.40f, 587.33f},
-		{EFlickGeneratedSoundKind::ReplayMusic, TEXT("10-replay-music"), 3.0f, 110.0f}
+		{EFlickGeneratedSoundKind::ReplayMusic, TEXT("10-replay-music"), 3.0f, 110.0f},
+		{EFlickGeneratedSoundKind::Switch, TEXT("11-switch"), 0.28f, 660.0f},
+		{EFlickGeneratedSoundKind::Divider, TEXT("12-divider"), 0.36f, 125.0f},
+		{EFlickGeneratedSoundKind::Pocket, TEXT("13-bob-pocket"), 0.55f, 392.0f},
+		{EFlickGeneratedSoundKind::TeamPing, TEXT("14-team-ping"), 0.22f, 880.0f},
+		{EFlickGeneratedSoundKind::OwnTurn, TEXT("15-your-turn"), 0.48f, 523.25f}
 	};
 	const bool bExport = FParse::Param(FCommandLine::Get(), TEXT("FlickExportSoundReview"));
 	const FString ReviewDirectory = FPaths::ProjectSavedDir() / TEXT("AudioReview");

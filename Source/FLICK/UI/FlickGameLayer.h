@@ -55,7 +55,8 @@ enum class EFlickSettingsTab : uint8
 	Display,
 	StreamSafe,
 	Controls,
-	Lighting
+	Lighting,
+	QuickChat
 };
 
 class SFlickGameLayer final : public SCompoundWidget
@@ -77,6 +78,7 @@ private:
 #endif
 	TSharedRef<SWidget> BuildMainMenu();
 	TSharedRef<SWidget> BuildMainMenuFooter();
+	TSharedRef<SWidget> BuildMenuRadio();
 	TSharedRef<SWidget> BuildChallengePreview();
 	TSharedRef<SWidget> BuildChallengesPanel();
 	TSharedRef<SWidget> BuildChallengeRow(int32 ChallengeIndex, bool bCompact);
@@ -122,6 +124,7 @@ private:
 	TSharedRef<SWidget> BuildArchetypePicker(EFlickTeam Team);
 	TSharedRef<SWidget> BuildArchetypeChoice(EFlickTeam Team, EFlickPieceArchetype Archetype);
 	TSharedRef<SWidget> BuildSettings();
+	TSharedRef<SWidget> BuildQuickChatSettings();
 	TSharedRef<SWidget> BuildLightingSettings();
 	TSharedRef<SWidget> BuildMatchHud();
 	TSharedRef<SWidget> BuildCinematicReplayOverlay();
@@ -324,6 +327,7 @@ private:
 	TArray<TSharedPtr<int32>> WindowModeOptions;
 	TArray<TSharedPtr<int32>> CameraShakeOptions;
 	TArray<TSharedPtr<int32>> PuckHoverSizeOptions;
+	TArray<TSharedPtr<FString>> QuickChatPhraseOptions;
 	TArray<TSharedPtr<int32>> PuckHoverDetailOptions;
 	TArray<TSharedPtr<int32>> PuckIndicatorOptions;
 	TArray<TSharedPtr<int32>> FrameLimitOptions;

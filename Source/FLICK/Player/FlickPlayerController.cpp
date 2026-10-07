@@ -3,6 +3,7 @@
 #include "Arena/FlickTestArena.h"
 #include "Core/FlickModeRules.h"
 #include "Core/FlickControlBindings.h"
+#include "Core/FlickQuickChats.h"
 #include "Core/FlickCosmeticCatalog.h"
 
 #include "Core/FlickLog.h"
@@ -11,6 +12,8 @@
 #include "Player/FlickPostMatchPresentationComponent.h"
 #include "Player/FlickPrivateSpectatorComponent.h"
 #include "Player/FlickTeamPingComponent.h"
+#include "Audio/FlickMenuRadioComponent.h"
+#include "Audio/FlickAudioDirector.h"
 #include "Engine/EngineTypes.h"
 #include "EngineUtils.h"
 #include "Game/FlickGameInstance.h"
@@ -44,6 +47,7 @@ AFlickPlayerController::AFlickPlayerController()
 	PostMatchPresentation = CreateDefaultSubobject<UFlickPostMatchPresentationComponent>(TEXT("PostMatchPresentation"));
 	PrivateSpectator = CreateDefaultSubobject<UFlickPrivateSpectatorComponent>(TEXT("PrivateSpectator"));
 	TeamPings = CreateDefaultSubobject<UFlickTeamPingComponent>(TEXT("TeamPings"));
+	MenuRadio = CreateDefaultSubobject<UFlickMenuRadioComponent>(TEXT("MenuRadio"));
 	bShouldPerformFullTickWhenPaused = true;
 }
 
@@ -164,6 +168,15 @@ void AFlickPlayerController::RefreshControlBindings()
 	InputComponent->BindKey(Key(TEXT("ReplaySkip")), IE_Pressed, this, &AFlickPlayerController::HandleReplaySkipPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Shoot")), IE_Pressed, this, &AFlickPlayerController::HandlePrimaryPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("TeamPing")), IE_Pressed, this, &AFlickPlayerController::HandleTeamPingPressed);
+	for (int32 Choice = 0; Choice < 4; ++Choice)
+	{
+		FInputKeyBinding Binding(FInputChord(Key(FlickQuickChats::ControlId(Choice))), IE_Pressed);
+		Binding.KeyDelegate.GetDelegateForManualSet().BindLambda([this, Choice]()
+		{
+			if (auto* Feed = FindComponentByClass<UFlickTeamPingComponent>()) Feed->QuickChatInput(Choice);
+		});
+		InputComponent->KeyBindings.Add(MoveTemp(Binding));
+	}
 	InputComponent->BindKey(Key(TEXT("Shoot")), IE_Released, this, &AFlickPlayerController::HandlePrimaryReleased).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Secondary")), IE_Pressed, this, &AFlickPlayerController::HandleSecondaryPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Menu")), IE_Pressed, this, &AFlickPlayerController::HandleCancelPressed).bExecuteWhenPaused = true;
@@ -213,6 +226,7 @@ void AFlickPlayerController::RefreshLocalLighting()
 void AFlickPlayerController::PlayerTick(const float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+	UpdateLocalTurnAudio();
 	if (IsLocalController() && !bPuckSkinsSubmitted && GetPlayerState<AFlickPlayerState>()) SubmitLocalPuckSkins();
 	InspectedPiece.Reset();
 	const AFlickGameState* NetworkState = GetFlickGameState();
@@ -729,6 +743,7 @@ void AFlickPlayerController::HandleSecondaryPressed()
 
 void AFlickPlayerController::HandleCancelPressed()
 {
+	if (auto* Feed = FindComponentByClass<UFlickTeamPingComponent>(); Feed && Feed->CancelQuickChat()) return;
 	AFlickGameMode* FlickGameMode = GetFlickGameMode();
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
 		CameraPawn && CameraPawn->IsFreeCameraEnabled())
@@ -1466,6 +1481,33 @@ void AFlickPlayerController::RequestPrivateMatchSpectate()
 	}
 	// On remote clients the role update may arrive later; the component starts
 	// following once the chosen spectator role has replicated.
+}
+
+void AFlickPlayerController::UpdateLocalTurnAudio()
+{
+	const AFlickGameState* State = GetFlickGameState();
+	if (!IsLocalController() || !State) return;
+	if (!IsGameplayActive()) { LastAudibleTurn.Reset(); return; }
+	if (State->bSeriesComplete
+		|| State->bPuckArrivalActive || IsCinematicReplayPresentationActive()
+		|| (State->MatchPhase != EFlickMatchPhase::Aiming && State->MatchPhase != EFlickMatchPhase::KickoffPlanning)) return;
+	const double Now = FPlatformTime::Seconds();
+	if (Now < NextTurnAudioCheck) return;
+	NextTurnAudioCheck = Now + 0.15;
+	const FString Key = FString::Printf(TEXT("%s/%d/%d/%d/%d/%d"), *State->MatchId, State->RoundNumber,
+		State->TurnNumber, static_cast<int32>(State->CurrentTeam), State->CurrentTeamPlayerSlot, static_cast<int32>(State->MatchPhase));
+	if (LastAudibleTurn == Key) return;
+	for (TActorIterator<AFlickPiece> Piece(GetWorld()); Piece; ++Piece)
+	{
+		// Reuse actual selection eligibility: spectators, bots and other seats stay silent.
+		if (!CanSelectPieceLocally(*Piece)) continue;
+		for (TActorIterator<AFlickAudioDirector> Audio(GetWorld()); Audio; ++Audio)
+		{
+			Audio->PlayLocalNotification(true);
+			LastAudibleTurn = Key;
+			return;
+		}
+	}
 }
 
 bool AFlickPlayerController::ShouldShowPrivateTeamMenu() const

@@ -6,6 +6,8 @@
 #include "Pieces/FlickPiece.h"
 #include "Arena/FlickTestArena.h"
 #include "EngineUtils.h"
+#include "Audio/FlickAudioDirector.h"
+#include "Core/FlickQuickChats.h"
 
 namespace
 {
@@ -52,9 +54,7 @@ void UFlickTeamPingComponent::TryPing(AFlickPiece* Piece, const int32 SwitchInde
 		const auto* Arena = PingArena(GetWorld());
 		if (!Arena || SwitchIndex < 0 || SwitchIndex >= Arena->GetMechanismCount()) return;
 	}
-	const double Now = GetWorld()->GetTimeSeconds();
-	if (Now - LastLocalPing < FMath::Max(.5f, CooldownSeconds)) return;
-	LastLocalPing = Now;
+	if (!TryStartLocalCooldown()) return;
 	ServerPingTarget(Piece ? Piece->GetPieceId() : INDEX_NONE, Piece ? INDEX_NONE : SwitchIndex);
 }
 
@@ -98,6 +98,15 @@ void UFlickTeamPingComponent::ServerPingTarget_Implementation(const int32 PieceI
 		Message = FString::Printf(TEXT("%s: Target %s - %s"), *CleanName(SenderState->GetPlayerName()),
 			*CleanName(TargetName), *GetPieceArchetypeName(Target->GetArchetype()));
 	}
+	DeliverTeamMessage(Message);
+}
+
+void UFlickTeamPingComponent::DeliverTeamMessage(const FString& Message)
+{
+	const auto* Sender = Cast<AFlickPlayerController>(GetOwner());
+	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
+	if (!Sender || !State) return;
+	const EFlickTeam Team = Sender->GetLocalTeam();
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		auto* Recipient = Cast<AFlickPlayerController>(It->Get());
@@ -107,15 +116,99 @@ void UFlickTeamPingComponent::ServerPingTarget_Implementation(const int32 PieceI
 	}
 }
 
+bool UFlickTeamPingComponent::CanUseQuickChat() const
+{
+	const auto* Controller = Cast<AFlickPlayerController>(GetOwner());
+	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
+	const auto* Mode = GetWorld()->GetAuthGameMode<AFlickGameMode>();
+	return Controller && Controller->IsLocalController() && CanPing(State)
+		&& Controller->GetLocalTeam() != EFlickTeam::None && !Controller->ShouldShowPrivateTeamMenu()
+		&& !Controller->IsCinematicReplayPresentationActive() && !Controller->IsScoreboardVisible()
+		&& !GetWorld()->IsPaused() && (!Mode || Mode->GetFrontendScreen() == EFlickFrontendScreen::Playing);
+}
+
+int32 UFlickTeamPingComponent::GetQuickChatGroup() const
+{
+	return CanUseQuickChat() && GetWorld()->GetRealTimeSeconds() - QuickChatOpenedAt < 3.0 ? QuickChatGroup : INDEX_NONE;
+}
+
+bool UFlickTeamPingComponent::CancelQuickChat()
+{
+	const bool bOpen = GetQuickChatGroup() != INDEX_NONE;
+	QuickChatGroup = INDEX_NONE; return bOpen;
+}
+
+void UFlickTeamPingComponent::QuickChatInput(int32 Choice)
+{
+	if (Choice < 0 || Choice >= 4 || !CanUseQuickChat()) { CancelQuickChat(); return; }
+	const int32 Group = GetQuickChatGroup();
+	if (Group == INDEX_NONE) { QuickChatGroup = Choice; QuickChatOpenedAt = GetWorld()->GetRealTimeSeconds(); return; }
+	CancelQuickChat();
+	if (!TryStartLocalCooldown()) return;
+	ServerQuickChat(FlickQuickChats::GetSlot(Group, Choice));
+}
+
+bool UFlickTeamPingComponent::TryStartLocalCooldown()
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now - LastLocalPing < FMath::Max(.5f, CooldownSeconds))
+	{
+		const auto* State = GetWorld()->GetGameState<AFlickGameState>();
+		const auto* Controller = Cast<AFlickPlayerController>(GetOwner());
+		CooldownNoticeMatchId = State ? State->MatchId : FString();
+		CooldownNoticeTeam = Controller ? Controller->GetLocalTeam() : EFlickTeam::None;
+		return false;
+	}
+	CooldownNoticeTeam = EFlickTeam::None;
+	LastLocalPing = Now;
+	return true;
+}
+
+FString UFlickTeamPingComponent::GetCooldownNotice() const
+{
+	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
+	const auto* Controller = Cast<AFlickPlayerController>(GetOwner());
+	if (!CanUseQuickChat() || !State || !Controller || CooldownNoticeTeam == EFlickTeam::None
+		|| CooldownNoticeTeam != Controller->GetLocalTeam() || CooldownNoticeMatchId != State->MatchId) return FString();
+	const double Remaining = FMath::Max(.5f, CooldownSeconds) - (GetWorld()->GetTimeSeconds() - LastLocalPing);
+	if (Remaining <= 0) return FString();
+	// Round up so the notice never reads zero while a send is still blocked.
+	return FString::Printf(TEXT("Chat cooldown: %.1f s remaining"), FMath::CeilToDouble(Remaining * 10.0) / 10.0);
+}
+
+void UFlickTeamPingComponent::ServerQuickChat_Implementation(const FString& PhraseId)
+{
+	const auto* Sender = Cast<AFlickPlayerController>(GetOwner());
+	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
+	const auto* Player = Sender ? Sender->GetPlayerState<AFlickPlayerState>() : nullptr;
+	const auto* Mode = GetWorld()->GetAuthGameMode<AFlickGameMode>();
+	if (!Player || !CanPing(State) || Sender->GetLocalTeam() == EFlickTeam::None
+		|| (Mode && (Mode->IsCinematicReplayActive() || Mode->GetFrontendScreen() != EFlickFrontendScreen::Playing))) return;
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now - LastServerPing < FMath::Max(.5f, CooldownSeconds)) return;
+	LastServerPing = Now;
+	const auto* Phrase = FlickQuickChats::Find(PhraseId);
+	if (!Phrase) return;
+	DeliverTeamMessage(FString::Printf(TEXT("%s: %s"), *CleanName(Player->GetPlayerName()), Phrase->Text));
+}
+
 void UFlickTeamPingComponent::ClientReceivePing_Implementation(const FString& MatchId, EFlickTeam Team, const FString& Message)
 {
 	const auto* Controller = Cast<AFlickPlayerController>(GetOwner());
 	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
 	if (!Controller || !State || Team == EFlickTeam::None || Controller->GetLocalTeam() != Team || State->MatchId != MatchId) return;
-	Messages.RemoveAll([this, State](const FMessage& Entry)
-	{ return Entry.MatchId != State->MatchId || GetWorld()->GetTimeSeconds() - Entry.ReceivedAt >= MessageLifetime; });
+	Messages.RemoveAll([State, Team](const FMessage& Entry)
+	{ return Entry.MatchId != State->MatchId || Entry.Team != Team; });
 	Messages.Add({MatchId, Team, Message.Left(160), GetWorld()->GetTimeSeconds()});
 	if (Messages.Num() > MaximumMessages) Messages.RemoveAt(0, Messages.Num() - MaximumMessages);
+	// Retain history after fading. A new message brings the latest five back together.
+	for (FMessage& Entry : Messages) Entry.ReceivedAt = GetWorld()->GetTimeSeconds();
+	if (Controller->IsLocalController())
+		for (TActorIterator<AFlickAudioDirector> Audio(GetWorld()); Audio; ++Audio)
+		{
+			Audio->PlayLocalNotification(false);
+			break;
+		}
 }
 
 float UFlickTeamPingComponent::GetOpacity(const int32 Row) const

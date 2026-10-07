@@ -10,6 +10,22 @@ class USoundWaveProcedural;
 class USoundAttenuation;
 class UAudioComponent;
 
+// Replicate the small sound description, never generated PCM or gameplay state.
+USTRUCT()
+struct FFlickAudioCue
+{
+	GENERATED_BODY()
+	UPROPERTY() uint8 Kind = 0;
+	UPROPERTY() float Duration = 0;
+	UPROPERTY() float Frequency = 0;
+	UPROPERTY() float Volume = 0;
+	UPROPERTY() float Pitch = 1;
+	UPROPERTY() FVector Location = FVector::ZeroVector;
+	UPROPERTY() bool bSpatial = false;
+	UPROPERTY() float Timbre = 0.5f;
+	UPROPERTY() float Intensity = 1;
+};
+
 UCLASS(NotBlueprintable)
 class FLICK_API AFlickAudioDirector : public AActor
 {
@@ -17,6 +33,7 @@ class FLICK_API AFlickAudioDirector : public AActor
 
 public:
 	AFlickAudioDirector();
+	virtual void Tick(float DeltaSeconds) override;
 
 	void PlayUi(bool bConfirm);
 	void PlayLaunch(EFlickPieceArchetype Archetype, float Power, const FVector& Location);
@@ -32,8 +49,21 @@ public:
 	void PlayRoundResult(EFlickTeam Winner, bool bDraw, bool bSeriesComplete);
 	void PlayReplayMusic(float Duration, EFlickTeam WinningTeam);
 	void StopReplayMusic();
+	void PlaySwitch(const FVector& Location);
+	void PlayDivider(const FVector& Location);
+	void PlayPocket(const FVector& Location);
+	// Local-only: team ping audio must never leak to opponents or spectators.
+	void PlayLocalNotification(bool bOwnTurn);
 
 private:
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastImpactCue(const FFlickAudioCue& Cue);
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastImportantCue(const FFlickAudioCue& Cue);
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastReplayMusic(float Duration, EFlickTeam WinningTeam, bool bStop);
+	void PlayLocalCue(const FFlickAudioCue& Cue);
+	void PlayReplayMusicLocal(float Duration, EFlickTeam WinningTeam);
 	USoundWaveProcedural* CreateSound(
 		EFlickGeneratedSoundKind Kind,
 		float Duration,
@@ -73,4 +103,5 @@ private:
 	float LastRimImpactTime = -100.0f;
 	float LastUiTime = -100.0f;
 	int32 SoundSeed = 173;
+	bool bReplayMusicActive = false;
 };
