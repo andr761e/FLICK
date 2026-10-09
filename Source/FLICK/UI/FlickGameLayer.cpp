@@ -156,6 +156,13 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	{
 		SelectedPlayPlaylist = EFlickPlayPlaylist::Casual;
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickPracticeMenuPreview")))
+	{
+		SelectedPlayPlaylist = EFlickPlayPlaylist::Training;
+		SelectedTrainingActivity = EFlickTrainingActivity::PracticePacks;
+		FParse::Value(FCommandLine::Get(), TEXT("FlickPracticeCategory="), SelectedPracticeCategory);
+		SelectedPracticeCategory = FMath::Clamp(SelectedPracticeCategory, -1, 3);
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickLoadoutComparePreview")))
 	{
 		Player1HoveredLoadoutArchetype = EFlickPieceArchetype::Heavy;

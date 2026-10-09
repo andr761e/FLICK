@@ -39,6 +39,8 @@ public:
 		TFunction<void(int32)> OnSwitchActivated = nullptr);
 	uint16 CommitPendingControlZoneToggles(const TArray<TObjectPtr<AFlickPiece>>& Pieces);
 	void ResetMechanisms();
+	void SetTrainingLayoutSeed(int32 Seed);
+	void RestoreTrainingMechanisms(uint16 DividerMask);
 	void SetTrainingBoardEditMode(bool bEnabled);
 	bool ToggleTrainingMechanismAtWorldLocation(const FVector& WorldLocation, bool& bOutEnabled, bool& bOutChanged);
 	bool IsDividerRaised(int32 DividerIndex) const;

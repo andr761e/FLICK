@@ -181,6 +181,7 @@ void AFlickPlayerController::RefreshControlBindings()
 	InputComponent->BindKey(Key(TEXT("Secondary")), IE_Pressed, this, &AFlickPlayerController::HandleSecondaryPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Menu")), IE_Pressed, this, &AFlickPlayerController::HandleCancelPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Restart")), IE_Pressed, this, &AFlickPlayerController::HandleRestartPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("TrainingUndo")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingUndoPressed);
 	InputComponent->BindKey(Key(TEXT("Editor")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingEditorTogglePressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("OwnPuck")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingOwnPuckPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("TargetPuck")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingTargetPuckPressed).bExecuteWhenPaused = true;
@@ -1481,6 +1482,15 @@ void AFlickPlayerController::RequestPrivateMatchSpectate()
 	}
 	// On remote clients the role update may arrive later; the component starts
 	// following once the chosen spectator role has replicated.
+}
+
+void AFlickPlayerController::HandleTrainingUndoPressed()
+{
+	if (AFlickGameMode* Mode = GetFlickGameMode(); Mode && Mode->CanUndoTrainingShot())
+	{
+		ClearHoveredPiece();
+		Mode->UndoTrainingShot();
+	}
 }
 
 void AFlickPlayerController::UpdateLocalTurnAudio()

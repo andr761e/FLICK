@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/FlickTypes.h"
+#include "Game/FlickGameState.h"
 #include "GameFramework/GameModeBase.h"
 #include "Ranking/FlickRankedBackendTypes.h"
 #include "FlickGameMode.generated.h"
@@ -14,6 +15,7 @@ class AFlickGameState;
 class AFlickPiece;
 class AFlickPlayerState;
 class AFlickTestArena;
+class UFlickPracticeComponent;
 class UPrimitiveComponent;
 class AFlickWorldFeedback;
 class ADirectionalLight;
@@ -37,6 +39,28 @@ struct FFlickTrainingPieceSnapshot
 	int32 OwningPlayerSlot = 0;
 	bool bBobStriker = false;
 	int32 PuckSkin = 0;
+};
+
+struct FFlickTrainingUndoPiece : FFlickTrainingPieceSnapshot
+{
+	FTransform Transform = FTransform::Identity;
+	FVector LinearVelocity = FVector::ZeroVector;
+	FVector AngularVelocity = FVector::ZeroVector;
+	TArray<int32> Effects;
+	bool bAwake = false;
+};
+
+struct FFlickTrainingUndoSnapshot
+{
+	TArray<FFlickTrainingUndoPiece> Pieces;
+	TArray<FFlickPlayerMatchStats> PlayerStats;
+	uint16 DividerMask = 0;
+	int32 TurnNumber = 1;
+	int32 Player1Shots = 0;
+	int32 Player2Shots = 0;
+	int32 Player1NextSlot = 0;
+	int32 Player2NextSlot = 0;
+	int32 CurrentSlot = 0;
 };
 
 struct FFlickLockedKickoffShot
@@ -162,7 +186,11 @@ public:
 	bool IsTrainingMode() const { return bTrainingMode; }
 	bool IsTrainingBotMatch() const { return bTrainingMode && bTrainingBotMatch; }
 	bool IsTutorialMode() const { return bTrainingMode && bTutorialMode; }
+	bool IsPracticeMode() const;
+	UFlickPracticeComponent* GetPractice() const { return Practice; }
 	bool IsFreePlayTraining() const { return bTrainingMode && !bTrainingBotMatch && !bTutorialMode; }
+	bool CanUndoTrainingShot() const;
+	bool UndoTrainingShot();
 	bool IsTrainingEditMode() const { return bTrainingMode && bTrainingEditMode; }
 	int32 GetTutorialStageNumber() const { return TutorialStageIndex + 1; }
 	int32 GetTutorialStageCount() const { return TutorialStageTotal; }
@@ -269,6 +297,7 @@ public:
 	void StartTrainingMode();
 	void StartTrainingBotMatch();
 	void StartTutorialMode();
+	void StartPractice(int32 Category, int32 Difficulty);
 	void ToggleTrainingEditMode();
 	bool CanEditTrainingBoard() const;
 	void SetTrainingPlacementTeam(EFlickTeam Team);
@@ -584,6 +613,9 @@ private:
 	friend class FFlickBobGameplayTest;
 	friend class FFlickRematchFlowTest;
 	friend class FFlickTrainingFeedbackTest;
+	friend class FFlickTrainingUndoTest;
+	friend class UFlickPracticeComponent;
+	friend class FFlickPracticeTest;
 
 	void SpawnCameraIfNeeded();
 	void SpawnAudioIfNeeded();
@@ -710,6 +742,7 @@ private:
 	void ResolveTrainingTurn();
 	void ResetTrainingBoard();
 	void CaptureTrainingResetSnapshot();
+	void CaptureTrainingUndoSnapshot();
 	void RestoreTrainingResetSnapshot();
 	bool ResolveTrainingPlacement(
 		const FVector& RequestedWorldLocation,
@@ -853,6 +886,8 @@ private:
 	bool bTrainingEditMode = false;
 	bool bTrainingBotMatch = false;
 	bool bTutorialMode = false;
+	UPROPERTY(VisibleAnywhere, Category="FLICK|Practice")
+	TObjectPtr<UFlickPracticeComponent> Practice;
 	bool bTutorialCompleted = false;
 	bool bTutorialAdvancePending = false;
 	static constexpr int32 TutorialStageTotal = 4;
@@ -883,6 +918,8 @@ private:
 	FRandomStream TrainingBotRandom;
 	bool bHasTrainingResetSnapshot = false;
 	TArray<FFlickTrainingPieceSnapshot> TrainingResetSnapshot;
+	bool bHasTrainingUndoSnapshot = false;
+	FFlickTrainingUndoSnapshot TrainingUndoSnapshot;
 	bool bPlayerClassesActiveForMatch = false;
 	bool bClassSelectionForNextRound = false;
 	bool bHasPendingClassChanges = false;

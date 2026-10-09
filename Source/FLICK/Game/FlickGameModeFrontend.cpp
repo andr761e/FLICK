@@ -1056,6 +1056,7 @@ void AFlickGameMode::StartTutorialMode()
 		return;
 	}
 
+	Practice->Stop();
 	SelectedMatchVariant = EFlickMatchVariant::Classic;
 	MatchmakingPlayersPerTeam = 1;
 	bTutorialMode = true;
@@ -1076,6 +1077,7 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 	bTestArenaMode = FlickModeRules::Get(NormalizeMatchVariant(SelectedMatchVariant)).bUseSwitchyardArena;
 
 	UGameplayStatics::SetGamePaused(this, false);
+	if (!bTutorialMode) Practice->Stop();
 	bTrainingMode = true;
 	bTrainingEditMode = false;
 	bTrainingBotMatch = bAgainstBot;
@@ -1289,6 +1291,7 @@ void AFlickGameMode::SetupTutorialStage(const int32 StageIndex)
 
 void AFlickGameMode::ResolveTutorialShot()
 {
+	if (IsPracticeMode()) { Practice->ResolveShot(); return; }
 	if (!IsTutorialMode() || bTutorialAdvancePending || bTutorialCompleted)
 	{
 		return;
@@ -1351,6 +1354,11 @@ void AFlickGameMode::ResolveTutorialShot()
 
 void AFlickGameMode::UpdateTutorial(const float DeltaSeconds)
 {
+	if (IsPracticeMode())
+	{
+		if (FrontendScreen == EFlickFrontendScreen::Playing) Practice->Update(DeltaSeconds);
+		return;
+	}
 	if (!IsTutorialMode() || bTutorialCompleted || TutorialTransitionRemaining <= 0.0f)
 	{
 		return;
@@ -1410,6 +1418,8 @@ void AFlickGameMode::ToggleTrainingEditMode()
 	const bool bEnteringEditor = !bTrainingEditMode;
 	if (bEnteringEditor)
 	{
+		bHasTrainingUndoSnapshot = false;
+		TrainingUndoSnapshot = FFlickTrainingUndoSnapshot();
 		if (IsBobMode())
 		{
 			TrainingPlacementArchetype = EFlickPieceArchetype::Standard;

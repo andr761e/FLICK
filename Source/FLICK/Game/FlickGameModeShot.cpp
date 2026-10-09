@@ -457,6 +457,7 @@ bool AFlickGameMode::TryExecuteTrainingBotShot(const EFlickTeam BotTeam, const i
 
 bool AFlickGameMode::CanSelectPiece(const AFlickPiece* Piece) const
 {
+	if (IsPracticeMode() && (!Piece || Piece->GetPieceId() != Practice->GetShooterId())) return false;
 	const AFlickGameState* FlickGameState = GetFlickGameState();
 	if (IsTrainingBotMatch() && FlickGameState
 		&& FlickGameState->MatchPhase == EFlickMatchPhase::KickoffPlanning
@@ -490,6 +491,7 @@ bool AFlickGameMode::CanSelectPieceForController(
 	const APlayerController* RequestingPlayer,
 	const AFlickPiece* Piece) const
 {
+	if (IsPracticeMode() && (!Piece || Piece->GetPieceId() != Practice->GetShooterId())) return false;
 	const AFlickGameState* FlickGameState = GetFlickGameState();
 	const bool bCanUseEitherTrainingBobStriker = IsFreePlayTraining()
 		&& IsBobMode()
@@ -580,6 +582,7 @@ bool AFlickGameMode::ExecuteValidatedLaunch(
 	}
 
 	const bool bFreePlayTraining = IsFreePlayTraining();
+	if (bFreePlayTraining) CaptureTrainingUndoSnapshot();
 	const EFlickTeam ShootingTeam = bFreePlayTraining ? Piece->GetTeam() : FlickGameState->CurrentTeam;
 	const int32 ShootingPlayerSlot = bFreePlayTraining
 		? Piece->GetOwningPlayerSlot()
@@ -997,6 +1000,7 @@ void AFlickGameMode::RestartMatch()
 	{
 		UGameplayStatics::SetGamePaused(this, false);
 		FrontendScreen = EFlickFrontendScreen::Playing;
+		if (IsPracticeMode()) { Practice->Restart(); return; }
 		SetupTutorialStage(bTutorialCompleted ? 0 : TutorialStageIndex);
 		return;
 	}

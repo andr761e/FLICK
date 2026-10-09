@@ -24,7 +24,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 		.Cursor(EMouseCursor::Hand)
 		.OnClicked_Lambda([this]()
 		{
-			if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training
+			if (SelectedTrainingActivity == EFlickTrainingActivity::PracticePacks && SelectedPracticeCategory >= 0)
+			{
+				SelectedPracticeCategory = INDEX_NONE;
+			}
+			else if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training
 				&& SelectedTrainingActivity != EFlickTrainingActivity::None)
 			{
 				SelectedTrainingActivity = EFlickTrainingActivity::None;
@@ -120,6 +124,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							.Text_Lambda([this]()
 							{
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::None) return FText::FromString(TEXT("FIND YOUR NEXT RIVALRY."));
+								if (SelectedTrainingActivity == EFlickTrainingActivity::PracticePacks) return FText::FromString(TEXT("PRACTICE PACKS"));
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training && SelectedTrainingActivity == EFlickTrainingActivity::None) return FText::FromString(TEXT("TRAINING"));
 								return FText::FromString(TEXT("SELECT MATCH FORMAT"));
 							})
@@ -132,6 +137,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							.Text_Lambda([this]()
 							{
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::None) return FText::FromString(TEXT("CHOOSE HOW YOU WANT TO PLAY"));
+								if (SelectedTrainingActivity == EFlickTrainingActivity::PracticePacks) return FText::FromString(TEXT("FIVE SHOTS PER RUN. MASTER EVERY PACK WITH A PERFECT SCORE."));
 								if (SelectedPlayPlaylist == EFlickPlayPlaylist::Training && SelectedTrainingActivity == EFlickTrainingActivity::None) return FText::FromString(TEXT("CHOOSE A TRAINING ACTIVITY"));
 								return FText::FromString(TEXT("SET THE ARENA RULESET AND TEAM SIZE"));
 							})
@@ -151,6 +157,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 							SNew(STextBlock)
 							.Text_Lambda([this]()
 							{
+								if (SelectedTrainingActivity == EFlickTrainingActivity::PracticePacks) return FText::FromString(SelectedPracticeCategory < 0 ? TEXT("02  //  FOCUS") : TEXT("03  //  DIFFICULTY"));
 								return FText::FromString(SelectedPlayPlaylist == EFlickPlayPlaylist::None
 									? TEXT("01  //  MODE")
 									: TEXT("02  //  FORMAT"));
@@ -252,10 +259,23 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 						TEXT("BOB VS BOT"),
 						TEXT("POCKET YOUR COLOR BEFORE THE BOT CLEARS THEIRS"),
 						TEXT("STANDARD PUCKS  |  BOB RULES  |  OFFLINE"),
-						FLinearColor(0.18f, 0.82f, 0.48f, 1.0f))
+							FLinearColor(0.18f, 0.82f, 0.48f, 1.0f))
 				]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(UiMetrics::CardGap)
+				[
+					BuildTrainingActivityCard(EFlickTrainingActivity::PracticePacks, TEXT("PRACTICE PACKS"),
+						TEXT("PRECISION, KNOCKOUTS, SWITCH CONTROL AND BOB POCKETS"),
+						TEXT("3 DIFFICULTIES  |  SCORED CHALLENGES  |  SAVED PERSONAL BESTS"), Brand)
 				]
 			]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(28, 116, 28, 98)
+		[
+			SNew(SBox).WidthOverride(UiMetrics::ModeContentWidth)
+			.Visibility_Lambda([this]() { return SelectedPlayPlaylist == EFlickPlayPlaylist::Training
+				&& SelectedTrainingActivity == EFlickTrainingActivity::PracticePacks ? EVisibility::Visible : EVisibility::Collapsed; })
+			[BuildPracticeMenu()]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(28.0f, 116.0f, 28.0f, 98.0f)
 		[
@@ -602,7 +622,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 	const FString& Detail,
 	const FLinearColor& Accent)
 {
-	const FString ActivitySymbolPath = Activity == EFlickTrainingActivity::Tutorial
+	const FString ActivitySymbolPath = (Activity == EFlickTrainingActivity::Tutorial || Activity == EFlickTrainingActivity::PracticePacks)
 		? TEXT("/Game/UI/TutorialPlaylist.TutorialPlaylist")
 		: Activity == EFlickTrainingActivity::FreePlay
 			? TEXT("/Game/UI/FreePlayPlaylist.FreePlayPlaylist")
@@ -616,6 +636,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 		.OnClicked_Lambda([this, Activity]()
 		{
 			SelectedTrainingActivity = Activity;
+			if (Activity == EFlickTrainingActivity::PracticePacks)
+			{
+				SelectedPracticeCategory = INDEX_NONE;
+				return FReply::Handled();
+			}
 			if (GameMode.IsValid())
 			{
 				GameMode->SetMatchmakingPlayersPerTeam(1);
@@ -698,7 +723,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 7.0f, 0.0f, 0.0f)
 						[
 							SNew(STextBlock)
-							.Text(FText::FromString(Activity == EFlickTrainingActivity::FreePlay ? TEXT("CHOOSE  >") : TEXT("PLAY  >")))
+							.Text(FText::FromString(Activity == EFlickTrainingActivity::FreePlay || Activity == EFlickTrainingActivity::PracticePacks ? TEXT("CHOOSE  >") : TEXT("PLAY  >")))
 							.Font(UiFont(11, true)).ColorAndOpacity(Paper)
 						]
 					]

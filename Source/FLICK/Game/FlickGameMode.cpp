@@ -6,6 +6,7 @@ using namespace FlickGameModePrivate;
 AFlickGameMode::AFlickGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	Practice = CreateDefaultSubobject<UFlickPracticeComponent>(TEXT("Practice"));
 
 	TrainingBotEasySettings.ThinkDelay = 1.65f;
 	TrainingBotEasySettings.MinimumPower = 0.34f;
@@ -741,6 +742,13 @@ void AFlickGameMode::BeginPlay()
 	{
 		SelectMatchVariant(EFlickMatchVariant::Classic);
 		StartSelectedMatch();
+	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickPracticePreview")))
+	{
+		int32 Category = 0, Difficulty = 0;
+		FParse::Value(FCommandLine::Get(), TEXT("FlickPracticeCategory="), Category);
+		FParse::Value(FCommandLine::Get(), TEXT("FlickPracticeDifficulty="), Difficulty);
+		StartPractice(FMath::Clamp(Category, 0, 3), FMath::Clamp(Difficulty, 0, 2));
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickTrainingPreview")))
 	{

@@ -1288,6 +1288,7 @@ FText SFlickGameLayer::GetScoreboardMatchSummary() const
 	}
 	if (GameMode.IsValid() && GameMode->IsTrainingMode())
 	{
+		if (GameMode->IsPracticeMode()) return FText::FromString(TEXT("OFFLINE PRACTICE PACK"));
 		return FText::FromString(FString::Printf(TEXT("%s   /   OFFLINE FREE PLAY"), *Mode));
 	}
 	return FText::FromString(FString::Printf(TEXT("%s   /   ROUND %d"), *Mode, State->RoundNumber));
@@ -1349,6 +1350,8 @@ FText SFlickGameLayer::GetMatchStatusText() const
 	}
 	if (GameMode.IsValid() && GameMode->IsTrainingMode())
 	{
+		if (GameMode->IsPracticeMode()) return FText::FromString(State->MatchPhase == EFlickMatchPhase::ResolvingPhysics
+			? TEXT("PUCKS IN MOTION") : State->MatchPhase == EFlickMatchPhase::WaitingToStart ? TEXT("PRACTICE RESULT") : TEXT("TAKE YOUR SHOT"));
 		if (GameMode->IsTrainingEditMode())
 		{
 			return FText::FromString(GameMode->GetTrainingPlacementTeam() == EFlickTeam::Player1

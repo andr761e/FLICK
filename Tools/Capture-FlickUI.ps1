@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -31,6 +31,10 @@ param(
     [int]$ProfilePage = 0,
     [ValidateRange(0, 8)]
     [int]$SettingsTab = 0,
+    [ValidateRange(-1, 3)]
+    [int]$PracticeCategory = -1,
+    [ValidateRange(0, 2)]
+    [int]$PracticeDifficulty = 0,
     [ValidateRange(15, 600)]
     [int]$TimeoutSeconds = 120,
     [ValidateRange(1, 30)]
@@ -87,6 +91,8 @@ $previewFlags = @{
     AimArrow = @('-Flick4v4Preview', '-FlickAimArrowPreview')
     PuckHover = @('-Flick4v4Preview', '-FlickPuckHoverPreview')
     Training = @('-FlickTrainingPreview')
+    Practice = @('-FlickPracticePreview')
+    PracticePacks = @('-FlickModeSelectPreview', '-FlickPracticeMenuPreview')
     Pause = @('-FlickPausePreview')
     Result = @('-FlickMatchResultPreview', '-FlickRoundOverPreview')
     Scoreboard = @('-Flick4v4Preview', '-FlickScoreboardPreview')
@@ -113,6 +119,7 @@ foreach ($screenName in $Screen) {
         '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame', "-FlickCaptureDelaySeconds=$CaptureDelaySeconds",
         "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickLockerItem=$LockerItem", "-FlickProfilePage=$ProfilePage", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
+        "-FlickPracticeCategory=$PracticeCategory", "-FlickPracticeDifficulty=$PracticeDifficulty",
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),
         ('-abslog="{0}"' -f $logPath)

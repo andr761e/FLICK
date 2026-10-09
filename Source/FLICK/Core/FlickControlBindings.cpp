@@ -35,6 +35,7 @@ namespace FlickControlBindings
 			{TEXT("MoveBoost"), TEXT("FREE CAMERA BOOST"), TEXT("FREE CAMERA"), EKeys::LeftShift},
 			{TEXT("MoveBoostAlt"), TEXT("FREE CAMERA BOOST (ALT)"), TEXT("FREE CAMERA"), EKeys::RightShift},
 			{TEXT("Restart"), TEXT("RESTART TRAINING"), TEXT("TRAINING"), EKeys::R},
+			{TEXT("TrainingUndo"), TEXT("UNDO LAST FREE PLAY SHOT"), TEXT("TRAINING"), EKeys::BackSpace},
 			{TEXT("Editor"), TEXT("TOGGLE BOARD EDITOR"), TEXT("TRAINING"), EKeys::T},
 			{TEXT("OwnPuck"), TEXT("PLACE OWN PUCK"), TEXT("TRAINING"), EKeys::One},
 			{TEXT("TargetPuck"), TEXT("PLACE TARGET PUCK"), TEXT("TRAINING"), EKeys::Two},

@@ -140,6 +140,7 @@ private:
 	void HandleSecondaryPressed();
 	void HandleCancelPressed();
 	void HandleRestartPressed();
+	void HandleTrainingUndoPressed();
 	void HandleTrainingEditorTogglePressed();
 	void HandleTrainingOwnPuckPressed();
 	void HandleTrainingTargetPuckPressed();

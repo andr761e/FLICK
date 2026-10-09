@@ -471,6 +471,15 @@ uint16 AFlickTestArena::CommitPendingControlZoneToggles(const TArray<TObjectPtr<
 	return ToggledMechanisms;
 }
 
+void AFlickTestArena::SetTrainingLayoutSeed(const int32 Seed)
+{
+	if (!HasAuthority()) return;
+	ArenaLayoutSeed = Seed;
+	BuildLayoutFromSeed();
+	ApplyTestLayout();
+	ResetMechanisms();
+}
+
 void AFlickTestArena::ResetMechanisms()
 {
 	RaisedDividerMask = 0;
@@ -714,6 +723,15 @@ FVector AFlickTestArena::GetSwitchWorldCenter(const int32 Index) const
 {
 	const FVector2D Center = GetZoneLocalCenter(Index);
 	return GetActorTransform().TransformPosition(FVector(Center, SurfaceZ));
+}
+
+void AFlickTestArena::RestoreTrainingMechanisms(const uint16 DividerMask)
+{
+	if (!HasAuthority()) return;
+	ResetMechanisms();
+	RaisedDividerMask = DividerMask & static_cast<uint16>((1u << GetMechanismCount()) - 1u);
+	ApplyMechanismState();
+	ForceNetUpdate();
 }
 
 int32 AFlickTestArena::FindSwitchAtWorldLocation(const FVector& WorldLocation) const

@@ -132,6 +132,7 @@ void AFlickGameMode::CloseSettings()
 
 void AFlickGameMode::ReturnToMainMenu()
 {
+	Practice->Stop();
 	if (bNetworkMatchRequested)
 	{
 		AFlickGameState* State = GetFlickGameState();
@@ -653,6 +654,8 @@ void AFlickGameMode::SpawnBobPieces()
 
 void AFlickGameMode::DestroyPieces()
 {
+	bHasTrainingUndoSnapshot = false;
+	TrainingUndoSnapshot = FFlickTrainingUndoSnapshot();
 	if (LockerKnockoutFeedback.IsValid()) LockerKnockoutFeedback->Destroy();
 	LockerKnockoutFeedback.Reset();
 	if (LockerSpawnFeedback.IsValid()) LockerSpawnFeedback->Destroy();

@@ -1,6 +1,7 @@
 // HUD, scoreboard, tutorial, pause/results and state
 #include "UI/FlickGameLayerPrivate.h"
 #include "Debug/FlickPhysicsDiagnosticsComponent.h"
+#include "Game/FlickPracticeComponent.h"
 
 namespace FlickScoreboardLayout
 {
@@ -46,6 +47,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)[BuildTrainingToolsPanel()]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 132.0f, 0.0f, 0.0f)[BuildTutorialOverlay()]
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24, 132, 0, 0)[BuildPracticeOverlay()]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 14.0f, 0.0f, 0.0f)
 		[
 			SNew(SBox)
@@ -93,6 +95,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 								if (!State) return FText::GetEmpty();
 								if (GameMode.IsValid() && GameMode->IsTrainingMode())
 								{
+									if (GameMode->IsPracticeMode()) return FText::FromString(GameMode->GetPractice()->IsComplete()
+										? TEXT("PRACTICE COMPLETE") : FString::Printf(TEXT("CHALLENGE %d / 5"), GameMode->GetPractice()->GetChallengeNumber()));
 									if (GameMode->IsTutorialMode())
 									{
 										return FText::FromString(GameMode->IsTutorialComplete()
@@ -825,12 +829,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 								? TEXT("1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  DEL REMOVE NON-STRIKERS")
 								: TEXT("WHEEL TYPE  |  LMB PLACE/DRAG PUCK OR TOGGLE DIVIDER  |  DEL REMOVE"));
 						}
-						return FText::FromString(TEXT("Aim and shoot normally. Reset restores your saved setup, not a new board."));
+						return FText::FromString(TEXT("Undo restores the board before your last shot. Reset restores your saved setup."));
 					})
 					.Font(UiFont(8, true))
 					.AutoWrapText(true)
 					.WrapTextAt(272.0f)
 					.ColorAndOpacity(FLinearColor(0.68f, 0.76f, 0.82f, 1.0f))
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 8, 0, 0)
+				[
+					SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).IsFocusable(false)
+					.IsEnabled_Lambda([this]() { return GameMode.IsValid() && GameMode->CanUndoTrainingShot(); })
+					.OnClicked_Lambda([this]() { if (GameMode.IsValid()) GameMode->UndoTrainingShot(); return FReply::Handled(); })
+					[SNew(STextBlock).Font(UiFont(10, true)).ColorAndOpacity(Paper).Text_Lambda([]()
+					{ return FText::FromString(TEXT("UNDO LAST SHOT  /  ") + FlickControlBindings::GetKey(TEXT("TrainingUndo")).GetDisplayName().ToString()); })]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0, 8, 0, 0)
 				[
@@ -861,7 +873,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTutorialOverlay()
 	return SNew(SBox)
 		.Visibility_Lambda([this]()
 		{
-			return GameMode.IsValid() && GameMode->IsTutorialMode()
+			return GameMode.IsValid() && GameMode->IsTutorialMode() && !GameMode->IsPracticeMode()
 				&& GameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing
 				? EVisibility::SelfHitTestInvisible
 				: EVisibility::Collapsed;
@@ -952,7 +964,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 					.Text_Lambda([Key]()
 					{
 					const TCHAR* Id = Key == TEXT("T") ? TEXT("Editor")
-						: Key == TEXT("C") ? TEXT("Clear") : Key == TEXT("R") ? TEXT("Restart")
+						: Key == TEXT("C") ? TEXT("Clear") : Key == TEXT("R") ? TEXT("Restart") : Key == TEXT("BACKSPACE") ? TEXT("TrainingUndo")
 						: Key == TEXT("X") ? TEXT("FreeCamera") : Key == TEXT("V") ? TEXT("TopView")
 						: Key == TEXT("TAB") ? TEXT("Scoreboard") : Key == TEXT("ESC") ? TEXT("Menu")
 						: Key == TEXT("LMB") ? TEXT("Shoot") : Key == TEXT("DEL") ? TEXT("Remove") : nullptr;
@@ -978,7 +990,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 			{
 				AddHint(TEXT("T"), TEXT("SAVE / DONE"), false);
 				AddHint(TEXT("C"), TEXT("CLEAR"), false);
-				AddHint(TEXT("R"), TEXT("RESET"), true);
+				AddHint(TEXT("R"), TEXT("RESET"), false);
+				AddHint(TEXT("BACKSPACE"), TEXT("UNDO SHOT"), true);
 			}
 			else if (bTraining)
 			{

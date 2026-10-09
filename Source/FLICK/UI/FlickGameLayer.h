@@ -34,7 +34,8 @@ enum class EFlickTrainingActivity : uint8
 	Tutorial,
 	FreePlay,
 	BotMatch,
-	BobBotMatch
+	BobBotMatch,
+	PracticePacks
 };
 
 enum class EFlickProfileTab : uint8
@@ -134,6 +135,8 @@ private:
 	TSharedRef<SWidget> BuildTeamPlate(EFlickTeam Team);
 	TSharedRef<SWidget> BuildTrainingToolsPanel();
 	TSharedRef<SWidget> BuildTutorialOverlay();
+	TSharedRef<SWidget> BuildPracticeMenu();
+	TSharedRef<SWidget> BuildPracticeOverlay();
 	TSharedRef<SWidget> BuildControlHintPanel(bool bRightSide);
 	TSharedRef<SWidget> BuildPowerMeter();
 	TSharedRef<SWidget> BuildCameraOrbitHint();
@@ -305,6 +308,7 @@ private:
 	EFlickPlayPlaylist SelectedPlayPlaylist = EFlickPlayPlaylist::None;
 	int32 SelectedPlayFormat = 0;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;
+	int32 SelectedPracticeCategory = INDEX_NONE;
 	EFlickProfileTab SelectedProfileTab = EFlickProfileTab::Overview;
 	EFlickProfileTab AnimatedProfileTab = EFlickProfileTab::Overview;
 	float ProfileEntranceElapsed = 0.0f;
