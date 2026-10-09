@@ -117,7 +117,6 @@ void AFlickGameMode::StartSelectedMatchmaking()
 	bTutorialAdvancePending = false;
 	TutorialTransitionRemaining = 0.0f;
 	bClassSelectionStartsTrainingBotMatch = false;
-	bTestArenaMode = false;
 	ResetTrainingBotThinking();
 	const UFlickPartySubsystem* PersistentParty = GetGameInstance()
 		? GetGameInstance()->GetSubsystem<UFlickPartySubsystem>() : nullptr;

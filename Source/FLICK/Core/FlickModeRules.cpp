@@ -105,7 +105,10 @@ bool FlickModeRules::IsPieceOutsideCircularTabletop(
 		* FMath::Sqrt(FMath::Max(0.0f, 1.0f - FMath::Square(VerticalAxisAlignment)))
 		+ HalfThickness * VerticalAxisAlignment;
 	const bool bBelowTabletop = PieceLocation.Z + VerticalExtent < ArenaSurfaceZ - SafeTolerance;
-	return bOutsideRim || bBelowTabletop;
+	// Horizontal clearance alone is not a ring-out while airborne. Keep the
+	// physical puck visible/simulating until its lower edge returns to rim height.
+	const bool bAtRimHeight = PieceLocation.Z - VerticalExtent <= ArenaSurfaceZ + SafeTolerance;
+	return (bOutsideRim && bAtRimHeight) || bBelowTabletop;
 }
 
 TArray<FVector2D> FlickModeRules::BuildMultiplayerFormationPositions(

@@ -33,6 +33,8 @@ public:
 		int32 InOwningPlayerSlot = 0);
 	void ApplyPhysicsSettings();
 	void SetPregamePreview(bool bInPreview);
+	// Presentation only: unlike pregame preview, this does not disable effect-preview physics.
+	void SetCosmeticPreview(bool bInPreview);
 	void BeginArrival(float Duration);
 	/** Premium cosmetic mesh; the existing root remains the authoritative physics body. */
 	void EnableTestArenaVisuals();
@@ -105,6 +107,10 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	UPROPERTY(ReplicatedUsing = OnRep_CosmeticPreview)
+	bool bCosmeticPreview = false;
+	UFUNCTION()
+	void OnRep_CosmeticPreview();
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FFlickPuckInspectionTest;
 #endif

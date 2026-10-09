@@ -1,4 +1,6 @@
 #include "Online/FlickSessionSubsystem.h"
+#include "Audio/FlickAudioDirector.h"
+#include "EngineUtils.h"
 
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
 #include "Online/FlickPartySubsystem.h"
@@ -666,6 +668,7 @@ bool UFlickSessionSubsystem::StartMatchmaking(
 	const bool bRanked,
 	const int32 QueueRating)
 {
+	MatchmakingStartedSeconds = FPlatformTime::Seconds();
 	if (!IsSteamAvailable() || !RegisterOnlineDelegates())
 	{
 		SetState(EFlickSessionState::Error, TEXT("STEAM IS REQUIRED FOR ONLINE MATCHMAKING"));
@@ -710,6 +713,7 @@ bool UFlickSessionSubsystem::ConvertPartyToMatchmakingQueue(
 	const bool bRanked,
 	const int32 QueueRating)
 {
+	MatchmakingStartedSeconds = FPlatformTime::Seconds();
 	IOnlineSubsystem* OnlineSubsystem = GetFlickOnlineSubsystem(this);
 	const IOnlineSessionPtr Sessions = OnlineSubsystem ? OnlineSubsystem->GetSessionInterface() : nullptr;
 	const int32 TeamSize = FMath::Clamp(PlayersPerTeam, 1, 3);
@@ -1130,6 +1134,12 @@ bool UFlickSessionSubsystem::JoinSearchResult(const FOnlineSessionSearchResult& 
 	bMatchmakingActive = ActivePurpose == EFlickSessionPurpose::Matchmaking;
 
 	SetState(EFlickSessionState::Joining, FString::Printf(TEXT("JOINING %s..."), *SearchResult.Session.OwningUserName));
+	if (ActivePurpose == EFlickSessionPurpose::Matchmaking && GetWorld())
+		for (TActorIterator<AFlickAudioDirector> It(GetWorld()); It; ++It)
+		{
+			It->PlayLocalNotification(true);
+			break;
+		}
 	if (!Sessions->JoinSession(0, NAME_GameSession, SearchResult))
 	{
 		bMatchmakingActive = false;
@@ -2773,6 +2783,8 @@ EFlickSessionState UFlickSessionSubsystem::GetState() const
 		if (const UFlickMatchmakingCoordinatorSubsystem* Coordinator =
 			GameInstance->GetSubsystem<UFlickMatchmakingCoordinatorSubsystem>())
 		{
+			if (Coordinator->GetQueueState() == EFlickCoordinatorQueueState::Allocated)
+				return EFlickSessionState::Joining;
 			if (Coordinator->GetQueueState() == EFlickCoordinatorQueueState::Error)
 			{
 				return EFlickSessionState::Error;
@@ -2780,6 +2792,29 @@ EFlickSessionState UFlickSessionSubsystem::GetState() const
 		}
 	}
 	return State;
+}
+
+float UFlickSessionSubsystem::GetMatchmakingElapsedSeconds() const
+{
+	const double Started = GetMatchmakingStartedSeconds();
+	return Started < 0.0 ? 0.f : static_cast<float>(FMath::Max(0.0, FPlatformTime::Seconds() - Started));
+}
+
+double UFlickSessionSubsystem::GetMatchmakingStartedSeconds() const
+{
+	if (GetGameInstance())
+		if (const auto* Coordinator = GetGameInstance()->GetSubsystem<UFlickMatchmakingCoordinatorSubsystem>();
+			Coordinator && Coordinator->ShouldUseCoordinator() && Coordinator->HasQueueAttempt())
+			return Coordinator->GetSearchStartedSeconds();
+	return MatchmakingStartedSeconds;
+}
+
+bool UFlickSessionSubsystem::HasMatchmakingAttempt() const
+{
+	if (GetGameInstance())
+		if (const auto* Coordinator = GetGameInstance()->GetSubsystem<UFlickMatchmakingCoordinatorSubsystem>();
+			Coordinator && Coordinator->ShouldUseCoordinator() && Coordinator->HasQueueAttempt()) return true;
+	return MatchmakingStartedSeconds >= 0.0;
 }
 
 const FString& UFlickSessionSubsystem::GetStatusMessage() const

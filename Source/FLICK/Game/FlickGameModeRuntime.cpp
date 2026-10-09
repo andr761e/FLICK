@@ -1173,7 +1173,7 @@ void AFlickGameMode::UpdateMainMenuPresentation()
 	}
 	// The frontend always returns to one stable arena. Play-mode selection can
 	// still preview its arena, but the main menu no longer cycles or rebuilds it.
-	if (ActiveMatchVariant != EFlickMatchVariant::Classic || CurrentPlayersPerTeam != 1)
+	if (ActiveMatchVariant != EFlickMatchVariant::Classic || CurrentPlayersPerTeam != 1 || !bTestArenaMode)
 	{
 		ApplyMatchConfiguration(EFlickMatchVariant::Classic, 1);
 		RebuildMatch();
@@ -1219,6 +1219,8 @@ void AFlickGameMode::UpdateMainMenuPresentation()
 			Index + 1, Location, Archetype);
 		if (Piece)
 		{
+			Piece->EnableTestArenaVisuals();
+			Piece->SetCosmeticPreview(true);
 			Piece->BeginReplayPresentation();
 		}
 	}

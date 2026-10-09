@@ -83,6 +83,7 @@ struct FFlickRoundReplayFrame
 {
 	float Time = 0.0f;
 	uint16 RaisedDividerMask = 0;
+	TArray<float> DividerLiftFractions;
 	TArray<FFlickReplayPieceState> Pieces;
 };
 
@@ -616,6 +617,7 @@ private:
 	friend class FFlickTrainingUndoTest;
 	friend class UFlickPracticeComponent;
 	friend class FFlickPracticeTest;
+	friend class FFlickFrontendRecoveryTest;
 
 	void SpawnCameraIfNeeded();
 	void SpawnAudioIfNeeded();

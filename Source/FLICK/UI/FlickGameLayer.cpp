@@ -419,7 +419,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		[
 			SNew(SBox)
 			.WidthOverride(720.0f)
-			.HeightOverride(58.0f)
+			.MinDesiredHeight(58.0f)
 			.Visibility_Lambda([this]() { return GetMatchmakingStatusVisibility(); })
 			[
 				BuildMatchmakingStatusBar()
@@ -590,8 +590,16 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchmakingStatusBar()
 					.Text_Lambda([this]()
 					{
 						const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
-						return FText::FromString(Sessions ? Sessions->GetStatusMessage() : TEXT("MATCHMAKING UNAVAILABLE"));
+						if (!Sessions) return FText::FromString(TEXT("MATCHMAKING UNAVAILABLE"));
+						if (Sessions->GetState() == EFlickSessionState::Error)
+							return FText::FromString(FString::Printf(TEXT("COULD NOT JOIN: %s"), *Sessions->GetStatusMessage()));
+						const int32 Seconds = FMath::Max(0, FMath::FloorToInt(Sessions->GetMatchmakingElapsedSeconds()));
+						return FText::FromString(FString::Printf(TEXT("%s  |  %02d:%02d"),
+							Sessions->GetState() == EFlickSessionState::Joining ? TEXT("JOINING") : *Sessions->GetStatusMessage(),
+							Seconds / 60, Seconds % 60));
 					})
+					.AutoWrapText(true)
+					.WrapTextAt(430.f)
 					.Font(UiFont(9, true))
 					.ColorAndOpacity(Brand)
 				]
@@ -610,12 +618,19 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchmakingStatusBar()
 					.VAlign(VAlign_Center)
 					.OnClicked_Lambda([this]()
 					{
+						if (const auto* Sessions = GetDisplayedSessionSubsystem(); Sessions && Sessions->GetState() == EFlickSessionState::Error)
+						{
+							DismissedMatchmakingFailure = Sessions->GetStatusMessage();
+							DismissedMatchmakingStartSeconds = Sessions->GetMatchmakingStartedSeconds();
+							return FReply::Handled();
+						}
 						if (GameMode.IsValid()) GameMode->CancelUnrankedMatchmaking();
 						return FReply::Handled();
 					})
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("CANCEL  X")))
+						.Text_Lambda([this]() { const auto* Sessions = GetDisplayedSessionSubsystem();
+							return FText::FromString(Sessions && Sessions->GetState() == EFlickSessionState::Error ? TEXT("DISMISS  X") : TEXT("CANCEL  X")); })
 						.Font(UiFont(10, true))
 						.ColorAndOpacity(Muted)
 					]
@@ -639,6 +654,10 @@ EVisibility SFlickGameLayer::GetMatchmakingStatusVisibility() const
 		return EVisibility::Collapsed;
 	}
 	const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem();
+	if (Sessions && Sessions->HasMatchmakingAttempt() && Sessions->GetState() == EFlickSessionState::Error)
+		return DismissedMatchmakingFailure != Sessions->GetStatusMessage()
+			|| Sessions->GetMatchmakingStartedSeconds() != DismissedMatchmakingStartSeconds
+			? EVisibility::Visible : EVisibility::Collapsed;
 	if (Sessions && Sessions->IsMatchmakingActive())
 	{
 		return EVisibility::Visible;

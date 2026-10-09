@@ -341,6 +341,8 @@ private:
 	bool bPendingVSync = false;
 	bool bDisplayOptionsInitialized = false;
 	FString ControlBindingMessage;
+	FString DismissedMatchmakingFailure;
+	double DismissedMatchmakingStartSeconds = -1.0;
 	// Remote party members do not own the authoritative GameMode. Their
 	// non-gameplay frontend navigation therefore remains local to their Slate UI.
 	EFlickFrontendScreen RemotePartyScreen = EFlickFrontendScreen::MainMenu;

@@ -132,6 +132,9 @@ public:
 	int32 GetPersistentPartySlot() const { return PersistentPartySlot; }
 	int32 GetPersistentPartySize() const { return PersistentPartySize; }
 	bool IsMatchmakingActive() const;
+	float GetMatchmakingElapsedSeconds() const;
+	double GetMatchmakingStartedSeconds() const;
+	bool HasMatchmakingAttempt() const;
 	int32 GetMatchmakingPlayersPerTeam() const { return PendingPlayersPerTeam; }
 	int32 GetMatchmakingPartySize() const { return PendingPartySize; }
 	bool IsRankedMatchmaking() const { return bPendingRanked; }
@@ -152,6 +155,9 @@ public:
 	FOnFlickSessionsChanged OnSessionsChanged;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FFlickMatchmakingFeedbackTest;
+#endif
 	bool RegisterOnlineDelegates();
 	bool BeginCreateSession(EFlickMatchVariant Variant, int32 MaximumPlayers, EFlickSessionPurpose Purpose);
 	bool JoinSearchResult(const FOnlineSessionSearchResult& SearchResult);
@@ -211,6 +217,7 @@ private:
 	EFlickPieceArchetype LocalShowcaseArchetype = EFlickPieceArchetype::Standard;
 	EFlickSessionState State = EFlickSessionState::Idle;
 	FString StatusMessage = TEXT("STEAM SESSION SERVICE READY");
+	double MatchmakingStartedSeconds = -1.0;
 	EFlickMatchVariant PendingHostVariant = EFlickMatchVariant::Classic;
 	int32 PendingMaximumPlayers = 2;
 	int32 PendingPlayersPerTeam = 1;

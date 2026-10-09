@@ -1445,7 +1445,9 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 		return;
 	}
 
-	if (ResolutionElapsed >= MaximumResolutionDuration && ApplyResolutionTimeoutCleanup())
+	if (ResolutionElapsed >= MaximumResolutionDuration
+		&& (!TestArenaActor || (!TestArenaActor->HasMovingDividers() && !TestArenaActor->HasPiecesOnDividerCrowns(Pieces)))
+		&& ApplyResolutionTimeoutCleanup())
 	{
 		FinishPhysicsResolution(true);
 	}

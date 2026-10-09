@@ -789,6 +789,11 @@ void AFlickGameMode::SetLockerPreview(const int32 Category)
 			? (ArenaActor ? ArenaActor->GetRadius() : ArenaRadius) - 400.0f : 0.0f;
 		AFlickPiece* Preview = SpawnPiece(EFlickTeam::Player1, 1,
 			FVector(PreviewX, 0.0f, ArenaSurfaceZ + PieceThickness * Rules.ThicknessMultiplier * 0.5f + 3.0f), Archetype);
+		if (Preview)
+		{
+			Preview->EnableTestArenaVisuals();
+			Preview->SetCosmeticPreview(true);
+		}
 		if (Preview && Category != FlickCosmeticCatalog::KnockoutCategory)
 			Preview->BeginReplayPresentation();
 		LockerPreviewElapsed = 0.0f;
@@ -856,6 +861,8 @@ void AFlickGameMode::UpdateLockerPreview(const float DeltaSeconds)
 				FVector(TableRadius - 400.0f, 0.0f, SurfaceZ), EFlickPieceArchetype::Standard);
 			LockerPreviewCycle = Cycle;
 			if (!Preview) return;
+			Preview->EnableTestArenaVisuals();
+			Preview->SetCosmeticPreview(true);
 			Preview->Launch(FVector::ForwardVector, 0.38f, MaxLaunchSpeed);
 		}
 		if (!Preview->IsActive()) return;

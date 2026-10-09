@@ -75,6 +75,16 @@ bool FFlickModeRulesTest::RunTest(const FString& Parameters)
 	const float PuckRadius = Classic.PieceRadius;
 	const float PuckThickness = Classic.PieceThickness;
 	const float BoundsTolerance = 2.0f;
+	TestFalse(TEXT("Airborne puck beyond the rim waits to fall before knockout"),
+		FlickModeRules::IsPieceOutsideCircularTabletop(
+			FVector(ArenaRadius + PuckRadius + 100.f, 0.f, SurfaceZ + 500.f),
+			FVector::UpVector, PuckRadius, PuckThickness, ArenaLocation,
+			ArenaRadius, SurfaceZ, BoundsTolerance));
+	TestFalse(TEXT("Tilted airborne puck also waits to reach rim height"),
+		FlickModeRules::IsPieceOutsideCircularTabletop(
+			FVector(ArenaRadius + PuckRadius + 100.f, 0.f, SurfaceZ + 500.f),
+			FVector::ForwardVector, PuckRadius, PuckThickness, ArenaLocation,
+			ArenaRadius, SurfaceZ, BoundsTolerance));
 	TestFalse(
 		TEXT("An upright puck may legitimately overhang the arena edge"),
 		FlickModeRules::IsPieceOutsideCircularTabletop(

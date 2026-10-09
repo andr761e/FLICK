@@ -27,6 +27,9 @@ public:
 	bool IsQueueActive() const;
 	bool HasReconnectReservation() const;
 	EFlickCoordinatorQueueState GetQueueState() const { return QueueState; }
+	float GetSearchElapsedSeconds() const { return SearchStartedSeconds < 0.0 ? 0.f : static_cast<float>(FPlatformTime::Seconds() - SearchStartedSeconds); }
+	bool HasQueueAttempt() const { return SearchStartedSeconds >= 0.0; }
+	double GetSearchStartedSeconds() const { return SearchStartedSeconds; }
 	const FString& GetStatusMessage() const { return StatusMessage; }
 	const FString& GetSteamTicketAudience() const { return SteamTicketAudience; }
 	float GetReconnectGraceSeconds() const { return ReconnectGraceSeconds; }
@@ -58,6 +61,9 @@ public:
 	FOnFlickCoordinatorAllocated OnAllocated;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FFlickMatchmakingFeedbackTest;
+#endif
 	using FJsonResponseCallback = TFunction<void(bool, const TSharedPtr<FJsonObject>&, const FString&)>;
 
 	void PollQueue();
@@ -83,6 +89,7 @@ private:
 	FString ServerApiKey;
 	FString ServerId;
 	FString QueueTicketId;
+	double SearchStartedSeconds = -1.0;
 	FString StatusMessage = TEXT("STEAM SESSION MATCHMAKING READY");
 	FString HeartbeatMatchId;
 	float PollIntervalSeconds = 1.0f;

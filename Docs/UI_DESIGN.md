@@ -53,10 +53,11 @@ existing eight switches, twenty possible sockets and bot match rules.
 
 The matte instrument face, cap strips and switch markings have no collision.
 Physics still uses the inherited arena collider and the existing divider bodies.
-Divider dimensions, friction, restitution, overlap clearance and deployment
-timing are unchanged. The activation dot radius is reduced from 13 to 8 world
-units, with its visible size and activation area kept in agreement. The one state-refresh correction clears a
-queued visual when an obstructed deployment is cancelled at settlement.
+Divider dimensions, friction and restitution are unchanged. Switch activation
+keeps the existing cue delay, followed by a tuneable physical lift (see
+`DividerLift.md`). Occupied dividers now lift pucks instead of cancelling deployment
+at settlement. The activation dot radius is reduced from 13 to 8 world units,
+with its visible size and activation area kept in agreement.
 
 Arena-specific presentation changes are confined to `AFlickTestArena`. Other arena visuals are unchanged.
 

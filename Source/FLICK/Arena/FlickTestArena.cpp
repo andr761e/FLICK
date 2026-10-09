@@ -90,6 +90,8 @@ namespace
 
 AFlickTestArena::AFlickTestArena()
 {
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickGroup = TG_PrePhysics;
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	CreateOneVsOnePresentationComponents(CubeMesh.Object, CylinderMesh.Object);
@@ -259,6 +261,7 @@ void AFlickTestArena::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AFlickTestArena, RaisedDividerMask);
 	DOREPLIFETIME(AFlickTestArena, PendingToggleMask);
+	DOREPLIFETIME(AFlickTestArena, DividerLiftFractions);
 	DOREPLIFETIME(AFlickTestArena, ArenaLayoutSeed);
 	DOREPLIFETIME(AFlickTestArena, ActiveMechanismCount);
 	DOREPLIFETIME(AFlickTestArena, DesignedLocationCount);
@@ -423,7 +426,7 @@ uint16 AFlickTestArena::TrackControlZoneCrossings(
 	const uint16 NewlyTriggeredMask = PendingToggleMask & ~PendingMaskBeforeTracking;
 	if (NewlyTriggeredMask != 0)
 	{
-		ApplyMechanismState();
+		ApplyMechanismState(false);
 		ForceNetUpdate();
 	}
 	OutDeployedMechanisms = DeployReadyDividers(Pieces, DeltaSeconds);
@@ -440,9 +443,7 @@ uint16 AFlickTestArena::CommitPendingControlZoneToggles(const TArray<TObjectPtr<
 	uint16 ToggledMechanisms = 0;
 	TrackControlZoneCrossings(Pieces, 0.0f, ToggledMechanisms);
 	const uint16 PendingBeforeCommit = PendingToggleMask;
-	// A shot normally lasts far longer than the deployment delay. At resolution,
-	// safely deploy any remaining unobstructed mechanisms and cancel only a wall
-	// whose footprint is still occupied by a settled puck.
+	// Normal resolution waits for deployment and lift motion to finish.
 	for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
 	{
 		const uint16 MechanismBit = static_cast<uint16>(1 << Index);
@@ -450,12 +451,8 @@ uint16 AFlickTestArena::CommitPendingControlZoneToggles(const TArray<TObjectPtr<
 		{
 			continue;
 		}
-		const bool bWillRaise = (RaisedDividerMask & MechanismBit) == 0;
-		if (!bWillRaise || !IsDividerCurrentlyOverlapped(Index, Pieces))
-		{
-			RaisedDividerMask ^= MechanismBit;
-			ToggledMechanisms |= MechanismBit;
-		}
+		RaisedDividerMask ^= MechanismBit;
+		ToggledMechanisms |= MechanismBit;
 	}
 	PendingToggleMask = 0;
 	ArmedZoneMask = 0;
@@ -643,7 +640,7 @@ void AFlickTestArena::BeginReplayPresentation()
 	bReplayPresentationActive = true;
 }
 
-void AFlickTestArena::ApplyReplayDividerState(const uint16 DividerMask)
+void AFlickTestArena::ApplyReplayDividerState(const uint16 DividerMask, const TArray<float>& LiftFractions)
 {
 	if (!bReplayPresentationActive)
 	{
@@ -651,7 +648,12 @@ void AFlickTestArena::ApplyReplayDividerState(const uint16 DividerMask)
 	}
 	RaisedDividerMask = DividerMask;
 	PendingToggleMask = 0;
-	ApplyMechanismState();
+	if (LiftFractions.Num() == MaxMechanismCount)
+	{
+		DividerLiftFractions = LiftFractions;
+		ApplyMechanismState(false);
+	}
+	else ApplyMechanismState();
 }
 
 void AFlickTestArena::EndReplayPresentation()
@@ -813,7 +815,7 @@ FLinearColor AFlickTestArena::GetMechanismColor(const int32 MechanismIndex) cons
 
 void AFlickTestArena::OnRep_DividerState()
 {
-	ApplyMechanismState();
+	ApplyMechanismState(false);
 }
 
 void AFlickTestArena::OnRep_TestLayout()
@@ -856,26 +858,17 @@ bool AFlickTestArena::IsZoneCurrentlyOverlapped(
 	return false;
 }
 
-bool AFlickTestArena::IsDividerCurrentlyOverlapped(
-	const int32 DividerIndex,
-	const TArray<TObjectPtr<AFlickPiece>>& Pieces) const
+bool AFlickTestArena::IsPieceNearRaisedDivider(const AFlickPiece* Piece) const
 {
-	if (!DividerCenters.IsValidIndex(DividerIndex)
-		|| !DividerAngles.IsValidIndex(DividerIndex)
-		|| !RandomizedDividerLengths.IsValidIndex(DividerIndex))
+	if (!IsValid(Piece) || !Piece->IsActive()) return false;
+	for (int32 DividerIndex = 0; DividerIndex < GetMechanismCount(); ++DividerIndex)
 	{
-		return false;
-	}
-
-	const FVector2D HalfExtents(
-		RandomizedDividerLengths[DividerIndex] * 0.5f,
-		DividerThickness * 0.5f + DividerDeploymentClearance);
-	for (const AFlickPiece* Piece : Pieces)
-	{
-		if (!Piece || !IsValid(Piece) || !Piece->IsActive())
-		{
-			continue;
-		}
+		if (!IsDividerRaised(DividerIndex)
+			&& (!DividerLiftFractions.IsValidIndex(DividerIndex) || DividerLiftFractions[DividerIndex] <= 0.f)) continue;
+		if (!DividerCenters.IsValidIndex(DividerIndex) || !DividerAngles.IsValidIndex(DividerIndex)
+			|| !RandomizedDividerLengths.IsValidIndex(DividerIndex)) continue;
+		const FVector2D HalfExtents(RandomizedDividerLengths[DividerIndex] * 0.5f,
+			DividerThickness * 0.5f + DividerDeploymentClearance);
 		const FVector LocalLocation = GetActorTransform().InverseTransformPosition(Piece->GetActorLocation());
 		if (FlickArenaControlRules::DoesCircleOverlapOrientedBox(
 			FVector2D(LocalLocation.X, LocalLocation.Y),
@@ -911,12 +904,6 @@ uint16 AFlickTestArena::DeployReadyDividers(
 			}
 		}
 
-		const bool bWillRaise = (RaisedDividerMask & MechanismBit) == 0;
-		if (bWillRaise && IsDividerCurrentlyOverlapped(Index, Pieces))
-		{
-			continue;
-		}
-
 		RaisedDividerMask ^= MechanismBit;
 		PendingToggleMask &= ~MechanismBit;
 		DeployedMask |= MechanismBit;
@@ -924,10 +911,91 @@ uint16 AFlickTestArena::DeployReadyDividers(
 
 	if (DeployedMask != 0)
 	{
-		ApplyMechanismState();
+		ApplyMechanismState(false);
 		ForceNetUpdate();
 	}
+	for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
+	{
+		if (DividerLiftFractions.IsValidIndex(Index))
+		{
+			DividerLiftFractions[Index] = FMath::FInterpConstantTo(DividerLiftFractions[Index],
+				IsDividerRaised(Index) ? 1.0f : 0.0f, DeltaSeconds,
+				1.0f / FMath::Max(0.05f, IsDividerRaised(Index) ? DividerRiseDuration : DividerRetractionDuration));
+		}
+	}
+	UpdateDividerTransforms();
+	DeflectPiecesFromDividerCrowns(Pieces);
 	return DeployedMask;
+}
+
+bool AFlickTestArena::IsPieceOnDividerCrown(const int32 Index, const AFlickPiece* Piece) const
+{
+	if (!IsValid(Piece) || !Piece->IsActive() || !DividerCenters.IsValidIndex(Index)
+		|| !DividerLiftFractions.IsValidIndex(Index) || DividerLiftFractions[Index] <= 0.f) return false;
+	const UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(Piece->GetRootComponent());
+	if (!Body || !Body->IsSimulatingPhysics()) return false;
+	const FVector Local = GetActorTransform().InverseTransformPosition(Piece->GetActorLocation());
+	const float CrownZ = SurfaceZ + DividerHeight + 1.f - (1.f - DividerLiftFractions[Index]) * (DividerHeight + 2.f);
+	// Only crown contacts, never pucks beside the wall on the playing surface or high above it.
+	const float BottomZ = Local.Z - Body->Bounds.BoxExtent.Z;
+	const bool bRising = (RaisedDividerMask & (1 << Index)) != 0 && DividerLiftFractions[Index] < 1.f;
+	if ((!bRising && Local.Z <= SurfaceZ + Piece->GetPieceThickness() * .5f + 6.f)
+		|| BottomZ > CrownZ + 6.f || BottomZ < CrownZ - Piece->GetPieceThickness() - 6.f) return false;
+	return FlickArenaControlRules::DoesCircleOverlapOrientedBox(FVector2D(Local), Piece->GetPieceRadius(),
+		DividerCenters[Index], FVector2D(RandomizedDividerLengths[Index] * .5f, DividerThickness * .5f), DividerAngles[Index]);
+}
+
+bool AFlickTestArena::HasPiecesOnDividerCrowns(const TArray<TObjectPtr<AFlickPiece>>& Pieces) const
+{
+	if (DividerCrownDeflectionForce <= 0.f) return false;
+	for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
+		for (const AFlickPiece* Piece : Pieces)
+			if (IsPieceOnDividerCrown(Index, Piece)) return true;
+	return false;
+}
+
+void AFlickTestArena::DeflectPiecesFromDividerCrowns(const TArray<TObjectPtr<AFlickPiece>>& Pieces)
+{
+	if (!HasAuthority() || bReplayPresentationActive || DividerCrownDeflectionForce <= 0.f) return;
+	for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
+	{
+		const FVector2D Tangent(FMath::Cos(DividerAngles[Index]), FMath::Sin(DividerAngles[Index]));
+		const FVector2D Normal(-Tangent.Y, Tangent.X);
+		for (AFlickPiece* Piece : Pieces)
+		{
+			if (!IsPieceOnDividerCrown(Index, Piece)) continue;
+			UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(Piece->GetRootComponent());
+			const FVector Local = GetActorTransform().InverseTransformPosition(Piece->GetActorLocation());
+			const FVector2D Offset = FVector2D(Local) - DividerCenters[Index];
+			const float Across = FVector2D::DotProduct(Offset, Normal);
+			const float Along = FVector2D::DotProduct(Offset, Tangent);
+			FVector2D Direction;
+			if (FMath::Abs(Along) > RandomizedDividerLengths[Index] * .5f)
+				Direction = Tangent * FMath::Sign(Along); // Most of the puck overhangs an end.
+			else
+			{
+				float Side = Across;
+				if (FMath::Abs(Side) < .5f)
+				{
+					const FVector LocalUp = GetActorTransform().InverseTransformVectorNoScale(Piece->GetActorUpVector());
+					Side = FVector2D::DotProduct(FVector2D(LocalUp), Normal);
+					if (FMath::Abs(Side) < .05f)
+					{
+						const FVector Velocity = GetActorTransform().InverseTransformVectorNoScale(Piece->GetLinearVelocity());
+						Side = FVector2D::DotProduct(FVector2D(Velocity), Normal);
+						if (FMath::Abs(Side) < 5.f) Side = -FVector2D::DotProduct(DividerCenters[Index], Normal);
+					}
+				}
+				Direction = Normal * (Side >= 0.f ? 1.f : -1.f);
+			}
+			const bool bRising = (RaisedDividerMask & (1 << Index)) != 0 && DividerLiftFractions[Index] < 1.f;
+			const FVector WorldDirection = GetActorTransform().TransformVectorNoScale(FVector(Direction, bRising ? .5f : 0.f));
+			Body->WakeAllRigidBodies();
+			// Slightly above the centre of mass: the same force both displaces and tips the physical puck.
+			Body->AddForceAtLocation(WorldDirection * DividerCrownDeflectionForce,
+				Body->GetCenterOfMass() + FVector::UpVector * Piece->GetPieceThickness() * .35f);
+		}
+	}
 }
 
 void AFlickTestArena::BuildLayoutFromSeed()
@@ -1250,8 +1318,14 @@ void AFlickTestArena::CreateRuntimeMaterials()
 	}
 }
 
-void AFlickTestArena::ApplyMechanismState()
+void AFlickTestArena::ApplyMechanismState(const bool bSnap)
 {
+	if (bSnap || DividerLiftFractions.Num() != MaxMechanismCount)
+	{
+		DividerLiftFractions.SetNumZeroed(MaxMechanismCount);
+		for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
+			DividerLiftFractions[Index] = IsDividerRaised(Index) ? 1.0f : 0.0f;
+	}
 	for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 	{
 		const uint16 MechanismBit = static_cast<uint16>(1 << Index);
@@ -1277,20 +1351,52 @@ void AFlickTestArena::ApplyMechanismState()
 			if (DotMaterials.IsValidIndex(Index) && DotMaterials[Index])
 				DotMaterials[Index]->SetScalarParameterValue(TEXT("Emission"), 1.8f);
 		}
-		DividerCapMeshes[Index]->SetVisibility(bRaised && !bUsingWorkshopAssets);
-		DividerCapMeshes[Index]->SetHiddenInGame(!bRaised || bUsingWorkshopAssets);
-		if (DividerVisualMeshes.IsValidIndex(Index) && DividerVisualMeshes[Index])
-		{
-			DividerVisualMeshes[Index]->SetVisibility(bRaised && bUsingWorkshopAssets, true);
-			DividerVisualMeshes[Index]->SetHiddenInGame(!bRaised || !bUsingWorkshopAssets, true);
-		}
+	}
+	UpdateDividerTransforms();
+}
 
-		if (DividerMeshes.IsValidIndex(Index) && DividerMeshes[Index])
-		{
-			DividerMeshes[Index]->SetVisibility(bRaised && !bUsingWorkshopAssets, true);
-			DividerMeshes[Index]->SetHiddenInGame(!bRaised || bUsingWorkshopAssets, true);
-			DividerMeshes[Index]->SetCollisionEnabled(
-				bRaised ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-		}
+bool AFlickTestArena::HasMovingDividers() const
+{
+	if (PendingToggleMask != 0) return true;
+	for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
+		if (DividerLiftFractions.IsValidIndex(Index)
+			&& !FMath::IsNearlyEqual(DividerLiftFractions[Index], IsDividerRaised(Index) ? 1.0f : 0.0f)) return true;
+	return false;
+}
+
+void AFlickTestArena::Tick(const float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	// Physics remains server-authoritative; clients predict only the moving divider's presentation.
+	if (!HasAuthority() && !bReplayPresentationActive)
+	{
+		for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
+			if (DividerLiftFractions.IsValidIndex(Index))
+				DividerLiftFractions[Index] = FMath::FInterpConstantTo(DividerLiftFractions[Index],
+					IsDividerRaised(Index) ? 1.0f : 0.0f, DeltaSeconds,
+					1.0f / FMath::Max(0.05f, IsDividerRaised(Index) ? DividerRiseDuration : DividerRetractionDuration));
+		UpdateDividerTransforms();
+	}
+}
+
+void AFlickTestArena::UpdateDividerTransforms()
+{
+	for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
+	{
+		if (!DividerCenters.IsValidIndex(Index) || !DividerLiftFractions.IsValidIndex(Index)) continue;
+		const float Lift = DividerLiftFractions[Index];
+		// Retracted collider top is one centimetre below the deck. Never enable a full-height wall inside a puck.
+		const float Offset = (1.0f - Lift) * (DividerHeight + 2.0f);
+		const bool bVisible = Lift > 0.0f || IsDividerRaised(Index);
+		DividerMeshes[Index]->SetRelativeLocation(FVector(DividerCenters[Index], SurfaceZ + DividerHeight * 0.5f + 1.0f - Offset));
+		DividerCapMeshes[Index]->SetRelativeLocation(FVector(DividerCenters[Index], SurfaceZ + DividerHeight + 1.6f - Offset));
+		DividerVisualMeshes[Index]->SetRelativeLocation(FVector(DividerCenters[Index], SurfaceZ - Offset));
+		DividerMeshes[Index]->SetCollisionEnabled(bVisible ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+		DividerMeshes[Index]->SetVisibility(bVisible && !bUsingWorkshopAssets);
+		DividerMeshes[Index]->SetHiddenInGame(!bVisible || bUsingWorkshopAssets);
+		DividerCapMeshes[Index]->SetVisibility(bVisible && !bUsingWorkshopAssets);
+		DividerCapMeshes[Index]->SetHiddenInGame(!bVisible || bUsingWorkshopAssets);
+		DividerVisualMeshes[Index]->SetVisibility(bVisible && bUsingWorkshopAssets);
+		DividerVisualMeshes[Index]->SetHiddenInGame(!bVisible || !bUsingWorkshopAssets);
 	}
 }

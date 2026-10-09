@@ -176,6 +176,7 @@ void AFlickGameMode::CaptureRoundReplayFrame(const bool bForce)
 	FFlickRoundReplayFrame& Frame = RoundReplayFrames.AddDefaulted_GetRef();
 	Frame.Time = FMath::Max(0.0f, ResolutionElapsed);
 	Frame.RaisedDividerMask = TestArenaActor->GetRaisedDividerMask();
+	Frame.DividerLiftFractions = TestArenaActor->GetDividerLiftFractions();
 	Frame.Pieces.Reserve(Pieces.Num());
 	for (AFlickPiece* Piece : Pieces)
 	{
@@ -528,7 +529,11 @@ void AFlickGameMode::ApplyCinematicReplayTime(const float SourceTime)
 	ReplayFocus.Z = ArenaSurfaceZ + PieceThickness;
 	if (TestArenaActor)
 	{
-		TestArenaActor->ApplyReplayDividerState(LowerFrame.RaisedDividerMask);
+		TArray<float> LiftFractions = LowerFrame.DividerLiftFractions;
+		if (UpperFrame.DividerLiftFractions.Num() == LiftFractions.Num())
+			for (int32 Index = 0; Index < LiftFractions.Num(); ++Index)
+				LiftFractions[Index] = FMath::Lerp(LiftFractions[Index], UpperFrame.DividerLiftFractions[Index], Alpha);
+		TestArenaActor->ApplyReplayDividerState(LowerFrame.RaisedDividerMask, LiftFractions);
 	}
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -1006,6 +1011,8 @@ bool AFlickGameMode::IsPieceSafeOnClassicTabletop(const AFlickPiece* Piece) cons
 	{
 		return false;
 	}
+	// A divider is legitimate support. Do not clamp its lift or flatten a resting puck through it.
+	if (TestArenaActor && TestArenaActor->IsPieceNearRaisedDivider(Piece)) return false;
 	const FVector ArenaLocation = ArenaActor->GetActorLocation();
 	const FVector PieceLocation = Piece->GetActorLocation();
 	const float SafeRadius = FMath::Max(
@@ -1063,6 +1070,7 @@ void AFlickGameMode::UpdateGameStateCounts() const
 
 bool AFlickGameMode::AreActivePiecesSettled() const
 {
+	if (TestArenaActor && (TestArenaActor->HasMovingDividers() || TestArenaActor->HasPiecesOnDividerCrowns(Pieces))) return false;
 	for (const AFlickPiece* Piece : Pieces)
 	{
 		if (!Piece || !IsValid(Piece) || !Piece->IsActive())
@@ -1070,7 +1078,12 @@ bool AFlickGameMode::AreActivePiecesSettled() const
 			continue;
 		}
 
-		if (Piece->GetLinearVelocity().Size() > SleepLinearVelocityThreshold
+		// An airborne puck is not settled at the apex, even if its speed is tiny.
+		const FVector Up = Piece->GetActorUpVector().GetSafeNormal();
+		const float VerticalExtent = Piece->GetPieceRadius() * FMath::Sqrt(FMath::Max(0.f, 1.f - Up.Z * Up.Z))
+			+ Piece->GetPieceThickness() * .5f * FMath::Abs(Up.Z);
+		if (Piece->GetActorLocation().Z - VerticalExtent > ArenaSurfaceZ + KnockoutBoundsTolerance
+			|| Piece->GetLinearVelocity().Size() > SleepLinearVelocityThreshold
 			|| Piece->GetAngularVelocityDegrees().Size() > SleepAngularVelocityThreshold)
 		{
 			return false;
@@ -1091,7 +1104,11 @@ bool AFlickGameMode::ApplyResolutionTimeoutCleanup()
 
 		const float LinearSpeed = Piece->GetLinearVelocity().Size();
 		const float AngularSpeed = Piece->GetAngularVelocityDegrees().Size();
-		if (LinearSpeed > SleepLinearVelocityThreshold * 6.0f || AngularSpeed > SleepAngularVelocityThreshold * 4.0f)
+		const FVector Up = Piece->GetActorUpVector().GetSafeNormal();
+		const float VerticalExtent = Piece->GetPieceRadius() * FMath::Sqrt(FMath::Max(0.f, 1.f - Up.Z * Up.Z))
+			+ Piece->GetPieceThickness() * .5f * FMath::Abs(Up.Z);
+		if (Piece->GetActorLocation().Z - VerticalExtent > ArenaSurfaceZ + KnockoutBoundsTolerance
+			|| LinearSpeed > SleepLinearVelocityThreshold * 6.0f || AngularSpeed > SleepAngularVelocityThreshold * 4.0f)
 		{
 			bHasMeaningfulMotion = true;
 			continue;

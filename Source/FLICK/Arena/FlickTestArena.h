@@ -28,6 +28,10 @@ public:
 	static constexpr int32 MaxMechanismCount = 14;
 
 	AFlickTestArena();
+	virtual void Tick(float DeltaSeconds) override;
+	bool HasMovingDividers() const;
+	bool HasPiecesOnDividerCrowns(const TArray<TObjectPtr<AFlickPiece>>& Pieces) const;
+	bool IsPieceNearRaisedDivider(const AFlickPiece* Piece) const;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	void InitializeTestArena(float InRadius, float InThickness, float InSurfaceZ, int32 InPlayersPerTeam = 1);
@@ -59,8 +63,9 @@ public:
 	FString GetDividerLabel(int32 DividerIndex) const;
 	FLinearColor GetMechanismColor(int32 MechanismIndex) const;
 	uint16 GetRaisedDividerMask() const { return RaisedDividerMask; }
+	const TArray<float>& GetDividerLiftFractions() const { return DividerLiftFractions; }
 	void BeginReplayPresentation();
-	void ApplyReplayDividerState(uint16 DividerMask);
+	void ApplyReplayDividerState(uint16 DividerMask, const TArray<float>& LiftFractions = TArray<float>());
 	void EndReplayPresentation();
 	// Local presentation overrides; imported assets and gameplay materials remain untouched.
 	void SetMenuPresentationEnabled(bool bEnabled);
@@ -103,6 +108,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "0.03", ClampMax = "0.75"))
 	float DividerDeploymentDelay = 0.10f;
 
+	// Constant-speed kinematic lift; Chaos transfers motion through contact, not a scripted impulse.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena|Physics", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float DividerRiseDuration = 0.075f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena|Physics", meta = (ClampMin = "0.15", ClampMax = "1.0"))
+	float DividerRetractionDuration = 0.30f;
+
+	// A continuous crown actuator prevents stable perching without teleporting or replacing velocity.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena|Physics", meta = (ClampMin = "0.0", ClampMax = "30000.0"))
+	float DividerCrownDeflectionForce = 8000.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "90.0", ClampMax = "260.0"))
 	float SwitchDistanceFromDivider = 145.0f;
 
@@ -138,6 +154,11 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FFlickDividerLiftTest;
+#endif
+	bool IsPieceOnDividerCrown(int32 Index, const AFlickPiece* Piece) const;
+	void DeflectPiecesFromDividerCrowns(const TArray<TObjectPtr<AFlickPiece>>& Pieces);
 	void CreateOneVsOnePresentationComponents(UStaticMesh* Box, UStaticMesh* Cylinder);
 	void UpdateOneVsOnePresentation();
 	void BuildOneVsOneRim();
@@ -206,10 +227,10 @@ private:
 	void BuildLayoutFromSeed();
 	void PopulateActiveLayoutFromLocations();
 	void ApplyTestLayout();
-	void ApplyMechanismState();
+	void ApplyMechanismState(bool bSnap = true);
+	void UpdateDividerTransforms();
 	void CreateRuntimeMaterials();
 	bool IsZoneCurrentlyOverlapped(int32 ZoneIndex, const TArray<TObjectPtr<AFlickPiece>>& Pieces) const;
-	bool IsDividerCurrentlyOverlapped(int32 DividerIndex, const TArray<TObjectPtr<AFlickPiece>>& Pieces) const;
 	FVector2D GetZoneLocalCenter(int32 ZoneIndex) const;
 	uint16 DeployReadyDividers(const TArray<TObjectPtr<AFlickPiece>>& Pieces, float DeltaSeconds);
 
@@ -241,6 +262,9 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_DividerState)
 	uint16 PendingToggleMask = 0;
+
+	UPROPERTY(ReplicatedUsing = OnRep_DividerState)
+	TArray<float> DividerLiftFractions;
 
 	UPROPERTY(ReplicatedUsing = OnRep_TestLayout)
 	int32 ArenaLayoutSeed = 1337;

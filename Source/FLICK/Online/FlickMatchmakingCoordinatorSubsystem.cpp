@@ -1,4 +1,6 @@
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
+#include "Audio/FlickAudioDirector.h"
+#include "EngineUtils.h"
 
 #include "Core/FlickLog.h"
 #include "Dom/JsonObject.h"
@@ -133,8 +135,15 @@ bool UFlickMatchmakingCoordinatorSubsystem::QueueParty(
 	const FFlickCoordinatorQueueRequest& Request,
 	FFlickCoordinatorQueueCallback Callback)
 {
-	if (!ShouldUseCoordinator() || BaseUrl.IsEmpty() || IsQueueActive() || Request.Members.IsEmpty())
+	if (!ShouldUseCoordinator() || IsQueueActive())
 	{
+		return false;
+	}
+	SearchStartedSeconds = FPlatformTime::Seconds();
+	if (BaseUrl.IsEmpty() || Request.Members.IsEmpty())
+	{
+		SetState(EFlickCoordinatorQueueState::Error, BaseUrl.IsEmpty()
+			? TEXT("MATCHMAKING SERVER IS NOT CONFIGURED") : TEXT("NO PLAYERS WERE PROVIDED FOR MATCHMAKING"));
 		return false;
 	}
 	ActiveRequest = Request;
@@ -252,7 +261,7 @@ void UFlickMatchmakingCoordinatorSubsystem::PollQueue()
 					return;
 				}
 				LastAllocation = Allocation;
-				SetState(EFlickCoordinatorQueueState::Allocated, TEXT("MATCH FOUND - CONNECTING TO DEDICATED SERVER"));
+				SetState(EFlickCoordinatorQueueState::Allocated, TEXT("JOINING - MATCH FOUND"));
 				OnAllocated.Broadcast(LastAllocation);
 				return;
 			}
@@ -260,7 +269,7 @@ void UFlickMatchmakingCoordinatorSubsystem::PollQueue()
 				|| Status.Equals(TEXT("expired"), ESearchCase::IgnoreCase))
 			{
 				QueueTicketId.Reset();
-				SetState(EFlickCoordinatorQueueState::Idle, TEXT("MATCHMAKING TICKET EXPIRED"));
+				SetState(EFlickCoordinatorQueueState::Error, TEXT("NO MATCH FOUND - MATCHMAKING TICKET EXPIRED"));
 				return;
 			}
 			if (Status.Equals(TEXT("error"), ESearchCase::IgnoreCase))
@@ -397,6 +406,12 @@ bool UFlickMatchmakingCoordinatorSubsystem::TravelToAllocatedMatch(APlayerContro
 	}
 	ReconnectAttempts = 0;
 	LocalController->ClientTravel(BuildTravelAddress(), ETravelType::TRAVEL_Absolute);
+	if (GetWorld())
+		for (TActorIterator<AFlickAudioDirector> It(GetWorld()); It; ++It)
+		{
+			It->PlayLocalNotification(true);
+			break;
+		}
 	return true;
 }
 

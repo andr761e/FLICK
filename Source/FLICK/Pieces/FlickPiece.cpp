@@ -288,6 +288,7 @@ void AFlickPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AFlickPiece, bBobStriker);
 	DOREPLIFETIME(AFlickPiece, bHighDetailVisualsEnabled);
 	DOREPLIFETIME(AFlickPiece, bPregamePreview);
+	DOREPLIFETIME(AFlickPiece, bCosmeticPreview);
 	DOREPLIFETIME(AFlickPiece, bArrivalActive);
 	DOREPLIFETIME(AFlickPiece, ArrivalStartServerTime);
 	DOREPLIFETIME(AFlickPiece, ArrivalDuration);
@@ -380,6 +381,18 @@ void AFlickPiece::SetPregamePreview(const bool bInPreview)
 	bPregamePreview = bInPreview;
 	ApplyPregamePreview();
 	ForceNetUpdate();
+}
+
+void AFlickPiece::SetCosmeticPreview(const bool bInPreview)
+{
+	bCosmeticPreview = bInPreview;
+	OnRep_CosmeticPreview();
+	if (HasAuthority()) ForceNetUpdate();
+}
+
+void AFlickPiece::OnRep_CosmeticPreview()
+{
+	ApplyVisuals();
 }
 
 void AFlickPiece::OnRep_PregamePreview()
@@ -1586,7 +1599,7 @@ void AFlickPiece::ApplyVisuals()
 	const bool bHasLocalTeam = Viewer && Viewer->GetLocalTeam() != EFlickTeam::None;
 	const bool bTeammate = bHasLocalTeam ? Viewer->GetLocalTeam() == Team : Team == EFlickTeam::Player1;
 	const int32 IndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
-	const bool bShowIndicator = !bEliminated && !bPregamePreview && !bLocalOwnershipRing;
+	const bool bShowIndicator = !bEliminated && !bPregamePreview && !bCosmeticPreview && !bLocalOwnershipRing;
 	const bool bDashed = IndicatorStyle > 0 && !bTeammate;
 	SelectionHalo->SetVisibility(bShowIndicator && !bDashed);
 	if (!TeamIndicatorMaterial && !TeamIndicatorDashes.IsEmpty())
