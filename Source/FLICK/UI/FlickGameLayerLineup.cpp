@@ -279,7 +279,17 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutWorkspace()
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(0.25f).Padding(0.0f, 0.0f, 10.0f, 0.0f)
 				[
-					BuildLineupRadar()
+					SNew(SOverlay)
+					+ SOverlay::Slot()
+					[
+						SNew(SBox).Visibility_Lambda([this]() { return bReadableLineup ? EVisibility::Visible : EVisibility::Collapsed; })
+						[BuildLineupInspector()]
+					]
+					+ SOverlay::Slot()
+					[
+						SNew(SBox).Visibility_Lambda([this]() { return bReadableLineup ? EVisibility::Collapsed : EVisibility::Visible; })
+						[BuildLineupRadar()]
+					]
 				]
 				+ SHorizontalBox::Slot().FillWidth(0.33f).Padding(10.0f, 0.0f)
 				[
@@ -299,9 +309,71 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutWorkspace()
 				]
 			]
 		]
-		+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 14.0f, 0.0f, 0.0f)
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f)
+		[
+			SNew(SButton).ButtonStyle(&TransparentButtonStyle)
+			.OnClicked_Lambda([this]() { bReadableLineup = !bReadableLineup; return FReply::Handled(); })
+			[
+				SNew(STextBlock).Font(UiFont(10, true)).ColorAndOpacity(Cyan)
+				.Text_Lambda([this]() { return FText::FromString(bReadableLineup ? TEXT("VIEW ORIGINAL LAYOUT") : TEXT("VIEW PUCK GUIDE")); })
+			]
+		]
+		+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 8.0f, 0.0f, 0.0f)
 		[
 			BuildArchetypePicker(EFlickTeam::Player1)
+		];
+}
+
+TSharedRef<SWidget> SFlickGameLayer::BuildLineupInspector()
+{
+	return SNew(SFlickAngularBorder).BackgroundColor(FLinearColor(.004f, .013f, .023f, .96f))
+		.AccentColor(Cyan).CutSize(10.f).Padding(FMargin(16.f, 12.f))
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(STextBlock).Font(UiFont(12, true)).ColorAndOpacity(Cyan)
+				.Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("INSPECTING SLOT %02d"), GetSelectedLoadoutSlot(EFlickTeam::Player1) + 1)); })
+			]
+			+ SVerticalBox::Slot().FillHeight(1.f).HAlign(HAlign_Center).VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(170.f).HeightOverride(170.f)
+				[
+					SNew(SFlickPuckDisc).TeamColor(Cyan).RadiusScale(1.18f)
+					.Archetype_Lambda([this]() { return GetPreviewLoadoutArchetype(EFlickTeam::Player1); })
+					.AccentColor_Lambda([this]() { return FlickPieceArchetypeRules::GetVisualAccent(GetPreviewLoadoutArchetype(EFlickTeam::Player1), Cyan); })
+				]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
+			[
+				SNew(STextBlock).Font(UiFont(11, true)).ColorAndOpacity(FLinearColor::White).AutoWrapText(true)
+				.Text_Lambda([this]()
+				{
+					switch (GetPreviewLoadoutArchetype(EFlickTeam::Player1))
+					{
+					case EFlickPieceArchetype::Heavy: return FText::FromString(TEXT("Heavy contact; slower shots. More mass and friction, but a lower launch speed."));
+					case EFlickPieceArchetype::Striker: return FText::FromString(TEXT("Fast, lively shots. Less mass means you are also easier to displace."));
+					case EFlickPieceArchetype::Grippy: return FText::FromString(TEXT("Stops sooner. Higher friction helps limit drift, but reduces travel distance."));
+					case EFlickPieceArchetype::Slider: return FText::FromString(TEXT("Coasts farther. Low friction preserves movement; watch your power near the rim."));
+					case EFlickPieceArchetype::Blocker: return FText::FromString(TEXT("Covers more space. Its wider footprint is useful for blocking, but it is lighter and slower."));
+					case EFlickPieceArchetype::Compact: return FText::FromString(TEXT("Fits tighter gaps. A smaller footprint also covers less of the board."));
+					case EFlickPieceArchetype::Bouncer: return FText::FromString(TEXT("Livelier rebounds. Useful for banks, but harder to bring to a controlled stop."));
+					case EFlickPieceArchetype::Toppler: return FText::FromString(TEXT("Tall and easier to tip. Its raised centre of mass and lower angular damping favour tumbling."));
+					default: return FText::FromString(TEXT("The balanced baseline. Normal size, mass and launch speed; no specialised advantage or penalty."));
+					}
+				})
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f, 0.f, 0.f)
+			[
+				SNew(STextBlock).Font(UiFont(9, true)).ColorAndOpacity(Muted).AutoWrapText(true)
+				.Text_Lambda([this]()
+				{
+					const EFlickPieceArchetype Equipped = GetDisplayedLoadoutPiece(GetSelectedLoadoutSlot(EFlickTeam::Player1));
+					return FText::FromString(GetPreviewLoadoutArchetype(EFlickTeam::Player1) == Equipped
+						? TEXT("EQUIPPED  /  Hover a puck below to compare. Click to replace this slot.")
+						: FString::Printf(TEXT("PREVIEW ONLY  /  Replaces %s on click. Grey bars show the equipped puck."), *GetPieceArchetypeName(Equipped)));
+				})
+			]
 		];
 }
 
@@ -1154,28 +1226,30 @@ TSharedRef<SWidget> SFlickGameLayer::BuildArchetypeChoice(
 	const FString ClassLabel = Rules.ClassLabel;
 	const TArray<float> Values = {Stats.Speed, Stats.Weight, Stats.Impact, Stats.Control, Stats.Coast, Stats.Stability};
 	const TArray<FString> Labels = {TEXT("SPD"), TEXT("WGT"), TEXT("IMP"), TEXT("CTL"), TEXT("CST"), TEXT("STB")};
-	TSharedRef<SVerticalBox> StatRows = SNew(SVerticalBox);
+	// Two columns keep all six stats inside the card when the picker receives
+	// less than its desired height. Do not rely on overflowing auto-height rows.
+	TSharedRef<SUniformGridPanel> StatRows = SNew(SUniformGridPanel).SlotPadding(FMargin(0.f, 1.f, 6.f, 1.f));
 	for (int32 StatIndex = 0; StatIndex < Values.Num(); ++StatIndex)
 	{
-		StatRows->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 2.0f)
+		StatRows->AddSlot(StatIndex / 3, StatIndex % 3)
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				SNew(SBox).WidthOverride(27.0f)
+				SNew(SBox).WidthOverride(24.0f)
 				[
 					SNew(STextBlock).Text(FText::FromString(Labels[StatIndex])).Font(UiFont(6, true)).ColorAndOpacity(Muted)
 				]
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				SNew(SBox).WidthOverride(154.0f).HeightOverride(6.0f)
+				SNew(SBox).WidthOverride(100.0f).HeightOverride(6.0f)
 				[
 					SNew(SOverlay)
 					+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.003f, 0.007f, 0.012f, 1.0f))]
 					+ SOverlay::Slot().HAlign(HAlign_Left)
 					[
-						SNew(SBox).WidthOverride(154.0f * Values[StatIndex])
+						SNew(SBox).WidthOverride(100.0f * Values[StatIndex])
 						[
 							SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Accent)
 						]
@@ -1569,8 +1643,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 			{
 				SelectedSettingsTab = Tab;
 				bLightingPreview = false;
-				if (Tab == EFlickSettingsTab::Lighting)
-					bEditMenuLighting = !GameMode.IsValid() || GameMode->GetSettingsReturnScreen() == EFlickFrontendScreen::MainMenu;
 				if (GameMode.IsValid()) GameMode->PlayMenuSound(true);
 				return FReply::Handled();
 			});

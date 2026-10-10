@@ -26,7 +26,8 @@ bool FFlickLightingSettingsTest::RunTest(const FString& Parameters)
 		GConfig->Add(TestIni, File);
 	};
 	TestEqual(TEXT("Default menu glare is restrained"), GetValue(EScene::Menu, EControl::Highlights, TestIni), 0.35f);
-	TestEqual(TEXT("Default gameplay fill is brighter"), GetValue(EScene::Gameplay, EControl::Fill, TestIni), 1.2f);
+	TestEqual(TEXT("Default gameplay fill matches the menu"), GetValue(EScene::Gameplay, EControl::Fill, TestIni), 1.0f);
+	TestEqual(TEXT("Default gameplay reflections match the menu"), GetValue(EScene::Gameplay, EControl::Highlights, TestIni), 0.35f);
 	for (const EScene Scene : {EScene::Menu, EScene::Gameplay})
 	{
 		for (int32 Index = 0; Index < static_cast<int32>(EControl::Count); ++Index)
@@ -40,13 +41,17 @@ bool FFlickLightingSettingsTest::RunTest(const FString& Parameters)
 		}
 	}
 	SetValue(EScene::Menu, EControl::Fill, 0.5f, TestIni);
+	TestEqual(TEXT("Menu edits immediately carry into gameplay"), GetValue(EScene::Gameplay, EControl::Fill, TestIni), 0.5f);
 	SetValue(EScene::Gameplay, EControl::Fill, 2.0f, TestIni);
 	// New temporary files are not subject to the user's INI section-save whitelist.
 	if (FConfigFile* File = GConfig->Find(TestIni)) File->bCanSaveAllSections = true;
 	GConfig->Flush(false, TestIni);
 	Reload();
-	TestEqual(TEXT("Menu values survive reload"), GetValue(EScene::Menu, EControl::Fill, TestIni), 0.5f);
-	TestEqual(TEXT("Gameplay values survive reload independently"), GetValue(EScene::Gameplay, EControl::Fill, TestIni), 2.0f);
+	TestEqual(TEXT("Gameplay edits update the shared menu value after reload"), GetValue(EScene::Menu, EControl::Fill, TestIni), 2.0f);
+	TestEqual(TEXT("Shared gameplay values survive reload"), GetValue(EScene::Gameplay, EControl::Fill, TestIni), 2.0f);
+	GConfig->SetFloat(TEXT("FLICK.LightingSettings"), TEXT("Gameplay.Key"), 2.8f, TestIni);
+	GConfig->SetFloat(TEXT("FLICK.LightingSettings"), TEXT("Menu.Key"), 0.57f, TestIni);
+	TestEqual(TEXT("Legacy menu settings take precedence over old gameplay settings"), GetValue(EScene::Gameplay, EControl::Key, TestIni), 0.57f);
 	ResetToDefaults(TestIni);
 	Reload();
 	for (const EScene Scene : {EScene::Menu, EScene::Gameplay})

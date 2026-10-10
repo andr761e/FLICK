@@ -17,7 +17,7 @@ namespace
 {
 	TAutoConsoleVariable<int32> Enabled(TEXT("flick.Diagnostics"), 0, TEXT("Local physics diagnostics: 0 off, 1 on."), ECVF_Cheat);
 	TAutoConsoleVariable<int32> Collision(TEXT("flick.Diagnostics.Collision"), 1, TEXT("Draw active collision geometry."), ECVF_Cheat);
-	TAutoConsoleVariable<int32> Velocity(TEXT("flick.Diagnostics.Velocity"), 1, TEXT("Draw puck velocity arrows (0.15 seconds of travel)."), ECVF_Cheat);
+	TAutoConsoleVariable<int32> CVarDiagnosticsVelocity(TEXT("flick.Diagnostics.Velocity"), 1, TEXT("Draw puck velocity arrows (0.15 seconds of travel)."), ECVF_Cheat);
 	TAutoConsoleVariable<int32> ContactNormals(TEXT("flick.Diagnostics.Contacts"), 1, TEXT("Draw recent actual hit normals."), ECVF_Cheat);
 	TAutoConsoleVariable<int32> Pockets(TEXT("flick.Diagnostics.Pockets"), 1, TEXT("Draw BOB openings and capture depth."), ECVF_Cheat);
 
@@ -124,7 +124,7 @@ void UFlickPhysicsDiagnosticsComponent::TickComponent(float DeltaTime, ELevelTic
 			Root->OnComponentHit.AddUniqueDynamic(this, &UFlickPhysicsDiagnosticsComponent::RecordContact);
 			Observed.Add(Root);
 		}
-		if (Velocity.GetValueOnGameThread())
+		if (CVarDiagnosticsVelocity.GetValueOnGameThread())
 			DrawDebugDirectionalArrow(World, Piece->GetActorLocation(), Piece->GetActorLocation() + Piece->GetLinearVelocity() * .15f, 12, FColor::Yellow, false, 0, 0, 1.5f);
 	}
 	if (Collision.GetValueOnGameThread())

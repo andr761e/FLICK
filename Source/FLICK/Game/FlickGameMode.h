@@ -591,8 +591,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Menu Softbox Multiplier", ClampMin = "0.0", ClampMax = "1000.0"))
 	float OneVsOneMenuSoftboxMultiplier = 250.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Gameplay Softbox Multiplier", ClampMin = "0.0", ClampMax = "80.0"))
-	float OneVsOneGameplaySoftboxMultiplier = 50.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Gameplay Softbox Multiplier", ClampMin = "0.0", ClampMax = "1000.0"))
+	float OneVsOneGameplaySoftboxMultiplier = 250.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Sky Light Multiplier", ClampMin = "1.0", ClampMax = "4.0"))
 	float OneVsOneSkyLightMultiplier = 2.25f;

@@ -1,4 +1,5 @@
 #include "Arena/FlickTestArena.h"
+#include "Engine/StaticMesh.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Core/FlickArenaControlRules.h"
@@ -225,6 +226,10 @@ AFlickTestArena::AFlickTestArena()
 		for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 		{
 			ZoneOuterMeshes[Index]->SetStaticMesh(WorkshopSwitchAsset.Object);
+			// CreateDisc supplies a primitive material override in slot zero.
+			// Clear it when using the authored housing so its backing uses the
+			// arena material (including the render offset separating it from the rim).
+			ZoneOuterMeshes[Index]->SetMaterial(0, nullptr);
 			ZoneInnerMeshes[Index]->SetVisibility(false, true);
 			ZoneInnerMeshes[Index]->SetHiddenInGame(true, true);
 			ZoneDotMeshes[Index]->SetStaticMesh(WorkshopDotAsset.Object);
@@ -605,7 +610,7 @@ void AFlickTestArena::SetMenuPresentationEnabled(const bool bEnabled)
 			UMaterialInstanceDynamic* Material = Parent ? UMaterialInstanceDynamic::Create(Parent, this) : nullptr;
 			if (Material && OriginalDynamic) Material->CopyInterpParameters(OriginalDynamic);
 			MenuPresentationMaterials.Add(Material);
-			if (!Material) continue;
+			if (!Material || bConceptApplied) continue; // Permanent Switchyard finish already matches the menu.
 			float Emission = 0.0f;
 			Original->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), Emission);
 			if (Emission > 0.1f)
@@ -1114,16 +1119,20 @@ void AFlickTestArena::ApplyTestLayout()
 	InstrumentDeckMesh->SetHiddenInGame(bUsingWorkshopAssets, true);
 	InstrumentDeckMesh->SetRelativeLocation(FVector(0.0f, 0.0f, SurfaceZ + 2.1f));
 	InstrumentDeckMesh->SetRelativeScale3D(FVector(ArenaRadius * 1.98f / 100.0f, ArenaRadius * 1.98f / 100.0f, 0.004f));
-	// Workshop switch, trace and dormant-socket meshes are authored downward
-	// from a shared Z=0 top face. Place that face exactly on the authoritative
-	// arena surface so pucks cannot visually enter non-colliding presentation.
-	// Keep the authored switch graphics visually flush while giving their top
-	// faces a sub-centimetre depth separation from the arena's curved linework.
-	// These components never collide, so gameplay geometry remains exactly flat.
-	// Keep the complete switch assembly above both the deck and its etched line
-	// layer. A one-centimetre visual separation is imperceptible at puck scale,
-	// but prevents depth-buffer contention where switches cross curved markings.
-	const float SwitchSurfaceZ = SurfaceZ + 1.15f;
+	// Restore the authored housing proportions, but place its complete depth
+	// above the deck rather than lifting only the top face. All parts remain
+	// visual-only; collision and the switch activation footprint do not move.
+	float SwitchVisualHeight = 1.15f;
+	if (bUsingWorkshopAssets)
+	{
+		for (const auto& Part : {ZoneOuterMeshes[0], ZoneDotMeshes[0]})
+		{
+			const FBoxSphereBounds Bounds = Part->GetStaticMesh()->GetBounds();
+			const float Scale = Part == ZoneOuterMeshes[0] ? ControlZoneRadius / 40.f : SwitchActivationDotRadius / 8.f;
+			SwitchVisualHeight = FMath::Max(SwitchVisualHeight, (Bounds.BoxExtent.Z - Bounds.Origin.Z) * Scale + .65f);
+		}
+	}
+	const float SwitchSurfaceZ = SurfaceZ + SwitchVisualHeight;
 	for (int32 LocationIndex = 0; LocationIndex < MaxPossibleLocationCount; ++LocationIndex)
 	{
 		UStaticMeshComponent* Socket = DividerBaseMeshes[LocationIndex];

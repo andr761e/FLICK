@@ -112,6 +112,7 @@ private:
 	TSharedRef<SWidget> BuildLoadout();
 	TSharedRef<SWidget> BuildLoadoutWorkspace();
 	TSharedRef<SWidget> BuildLineupRadar();
+	TSharedRef<SWidget> BuildLineupInspector();
 	TSharedRef<SWidget> BuildLoadoutFormation(EFlickTeam Team);
 	TSharedRef<SWidget> BuildFormationPuck(EFlickTeam Team, int32 SlotIndex);
 	TSharedRef<SWidget> BuildLoadoutComparison(EFlickTeam Team);
@@ -323,9 +324,7 @@ private:
 	int32 GetSelectedCosmeticIndex(int32 Category) const;
 	int32 LastLockerPreviewCategory = INDEX_NONE;
 	EFlickSettingsTab SelectedSettingsTab = EFlickSettingsTab::GameFeel;
-	bool bEditMenuLighting = true;
 	bool bLightingPreview = false;
-	TArray<TSharedPtr<int32>> LightingSceneOptions;
 	float SmoothedFrameSeconds = 1.0f / 60.0f;
 	TArray<TSharedPtr<FIntPoint>> ResolutionOptions;
 	TArray<TSharedPtr<int32>> WindowModeOptions;
@@ -348,6 +347,7 @@ private:
 	EFlickFrontendScreen RemotePartyScreen = EFlickFrontendScreen::MainMenu;
 	EFlickLineupPreset RemoteLoadoutPreset = EFlickLineupPreset::Balanced;
 	int32 Player1SelectedLoadoutSlot = 0;
+	bool bReadableLineup = true;
 	int32 Player2SelectedLoadoutSlot = 0;
 	TOptional<EFlickPieceArchetype> Player1HoveredLoadoutArchetype;
 	TOptional<EFlickPieceArchetype> Player2HoveredLoadoutArchetype;

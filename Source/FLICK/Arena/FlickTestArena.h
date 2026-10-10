@@ -156,12 +156,35 @@ protected:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FFlickDividerLiftTest;
+	friend class FFlickArenaConceptTest;
 #endif
 	bool IsPieceOnDividerCrown(int32 Index, const AFlickPiece* Piece) const;
 	void DeflectPiecesFromDividerCrowns(const TArray<TObjectPtr<AFlickPiece>>& Pieces);
 	void CreateOneVsOnePresentationComponents(UStaticMesh* Box, UStaticMesh* Cylinder);
 	void UpdateOneVsOnePresentation();
 	void BuildOneVsOneRim();
+	void UpdateOneVsOneConcept(bool bRebuildGuides = false);
+	void BuildConceptGuides();
+	void BuildConceptSockets();
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
+	TObjectPtr<UInstancedStaticMeshComponent> ConceptSocketMetal;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
+	TObjectPtr<UInstancedStaticMeshComponent> ConceptSocketDark;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
+	TObjectPtr<UInstancedStaticMeshComponent> ConceptWarmRim;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ConceptSocketMetalMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ConceptSocketDarkMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ConceptWarmRimMaterial;
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
+	TObjectPtr<UInstancedStaticMeshComponent> ConceptGuides;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> ConceptMaterials;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ConceptGuideMaterial;
+	bool bConceptApplied = false;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|1v1 Presentation")
 	TObjectPtr<UInstancedStaticMeshComponent> RimLensBodies;

@@ -862,6 +862,21 @@ void AFlickGameMode::BeginPlay()
 	{
 		CameraPawn->SetGameplayViewIndex(CameraViewPreview, true);
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickSwitchRimPreview")) && CameraPawn && TestArenaActor)
+	{
+		// Close-up render fixture for rim artifacts that full-board captures miss.
+		FTimerHandle CloseupTimer;
+		GetWorldTimerManager().SetTimer(CloseupTimer, [this, CameraViewPreview]()
+		{
+			if (!CameraPawn || !TestArenaActor) return;
+			for (AFlickPiece* Piece : Pieces) if (Piece) Piece->SetActorHiddenInGame(true);
+			const FVector Center = TestArenaActor->GetSwitchWorldCenter(0);
+			const FVector Position = Center + FVector(0.f, -150.f, 24.f).RotateAngleAxis(CameraViewPreview * 90.f, FVector::UpVector);
+			CameraPawn->SetFreeCameraEnabled(true);
+			CameraPawn->SetActorLocation(Position);
+			CameraPawn->SetActorRotation((Center + FVector(0.f, 0.f, 3.f) - Position).Rotation());
+		}, 1.f, false);
+	}
 #endif
 
 	TryStartNetworkMatch();

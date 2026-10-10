@@ -34,7 +34,12 @@ namespace FlickArenaLighting
 		float MenuAccentLightIntensity = 3200.0f;
 		float MenuSoftboxLightMultiplier = 80.0f;
 		float OneVsOneMenuSoftboxMultiplier = 250.0f;
-		float OneVsOneGameplaySoftboxMultiplier = 50.0f;
+		float OneVsOneGameplaySoftboxMultiplier = 250.0f;
+		// Broad source areas avoid concentrated mirror patches on the metallic deck.
+		float SwitchyardKeySourceWidth = 1100.0f;
+		float SwitchyardKeySourceHeight = 1200.0f;
+		float SwitchyardRimSourceWidth = 1000.0f;
+		float SwitchyardRimSourceHeight = 900.0f;
 		float OneVsOneSkyLightMultiplier = 2.25f;
 		float OneVsOneFillLightIntensity = 150000.0f;
 		// BOB retains its warmer board lighting, with adjustable broad softboxes.

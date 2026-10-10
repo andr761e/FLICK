@@ -93,7 +93,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		[
 			SAssignNew(MainMenuDiagonalPanel, SFlickDiagonalPanel)
-			.Visibility(EVisibility::HitTestInvisible)
+			.Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 			.PanelColor(FLinearColor::FromSRGBColor(FColor(4, 10, 14, 252)))
 			.EdgeColor(FlickMainMenuStyle::Ice.CopyWithNewOpacity(0.68f))
 		]
@@ -103,6 +103,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		.Padding(FlickMainMenuStyle::LeftPadding, 50.0f, 0.0f, 0.0f)
 		[
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
+			.Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 			[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()

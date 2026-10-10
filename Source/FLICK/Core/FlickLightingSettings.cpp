@@ -8,17 +8,19 @@ namespace FlickLightingSettings
 		const TCHAR* Section = TEXT("FLICK.LightingSettings");
 		const FControl Controls[] = {
 			{TEXT("Ambient"), TEXT("AMBIENT LIGHT"), TEXT("Even environment lighting across the metallic surface."), 3.0f, 1.0f, 1.0f},
-			{TEXT("Fill"), TEXT("ARENA FILL"), TEXT("Broad, reflection-free light. Raise this if the board is too dark."), 3.0f, 1.0f, 1.2f},
+			{TEXT("Fill"), TEXT("ARENA FILL"), TEXT("Broad, reflection-free light. Raise this if the board is too dark."), 3.0f, 1.0f, 1.0f},
 			{TEXT("Key"), TEXT("COOL SOFTBOX"), TEXT("Cool overhead illumination and satin-metal highlight bands."), 3.0f, 1.0f, 1.0f},
 			{TEXT("Rim"), TEXT("WARM SOFTBOX"), TEXT("Warm illumination for colour separation and metallic depth."), 3.0f, 1.0f, 1.0f},
 			{TEXT("Accents"), TEXT("TEAM ACCENT LIGHTS"), TEXT("Cyan and orange light cast onto the arena; not the glowing rim strips."), 3.0f, 1.0f, 1.0f},
 			{TEXT("Direct"), TEXT("OVERHEAD LIGHT"), TEXT("The neutral directional light and its shadows."), 3.0f, 1.0f, 1.0f},
-			{TEXT("Highlights"), TEXT("DIRECT LIGHT REFLECTIONS"), TEXT("Lower this to tame camera-angle-dependent glare on the floor and pucks."), 1.0f, 0.35f, 0.75f}
+			{TEXT("Highlights"), TEXT("DIRECT LIGHT REFLECTIONS"), TEXT("Lower this to tame camera-angle-dependent glare on the floor and pucks."), 1.0f, 0.35f, 0.35f}
 		};
 		static_assert(UE_ARRAY_COUNT(Controls) == static_cast<int32>(EControl::Count));
 		FString Key(EScene Scene, EControl Control)
 		{
-			return FString(Scene == EScene::Menu ? TEXT("Menu.") : TEXT("Gameplay.")) + GetControl(Control).Key;
+			// Keep the original menu keys so existing menu adjustments become the
+			// shared preset without overwriting them with older gameplay values.
+			return FString(TEXT("Menu.")) + GetControl(Control).Key;
 		}
 		float Default(EScene Scene, EControl Control)
 		{

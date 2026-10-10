@@ -190,7 +190,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	const FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, BlendSpeed);
 	SetActorLocation(NewLocation);
 	SetActorRotation(NewRotation);
-	if (bMenuPresentation && bMenuOrbitEnabled && (bTestArenaPresentation || bOneVsOneArenaPresentation))
+	if (bTestArenaPresentation || (bMenuPresentation && bMenuOrbitEnabled && bOneVsOneArenaPresentation))
 	{
 		if (!MenuKeyLight.IsValid() || !MenuRimLight.IsValid())
 		{
@@ -361,23 +361,24 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 		Camera->PostProcessSettings.Bloom6Size = 22.0f;
 	}
 	const bool bPremiumMenu = bMenuPresentation && bMenuOrbitEnabled;
-	const bool bOneVsOneMenu = bPremiumMenu && bOneVsOneArenaPresentation;
+	const bool bShowcaseGrade = bPremiumMenu || bTestArenaPresentation;
+	const bool bOneVsOneMenu = bTestArenaPresentation || (bPremiumMenu && bOneVsOneArenaPresentation);
 	Camera->PostProcessSettings.ColorGamma = bOneVsOneMenu ? FVector4(1.0f, 1.0f, 1.0f, 1.0f) : FVector4(0.96f, 0.975f, 1.0f, 1.0f);
 	if (bOneVsOneMenu) Camera->PostProcessSettings.AutoExposureBias = 0.0f;
-	Camera->PostProcessSettings.ColorSaturation = bPremiumMenu
+	Camera->PostProcessSettings.ColorSaturation = bShowcaseGrade
 		? FVector4(MenuColorSaturation, MenuColorSaturation, MenuColorSaturation, 1.0f) : FVector4(1.02f, 1.02f, 1.02f, 1.0f);
-	Camera->PostProcessSettings.ColorContrast = bPremiumMenu
+	Camera->PostProcessSettings.ColorContrast = bShowcaseGrade
 		? FVector4(1.24f, 1.24f, 1.24f, 1.0f) : FVector4(1.16f, 1.16f, 1.16f, 1.0f);
-	Camera->PostProcessSettings.VignetteIntensity = bPremiumMenu ? 0.36f : 0.43f;
+	Camera->PostProcessSettings.VignetteIntensity = bShowcaseGrade ? 0.36f : 0.43f;
 	Camera->PostProcessSettings.bOverride_DepthOfFieldFocalDistance = bPremiumMenu;
 	Camera->PostProcessSettings.bOverride_DepthOfFieldFstop = bPremiumMenu;
-	Camera->PostProcessSettings.bOverride_DepthOfFieldSensorWidth = bOneVsOneMenu;
+	Camera->PostProcessSettings.bOverride_DepthOfFieldSensorWidth = bPremiumMenu && bOneVsOneMenu;
 	Camera->PostProcessSettings.DepthOfFieldSensorWidth = OneVsOneMenuSensorWidth;
 	Camera->PostProcessSettings.DepthOfFieldFstop = bOneVsOneArenaPresentation ? OneVsOneMenuFstop : 3.2f;
-	if (bPremiumMenu)
+	if (bShowcaseGrade)
 	{
-		Camera->PostProcessSettings.BloomIntensity = bOneVsOneArenaPresentation ? OneVsOneMenuBloomIntensity : MenuBloomIntensity;
-		Camera->PostProcessSettings.BloomThreshold = bOneVsOneArenaPresentation ? 0.5f : 0.8f;
+		Camera->PostProcessSettings.BloomIntensity = bOneVsOneMenu ? OneVsOneMenuBloomIntensity : MenuBloomIntensity;
+		Camera->PostProcessSettings.BloomThreshold = bOneVsOneMenu ? 0.5f : 0.8f;
 	}
 }
 

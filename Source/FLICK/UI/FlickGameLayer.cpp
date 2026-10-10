@@ -168,7 +168,6 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		Player1HoveredLoadoutArchetype = EFlickPieceArchetype::Heavy;
 	}
 #endif
-	bEditMenuLighting = !GameMode.IsValid() || GameMode->GetSettingsReturnScreen() == EFlickFrontendScreen::MainMenu;
 	if (GameMode.IsValid() && GameMode->GetFrontendScreen() == EFlickFrontendScreen::Settings)
 		LastFocusedScreen = EFlickFrontendScreen::Settings;
 
@@ -792,7 +791,6 @@ void SFlickGameLayer::Tick(
 	if (CurrentScreen == EFlickFrontendScreen::Settings && LastFocusedScreen != EFlickFrontendScreen::Settings)
 	{
 		// Reopening from a match must not retain a menu-only preview from the previous visit.
-		bEditMenuLighting = GameMode->GetSettingsReturnScreen() == EFlickFrontendScreen::MainMenu;
 		bLightingPreview = false;
 	}
 	if (CurrentScreen == EFlickFrontendScreen::Loadout
