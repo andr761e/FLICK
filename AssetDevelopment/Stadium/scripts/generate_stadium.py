@@ -159,8 +159,11 @@ for group, (start, end) in enumerate(bench_specs):
             radius = 12.0 + step * .47
             structure.append(radial_cube(f"Aisle {group} step {step}", aisle_angle, radius,
                                          .92, .46, STADIUM_FLOOR_Z_M, .11 * (step + 1), porcelain, .01))
+            # The highest lens previously ended exactly on its tread plane.
+            # Give that strip 5 mm base clearance; leave the lower strips intact.
             lights.append(radial_cube(f"Aisle {group} light {step}", aisle_angle, radius - .21,
-                                      .62, .025, STADIUM_FLOOR_Z_M + .105 * (step + 1), .025, warm, .003))
+                                      .62, .025, STADIUM_FLOOR_Z_M + .105 * (step + 1)
+                                      + (.030 if step == 4 else 0.0), .025, warm, .003))
 
 # Low guardrails remain open so they frame rather than hide gameplay.
 for rail_index, (start, end) in enumerate(((200, 252), (288, 340), (20, 62), (118, 160))):

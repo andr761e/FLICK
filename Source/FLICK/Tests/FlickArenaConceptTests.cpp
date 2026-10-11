@@ -97,6 +97,41 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Menu presentation preserves component transforms"), Components[Index]->GetComponentTransform().Equals(Transforms[Index]));
 			TestEqual(TEXT("Menu presentation preserves collision modes"), Components[Index]->GetCollisionEnabled(), Collision[Index]);
 		}
+		// Client ticks must still animate both directions and leave replay frames
+		// alone when redundant settled-transform updates are omitted.
+		Arena->SetRole(ROLE_SimulatedProxy);
+		Arena->RaisedDividerMask = 1;
+		Arena->DividerLiftFractions[0] = .5f;
+		Arena->ApplyMechanismState(false);
+		const float RaisedZ = Arena->SurfaceZ + Arena->DividerHeight * .5f + 1.f;
+		const auto CheckClientStep = [&](const float Target, const float Duration)
+		{
+			const float Expected = FMath::FInterpConstantTo(Arena->DividerLiftFractions[0], Target, .01f,
+				1.f / FMath::Max(.05f, Duration));
+			Arena->Tick(.01f);
+			TestEqual(TEXT("Client retains exact divider interpolation"), Arena->DividerLiftFractions[0], Expected);
+			TestTrue(TEXT("Moving client divider retains its exact transform"),
+				FMath::IsNearlyEqual(Arena->DividerMeshes[0]->GetRelativeLocation().Z,
+					RaisedZ - (1.f - Expected) * (Arena->DividerHeight + 2.f), .001f));
+			Arena->Tick(10.f);
+			const FTransform Settled = Arena->DividerMeshes[0]->GetRelativeTransform();
+			Arena->Tick(.01f);
+			TestEqual(TEXT("Client divider reaches its target"), Arena->DividerLiftFractions[0], Target);
+			TestTrue(TEXT("Settled client divider stays unchanged"), Arena->DividerMeshes[0]->GetRelativeTransform().Equals(Settled));
+		};
+		CheckClientStep(1.f, Arena->DividerRiseDuration);
+		Arena->RaisedDividerMask = 0;
+		Arena->ApplyMechanismState(false);
+		CheckClientStep(0.f, Arena->DividerRetractionDuration);
+		Arena->BeginReplayPresentation();
+		TArray<float> ReplayLifts = Arena->GetDividerLiftFractions();
+		ReplayLifts[0] = .3f;
+		Arena->ApplyReplayDividerState(1, ReplayLifts);
+		Arena->Tick(.1f);
+		TestEqual(TEXT("Client tick preserves recorded replay lift"), Arena->DividerLiftFractions[0], .3f);
+		Arena->EndReplayPresentation();
+		Arena->SetRole(ROLE_Authority);
+		Arena->ResetMechanisms();
 	}
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);

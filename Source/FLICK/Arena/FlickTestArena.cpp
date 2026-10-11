@@ -1379,12 +1379,19 @@ void AFlickTestArena::Tick(const float DeltaSeconds)
 	// Physics remains server-authoritative; clients predict only the moving divider's presentation.
 	if (!HasAuthority() && !bReplayPresentationActive)
 	{
+		bool bTransformsChanged = false;
 		for (int32 Index = 0; Index < GetMechanismCount(); ++Index)
 			if (DividerLiftFractions.IsValidIndex(Index))
-				DividerLiftFractions[Index] = FMath::FInterpConstantTo(DividerLiftFractions[Index],
+			{
+				const float PreviousLift = DividerLiftFractions[Index];
+				DividerLiftFractions[Index] = FMath::FInterpConstantTo(PreviousLift,
 					IsDividerRaised(Index) ? 1.0f : 0.0f, DeltaSeconds,
 					1.0f / FMath::Max(0.05f, IsDividerRaised(Index) ? DividerRiseDuration : DividerRetractionDuration));
-		UpdateDividerTransforms();
+				bTransformsChanged |= DividerLiftFractions[Index] != PreviousLift;
+			}
+		// Replicated state/layout changes already apply their transforms. Avoid
+		// reissuing component, visibility and collision updates once motion stops.
+		if (bTransformsChanged) UpdateDividerTransforms();
 	}
 }
 

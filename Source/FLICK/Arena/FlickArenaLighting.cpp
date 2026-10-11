@@ -45,16 +45,20 @@ namespace FlickArenaLighting
 			if (It->ActorHasTag(TEXT("FLICK.DirectionalLightActor"))) { Rig.DirectionalLightActor = *It; break; }
 		for (TActorIterator<ASkyLight> It(World); It; ++It)
 			if (It->ActorHasTag(TEXT("FLICK.SkyLightActor"))) { Rig.SkyLightActor = *It; break; }
+		// One pass per light type, retaining the first match for each tag.
 		for (TActorIterator<APointLight> It(World); It; ++It)
-			if (It->ActorHasTag(TEXT("FLICK.Player1AccentLight"))) { Rig.Player1AccentLight = *It; break; }
-		for (TActorIterator<APointLight> It(World); It; ++It)
-			if (It->ActorHasTag(TEXT("FLICK.Player2AccentLight"))) { Rig.Player2AccentLight = *It; break; }
-		for (TActorIterator<APointLight> It(World); It; ++It)
-			if (It->ActorHasTag(TEXT("FLICK.ArenaFillLight"))) { Rig.ArenaFillLight = *It; break; }
+		{
+			if (!Rig.Player1AccentLight && It->ActorHasTag(TEXT("FLICK.Player1AccentLight"))) Rig.Player1AccentLight = *It;
+			if (!Rig.Player2AccentLight && It->ActorHasTag(TEXT("FLICK.Player2AccentLight"))) Rig.Player2AccentLight = *It;
+			if (!Rig.ArenaFillLight && It->ActorHasTag(TEXT("FLICK.ArenaFillLight"))) Rig.ArenaFillLight = *It;
+			if (Rig.Player1AccentLight && Rig.Player2AccentLight && Rig.ArenaFillLight) break;
+		}
 		for (TActorIterator<ARectLight> It(World); It; ++It)
-			if (It->ActorHasTag(TEXT("FLICK.TestPuckKeyLight"))) { Rig.TestPuckKeyLight = *It; break; }
-		for (TActorIterator<ARectLight> It(World); It; ++It)
-			if (It->ActorHasTag(TEXT("FLICK.TestPuckRimLight"))) { Rig.TestPuckRimLight = *It; break; }
+		{
+			if (!Rig.TestPuckKeyLight && It->ActorHasTag(TEXT("FLICK.TestPuckKeyLight"))) Rig.TestPuckKeyLight = *It;
+			if (!Rig.TestPuckRimLight && It->ActorHasTag(TEXT("FLICK.TestPuckRimLight"))) Rig.TestPuckRimLight = *It;
+			if (Rig.TestPuckKeyLight && Rig.TestPuckRimLight) break;
+		}
 		return Rig;
 	}
 

@@ -45,11 +45,15 @@ void AFlickTestArena::CreateOneVsOnePresentationComponents(UStaticMesh* Box, USt
 void AFlickTestArena::UpdateOneVsOnePresentation()
 {
 	const bool bEnabled = bUsingWorkshopAssets;
-	TArray<UStaticMeshComponent*> Components = {WorkshopArenaMesh, StadiumStructureMesh, StadiumLightsMesh};
-	for (UStaticMeshComponent* Component : ZoneOuterMeshes) Components.Add(Component);
-	for (UStaticMeshComponent* Component : DividerBaseMeshes) Components.Add(Component);
 	if (bEnabled != bOneVsOnePresentationEnabled)
 	{
+		// This list is only needed when changing the material presentation.
+		TArray<UStaticMeshComponent*, TInlineAllocator<64>> Components;
+		Components.Add(WorkshopArenaMesh);
+		Components.Add(StadiumStructureMesh);
+		Components.Add(StadiumLightsMesh);
+		for (UStaticMeshComponent* Component : ZoneOuterMeshes) Components.Add(Component);
+		for (UStaticMeshComponent* Component : DividerBaseMeshes) Components.Add(Component);
 		// Menu materials inherit the shared finish. Invalidate their cache when
 		// switching between workshop art and the primitive fallback.
 		const bool bWasMenu = bMenuMaterialsEnabled;
@@ -60,11 +64,12 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 		{
 			for (UStaticMeshComponent* Component : Components)
 			{
+				const int32 AccentSlot = Component->GetMaterialIndex(TEXT("09_Switch_Accent"));
 				for (int32 Slot = 0; Slot < Component->GetNumMaterials(); ++Slot)
 				{
 					// State-owned accent MIDs are shared between each switch and its
 					// active socket. Never cache or replace them with cosmetic MIDs.
-					if (Slot == Component->GetMaterialIndex(TEXT("09_Switch_Accent"))) continue;
+					if (Slot == AccentSlot) continue;
 					UMaterialInterface* Original = Component->GetMaterial(Slot);
 					OneVsOneOriginalMaterials.Add(Original);
 					const FString Name = FString::Printf(TEXT("OneVsOne_%s_%d_%s"), *Component->GetName(), Slot,
@@ -131,9 +136,10 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 		int32 MaterialIndex = 0;
 		for (UStaticMeshComponent* Component : Components)
 		{
+			const int32 AccentSlot = Component->GetMaterialIndex(TEXT("09_Switch_Accent"));
 			for (int32 Slot = 0; Slot < Component->GetNumMaterials(); ++Slot)
 			{
-				if (Slot == Component->GetMaterialIndex(TEXT("09_Switch_Accent"))) continue;
+				if (Slot == AccentSlot) continue;
 				if (OneVsOneOriginalMaterials.IsValidIndex(MaterialIndex))
 					Component->SetMaterial(Slot, bEnabled && OneVsOneMaterials[MaterialIndex]
 						? static_cast<UMaterialInterface*>(OneVsOneMaterials[MaterialIndex].Get()) : OneVsOneOriginalMaterials[MaterialIndex].Get());

@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -68,6 +68,7 @@ $previewFlags = @{
     Challenges = @('-FlickChallengesPreview')
     TestArena = @('-FlickTestArenaPreview')
     SwitchRim = @('-FlickTestArenaPreview', '-FlickSwitchRimPreview')
+    StadiumSteps = @('-FlickTestArenaPreview', '-FlickStadiumStepPreview')
     Bob = @('-FlickBobPreview')
     BobPocket = @('-FlickBobPocketTest')
     TestArenaSettings = @('-FlickTestArenaSettingsPreview')

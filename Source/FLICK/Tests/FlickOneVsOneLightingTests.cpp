@@ -317,4 +317,35 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 	GEngine->DestroyWorldContext(World);
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickLightingRigLookupTest, "FLICK.Visuals.LightingRigLookup",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickLightingRigLookupTest::RunTest(const FString& Parameters)
+{
+	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Settings);
+	if (!TestNotNull(TEXT("Lookup test world"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+	TestNull(TEXT("Missing fixtures remain absent"), FlickArenaLighting::FindRig(World).ArenaFillLight.Get());
+	auto* Accent = World->SpawnActor<APointLight>();
+	Accent->Tags = {TEXT("FLICK.Player1AccentLight"), TEXT("FLICK.Player2AccentLight")};
+	auto* Fill = World->SpawnActor<APointLight>();
+	Fill->Tags.Add(TEXT("FLICK.ArenaFillLight"));
+	auto* Duplicate = World->SpawnActor<APointLight>();
+	Duplicate->Tags = {TEXT("FLICK.Player1AccentLight"), TEXT("FLICK.Player2AccentLight"), TEXT("FLICK.ArenaFillLight")};
+	auto* Key = World->SpawnActor<ARectLight>();
+	Key->Tags.Add(TEXT("FLICK.TestPuckKeyLight"));
+	auto* Rim = World->SpawnActor<ARectLight>();
+	Rim->Tags.Add(TEXT("FLICK.TestPuckRimLight"));
+	auto* DuplicateRect = World->SpawnActor<ARectLight>();
+	DuplicateRect->Tags = {TEXT("FLICK.TestPuckKeyLight"), TEXT("FLICK.TestPuckRimLight")};
+	const auto Rig = FlickArenaLighting::FindRig(World);
+	TestTrue(TEXT("Multi-tag actor can supply both accents"), Rig.Player1AccentLight == Accent && Rig.Player2AccentLight == Accent);
+	TestTrue(TEXT("First matching fill wins over duplicates"), Rig.ArenaFillLight == Fill);
+	TestTrue(TEXT("First matching softboxes win over duplicates"), Rig.TestPuckKeyLight == Key && Rig.TestPuckRimLight == Rim);
+	TestNull(TEXT("Lookup never creates absent directional fixtures"), Rig.DirectionalLightActor.Get());
+	return true;
+}
 #endif
