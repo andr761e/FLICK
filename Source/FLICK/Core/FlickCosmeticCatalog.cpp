@@ -123,10 +123,10 @@ FLinearColor FlickCosmeticCatalog::GetPuckSkinColor(const int32 Skin)
 	switch (Skin)
 	{
 	case 1: return FLinearColor(1.0f, .18f, .003f);
-	case 2: return FLinearColor(.003f, 1.f, .12f);
-	case 3: return FLinearColor(.30f, .015f, 1.f);
-	case 4: return FLinearColor(1.f, .008f, .035f);
-	case 5: return FLinearColor(1.f, .32f, .004f);
+	case 2: return FLinearColor(.008f, 1.f, .38f);
+	case 3: return FLinearColor(.48f, .035f, 1.f);
+	case 4: return FLinearColor(1.f, .012f, .020f);
+	case 5: return FLinearColor(1.f, .48f, .012f);
 	default: return FLinearColor(0.0f, .55f, 1.0f);
 	}
 }

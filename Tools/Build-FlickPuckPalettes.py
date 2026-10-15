@@ -8,6 +8,7 @@ source = '/Game/TestArena/Pucks/PrototypeStandard'
 destination = '/Game/Cosmetics/Pucks'
 roles = {
     'Housing': 'MI_01_Graphite_anodized_housing',
+    'Core': 'MI_03_Recessed_dark_titanium',
     'Crown': 'MI_02_Circular_brushed_silver',
     'Diffuser': 'MI_04_Cyan_light_diffuser',
     'Edges': 'MI_06_Machined_edge_highlights',

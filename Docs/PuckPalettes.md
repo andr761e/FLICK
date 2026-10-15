@@ -20,6 +20,15 @@ collision, mass and friction remain unchanged.
 Team-indicator rings remain
 independent of the cosmetic color.
 
+The reference-matched palettes override six colour regions: diffuser, emblem,
+housing, recessed core, silver crown and machined edges. Emerald uses a mint-green
+accent with cool charcoal; Amethyst uses orchid-violet with plum charcoal; Crimson
+uses a red accent with near-neutral charcoal; Amber uses amber-gold with warm
+charcoal and champagne silver. Recesses no longer retain Classic Blue's blue tint.
+Classic Blue and Classic Orange are unchanged. Emission strength and the existing
+reflective finish are unchanged; these are colour adjustments, not a lighting or
+reflection-system change.
+
 To regenerate the material instances from the definitions, run in PowerShell:
 
 ```powershell

@@ -1,6 +1,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 #include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickPuckPalette.h"
 #include "Materials/MaterialInstanceConstant.h"
@@ -17,6 +21,49 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickStarterSkinTest, "FLICK.Cosmetics.StarterSkins",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPaletteDefinitionTest, "FLICK.Cosmetics.PaletteDefinitions",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickPaletteDefinitionTest::RunTest(const FString& Parameters)
+{
+	const TCHAR* Names[] = {TEXT("Emerald"), TEXT("Amethyst"), TEXT("Crimson"), TEXT("Amber")};
+	const TCHAR* Slots[] = {TEXT("Cyan light diffuser"), TEXT("Cyan center emblem"),
+		TEXT("Graphite anodized housing"), TEXT("Recessed dark titanium"),
+		TEXT("Circular brushed silver"), TEXT("Machined edge highlights")};
+	const TCHAR* Roles[] = {TEXT("Diffuser"), TEXT("Emblem"), TEXT("Housing"), TEXT("Core"), TEXT("Crown"), TEXT("Edges")};
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Names); ++Index)
+	{
+		FString Source;
+		const FString Path = FPaths::ProjectDir() / TEXT("AssetDevelopment/Pucks") / Names[Index] / TEXT("set.json");
+		if (!TestTrue(TEXT("Palette source exists"), FFileHelper::LoadFileToString(Source, *Path))) continue;
+		TSharedPtr<FJsonObject> Definition;
+		if (!TestTrue(TEXT("Palette source is valid JSON"), FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Source), Definition)
+			&& Definition.IsValid())) continue;
+		const auto ReadColor = [](const TArray<TSharedPtr<FJsonValue>>& Values)
+		{
+			return FLinearColor(Values[0]->AsNumber(), Values[1]->AsNumber(), Values[2]->AsNumber());
+		};
+		const FLinearColor Accent = ReadColor(Definition->GetArrayField(TEXT("accent_color")));
+		TestTrue(TEXT("Runtime light and UI hue match the authored palette"),
+			FlickCosmeticCatalog::GetPuckSkinColor(Index + 2).Equals(Accent, .00001f));
+		const auto& BaseColors = Definition->GetObjectField(TEXT("base_colors"));
+		for (int32 Role = 0; Role < UE_ARRAY_COUNT(Roles); ++Role)
+		{
+			auto* Material = LoadObject<UMaterialInstanceConstant>(nullptr, *FlickPuckPalette::MaterialPath(Index + 2, Slots[Role]));
+			if (!TestNotNull(TEXT("Authored palette role has a cooked material"), Material)) continue;
+			FLinearColor Actual;
+			Material->GetVectorParameterValue(FMaterialParameterInfo(TEXT("BaseColor")), Actual);
+			TestTrue(TEXT("Imported base colour matches its source"), Actual.Equals(ReadColor(BaseColors->GetArrayField(Roles[Role])), .00001f));
+			if (Role < 2)
+			{
+				Material->GetVectorParameterValue(FMaterialParameterInfo(TEXT("TeamColor")), Actual);
+				TestTrue(TEXT("Imported LED hue matches runtime"), Actual.Equals(Accent, .00001f));
+			}
+		}
+	}
+	return true;
+}
 
 bool FFlickStarterSkinTest::RunTest(const FString& Parameters)
 {
@@ -127,16 +174,19 @@ bool FFlickStarterSkinTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Palette preserves physical material"), VariantBody->GetBodyInstance()->GetSimplePhysicalMaterial() == VariantPhysics);
 			TestEqual(TEXT("Palette visual remains non-colliding"), VariantVisual->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 			if (!VariantMesh) continue;
+			int32 PaletteRoleCount = 0;
 			for (int32 Slot = 0; Slot < VariantMesh->GetStaticMaterials().Num(); ++Slot)
 			{
 				const FString Path = FlickPuckPalette::MaterialPath(Palette, VariantMesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString());
 				if (Path.IsEmpty()) continue;
+				++PaletteRoleCount;
 				auto* Expected = LoadObject<UMaterialInstanceConstant>(nullptr, *Path);
 				auto* Actual = VariantVisual->GetMaterial(Slot);
 				auto* Dynamic = Cast<UMaterialInstanceDynamic>(Actual);
 				TestTrue(TEXT("Every archetype uses the shared palette even while hovered"),
 					Expected && (Dynamic ? Dynamic->Parent == Expected : Actual == Expected));
 			}
+			TestEqual(TEXT("Every archetype recolours all six palette regions"), PaletteRoleCount, 6);
 		}
 		Variant->SetPuckSkin(0);
 		if (VariantMesh)
