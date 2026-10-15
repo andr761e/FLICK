@@ -1,4 +1,4 @@
-"""Build Standard-only recolors using the existing Blue material instances."""
+"""Build recolors shared by all nine puck types using existing Blue materials."""
 import json
 from pathlib import Path
 import unreal as u
@@ -17,7 +17,9 @@ editing = u.MaterialEditingLibrary
 assets = u.AssetToolsHelpers.get_asset_tools()
 for name in ['Emerald', 'Amethyst', 'Crimson', 'Amber']:
     definition = json.loads((root / 'AssetDevelopment/Pucks' / name / 'set.json').read_text())
-    assert (root / 'AssetDevelopment/Pucks' / name / definition['shared_geometry']).resolve().is_file()
+    geometry = (root / 'AssetDevelopment/Pucks' / name / definition['shared_geometry']).resolve()
+    for archetype in definition['archetypes']:
+        assert (geometry / (archetype + '.fbx')).is_file(), archetype
     folder = destination + '/' + name
     u.EditorAssetLibrary.make_directory(folder)
     for role, base_color in definition['base_colors'].items():
@@ -42,5 +44,5 @@ for name in ['Emerald', 'Amethyst', 'Crimson', 'Amber']:
                        editing.get_material_instance_scalar_parameter_value(original, parameter)) < .0001, (name,role,parameter)
         editing.update_material_instance(instance)
         assert u.EditorAssetLibrary.save_loaded_asset(instance, only_if_is_dirty=False)
-    u.log('FLICK Standard palette ready: ' + name)
+    u.log('FLICK shared puck palette ready: ' + name)
 u.log('FLICK_PUCK_PALETTES_COMPLETE')

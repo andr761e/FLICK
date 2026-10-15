@@ -60,6 +60,33 @@ The exporters validate dimensions and preserve seven material sections:
 graphite housing, machined highlights, gasket/sockets, skin diffuser, brushed
 silver, recessed titanium and the type emblem.
 
+## Optimize the eight archetype FBXs
+
+`scripts/optimize_archetypes_unreal.py` operates on the current FBXs, not the
+older GLBs. Standard is excluded. Run it with Blender in background mode:
+
+1. No arguments: generate candidates and a count/size/surface-distance report
+   under `Saved/PuckOptimization` without changing exports.
+2. `-- --review`: render original/candidate top, low-angle and underside comparisons.
+3. `-- --apply`: accept a complete eight-puck dry run, checking source hashes and
+   retaining the original FBXs in `Saved/PuckOptimization/originals`.
+
+Cleanup welds coincident vertices and dissolves near-planar faces at 0.1 degrees,
+preserving material/UV boundaries. Authored corner normals are restored by
+position, material and face direction; nearest-face normal transfer is deliberately
+avoided because overlapping layers can give incorrect reflections. Bounds must
+remain unchanged, all seven material sections remain, and sampled bidirectional
+surface deviation must stay below 0.2 mm. Inspect the renders before acceptance.
+
+Then run the Unreal Python commandlet with `Tools/Update-FlickPucks.py` and
+`-FlickPuckGeometryOnly` to reimport only these eight meshes without re-saving
+Standard or cosmetic materials. `Saved/HighDetailPuckImportReport.json` records
+actual Unreal render vertices and triangles before/after. FBX size and authoring
+polygon counts are not substitutes for those runtime mesh counts.
+
+The legacy GLB exporters overwrite optimized FBXs. If rebuilding from those
+sources, repeat this review/optimization pass before importing.
+
 ## Gameplay boundary
 
 The art keeps the established puck diameters and visual-height variation. The

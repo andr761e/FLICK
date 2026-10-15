@@ -54,7 +54,7 @@ bool FFlickCosmeticCatalogTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Puck category maps to its archetype"),
 				static_cast<int32>(FlickCosmeticCatalog::GetPuckArchetype(Category)),
 				Category - FlickCosmeticCatalog::PuckCategoryStart);
-			TestEqual(TEXT("Four palettes are available only for Standard"), FlickCosmeticCatalog::GetItems(Category).Num(), Category == FlickCosmeticCatalog::PuckCategoryStart ? 6 : 2);
+			TestEqual(TEXT("All puck types offer the four palettes and both starter skins"), FlickCosmeticCatalog::GetItems(Category).Num(), 6);
 			TestEqual(TEXT("Existing saved skin index is still Classic Blue"), FlickCosmeticCatalog::GetItems(Category)[0], FString(TEXT("CLASSIC BLUE")));
 			TestEqual(TEXT("Orange is freely selectable"), FlickCosmeticCatalog::GetItems(Category)[1], FString(TEXT("CLASSIC ORANGE")));
 		}

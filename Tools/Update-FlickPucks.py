@@ -5,6 +5,9 @@ import unreal as u
 
 project = Path(u.Paths.project_dir())
 u.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX 0")
-for importer in ("Import-FlickBlueStandardPrototype.py", "Import-FlickHighDetailPucks.py"):
+geometry_only = '-FlickPuckGeometryOnly' in u.SystemLibrary.get_command_line()
+importers = ("Import-FlickHighDetailPucks.py",) if geometry_only else (
+    "Import-FlickBlueStandardPrototype.py", "Import-FlickHighDetailPucks.py")
+for importer in importers:
     runpy.run_path(str(project / "Tools" / importer), run_name="__main__")
 u.log("FLICK_PUCK_UPDATE_COMPLETE")

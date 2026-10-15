@@ -1,9 +1,9 @@
 {
   "name": "CRIMSON",
   "archetypes": [
-    "Standard"
+    "Standard", "Heavy", "Striker", "Grippy", "Slider", "Blocker", "Compact", "Bouncer", "Toppler"
   ],
-  "shared_geometry": "../ClassicBlue/exports/Standard.fbx",
+  "shared_geometry": "../ClassicBlue/exports",
   "accent_color": [
     1,
     0.008,

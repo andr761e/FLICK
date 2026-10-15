@@ -1,13 +1,18 @@
-# Standard puck palettes
+# Shared puck palettes
 
-Emerald, Amethyst, Crimson and Amber are available in Customize > Standard Puck.
-Only Standard has these sets; the other eight puck types retain Classic Blue and
-Classic Orange.
+Emerald, Amethyst, Crimson and Amber are available for all nine puck types in
+Customize, alongside Classic Blue and Classic Orange. Each type saves its skin
+independently; validated player-state replication uses the same six stable IDs.
 
 Each set has a folder under `AssetDevelopment/Pucks` with its `set.json` color
-definition. They share `ClassicBlue/exports/Standard.fbx`; there are no duplicated
-FBXs or new textures. Generated material instances live under
+definition. They share the optimized meshes in `ClassicBlue/exports`; there are
+no duplicated FBXs, textures or per-archetype material instances. Materials live under
 `Content/Cosmetics/Pucks/<Set>`.
+
+Existing `MI_Standard_*` material names are retained for compatibility and reused
+by every archetype. They target the same seven named material families on each
+mesh, including the appropriate type emblem. No assets need regenerating merely
+to enable a palette on another archetype.
 
 The instances inherit the original Blue material instances and override vector
 colors only. Geometry, shader, roughness, metallic, anisotropy and gameplay

@@ -1322,7 +1322,7 @@ void AFlickPiece::EnableTestArenaVisuals()
 	for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
 	{
 		const FString SlotName = Mesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString();
-		if (Archetype == EFlickPieceArchetype::Standard)
+		if (bUsingHighDetailPuck)
 		{
 			const FString PalettePath = FlickPuckPalette::MaterialPath(PuckSkin, SlotName);
 			if (!PalettePath.IsEmpty())

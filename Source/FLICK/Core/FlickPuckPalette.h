@@ -2,7 +2,8 @@
 
 #include "CoreMinimal.h"
 
-// Standard-only vector-parameter recolors. The original mesh and shader are shared.
+// Vector-parameter recolors shared by every puck type. Historical MI_Standard_*
+// asset names remain stable; all archetypes use the same base material families.
 namespace FlickPuckPalette
 {
 	inline FString MaterialPath(const int32 Skin, FString Slot)

@@ -1,0 +1,153 @@
+{
+  "method": "Weld coincident vertices; near-planar dissolve at 0.1 degrees; preserve material/UV boundaries and authored corner normals.",
+  "standard": "Unmodified",
+  "physics": "Unmodified; visual meshes only",
+  "backups": "Saved/PuckOptimization/originals",
+  "visual_review": "Original/exported candidate comparisons: top, low angle, underside; actual Heavy locker preview.",
+  "pucks": [
+    {
+      "asset": "Toppler",
+      "fbx_bytes_before": 4748252,
+      "fbx_bytes_after": 3095116,
+      "polygons_before": 144688,
+      "polygons_after": 52427,
+      "blender_triangles_before": 144688,
+      "blender_triangles_after": 132184,
+      "unreal_before": {
+        "vertices": 162071,
+        "triangles": 133096
+      },
+      "unreal_after": {
+        "vertices": 132922,
+        "triangles": 120856
+      },
+      "max_sampled_surface_error_mm": 0.11506772716529667
+    },
+    {
+      "asset": "Bouncer",
+      "fbx_bytes_before": 4988924,
+      "fbx_bytes_after": 3097468,
+      "polygons_before": 148624,
+      "polygons_after": 50976,
+      "blender_triangles_before": 148624,
+      "blender_triangles_after": 130712,
+      "unreal_before": {
+        "vertices": 161897,
+        "triangles": 136392
+      },
+      "unreal_after": {
+        "vertices": 126095,
+        "triangles": 118808
+      },
+      "max_sampled_surface_error_mm": 0.11024880950571969
+    },
+    {
+      "asset": "Compact",
+      "fbx_bytes_before": 3670828,
+      "fbx_bytes_after": 2596812,
+      "polygons_before": 117888,
+      "polygons_after": 43972,
+      "blender_triangles_before": 117888,
+      "blender_triangles_after": 114850,
+      "unreal_before": {
+        "vertices": 132945,
+        "triangles": 109024
+      },
+      "unreal_after": {
+        "vertices": 111675,
+        "triangles": 106114
+      },
+      "max_sampled_surface_error_mm": 0.06001972724334337
+    },
+    {
+      "asset": "Blocker",
+      "fbx_bytes_before": 4338684,
+      "fbx_bytes_after": 2601404,
+      "polygons_before": 128848,
+      "polygons_after": 41831,
+      "blender_triangles_before": 128848,
+      "blender_triangles_after": 110042,
+      "unreal_before": {
+        "vertices": 133599,
+        "triangles": 119904
+      },
+      "unreal_after": {
+        "vertices": 107048,
+        "triangles": 101306
+      },
+      "max_sampled_surface_error_mm": 0.1352049584966153
+    },
+    {
+      "asset": "Slider",
+      "fbx_bytes_before": 3939100,
+      "fbx_bytes_after": 2523084,
+      "polygons_before": 121088,
+      "polygons_after": 41715,
+      "blender_triangles_before": 121088,
+      "blender_triangles_after": 109460,
+      "unreal_before": {
+        "vertices": 129196,
+        "triangles": 111960
+      },
+      "unreal_after": {
+        "vertices": 106917,
+        "triangles": 100724
+      },
+      "max_sampled_surface_error_mm": 0.11458351218607277
+    },
+    {
+      "asset": "Grippy",
+      "fbx_bytes_before": 6255484,
+      "fbx_bytes_after": 4289852,
+      "polygons_before": 185004,
+      "polygons_after": 69974,
+      "blender_triangles_before": 185004,
+      "blender_triangles_after": 174156,
+      "unreal_before": {
+        "vertices": 222185,
+        "triangles": 168348
+      },
+      "unreal_after": {
+        "vertices": 172724,
+        "triangles": 157644
+      },
+      "max_sampled_surface_error_mm": 0.11506772716529667
+    },
+    {
+      "asset": "Striker",
+      "fbx_bytes_before": 4304780,
+      "fbx_bytes_after": 2740556,
+      "polygons_before": 131464,
+      "polygons_after": 45494,
+      "blender_triangles_before": 131464,
+      "blender_triangles_after": 119664,
+      "unreal_before": {
+        "vertices": 141296,
+        "triangles": 121776
+      },
+      "unreal_after": {
+        "vertices": 116249,
+        "triangles": 110352
+      },
+      "max_sampled_surface_error_mm": 0.10195490904152393
+    },
+    {
+      "asset": "Heavy",
+      "fbx_bytes_before": 5313612,
+      "fbx_bytes_after": 3610076,
+      "polygons_before": 162140,
+      "polygons_after": 60084,
+      "blender_triangles_before": 162140,
+      "blender_triangles_after": 152540,
+      "unreal_before": {
+        "vertices": 186513,
+        "triangles": 148108
+      },
+      "unreal_after": {
+        "vertices": 150789,
+        "triangles": 138620
+      },
+      "max_sampled_surface_error_mm": 0.07863438077038154
+    }
+  ]
+}

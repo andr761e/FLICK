@@ -4,6 +4,7 @@ from pathlib import Path
 import unreal as u
 
 asset_selected = globals().get("asset_selected", lambda _project, _source: True)
+geometry_only = '-FlickPuckGeometryOnly' in u.SystemLibrary.get_command_line()
 
 
 project = Path(u.Paths.project_dir())
@@ -37,6 +38,10 @@ for source_name, asset_name in material_assets.items():
 
 def team_material(name, base_color, team_color, roughness):
     material = u.load_asset(destination + "/" + name)
+    if geometry_only:
+        if not material:
+            raise RuntimeError("Geometry-only import requires existing material: " + name)
+        return material
     if not material:
         material = assets.create_asset(
             name, destination, u.MaterialInstanceConstant,
@@ -80,6 +85,9 @@ for row in manifest:
         raise RuntimeError(name + ": source FBX is missing: " + str(source_file))
     if not asset_selected(project, source_file):
         continue
+    previous = u.load_asset(mesh_path)
+    before_geometry = ({"vertices": previous.get_num_vertices(0), "triangles": previous.get_num_triangles(0)}
+                       if previous else None)
     task = u.AssetImportTask()
     task.filename = str(source_file)
     task.destination_path = destination
@@ -131,6 +139,8 @@ for row in manifest:
     u.EditorAssetLibrary.save_loaded_asset(mesh)
     report.append({
         "asset": name,
+        "geometry_before": before_geometry,
+        "geometry_after": {"vertices": mesh.get_num_vertices(0), "triangles": mesh.get_num_triangles(0)},
         "dimensions_cm": measured,
         "materials": mapped,
         "orange_variant_materials": [

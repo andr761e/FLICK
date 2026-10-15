@@ -1,9 +1,9 @@
 {
   "name": "EMERALD",
   "archetypes": [
-    "Standard"
+    "Standard", "Heavy", "Striker", "Grippy", "Slider", "Blocker", "Compact", "Bouncer", "Toppler"
   ],
-  "shared_geometry": "../ClassicBlue/exports/Standard.fbx",
+  "shared_geometry": "../ClassicBlue/exports",
   "accent_color": [
     0.003,
     1,
