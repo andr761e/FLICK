@@ -1122,7 +1122,7 @@ bool UFlickSessionSubsystem::JoinSearchResult(const FOnlineSessionSearchResult& 
 	}
 	else
 	{
-		PendingQueueRating = FMath::Clamp(AdvertisedRating, 0, 3000);
+		PendingQueueRating = FMath::Clamp(AdvertisedRating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
 	}
 	if (ActivePurpose == EFlickSessionPurpose::Party)
 	{
@@ -1889,7 +1889,7 @@ void UFlickSessionSubsystem::HandleFindSessionsComplete(const bool bWasSuccessfu
 			int32 RankedValue = 0;
 			Result.Session.SessionSettings.Get(FlickRankedKey, RankedValue);
 			Result.Session.SessionSettings.Get(FlickMmrKey, Entry.QueueRating);
-			Entry.QueueRating = FMath::Clamp(Entry.QueueRating, 0, 3000);
+			Entry.QueueRating = FMath::Clamp(Entry.QueueRating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
 			Entry.bRanked = Entry.bMatchmaking && RankedValue != 0;
 		Entry.MaximumPlayers = Result.Session.SessionSettings.NumPublicConnections;
 		Entry.CurrentPlayers = FMath::Max(0, Entry.MaximumPlayers - Result.Session.NumOpenPublicConnections);

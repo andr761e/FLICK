@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/FlickTypes.h"
+#include "Core/FlickShopCatalog.h"
 #include "Input/Reply.h"
 #include "Styling/SlateTypes.h"
 #include "Widgets/SCompoundWidget.h"
@@ -57,7 +58,10 @@ enum class EFlickSettingsTab : uint8
 	StreamSafe,
 	Controls,
 	Lighting,
-	QuickChat
+	QuickChat,
+#if !UE_BUILD_SHIPPING
+	DevelopmentRanks
+#endif
 };
 
 class SFlickGameLayer final : public SCompoundWidget
@@ -72,6 +76,7 @@ public:
 	SFlickGameLayer();
 	void Construct(const FArguments& InArgs);
 	virtual void Tick(const FGeometry& AllottedGeometry, double InCurrentTime, float InDeltaTime) override;
+	virtual FReply OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override;
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS
@@ -91,6 +96,7 @@ private:
 	EFlickPieceArchetype GetDisplayedLoadoutPiece(int32 SlotIndex) const;
 	void SetDisplayedLoadoutPiece(int32 SlotIndex, EFlickPieceArchetype Archetype);
 	TSharedRef<SWidget> BuildProfile();
+	TSharedRef<SWidget> BuildRankedProfilePanel();
 	TSharedRef<SWidget> BuildProfileStatsPanel();
 	TSharedRef<SWidget> BuildStartupOverlay();
 	TSharedRef<SWidget> BuildSocialPanel();
@@ -100,7 +106,11 @@ private:
 	TSharedRef<SWidget> BuildPartyMemberRow(int32 PartySlot);
 	TSharedRef<SWidget> BuildMainMenuPartyMember(int32 PartySlot);
 	TSharedRef<SWidget> BuildItemShop();
-	TSharedRef<SWidget> BuildShopItemCard(const FString& Name, const FString& Type, const FString& Mark, const FLinearColor& Accent);
+	TSharedRef<SWidget> BuildShopItemCard(int32 ItemIndex);
+	TSharedRef<SWidget> BuildShopDetails();
+	FReply OpenShopItem(int32 ItemIndex);
+	FReply CloseShopItem();
+	FReply AcquireShopItem();
 	TSharedRef<SWidget> BuildModeSelect();
 	TSharedRef<SWidget> BuildPrivateMatchSetup();
 	TSharedRef<SWidget> BuildPrivateMatchTeamPicker();
@@ -127,6 +137,9 @@ private:
 	TSharedRef<SWidget> BuildArchetypeChoice(EFlickTeam Team, EFlickPieceArchetype Archetype);
 	TSharedRef<SWidget> BuildSettings();
 	TSharedRef<SWidget> BuildQuickChatSettings();
+#if !UE_BUILD_SHIPPING
+	TSharedRef<SWidget> BuildDevelopmentRankSettings();
+#endif
 	TSharedRef<SWidget> BuildLightingSettings();
 	TSharedRef<SWidget> BuildMatchHud();
 	TSharedRef<SWidget> BuildCinematicReplayOverlay();
@@ -319,6 +332,12 @@ private:
 	int32 SelectedBannerTag = 0;
 	int32 SelectedAvatarBorder = 0;
 	int32 SelectedLockerCategory = 0;
+	EFlickShopFilter SelectedShopFilter = EFlickShopFilter::All;
+	int32 SelectedShopItem = INDEX_NONE;
+	FFlickShopDemoState ShopDemo;
+	FString ShopStatus;
+	TWeakPtr<SWidget> ShopReturnFocus;
+	TSharedPtr<SButton> ShopDetailCloseButton;
 	TArray<int32> SelectedPuckSkins;
 	TArray<int32> SelectedPuckEffects;
 	int32 GetSelectedCosmeticIndex(int32 Category) const;

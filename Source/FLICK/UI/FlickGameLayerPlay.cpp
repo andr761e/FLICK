@@ -828,6 +828,22 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPlayFormatCard(
 					.Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)
 				]
 					+ SVerticalBox::Slot().FillHeight(1.0f)[SNew(SSpacer)]
+					+ SVerticalBox::Slot().AutoHeight()
+					[SNew(SHorizontalBox).Visibility_Lambda([this]()
+					 { return SelectedPlayPlaylist == EFlickPlayPlaylist::Competitive ? EVisibility::Visible : EVisibility::Collapsed; })
+					 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 7, 0)
+					 [SNew(SFlickRankBadge).Size(28).Progress_Lambda([this, PlayersPerTeam, bBob]()
+					  {
+						const auto* Ranking = GetRankingSubsystem();
+						return Ranking ? Ranking->GetDisplayProgress(bBob ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic, PlayersPerTeam) : FFlickRankProgress();
+					  })]
+					 + SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)
+					 [SNew(STextBlock).Text_Lambda([this, PlayersPerTeam, bBob]()
+					  {
+						const auto* Ranking = GetRankingSubsystem();
+						return FText::FromString(Ranking ? Ranking->GetDisplayProgressLabel(bBob ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic, PlayersPerTeam) : TEXT("RANK UNAVAILABLE"));
+					  }).Font(UiFont(9, true)).ColorAndOpacity(Paper)]
+					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 9.0f, 14.0f, 0.0f)
 					[
 						SNew(STextBlock)
@@ -930,7 +946,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildOnlineBrowser()
 									? GameMode->GetSelectedMatchVariant() : EFlickMatchVariant::Classic;
 								const int32 TeamSize = GameMode.IsValid() ? GameMode->GetMatchmakingPlayersPerTeam() : 1;
 								return FText::FromString(Ranking
-									? Ranking->GetProgressLabel(Variant, TeamSize)
+									? Ranking->GetDisplayProgressLabel(Variant, TeamSize)
 									: TEXT("RANK UNAVAILABLE"));
 							})
 							.Font(UiFont(9, true)).ColorAndOpacity(Muted)

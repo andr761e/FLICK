@@ -35,6 +35,7 @@
 #include "Styling/SlateColor.h"
 #include "UI/FlickHUD.h"
 #include "UI/FlickLogoWidget.h"
+#include "UI/FlickRankBadge.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SInputKeySelector.h"

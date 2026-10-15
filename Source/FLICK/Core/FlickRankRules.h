@@ -41,7 +41,9 @@ namespace FlickRankRules
 	constexpr int32 PlacementMatchCount = 5;
 	constexpr int32 DefaultRating = 1000;
 	constexpr int32 MinimumRating = 0;
-	constexpr int32 MaximumRating = 3000;
+	// Transport/storage sanity ceiling, not a rank threshold. Zenith has no subdivisions.
+	constexpr int32 MaximumRating = 1000000;
+	constexpr int32 BadgeCount = 22;
 
 	FString MakePlaylistKey(EFlickMatchVariant Variant, int32 PlayersPerTeam);
 	int32 GetSearchRangeForAttempt(int32 SearchAttempt);
@@ -52,9 +54,15 @@ namespace FlickRankRules
 		bool bInPlacements);
 	EFlickRankTier GetTier(const FFlickRankProgress& Progress);
 	int32 GetDivision(const FFlickRankProgress& Progress);
+	// Unranked has no earned badge. Ranked badges are ordered Carbon I .. Zenith.
+	int32 GetBadgeIndex(const FFlickRankProgress& Progress);
+	FFlickRankProgress GetBadgeProgress(int32 BadgeIndex);
+	FString GetRatingRangeLabel(const FFlickRankProgress& Progress);
 	int32 GetPlacementsRemaining(const FFlickRankProgress& Progress);
 	FString GetTierName(EFlickRankTier Tier);
 	FString GetDivisionName(int32 Division);
 	FString GetRankLabel(const FFlickRankProgress& Progress);
 	FString GetProgressLabel(const FFlickRankProgress& Progress);
+	// Ratings and match count are canonical; presentation metadata is always derived.
+	void RefreshRankMetadata(FFlickRatingUpdate& Update);
 }

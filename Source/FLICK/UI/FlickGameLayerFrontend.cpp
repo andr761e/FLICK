@@ -473,9 +473,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 18.0f, 0.0f)
 						[
-							SNew(SFlickMainMenuIcon)
-							.Icon(EFlickMainMenuIcon::Rank)
-							.Color(FlickMainMenuStyle::Lime).Glow(true)
+							SNew(SFlickRankBadge).Size(48)
+							.Progress_Lambda([this]()
+							{
+								const UFlickRankingSubsystem* Ranking = GetRankingSubsystem();
+								return Ranking ? Ranking->GetDisplayProgress(GameMode.IsValid() ? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic,
+									GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1) : FFlickRankProgress();
+							})
 						]
 						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 						[
@@ -503,7 +507,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 										? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
 									const int32 TeamSize = GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1;
 									return FText::FromString(Ranking
-										? Ranking->GetProgressLabel(Variant, TeamSize)
+										? Ranking->GetDisplayProgressLabel(Variant, TeamSize)
 										: TEXT("UNAVAILABLE"));
 								})
 								.Font(UiFont(14, true)).ColorAndOpacity(Brand)
@@ -777,33 +781,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 
 TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 {
-	auto MakeRankCard = [this](const int32 PlayersPerTeam, const FString& Label) -> TSharedRef<SWidget>
-	{
-		return SNew(SFlickAngularBorder)
-			.BackgroundColor(PanelRaised)
-			.AccentColor(Brand)
-			.UseAccentForOutline(false).CutSize(12.0f).BorderWidth(1.0f).Padding(FMargin(20.0f, 22.0f))
-			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(Label)).Font(UiFont(11, true)).ColorAndOpacity(Muted)]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
-				[
-					SNew(STextBlock)
-					.Text_Lambda([this, PlayersPerTeam]()
-					{
-						const UFlickRankingSubsystem* Ranking = GetRankingSubsystem();
-						return FText::FromString(Ranking
-							? Ranking->GetProgressLabel(EFlickMatchVariant::Classic, PlayersPerTeam)
-							: TEXT("UNAVAILABLE"));
-					})
-					.Font(DisplayFont(19)).ColorAndOpacity(Paper)
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 7.0f, 0.0f, 0.0f)
-				[
-					SNew(STextBlock).Text(FText::FromString(TEXT("RANKED KNOCKOUT  //  CURRENT SEASON"))).Font(UiFont(8, true)).ColorAndOpacity(Muted)
-				]
-			];
-	};
 	TSharedRef<SVerticalBox> LockerCategories = SNew(SVerticalBox);
 	TSharedRef<SOverlay> LockerContents = SNew(SOverlay);
 	for (int32 Category = 0; Category < FlickCosmeticCatalog::CategoryCount; ++Category)
@@ -1140,7 +1117,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 9.0f)
 					[MakeProfileChoice(EFlickProfileTab::Stats, 0, TEXT("STATS"), TEXT("Your performance across every playlist."), Cyan)]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 9.0f)
-					[MakeProfileChoice(EFlickProfileTab::Leaderboards, 1, TEXT("LEADERBOARDS"), TEXT("Placement and competitive progress."), Brand)]
+					[MakeProfileChoice(EFlickProfileTab::Leaderboards, 1, TEXT("COMPETITIVE RANKS"), TEXT("Your placement, MMR and the rank ladder."), Brand)]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 9.0f)
 					[MakeProfileChoice(EFlickProfileTab::MatchHistory, 2, TEXT("MATCH HISTORY"), TEXT("Revisit your most recent series."), Orange)]
 					+ SVerticalBox::Slot().AutoHeight()
@@ -1152,7 +1129,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		[
 			SNew(SBox).HeightOverride_Lambda([this]()
 			{
-				if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 520.0f;
+				if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 780.0f;
 				if (SelectedProfileTab == EFlickProfileTab::Customization) return 720.0f;
 				if (SelectedProfileTab == EFlickProfileTab::MatchHistory)
 				{
@@ -1188,7 +1165,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			})
 			.HeightOverride_Lambda([this]()
 			{
-				if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 520.0f;
+				if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 780.0f;
 				if (SelectedProfileTab == EFlickProfileTab::Customization) return 720.0f;
 				if (SelectedProfileTab == EFlickProfileTab::MatchHistory)
 				{
@@ -1215,7 +1192,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 14.0f)
 			[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(
 				SelectedProfileTab == EFlickProfileTab::Stats ? TEXT("STATS")
-				: SelectedProfileTab == EFlickProfileTab::Leaderboards ? TEXT("LEADERBOARDS")
+				: SelectedProfileTab == EFlickProfileTab::Leaderboards ? TEXT("COMPETITIVE RANKS")
 				: SelectedProfileTab == EFlickProfileTab::MatchHistory ? TEXT("MATCH HISTORY") : TEXT("CUSTOMIZE")); })
 				.Font(DisplayFont(36)).ColorAndOpacity(Paper)]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 14.0f)
@@ -1230,7 +1207,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				SNew(SBox)
 				.HeightOverride_Lambda([this]()
 				{
-					if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 290.0f;
+					if (SelectedProfileTab == EFlickProfileTab::Leaderboards) return 530.0f;
 					if (SelectedProfileTab == EFlickProfileTab::MatchHistory)
 					{
 						const UFlickGameInstance* Instance = PlayerController.IsValid()
@@ -1285,32 +1262,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 					SNew(SBox)
 					.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Leaderboards ? EVisibility::Visible : EVisibility::Collapsed; })
 					[
-						SNew(SFlickAngularBorder)
-						.BackgroundColor(PanelRaised)
-						.AccentColor(Hairline)
-						.UseAccentForOutline(false)
-						.CutSize(14.0f)
-						.BorderWidth(1.1f)
-						.Padding(FMargin(28.0f, 24.0f))
-						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR RANKED PLAYLISTS"))).Font(UiFont(16, true)).ColorAndOpacity(Paper)]
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 18.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("PLACEMENT AND MMR PROGRESS ACROSS EACH TEAM SIZE"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
-							+ SVerticalBox::Slot().AutoHeight()
-							[
-								SNew(SUniformGridPanel).SlotPadding(FMargin(7.0f))
-								+ SUniformGridPanel::Slot(0, 0)[MakeRankCard(1, TEXT("1V1 DUEL"))]
-								+ SUniformGridPanel::Slot(1, 0)[MakeRankCard(2, TEXT("2V2 DOUBLES"))]
-								+ SUniformGridPanel::Slot(2, 0)[MakeRankCard(3, TEXT("3V3 CHAOS"))]
-							]
-							+ SVerticalBox::Slot().AutoHeight().Padding(7.0f, 18.0f, 7.0f, 0.0f)
-							[
-								SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(7.0f).BorderWidth(0.8f).Padding(FMargin(20.0f, 14.0f))
-								[
-									SNew(STextBlock).Text(FText::FromString(TEXT("GLOBAL PLAYER TABLES WILL APPEAR HERE WHEN THE LIVE LEADERBOARD SERVICE IS CONNECTED."))).Font(UiFont(9, true)).ColorAndOpacity(Muted)
-								]
-							]
-						]
+						BuildRankedProfilePanel()
 					]
 				]
 				+ SOverlay::Slot()
@@ -2494,203 +2446,5 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 					]
 				]
 			]
-		];
-}
-
-TSharedRef<SWidget> SFlickGameLayer::BuildItemShop()
-{
-	return SNew(SOverlay)
-		+ SOverlay::Slot()
-		[
-			SNew(SBorder)
-			.BorderImage(WhiteBrush())
-			.BorderBackgroundColor(FLinearColor(0.002f, 0.006f, 0.011f, 0.9f))
-		]
-		+ SOverlay::Slot().VAlign(VAlign_Top)
-		[
-			SNew(SBox).HeightOverride(116.0f)
-			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.002f, 0.008f, 0.016f, 0.94f))
-				.AccentColor(Orange.CopyWithNewOpacity(0.76f))
-				.CutSize(10.0f)
-				.BorderWidth(1.1f)
-				.Padding(FMargin(44.0f, 22.0f))
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-					[
-						SNew(SBox).WidthOverride(6.0f).HeightOverride(55.0f)
-						[
-							SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Orange)
-						]
-					]
-					+ SHorizontalBox::Slot().AutoWidth().Padding(16.0f, 0.0f).VAlign(VAlign_Center)
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("ITEM SHOP"))).Font(UiFont(36, true)).ColorAndOpacity(FLinearColor::White)]
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("COSMETIC SHOWCASE"))).Font(UiFont(10, true)).ColorAndOpacity(Orange)]
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK CREDITS"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)[SNew(STextBlock).Text(FText::FromString(TEXT("0"))).Font(UiFont(24, true)).ColorAndOpacity(FLinearColor::White)]
-					]
-				]
-			]
-		]
-		+ SOverlay::Slot().Padding(44.0f, 142.0f, 44.0f, 104.0f)
-		[
-			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight()
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(STextBlock).Text(FText::FromString(TEXT("FEATURED"))).Font(UiFont(18, true)).ColorAndOpacity(FLinearColor::White)]
-				+ SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text(FText::FromString(TEXT("STORE PREVIEW  /  COMING SOON"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
-			]
-			+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 13.0f, 0.0f, 0.0f)
-			[
-				SNew(SUniformGridPanel)
-				.SlotPadding(FMargin(8.0f, 0.0f))
-				+ SUniformGridPanel::Slot(0, 0)[BuildShopItemCard(TEXT("NEON CIRCUIT"), TEXT("PUCK FINISH"), TEXT("N"), Cyan)]
-				+ SUniformGridPanel::Slot(1, 0)[BuildShopItemCard(TEXT("ARENA SIGNAL"), TEXT("RIM COLOR"), TEXT("A"), Orange)]
-				+ SUniformGridPanel::Slot(2, 0)[BuildShopItemCard(TEXT("FOUNDERS MARK"), TEXT("PLAYER BANNER"), TEXT("F"), FLinearColor(0.72f, 0.38f, 1.0f, 1.0f))]
-			]
-		]
-		+ SOverlay::Slot().VAlign(VAlign_Bottom)
-		[
-			SNew(SBox).HeightOverride(82.0f)
-			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.002f, 0.007f, 0.014f, 0.93f))
-				.AccentColor(Orange.CopyWithNewOpacity(0.58f))
-				.CutSize(8.0f)
-				.BorderWidth(1.0f)
-				.Padding(FMargin(34.0f, 14.0f))
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth()
-					[
-						SNew(SBox).WidthOverride(160.0f)
-						[
-							MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]()
-							{
-								if (GameMode.IsValid()) GameMode->CloseItemShop(); else RemotePartyScreen = EFlickFrontendScreen::MainMenu;
-								return FReply::Handled();
-							}), false, false, 50.0f)
-						]
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("PURCHASES AND INVENTORY WILL ARRIVE IN A LATER MILESTONE"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)
-					]
-				]
-			]
-		];
-}
-
-TSharedRef<SWidget> SFlickGameLayer::BuildShopItemCard(
-	const FString& Name,
-	const FString& Type,
-	const FString& Mark,
-	const FLinearColor& Accent)
-{
-	TSharedRef<SWidget> Preview = SNew(SBox);
-	if (Mark == TEXT("N"))
-	{
-		Preview = SNew(SOverlay)
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-			[
-				SNew(SBox).WidthOverride(205.0f).HeightOverride(205.0f)
-				[
-					SNew(SFlickPuckDisc).TeamColor(FLinearColor(0.025f, 0.08f, 0.12f, 1.0f)).AccentColor(Accent).Selected(true).RadiusScale(1.16f)
-				]
-			]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("F"))).Font(UiFont(28, true)).ColorAndOpacity(FLinearColor::White)
-			];
-	}
-	else if (Mark == TEXT("A"))
-	{
-		Preview = SNew(SOverlay)
-			+ SOverlay::Slot().Padding(34.0f)
-			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(FLinearColor(0.01f, 0.018f, 0.025f, 1.0f))
-				.AccentColor(Accent)
-				.CutSize(24.0f)
-				.BorderWidth(4.0f)
-				[
-					SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.025f, 0.04f, 0.052f, 1.0f))
-				]
-			]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("ARENA RIM"))).Font(UiFont(14, true)).ColorAndOpacity(Accent)
-			];
-	}
-	else
-	{
-		Preview = SNew(SOverlay)
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-			[
-				SNew(SBox).WidthOverride(260.0f).HeightOverride(105.0f)
-				[
-					SNew(SFlickAngularBorder)
-					.BackgroundColor(FMath::Lerp(Panel, Accent, 0.14f))
-					.AccentColor(Accent)
-					.CutSize(17.0f)
-					.BorderWidth(2.0f)
-					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("F"))).Font(UiFont(54, true)).Justification(ETextJustify::Center).ColorAndOpacity(FLinearColor::White)
-					]
-				]
-			];
-	}
-
-	return SNew(SFlickAngularBorder)
-		.BackgroundColor(FLinearColor(0.008f, 0.016f, 0.027f, 0.98f))
-		.AccentColor(Accent)
-		.CutSize(16.0f)
-		.BorderWidth(2.0f)
-		.Padding(FMargin(18.0f))
-		[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().FillHeight(1.0f)
-				[
-					SNew(SBorder)
-					.BorderImage(WhiteBrush())
-					.BorderBackgroundColor(FMath::Lerp(FLinearColor(0.008f, 0.016f, 0.027f, 1.0f), Accent, 0.16f))
-					[
-						SNew(SOverlay)
-						+ SOverlay::Slot()[Preview]
-						+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(10.0f)
-						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("PREVIEW"))).Font(UiFont(8, true)).ColorAndOpacity(Muted)
-						]
-					]
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 15.0f, 0.0f, 0.0f)
-				[
-					SNew(STextBlock).Text(FText::FromString(Type)).Font(UiFont(9, true)).ColorAndOpacity(Accent)
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f)
-				[
-					SNew(STextBlock).Text(FText::FromString(Name)).Font(UiFont(19, true)).ColorAndOpacity(FLinearColor::White)
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
-				[
-					SNew(SBorder)
-					.BorderImage(WhiteBrush())
-					.BorderBackgroundColor(PanelRaised)
-					.Padding(FMargin(10.0f, 7.0f))
-					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("NOT YET AVAILABLE"))).Font(UiFont(8, true)).Justification(ETextJustify::Center).ColorAndOpacity(Muted)
-					]
-				]
 		];
 }

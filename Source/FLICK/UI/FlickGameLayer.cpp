@@ -116,10 +116,17 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	bFpsPreview = FParse::Param(FCommandLine::Get(), TEXT("FlickFpsPreview"));
 	bChallengesOpen = FParse::Param(FCommandLine::Get(), TEXT("FlickChallengesPreview"));
 	bSocialPanelOpen = FParse::Param(FCommandLine::Get(), TEXT("FlickSocialPreview"));
+	int32 ShopInspectPreview = INDEX_NONE;
+	if (FParse::Value(FCommandLine::Get(), TEXT("FlickShopInspect="), ShopInspectPreview)
+		&& FlickShopCatalog::Find(ShopInspectPreview)) SelectedShopItem = ShopInspectPreview;
+	int32 ShopFilterPreview = 0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("FlickShopFilter="), ShopFilterPreview))
+		SelectedShopFilter = static_cast<EFlickShopFilter>(FMath::Clamp(ShopFilterPreview, 0, 4));
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickShopOwnedPreview"))) ShopDemo.Acquire(0);
 	int32 SettingsPreviewTab = 0;
 	if (FParse::Value(FCommandLine::Get(), TEXT("FlickSettingsTab="), SettingsPreviewTab))
 	{
-		SelectedSettingsTab = static_cast<EFlickSettingsTab>(FMath::Clamp(SettingsPreviewTab, 0, static_cast<int32>(EFlickSettingsTab::QuickChat)));
+		SelectedSettingsTab = static_cast<EFlickSettingsTab>(FMath::Clamp(SettingsPreviewTab, 0, static_cast<int32>(EFlickSettingsTab::DevelopmentRanks)));
 	}
 	bLightingPreview = SelectedSettingsTab == EFlickSettingsTab::Lighting
 		&& FParse::Param(FCommandLine::Get(), TEXT("FlickLightingPreview"));
@@ -154,7 +161,8 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickPlayFormatPreview")))
 	{
-		SelectedPlayPlaylist = EFlickPlayPlaylist::Casual;
+		SelectedPlayPlaylist = FParse::Param(FCommandLine::Get(), TEXT("FlickCompetitiveFormatPreview"))
+			? EFlickPlayPlaylist::Competitive : EFlickPlayPlaylist::Casual;
 	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickPracticeMenuPreview")))
 	{
@@ -788,6 +796,7 @@ void SFlickGameLayer::Tick(
 	}
 
 	const EFlickFrontendScreen CurrentScreen = GameMode->GetFrontendScreen();
+	if (CurrentScreen != EFlickFrontendScreen::ItemShop) SelectedShopItem = INDEX_NONE;
 	if (CurrentScreen == EFlickFrontendScreen::Settings && LastFocusedScreen != EFlickFrontendScreen::Settings)
 	{
 		// Reopening from a match must not retain a menu-only preview from the previous visit.

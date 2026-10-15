@@ -1,4 +1,5 @@
 #include "Player/FlickPlayerState.h"
+#include "Core/FlickRankRules.h"
 
 #include "Core/FlickLineupRules.h"
 #include "Core/FlickPieceArchetypeRules.h"
@@ -178,7 +179,7 @@ void AFlickPlayerState::SetRankedIdentity(
 		AuthoritativeRankedRating = FMath::Clamp(
 			InAuthoritativeRating,
 			0,
-			3000);
+			FlickRankRules::MaximumRating);
 		ForceNetUpdate();
 	}
 }

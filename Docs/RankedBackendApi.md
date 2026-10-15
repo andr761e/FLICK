@@ -92,14 +92,39 @@ The request repeats the immutable registration fields and adds:
       "matches_played": 20,
       "old_tier": 3,
       "new_tier": 3,
-      "old_division": 1,
-      "new_division": 2
+      "old_division": 3,
+      "new_division": 3
     }
   ]
 }
 ```
 
 Settlement must be one database transaction: lock the registered match, return the stored response when it is already settled, update every participant once, record history, and commit the final response. A server retry uses `X-Idempotency-Key: {match_id}:result`.
+
+## Rank ladder and rating policy
+
+Canonical implementation: `Source/FLICK/Core/FlickRankRules.cpp`. See
+`Docs/CompetitiveRanks.md` for all 22 badges and thresholds. Deploy the same policy
+in the hosted service before enabling competitive matchmaking; this repository
+contains the Unreal authority adapter and local-development service, not a hosted
+HTTP service implementation.
+
+- New playlist rating: 1000. Complete five matches per playlist to receive a rank.
+- Each season/variant/team size has an independent rating. Preserve existing MMR
+  and placement counts when updating the ladder; do not reset accounts.
+- Expected score: `1 / (1 + 10^((opponentTeamMean - playerRating) / 400))`.
+- Actual score: win 1, draw 0.5, loss 0. K = 56 before the fifth completed match,
+  otherwise 32. Round `K * (actual - expected)` with Unreal's floor(x + 0.5)
+  convention. Equal established opponents give +16/-16; placements give +28/-28.
+- Clamp final rating to 0..1,000,000 (transport/storage safety bound, not a ladder
+  tier). The former 3000 ceiling is removed. Stats never influence MMR. A forfeit
+  is settled as a loss, not an additional fabricated rank penalty.
+- Tier wire values: Unranked=0, Carbon=1, Alloy=2, Tempered=3, Vector=4, Prism=5,
+  Overdrive=6, Singularity=7, Zenith=8. Division is 1..3, or 0 for Unranked/Zenith.
+- Tier and division are derived metadata, never authority over rating. Unreal
+  derives these from the trusted old/new ratings and completed-match count so an
+  obsolete service display label cannot award a wrong badge. The hosted service
+  still owns rating calculation, identity and transactional settlement.
 
 ## Server Authentication
 

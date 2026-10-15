@@ -117,6 +117,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 		MenuTargetLocation = FVector(Radius * FMath::Cos(MenuOrbitAngle), Radius * FMath::Sin(MenuOrbitAngle),
 			MenuCameraLocation.Z * ArenaFramingScale * MenuOrbitHeightScale
 			* (bOneVsOneArenaPresentation ? OneVsOneMenuHeightMultiplier : 1.0f));
+		MenuTargetLocation = MenuFocus + (MenuTargetLocation - MenuFocus) * MenuOrbitZoomScale;
 		MenuTargetRotation = UKismetMathLibrary::FindLookAtRotation(MenuTargetLocation, MenuFocus);
 	}
 	FVector TargetLocation = bMenuPresentation ? MenuTargetLocation : GetGameplayTargetLocation();

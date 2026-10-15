@@ -1,4 +1,5 @@
 #include "Player/FlickPlayerController.h"
+#include "Core/FlickRankRules.h"
 #include "Arena/FlickArenaLighting.h"
 #include "Arena/FlickTestArena.h"
 #include "Core/FlickModeRules.h"
@@ -2099,7 +2100,7 @@ void AFlickPlayerController::ClientApplyTrustedRankedProgress_Implementation(
 		if (UFlickRankingSubsystem* Ranking = GameInstance->GetSubsystem<UFlickRankingSubsystem>())
 		{
 			FFlickRankProgress Progress;
-			Progress.Rating = FMath::Clamp(Rating, 0, 3000);
+			Progress.Rating = FMath::Clamp(Rating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
 			Progress.MatchesPlayed = FMath::Max(0, MatchesPlayed);
 			Progress.Wins = FMath::Max(0, Wins);
 			Progress.Losses = FMath::Max(0, Losses);
@@ -2130,20 +2131,20 @@ void AFlickPlayerController::ClientApplyTrustedRankedUpdate_Implementation(
 			Update.MatchId = MatchId;
 			Update.Variant = Variant;
 			Update.PlayersPerTeam = FMath::Clamp(PlayersPerTeam, 1, 3);
-			Update.OldRating = FMath::Clamp(OldRating, 0, 3000);
-			Update.NewRating = FMath::Clamp(NewRating, 0, 3000);
+			Update.OldRating = FMath::Clamp(OldRating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
+			Update.NewRating = FMath::Clamp(NewRating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
 			Update.RatingDelta = Update.NewRating - Update.OldRating;
 			Update.MatchesPlayed = FMath::Max(0, MatchesPlayed);
 			Update.OldTier = static_cast<EFlickRankTier>(FMath::Clamp<int32>(
 				OldTier,
 				static_cast<int32>(EFlickRankTier::Unranked),
-				static_cast<int32>(EFlickRankTier::GrandChampion)));
+				static_cast<int32>(EFlickRankTier::Zenith)));
 			Update.NewTier = static_cast<EFlickRankTier>(FMath::Clamp<int32>(
 				NewTier,
 				static_cast<int32>(EFlickRankTier::Unranked),
-				static_cast<int32>(EFlickRankTier::GrandChampion)));
-			Update.OldDivision = FMath::Clamp(OldDivision, 0, 4);
-			Update.NewDivision = FMath::Clamp(NewDivision, 0, 4);
+				static_cast<int32>(EFlickRankTier::Zenith)));
+			Update.OldDivision = FMath::Clamp(OldDivision, 0, 3);
+			Update.NewDivision = FMath::Clamp(NewDivision, 0, 3);
 			Update.bForfeit = bForfeit;
 			Update.bAccepted = true;
 			Ranking->ApplyTrustedUpdate(Update);

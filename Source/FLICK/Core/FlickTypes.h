@@ -125,13 +125,14 @@ UENUM(BlueprintType)
 enum class EFlickRankTier : uint8
 {
 	Unranked UMETA(DisplayName = "Unranked"),
-	Bronze UMETA(DisplayName = "Bronze"),
-	Silver UMETA(DisplayName = "Silver"),
-	Gold UMETA(DisplayName = "Gold"),
-	Platinum UMETA(DisplayName = "Platinum"),
-	Diamond UMETA(DisplayName = "Diamond"),
-	Champion UMETA(DisplayName = "Champion"),
-	GrandChampion UMETA(DisplayName = "Grand Champion")
+	Carbon UMETA(DisplayName = "Carbon"),
+	Alloy UMETA(DisplayName = "Alloy"),
+	Tempered UMETA(DisplayName = "Tempered"),
+	Vector UMETA(DisplayName = "Vector"),
+	Prism UMETA(DisplayName = "Prism"),
+	Overdrive UMETA(DisplayName = "Overdrive"),
+	Singularity UMETA(DisplayName = "Singularity"),
+	Zenith UMETA(DisplayName = "Zenith")
 };
 
 UENUM(BlueprintType)

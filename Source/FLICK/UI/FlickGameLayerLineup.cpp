@@ -1707,6 +1707,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::Sound, TEXT("AUDIO"))]
 						+ SHorizontalBox::Slot().AutoWidth()[MakeSettingsTab(EFlickSettingsTab::Controls, TEXT("CONTROLS"))]
 						+ SHorizontalBox::Slot().AutoWidth().Padding(6.0f, 0.0f, 0.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::QuickChat, TEXT("QUICK CHAT"))]
+#if !UE_BUILD_SHIPPING
+						+ SHorizontalBox::Slot().AutoWidth().Padding(6.0f, 0.0f, 0.0f, 0.0f)[MakeSettingsTab(EFlickSettingsTab::DevelopmentRanks, TEXT("DEV RANKS"))]
+#endif
 					]
 					+ SVerticalBox::Slot().FillHeight(1.0f)
 					[
@@ -1716,6 +1719,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 							SNew(SOverlay)
 							+ SOverlay::Slot()
 							[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::QuickChat ? EVisibility::Visible : EVisibility::Collapsed; })[BuildQuickChatSettings()]]
+#if !UE_BUILD_SHIPPING
+							+ SOverlay::Slot()
+							[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::DevelopmentRanks ? EVisibility::Visible : EVisibility::Collapsed; })[BuildDevelopmentRankSettings()]]
+#endif
 							+ SOverlay::Slot()
 							[
 								SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Lighting ? EVisibility::Visible : EVisibility::Collapsed; })

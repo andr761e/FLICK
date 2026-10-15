@@ -1,4 +1,5 @@
 #include "Game/FlickGameState.h"
+#include "Core/FlickRankRules.h"
 
 #include "Core/FlickSeriesRules.h"
 #include "Core/FlickTeamRules.h"
@@ -725,7 +726,7 @@ void AFlickGameState::SetMatchmakingState(
 	bMatchmakingLobby = bInMatchmakingLobby;
 	bMatchmakingTimedOut = bInMatchmakingLobby && bInTimedOut;
 	bRankedMatch = bInMatchmakingLobby && bInRankedMatch;
-	RankedQueueRating = FMath::Clamp(InRankedQueueRating, 0, 3000);
+	RankedQueueRating = FMath::Clamp(InRankedQueueRating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
 	RankedSearchRange = bRankedMatch ? FMath::Max(0, InRankedSearchRange) : 0;
 	ForceNetUpdate();
 }

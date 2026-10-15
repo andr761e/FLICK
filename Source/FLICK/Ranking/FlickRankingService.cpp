@@ -1,4 +1,5 @@
 #include "Ranking/FlickRankingService.h"
+#include "Core/FlickRankRules.h"
 
 #include "Misc/ConfigCacheIni.h"
 
@@ -166,7 +167,7 @@ void FConfigFlickRankingService::SavePendingMatch(
 	GConfig->SetString(*Section, TEXT("MatchId"), *MatchId, GGameUserSettingsIni);
 	GConfig->SetInt(*Section, TEXT("Variant"), static_cast<int32>(Variant), GGameUserSettingsIni);
 	GConfig->SetInt(*Section, TEXT("PlayersPerTeam"), FMath::Clamp(PlayersPerTeam, 1, 3), GGameUserSettingsIni);
-	GConfig->SetInt(*Section, TEXT("OpponentRating"), FMath::Clamp(OpponentRating, 0, 3000), GGameUserSettingsIni);
+	GConfig->SetInt(*Section, TEXT("OpponentRating"), FMath::Clamp(OpponentRating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating), GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 }
 
@@ -191,7 +192,7 @@ bool FConfigFlickRankingService::LoadPendingMatch(
 		static_cast<int32>(EFlickMatchVariant::Classic),
 		static_cast<int32>(EFlickMatchVariant::Blitz))));
 	OutPlayersPerTeam = FMath::Clamp(OutPlayersPerTeam, 1, 3);
-	OutOpponentRating = FMath::Clamp(OutOpponentRating, 0, 3000);
+	OutOpponentRating = FMath::Clamp(OutOpponentRating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
 	return true;
 }
 

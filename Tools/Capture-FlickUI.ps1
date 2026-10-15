@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -29,8 +29,13 @@ param(
     [int]$LockerItem = -1,
     [ValidateRange(0, 4)]
     [int]$ProfilePage = 0,
-    [ValidateRange(0, 8)]
+    [ValidateRange(0, 9)]
     [int]$SettingsTab = 0,
+    [ValidateRange(-1, 5)]
+    [int]$ShopItem = -1,
+    [ValidateRange(0, 4)]
+    [int]$ShopFilter = 0,
+    [switch]$ShopOwnedPreview,
     [ValidateRange(-1, 3)]
     [int]$PracticeCategory = -1,
     [ValidateRange(0, 2)]
@@ -75,6 +80,7 @@ $previewFlags = @{
     TestArenaStates = @('-FlickTestArenaPreview', '-FlickTestArenaStatePreview')
     Play = @('-FlickModeSelectPreview')
     Format = @('-FlickModeSelectPreview', '-FlickPlayFormatPreview')
+    CompetitiveFormat = @('-FlickModeSelectPreview', '-FlickPlayFormatPreview', '-FlickCompetitiveFormatPreview')
     Profile = @('-FlickProfilePreview')
     Customize = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
     CustomizePuck = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
@@ -127,6 +133,8 @@ foreach ($screenName in $Screen) {
         ('-abslog="{0}"' -f $logPath)
     ) + $(if ($GraphicsAPI -eq 'D3D11') { @('-d3d11') } else { @() }) + $previewFlags[$screenName]
     if (-not $EnableAudio) { $arguments += '-nosound' }
+    $arguments += @("-FlickShopInspect=$ShopItem", "-FlickShopFilter=$ShopFilter")
+    if ($ShopOwnedPreview) { $arguments += '-FlickShopOwnedPreview' }
     Write-Host "Capturing $screenName at ${Width}x${Height}..."
     $previousCachePath = [Environment]::GetEnvironmentVariable('UE-LocalDataCachePath', 'Process')
     try {

@@ -1,5 +1,7 @@
 #include "Game/FlickGameMode.h"
+#include "Core/FlickRankRules.h"
 #include "Game/FlickGameModePrivate.h"
+#include "Misc/Paths.h"
 
 using namespace FlickGameModePrivate;
 
@@ -92,7 +94,7 @@ void AFlickGameMode::InitGame(
 	const FString QueueRatingOption = UGameplayStatics::ParseOption(Options, TEXT("FlickQueueRating"));
 	if (!QueueRatingOption.IsEmpty())
 	{
-		RankedQueueRating = FMath::Clamp(FCString::Atoi(*QueueRatingOption), 0, 3000);
+		RankedQueueRating = FMath::Clamp(FCString::Atoi(*QueueRatingOption), FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
 	}
 }
 
@@ -126,7 +128,7 @@ FString AFlickGameMode::InitNewPlayer(
 	{
 		IncomingRankedRatings.Add(
 			NewPlayerController,
-			FMath::Clamp(FCString::Atoi(*RankedRatingOption), 0, 3000));
+			FMath::Clamp(FCString::Atoi(*RankedRatingOption), FlickRankRules::MinimumRating, FlickRankRules::MaximumRating));
 	}
 	const FString CoordinatorAccountId = UGameplayStatics::ParseOption(Options, TEXT("FlickAccountId")).Left(128);
 	const FString CoordinatorReservation = UGameplayStatics::ParseOption(Options, TEXT("FlickReservation")).Left(512);
@@ -275,6 +277,27 @@ void AFlickGameMode::BeginPlay()
 			State->DecisiveShotPlayerSlot = 0;
 			State->DecisiveShotTurn = 7;
 			State->FinalizeAuthoritativeMatch(EFlickMatchOutcome::Player1Wins);
+			// Exercise the accepted-result UI only in an isolated capture profile.
+			// Ordinary preview launches must never overwrite the developer's MMR.
+			FString CaptureUserDir;
+			if (State->bRankedMatch && FParse::Param(FCommandLine::Get(), TEXT("FlickCaptureFrame"))
+				&& FParse::Value(FCommandLine::Get(), TEXT("UserDir="), CaptureUserDir)
+				&& FPaths::IsUnderDirectory(FPaths::ConvertRelativePathToFull(CaptureUserDir),
+					FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Saved/UICaptures"))))
+			{
+				if (auto* Ranking = GetGameInstance()->GetSubsystem<UFlickRankingSubsystem>())
+				{
+					FFlickRatingUpdate Update;
+					Update.MatchId = State->MatchId;
+					Update.Variant = State->ActiveMatchVariant;
+					Update.PlayersPerTeam = State->PlayersPerTeam;
+					Update.OldRating = 1488;
+					Update.NewRating = 1504;
+					Update.MatchesPlayed = 21;
+					Update.bAccepted = true;
+					Ranking->ApplyTrustedUpdate(Update);
+				}
+			}
 		}
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickClassSelectPreview")))

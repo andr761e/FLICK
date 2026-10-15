@@ -117,6 +117,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.6", ClampMax = "1.0"))
 	float MenuOrbitHeightScale = 0.78f;
 
+	// Dolly the rotating menu view toward its focus without changing its viewing angle.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.4", ClampMax = "1.0"))
+	float MenuOrbitZoomScale = 0.65f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.0", ClampMax = "300.0"))
 	float MenuOrbitFocusHeight = 175.0f;
 

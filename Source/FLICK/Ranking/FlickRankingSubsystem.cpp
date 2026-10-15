@@ -5,6 +5,7 @@
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
 #include "Ranking/FlickRankingService.h"
+#include "Core/FlickDevelopmentRankSettings.h"
 #include "Misc/ConfigCacheIni.h"
 
 void UFlickRankingSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -41,6 +42,17 @@ FFlickRankProgress UFlickRankingSubsystem::GetProgress(
 	return RankingService
 		? RankingService->LoadProgress(Variant, PlayersPerTeam)
 		: FFlickRankProgress();
+}
+
+FFlickRankProgress UFlickRankingSubsystem::GetDisplayProgress(const EFlickMatchVariant Variant, const int32 PlayersPerTeam) const
+{
+	return FlickDevelopmentRankSettings::ApplyToProgress(Variant, PlayersPerTeam, GetProgress(Variant, PlayersPerTeam));
+}
+
+FString UFlickRankingSubsystem::GetDisplayProgressLabel(const EFlickMatchVariant Variant, const int32 PlayersPerTeam) const
+{
+	const FString Label = FlickRankRules::GetProgressLabel(GetDisplayProgress(Variant, PlayersPerTeam));
+	return FlickDevelopmentRankSettings::GetRating(Variant, PlayersPerTeam).IsSet() ? TEXT("DEV  /  ") + Label : Label;
 }
 
 int32 UFlickRankingSubsystem::GetQueueRating(
@@ -87,15 +99,16 @@ bool UFlickRankingSubsystem::ApplyTrustedUpdate(const FFlickRatingUpdate& Update
 	{
 		return false;
 	}
-	RankingService->CacheAuthoritativeUpdate(Update);
 	LastRatingUpdate = Update;
+	FlickRankRules::RefreshRankMetadata(LastRatingUpdate);
+	RankingService->CacheAuthoritativeUpdate(LastRatingUpdate);
 	UE_LOG(
 		LogFlick,
 		Log,
 		TEXT("TRUSTED_RANKED_SNAPSHOT: match=%s delta=%+d rating=%d"),
-		*Update.MatchId,
-		Update.RatingDelta,
-		Update.NewRating);
+		*LastRatingUpdate.MatchId,
+		LastRatingUpdate.RatingDelta,
+		LastRatingUpdate.NewRating);
 	return true;
 }
 

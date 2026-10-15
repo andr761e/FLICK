@@ -16,6 +16,9 @@ public:
 	virtual void Deinitialize() override;
 
 	FFlickRankProgress GetProgress(EFlickMatchVariant Variant, int32 PlayersPerTeam) const;
+	// Menus only. Queueing and results must continue to use GetProgress.
+	FFlickRankProgress GetDisplayProgress(EFlickMatchVariant Variant, int32 PlayersPerTeam) const;
+	FString GetDisplayProgressLabel(EFlickMatchVariant Variant, int32 PlayersPerTeam) const;
 	int32 GetQueueRating(EFlickMatchVariant Variant, int32 PlayersPerTeam) const;
 	FString GetProgressLabel(EFlickMatchVariant Variant, int32 PlayersPerTeam) const;
 	void BeginRankedMatch(

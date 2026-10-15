@@ -95,6 +95,37 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
    ? FText::FromString(FString::Printf(TEXT("REMATCH WINDOW  %ds"), FMath::Max(0, FMath::CeilToInt(State->RematchDeadlineServerTime - State->GetServerWorldTimeSeconds())))) : FText::GetEmpty();
  }), 11, Brand)];
  Menu->AddSlot().AutoHeight().Padding(0, 0, 0, 12)
+ [SNew(SBox).HAlign(HAlign_Left).Visibility_Lambda([this]()
+ {
+  const auto* State = GetScoreboardGameState();
+  const auto* Ranking = GetRankingSubsystem();
+  return State && State->bRankedMatch && Ranking && Ranking->HasRatingUpdateForMatch(State->MatchId)
+   ? EVisibility::Visible : EVisibility::Collapsed;
+ })
+ [SNew(SHorizontalBox)
+  + SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 10, 0)
+  [SNew(SFlickRankBadge).Size(56).Progress_Lambda([this]()
+  {
+   const auto* Ranking = GetRankingSubsystem();
+   if (!Ranking) return FFlickRankProgress();
+   const auto& Update = Ranking->GetLastRatingUpdate();
+   return Ranking->GetProgress(Update.Variant, Update.PlayersPerTeam);
+  })]
+  + SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)
+  [Text(TAttribute<FText>::CreateLambda([this]()
+  {
+   const auto* Ranking = GetRankingSubsystem();
+   if (!Ranking) return FText::GetEmpty();
+   const auto& Update = Ranking->GetLastRatingUpdate();
+   const int32 OldIndex = Update.OldTier == EFlickRankTier::Unranked ? -1
+    : Update.OldTier == EFlickRankTier::Zenith ? 21 : (static_cast<int32>(Update.OldTier) - 1) * 3 + Update.OldDivision - 1;
+   const int32 NewIndex = FlickRankRules::GetBadgeIndex(Ranking->GetProgress(Update.Variant, Update.PlayersPerTeam));
+   const TCHAR* Change = OldIndex < 0 && NewIndex >= 0 ? TEXT("PLACEMENTS COMPLETE")
+    : NewIndex > OldIndex ? TEXT("RANK UP") : NewIndex < OldIndex ? TEXT("RANK ADJUSTED") : TEXT("COMPETITIVE RESULT");
+   return FText::FromString(FString::Printf(TEXT("%s\n%d  >  %d MMR"), Change, Update.OldRating, Update.NewRating));
+  }), 11, Paper)]
+ ]];
+ Menu->AddSlot().AutoHeight().Padding(0, 0, 0, 12)
  [Text(TAttribute<FText>::CreateLambda([this]()
  {
   const AFlickGameState* State = GetScoreboardGameState();
