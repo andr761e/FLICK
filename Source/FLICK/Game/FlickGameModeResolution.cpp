@@ -1368,7 +1368,9 @@ void AFlickGameMode::RestoreTrainingResetSnapshot()
 		{
 			Primitive->SetPhysicsLinearVelocity(FVector::ZeroVector);
 			Primitive->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
-			Primitive->PutRigidBodyToSleep();
+			// Older saved setups may include the editor's former 3-unit air gap.
+			// Let gravity establish contact rather than freezing restored pucks in air.
+			Primitive->WakeRigidBody();
 		}
 	}
 }

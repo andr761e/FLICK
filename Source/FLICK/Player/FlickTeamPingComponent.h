@@ -6,7 +6,7 @@
 
 class AFlickPiece;
 
-// Messages are delivered to teammate controllers only, never replicated globally.
+// Target pings and tactics stay private. Social quick chats reach both teams.
 UCLASS()
 class FLICK_API UFlickTeamPingComponent : public UActorComponent
 {
@@ -37,7 +37,7 @@ private:
 	void ServerPingTarget(int32 PieceId, int32 SwitchIndex);
 	UFUNCTION(Server, Reliable)
 	void ServerQuickChat(const FString& PhraseId);
-	void DeliverTeamMessage(const FString& Message);
+	void DeliverTeamMessage(const FString& Message, bool bTeamOnly = true);
 	bool CanUseQuickChat() const;
 	bool TryStartLocalCooldown();
 	FString CooldownNoticeMatchId;
@@ -45,8 +45,8 @@ private:
 	int32 QuickChatGroup = INDEX_NONE;
 	double QuickChatOpenedAt = -1000;
 	UFUNCTION(Client, Reliable)
-	void ClientReceivePing(const FString& MatchId, EFlickTeam Team, const FString& Message);
-	struct FMessage { FString MatchId; EFlickTeam Team; FString Text; double ReceivedAt; };
+	void ClientReceivePing(const FString& MatchId, EFlickTeam Team, const FString& Message, bool bTeamOnly);
+	struct FMessage { FString MatchId; EFlickTeam Team; FString Text; double ReceivedAt; EFlickTeam RecipientTeam; };
 	TArray<FMessage> Messages;
 	double LastLocalPing = -1000;
 	double LastServerPing = -1000;

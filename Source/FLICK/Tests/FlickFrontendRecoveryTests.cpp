@@ -8,6 +8,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/FlickCosmeticCatalog.h"
+#include "Core/FlickPieceArchetypeRules.h"
+#include "Misc/ConfigCacheIni.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickFrontendRecoveryTest, "FLICK.Frontend.PreviewRecovery",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -21,6 +23,9 @@ bool FFlickFrontendRecoveryTest::RunTest(const FString& Parameters)
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	auto* State = World->SpawnActor<AFlickGameState>(); World->SetGameState(State);
 	auto* Mode = World->SpawnActor<AFlickGameMode>(); Mode->GameState = State;
+	TGuardValue<FString> IsolatedConfig(GGameUserSettingsIni, FConfigCacheIni::NormalizeConfigIniPath(
+		FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Config/FrontendRecoveryAutomation.ini"))));
+	GConfig->Add(GGameUserSettingsIni, FConfigFile());
 	const auto CheckPreview = [this](AFlickPiece* Piece)
 	{
 		if (!TestNotNull(TEXT("Preview puck"), Piece)) return;
@@ -56,6 +61,14 @@ bool FFlickFrontendRecoveryTest::RunTest(const FString& Parameters)
 		Mode->UpdateLockerPreview(3.f);
 		if (!Mode->Pieces.IsEmpty()) CheckPreview(Mode->Pieces[0]);
 	}
+	Mode->ReturnToMainMenu();
+	Mode->UpdateMainMenuPresentation();
+	Mode->OpenSettings();
+	GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), *FlickCosmeticCatalog::GetConfigKey(FlickCosmeticCatalog::PuckCategoryStart), 3, GGameUserSettingsIni);
+	TestEqual(TEXT("Isolated profile contains selected skin"), FlickCosmeticCatalog::LoadPuckSkins()[0], 3);
+	Mode->UpdateMainMenuPresentation();
+	TestEqual(TEXT("Showcase still updates in menu lighting settings"), Mode->Pieces.Num(), 1);
+	if (!Mode->Pieces.IsEmpty()) TestEqual(TEXT("Skin-only changes update while previewing lighting"), Mode->Pieces[0]->GetPuckSkin(), 3);
 	World->DestroyWorld(false); GEngine->DestroyWorldContext(World);
 	return true;
 }

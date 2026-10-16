@@ -7,6 +7,9 @@ Saved/
 # Packaged game builds
 Builds/
 
+# Pitch decks, recordings and other delivery artifacts
+/Deliverables/
+
 # IDE/editor generated files
 .vs/
 .vscode/.browse.VC.db*

@@ -149,6 +149,7 @@ public:
 	FString GetLocalDisplayName() const;
 	EFlickPieceArchetype GetShowcaseArchetype() const { return LocalShowcaseArchetype; }
 	void CycleShowcaseArchetype(int32 Direction);
+	void RefreshShowcaseCosmetics();
 	const FSlateBrush* GetLocalAvatarBrush();
 	const FSlateBrush* GetAvatarBrush(const FString& UserId);
 

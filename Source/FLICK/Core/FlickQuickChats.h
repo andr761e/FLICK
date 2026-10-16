@@ -4,7 +4,7 @@
 // Stable, server-whitelisted phrases. Customization never accepts arbitrary network text.
 namespace FlickQuickChats
 {
- struct FPhrase { const TCHAR* Id; const TCHAR* Text; };
+ struct FPhrase { const TCHAR* Id; const TCHAR* Text; bool bTeamOnly = false; };
  const TArray<FPhrase>& GetPhrases();
  const FPhrase* Find(const FString& Id);
  FString GetSlot(int32 Group, int32 Slot);

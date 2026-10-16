@@ -8,6 +8,7 @@
 #include "Core/FlickLog.h"
 #include "Core/FlickMatchmakingRules.h"
 #include "Core/FlickPieceArchetypeRules.h"
+#include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickRankRules.h"
 #include "Core/FlickTeamRules.h"
 #include "Engine/Engine.h"
@@ -99,6 +100,7 @@ namespace
 	const TCHAR* FlickSocialSection = TEXT("FLICK.Social");
 	const TCHAR* FlickShowcaseSection = TEXT("FLICK.ProfileCosmetics");
 	const char* FlickShowcaseMemberDataKey = "FLICK_SHOWCASE_PUCK";
+	const char* FlickShowcaseSkinDataKey = "FLICK_SHOWCASE_SKIN";
 	constexpr int32 MaximumRecentPlayers = 12;
 	constexpr int32 MaximumRankedSearchAttempts = 5;
 
@@ -295,6 +297,11 @@ void UFlickSessionSubsystem::CycleShowcaseArchetype(const int32 Direction)
 	GConfig->SetInt(FlickShowcaseSection, TEXT("ShowcasePuck"),
 		static_cast<int32>(LocalShowcaseArchetype), GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
+	RefreshShowcaseCosmetics();
+}
+
+void UFlickSessionSubsystem::RefreshShowcaseCosmetics()
+{
 	PublishShowcaseArchetypeToParty();
 	if (ActivePurpose == EFlickSessionPurpose::Party)
 	{
@@ -324,6 +331,10 @@ void UFlickSessionSubsystem::PublishShowcaseArchetypeToParty() const
 	{
 		SteamMatchmaking()->SetLobbyMemberData(Lobby, FlickShowcaseMemberDataKey, TCHAR_TO_UTF8(*Value));
 	}
+	const FString Skin = FString::FromInt(FlickCosmeticCatalog::LoadPuckSkins()[static_cast<int32>(LocalShowcaseArchetype)]);
+	const char* ExistingSkin = SteamMatchmaking()->GetLobbyMemberData(Lobby, SteamUser()->GetSteamID(), FlickShowcaseSkinDataKey);
+	if (!ExistingSkin || Skin != UTF8_TO_TCHAR(ExistingSkin))
+		SteamMatchmaking()->SetLobbyMemberData(Lobby, FlickShowcaseSkinDataKey, TCHAR_TO_UTF8(*Skin));
 #endif
 }
 
@@ -2439,6 +2450,7 @@ void UFlickSessionSubsystem::RefreshPartyFromSession()
 
 	TArray<TPair<FString, FString>> Members;
 	TMap<FString, EFlickPieceArchetype> ShowcaseArchetypes;
+	TMap<FString, int32> ShowcaseSkins;
 	const auto AddMember = [this, &Members, &Identity, &LocalId](const FString& UserId, const FUniqueNetId* ParticipantId)
 	{
 		if (UserId.IsEmpty() || Members.ContainsByPredicate(
@@ -2494,6 +2506,8 @@ void UFlickSessionSubsystem::RefreshPartyFromSession()
 				ArchetypeValue >= 0 && ArchetypeValue < FlickPieceArchetypeRules::ArchetypeCount
 					? static_cast<EFlickPieceArchetype>(ArchetypeValue)
 					: EFlickPieceArchetype::Standard);
+			const char* PublishedSkin = SteamMatchmaking()->GetLobbyMemberData(Lobby, Member, FlickShowcaseSkinDataKey);
+			ShowcaseSkins.Add(UserId, PublishedSkin ? FCString::Atoi(UTF8_TO_TCHAR(PublishedSkin)) : 0);
 		}
 	}
 #endif
@@ -2519,8 +2533,9 @@ void UFlickSessionSubsystem::RefreshPartyFromSession()
 		// The local selection changes immediately, even before Steam echoes the
 		// updated member data back to this client.
 		ShowcaseArchetypes.Add(LocalId, LocalShowcaseArchetype);
+		ShowcaseSkins.Add(LocalId, FlickCosmeticCatalog::LoadPuckSkins()[static_cast<int32>(LocalShowcaseArchetype)]);
 	}
-	Party->Synchronize(PartyId, LeaderId, Members, LocalId, ShowcaseArchetypes);
+	Party->Synchronize(PartyId, LeaderId, Members, LocalId, ShowcaseArchetypes, ShowcaseSkins);
 	PersistentPartyId = PartyId;
 	PersistentPartySize = Party->GetMemberCount();
 	bPersistentPartyLeader = Party->IsLocalLeader();

@@ -1,13 +1,15 @@
 #include "Online/FlickPartySubsystem.h"
 
 #include "Algo/Compare.h"
+#include "Core/FlickCosmeticCatalog.h"
 
 void UFlickPartySubsystem::Synchronize(
 	const FString& InPartyId,
 	const FString& InLeaderUserId,
 	const TArray<TPair<FString, FString>>& InMembers,
 	const FString& InLocalUserId,
-	const TMap<FString, EFlickPieceArchetype>& InShowcaseArchetypes)
+	const TMap<FString, EFlickPieceArchetype>& InShowcaseArchetypes,
+	const TMap<FString, int32>& InShowcaseSkins)
 {
 	TMap<FString, int32> ExistingSlots;
 	for (const FFlickPartyMember& Member : Members)
@@ -29,6 +31,12 @@ void UFlickPartySubsystem::Synchronize(
 		Member.DisplayName = Source.Value.IsEmpty() ? TEXT("STEAM PLAYER") : Source.Value;
 		Member.bLeader = Source.Key == InLeaderUserId;
 		Member.ShowcaseArchetype = InShowcaseArchetypes.FindRef(Source.Key);
+		if (static_cast<int32>(Member.ShowcaseArchetype) < 0
+			|| static_cast<int32>(Member.ShowcaseArchetype) >= FlickPieceArchetypeRules::ArchetypeCount)
+			Member.ShowcaseArchetype = EFlickPieceArchetype::Standard;
+		const int32 Skin = InShowcaseSkins.FindRef(Source.Key);
+		Member.ShowcaseSkin = FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart
+			+ static_cast<int32>(Member.ShowcaseArchetype)).IsValidIndex(Skin) ? Skin : 0;
 		if (const int32* ExistingSlot = ExistingSlots.Find(Source.Key))
 		{
 			Member.Slot = *ExistingSlot;
@@ -67,7 +75,8 @@ void UFlickPartySubsystem::Synchronize(
 				&& Left.DisplayName == Right.DisplayName
 				&& Left.Slot == Right.Slot
 				&& Left.bLeader == Right.bLeader
-				&& Left.ShowcaseArchetype == Right.ShowcaseArchetype;
+				&& Left.ShowcaseArchetype == Right.ShowcaseArchetype
+				&& Left.ShowcaseSkin == Right.ShowcaseSkin;
 		});
 
 	PartyId = InPartyId;

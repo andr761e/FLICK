@@ -12,6 +12,7 @@ struct FFlickPartyMember
 	int32 Slot = INDEX_NONE;
 	bool bLeader = false;
 	EFlickPieceArchetype ShowcaseArchetype = EFlickPieceArchetype::Standard;
+	int32 ShowcaseSkin = 0;
 };
 
 DECLARE_MULTICAST_DELEGATE(FOnFlickPartyChanged);
@@ -32,7 +33,8 @@ public:
 		const FString& InLeaderUserId,
 		const TArray<TPair<FString, FString>>& InMembers,
 		const FString& InLocalUserId,
-		const TMap<FString, EFlickPieceArchetype>& InShowcaseArchetypes = {});
+		const TMap<FString, EFlickPieceArchetype>& InShowcaseArchetypes = {},
+		const TMap<FString, int32>& InShowcaseSkins = {});
 	void Clear();
 
 	bool IsActive() const { return !PartyId.IsEmpty() && !Members.IsEmpty(); }

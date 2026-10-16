@@ -42,6 +42,7 @@ void UFlickTeamPingComponent::TryPing(AFlickPiece* Piece, const int32 SwitchInde
 	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
 	const auto* Mode = GetWorld()->GetAuthGameMode<AFlickGameMode>();
 	if (!Controller || !Controller->IsLocalController() || !CanPing(State)
+		|| Controller->GetLocalMatchMenuScreen() != EFlickFrontendScreen::Playing
 		|| Controller->GetLocalTeam() == EFlickTeam::None || Controller->ShouldShowPrivateTeamMenu()
 		|| Controller->IsCinematicReplayPresentationActive() || Controller->IsFreeCameraActive()
 		|| Controller->IsScoreboardVisible() || (Mode && Mode->GetFrontendScreen() != EFlickFrontendScreen::Playing)) return;
@@ -101,7 +102,7 @@ void UFlickTeamPingComponent::ServerPingTarget_Implementation(const int32 PieceI
 	DeliverTeamMessage(Message);
 }
 
-void UFlickTeamPingComponent::DeliverTeamMessage(const FString& Message)
+void UFlickTeamPingComponent::DeliverTeamMessage(const FString& Message, const bool bTeamOnly)
 {
 	const auto* Sender = Cast<AFlickPlayerController>(GetOwner());
 	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
@@ -110,9 +111,9 @@ void UFlickTeamPingComponent::DeliverTeamMessage(const FString& Message)
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		auto* Recipient = Cast<AFlickPlayerController>(It->Get());
-		if (!Recipient || Recipient->GetLocalTeam() != Team) continue;
+		if (!Recipient || (bTeamOnly && Recipient->GetLocalTeam() != Team)) continue;
 		if (auto* Feed = Recipient->FindComponentByClass<UFlickTeamPingComponent>())
-			Feed->ClientReceivePing(State->MatchId, Team, Message);
+			Feed->ClientReceivePing(State->MatchId, Team, Message, bTeamOnly);
 	}
 }
 
@@ -124,6 +125,7 @@ bool UFlickTeamPingComponent::CanUseQuickChat() const
 	return Controller && Controller->IsLocalController() && CanPing(State)
 		&& Controller->GetLocalTeam() != EFlickTeam::None && !Controller->ShouldShowPrivateTeamMenu()
 		&& !Controller->IsCinematicReplayPresentationActive() && !Controller->IsScoreboardVisible()
+		&& Controller->GetLocalMatchMenuScreen() == EFlickFrontendScreen::Playing
 		&& !GetWorld()->IsPaused() && (!Mode || Mode->GetFrontendScreen() == EFlickFrontendScreen::Playing);
 }
 
@@ -189,17 +191,20 @@ void UFlickTeamPingComponent::ServerQuickChat_Implementation(const FString& Phra
 	LastServerPing = Now;
 	const auto* Phrase = FlickQuickChats::Find(PhraseId);
 	if (!Phrase) return;
-	DeliverTeamMessage(FString::Printf(TEXT("%s: %s"), *CleanName(Player->GetPlayerName()), Phrase->Text));
+	DeliverTeamMessage(FString::Printf(TEXT("[%s] %s: %s"), Phrase->bTeamOnly ? TEXT("TEAM") : TEXT("ALL"),
+		*CleanName(Player->GetPlayerName()), Phrase->Text), Phrase->bTeamOnly);
 }
 
-void UFlickTeamPingComponent::ClientReceivePing_Implementation(const FString& MatchId, EFlickTeam Team, const FString& Message)
+void UFlickTeamPingComponent::ClientReceivePing_Implementation(const FString& MatchId, EFlickTeam Team, const FString& Message, const bool bTeamOnly)
 {
 	const auto* Controller = Cast<AFlickPlayerController>(GetOwner());
 	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
-	if (!Controller || !State || Team == EFlickTeam::None || Controller->GetLocalTeam() != Team || State->MatchId != MatchId) return;
-	Messages.RemoveAll([State, Team](const FMessage& Entry)
-	{ return Entry.MatchId != State->MatchId || Entry.Team != Team; });
-	Messages.Add({MatchId, Team, Message.Left(160), GetWorld()->GetTimeSeconds()});
+	if (!Controller || !State || Team == EFlickTeam::None
+		|| (bTeamOnly && Controller->GetLocalTeam() != Team) || State->MatchId != MatchId) return;
+	const EFlickTeam RecipientTeam = Controller->GetLocalTeam();
+	Messages.RemoveAll([State, RecipientTeam](const FMessage& Entry)
+	{ return Entry.MatchId != State->MatchId || Entry.RecipientTeam != RecipientTeam; });
+	Messages.Add({MatchId, Team, Message.Left(160), GetWorld()->GetTimeSeconds(), RecipientTeam});
 	if (Messages.Num() > MaximumMessages) Messages.RemoveAt(0, Messages.Num() - MaximumMessages);
 	// Retain history after fading. A new message brings the latest five back together.
 	for (FMessage& Entry : Messages) Entry.ReceivedAt = GetWorld()->GetTimeSeconds();
@@ -217,7 +222,7 @@ float UFlickTeamPingComponent::GetOpacity(const int32 Row) const
 	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
 	if (!Messages.IsValidIndex(Row) || !Controller || !CanPing(State)) return 0;
 	const FMessage& Entry = Messages[Row];
-	if (Entry.Team != Controller->GetLocalTeam() || Entry.MatchId != State->MatchId) return 0;
+	if (Entry.RecipientTeam != Controller->GetLocalTeam() || Entry.MatchId != State->MatchId) return 0;
 	const double Age = GetWorld()->GetTimeSeconds() - Entry.ReceivedAt;
 	return FMath::Clamp(static_cast<float>((MessageLifetime - Age) / FMath::Clamp(FadeSeconds, .1f, MessageLifetime)), 0.f, 1.f);
 }

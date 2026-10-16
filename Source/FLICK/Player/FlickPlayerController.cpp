@@ -136,6 +136,7 @@ void AFlickPlayerController::PostSeamlessTravel()
 {
 	Super::PostSeamlessTravel();
 	bPuckSkinsSubmitted = false;
+	LocalMatchMenuScreen = EFlickFrontendScreen::Playing;
 
 	if (!IsGameplayActive())
 	{
@@ -763,20 +764,26 @@ void AFlickPlayerController::HandleCancelPressed()
 		}
 		TrainingDraggedPiece = nullptr;
 	}
+	if (!FlickGameMode)
+	{
+		const AFlickGameState* State = GetFlickGameState();
+		if (LocalMatchMenuScreen == EFlickFrontendScreen::Settings)
+			SetLocalMatchMenuScreen(EFlickFrontendScreen::Paused);
+		else if (LocalMatchMenuScreen == EFlickFrontendScreen::Paused)
+			SetLocalMatchMenuScreen(EFlickFrontendScreen::Playing);
+		else if (State && (State->IsGameplayActive() || State->bPrivateMatchActive))
+		{
+			if (bAimingShot) ClearAiming();
+			else if (bPrivateTeamMenuOpen) ClosePrivateTeamMenu();
+			else SetLocalMatchMenuScreen(EFlickFrontendScreen::Paused);
+		}
+		else ClearAiming();
+		return;
+	}
 	if (const AFlickGameState* State = GetFlickGameState();
 		State && State->bPrivateMatchAssignmentActive)
 	{
 		bPrivateTeamMenuOpen = true;
-		return;
-	}
-	if (!FlickGameMode)
-	{
-		const AFlickGameState* State = GetFlickGameState();
-		if (State && State->bPrivateMatchActive)
-		{
-			bPrivateTeamMenuOpen = !bPrivateTeamMenuOpen;
-		}
-		else ClearAiming();
 		return;
 	}
 
@@ -1187,6 +1194,7 @@ bool AFlickPlayerController::OwnsPieceLocally(const AFlickPiece* Piece) const
 
 bool AFlickPlayerController::CanSelectPieceLocally(const AFlickPiece* Piece) const
 {
+	if (LocalMatchMenuScreen != EFlickFrontendScreen::Playing) return false;
 	if (const AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
 		return FlickGameMode->CanSelectPieceForController(this, Piece);
@@ -1225,6 +1233,8 @@ bool AFlickPlayerController::CanSelectPieceLocally(const AFlickPiece* Piece) con
 void AFlickPlayerController::SubmitLocalPuckSkins()
 {
 	if (!IsLocalController()) return;
+	if (UFlickSessionSubsystem* Sessions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UFlickSessionSubsystem>() : nullptr)
+		Sessions->RefreshShowcaseCosmetics();
 	ServerSetPuckSkins(FlickCosmeticCatalog::LoadPuckSkins());
 	SubmitLocalPuckEffects();
 	bPuckSkinsSubmitted = GetPlayerState<AFlickPlayerState>() != nullptr;
@@ -1265,6 +1275,7 @@ void AFlickPlayerController::ServerSetPuckSkins_Implementation(const TArray<int3
 
 bool AFlickPlayerController::IsGameplayActive() const
 {
+	if (LocalMatchMenuScreen != EFlickFrontendScreen::Playing) return false;
 	if (const AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{
 		return FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing;
@@ -1523,11 +1534,30 @@ void AFlickPlayerController::UpdateLocalTurnAudio()
 
 bool AFlickPlayerController::ShouldShowPrivateTeamMenu() const
 {
+	if (LocalMatchMenuScreen != EFlickFrontendScreen::Playing) return false;
 	const AFlickGameState* State = GetFlickGameState();
 	if (!State || !State->bPrivateMatchActive) return false;
 	if (State->bSeriesComplete && State->MatchPhase == EFlickMatchPhase::RoundOver) return false;
 	const AFlickPlayerState* LocalState = GetPlayerState<AFlickPlayerState>();
 	return bPrivateTeamMenuOpen || (LocalState && !LocalState->HasChosenPrivateRole());
+}
+
+void AFlickPlayerController::SetLocalMatchMenuScreen(const EFlickFrontendScreen Screen)
+{
+	if (Screen != EFlickFrontendScreen::Playing && Screen != EFlickFrontendScreen::Paused
+		&& Screen != EFlickFrontendScreen::Settings) return;
+	LocalMatchMenuScreen = Screen;
+	if (Screen != EFlickFrontendScreen::Playing)
+	{
+		ClearAiming();
+		ClearHoveredPiece();
+		bScoreboardVisible = false;
+		bPrivateTeamMenuOpen = false;
+		bShowMouseCursor = true;
+		FInputModeGameAndUI InputMode;
+		InputMode.SetHideCursorDuringCapture(false);
+		if (GetLocalPlayer()) SetInputMode(InputMode);
+	}
 }
 
 void AFlickPlayerController::CyclePrivateSpectatorPlayer(const int32 Direction)

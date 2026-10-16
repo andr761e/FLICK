@@ -40,6 +40,19 @@ bool FFlickPartySubsystemStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A friend's new display puck propagates without changing their slot"), Friend && Friend->ShowcaseArchetype == EFlickPieceArchetype::Bouncer);
 	TestEqual(TEXT("Member slots remain stable when Steam changes participant order"),
 		Friend ? Friend->Slot : INDEX_NONE, FriendSlot);
+	int32 Changes = 0;
+	Party->OnPartyChanged.AddLambda([&Changes]() { ++Changes; });
+	TMap<FString, int32> Skins;
+	Skins.Add(TEXT("200"), 3);
+	Party->Synchronize(TEXT("party-a"), TEXT("200"), Members, TEXT("100"), ShowcasePucks, Skins);
+	TestEqual(TEXT("Skin-only change notifies the frontend"), Changes, 1);
+	TestEqual(TEXT("Friend's selected skin propagates"), Party->GetMemberByUserId(TEXT("200"))->ShowcaseSkin, 3);
+	Party->Synchronize(TEXT("party-a"), TEXT("200"), Members, TEXT("100"), ShowcasePucks, Skins);
+	TestEqual(TEXT("Identical refresh does not rebuild the preview"), Changes, 1);
+	Skins[TEXT("200")] = 999;
+	Party->Synchronize(TEXT("party-a"), TEXT("200"), Members, TEXT("100"), ShowcasePucks, Skins);
+	TestEqual(TEXT("Invalid published skin falls back safely"), Party->GetMemberByUserId(TEXT("200"))->ShowcaseSkin, 0);
+	Party->OnPartyChanged.Clear();
 
 	Party->Clear();
 	TestFalse(TEXT("Clearing the party removes active social state"), Party->IsActive());

@@ -37,8 +37,8 @@ bool FFlickTeamPingTest::RunTest(const FString& Parameters)
 	Feed->ServerPingTarget_Implementation(10, INDEX_NONE);
 	TestTrue(TEXT("Server formats target puck type"), Feed->GetMessage(0).Contains(TEXT("Heavy")));
 	// Even an incorrectly delivered message is rejected by opposing clients.
-	Enemy->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, TEXT("Target"));
-	Spectator->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, TEXT("Target"));
+	Enemy->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, TEXT("Target"), true);
+	Spectator->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, TEXT("Target"), true);
 	TestTrue(TEXT("Sender sees ping"), Feed->HasMessages()); TestTrue(TEXT("Teammate sees ping"), Mate->HasMessages());
 	TestFalse(TEXT("Enemy cannot receive team feed"), Enemy->HasMessages()); TestFalse(TEXT("Spectator cannot receive team feed"), Spectator->HasMessages());
 	const int32 Count = Feed->Messages.Num();
@@ -106,14 +106,15 @@ bool FFlickTeamPingTest::RunTest(const FString& Parameters)
 	Feed->Messages[0].ReceivedAt -= 2;
 	TestFalse(TEXT("Switch message expires"), Feed->HasMessages());
 	State->MatchId = TEXT("new-match"); TestFalse(TEXT("Old match feed cleared from view"), Mate->HasMessages());
-	// Quick chats use the same private delivery, lifetime and anti-spam budget.
+	// Social chats reach both teams, with the same lifetime and anti-spam budget.
 	Feed->Messages.Reset(); Mate->Messages.Reset();
 	Feed->LastServerPing -= 3;
 	Feed->ServerQuickChat_Implementation(TEXT("NiceShot"));
-	TestEqual(TEXT("Quick chat is server formatted"), Feed->GetMessage(0), FString(TEXT("Player0: Nice shot!")));
+	TestEqual(TEXT("Quick chat is server formatted"), Feed->GetMessage(0), FString(TEXT("[ALL] Player0: Nice shot!")));
 	TestTrue(TEXT("Teammate receives quick chat"), Mate->HasMessages());
-	TestFalse(TEXT("Enemy cannot see quick chat"), Enemy->HasMessages());
-	TestFalse(TEXT("Spectator cannot see quick chat"), Spectator->HasMessages());
+	TestTrue(TEXT("Enemy sees social quick chat"), Enemy->HasMessages());
+	TestTrue(TEXT("Spectator sees social quick chat"), Spectator->HasMessages());
+	TestEqual(TEXT("Opponent sees sender's team colour"), Enemy->GetMessageTeam(0), EFlickTeam::Player1);
 	Feed->ServerQuickChat_Implementation(TEXT("Thanks"));
 	Feed->ServerPingTarget_Implementation(INDEX_NONE, 0);
 	TestEqual(TEXT("Quick chats and pings share cooldown"), Feed->Messages.Num(), 1);
@@ -162,22 +163,36 @@ bool FFlickTeamPingTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Notice disappears when ready"), Feed->GetCooldownNotice().IsEmpty());
 	for (int32 Index = 0; Index < 6; ++Index)
 	{
-		Feed->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, FString::Printf(TEXT("History%d"), Index));
+		Feed->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, FString::Printf(TEXT("History%d"), Index), true);
 		for (auto& Entry : Feed->Messages) Entry.ReceivedAt -= 8;
 		TestFalse(TEXT("History fades without being removed"), Feed->HasMessages());
 	}
 	TestEqual(TEXT("History retains only five messages"), Feed->Messages.Num(), 5);
-	Feed->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, TEXT("Newest"));
+	Feed->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, TEXT("Newest"), true);
 	TestEqual(TEXT("Oldest message is evicted"), Feed->GetMessage(0), FString(TEXT("History2")));
 	TestEqual(TEXT("Newest message appears at bottom"), Feed->GetMessage(4), FString(TEXT("Newest")));
 	for (int32 Row = 0; Row < 5; ++Row)
 		TestEqual(TEXT("All five faded messages reappear at full opacity"), Feed->GetOpacity(Row), 1.f);
 	State->MatchId = TEXT("history-next-match");
-	Feed->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, TEXT("Fresh match"));
+	Feed->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player1, TEXT("Fresh match"), true);
 	TestEqual(TEXT("Previous match history is not revived"), Feed->Messages.Num(), 1);
 	Controllers[0]->GetPlayerState<AFlickPlayerState>()->SetTeam(EFlickTeam::Player2);
-	Feed->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player2, TEXT("Fresh team"));
+	Feed->ClientReceivePing_Implementation(State->MatchId, EFlickTeam::Player2, TEXT("Fresh team"), true);
 	TestEqual(TEXT("Previous team history is not revived"), Feed->Messages.Num(), 1);
+	Controllers[0]->GetPlayerState<AFlickPlayerState>()->SetTeam(EFlickTeam::Player1);
+	Feed->Messages.Reset(); Mate->Messages.Reset(); Enemy->Messages.Reset(); Spectator->Messages.Reset();
+	Feed->LastServerPing -= 3;
+	Feed->ServerQuickChat_Implementation(TEXT("GotIt"));
+	TestTrue(TEXT("Tactical chat reaches teammates"), Mate->HasMessages());
+	TestFalse(TEXT("Tactical chat never reaches opponents"), Enemy->HasMessages());
+	TestFalse(TEXT("Tactical chat never reaches spectators"), Spectator->HasMessages());
+	Feed->LastServerPing -= 3;
+	Feed->ServerQuickChat_Implementation(TEXT("GreatPlay"));
+	TestTrue(TEXT("Great play reaches the opposing team"), Enemy->GetMessage(0).Contains(TEXT("Great play!")));
+	TestEqual(TEXT("Public chat preserves preceding team history"), Feed->Messages.Num(), 2);
+	Controllers[0]->SetLocalMatchMenuScreen(EFlickFrontendScreen::Paused);
+	Feed->QuickChatInput(0);
+	TestEqual(TEXT("Remote pause menu blocks chooser"), Feed->GetQuickChatGroup(), INDEX_NONE);
 	World->DestroyWorld(false); GEngine->DestroyWorldContext(World); return true;
 }
 #endif

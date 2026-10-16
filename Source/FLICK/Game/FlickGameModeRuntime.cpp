@@ -1167,7 +1167,9 @@ void AFlickGameMode::ApplyMatchConfiguration(
 
 void AFlickGameMode::UpdateMainMenuPresentation()
 {
-	if (FrontendScreen != EFlickFrontendScreen::MainMenu || bNetworkMatchRequested)
+	const bool bMenuShowcase = FrontendScreen == EFlickFrontendScreen::MainMenu
+		|| (FrontendScreen == EFlickFrontendScreen::Settings && SettingsReturnScreen == EFlickFrontendScreen::MainMenu);
+	if (!bMenuShowcase || bNetworkMatchRequested)
 	{
 		return;
 	}
@@ -1184,14 +1186,16 @@ void AFlickGameMode::UpdateMainMenuPresentation()
 	const UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem();
 	FString RosterKey;
 	TArray<EFlickPieceArchetype> DisplayArchetypes;
+	TArray<int32> DisplaySkins;
 	if (Party && Party->IsActive())
 	{
 		for (const FFlickPartyMember& Member : Party->GetMembers())
 		{
 			if (DisplayArchetypes.Num() >= 6) break;
 			DisplayArchetypes.Add(Member.ShowcaseArchetype);
-			RosterKey += FString::Printf(TEXT("%s:%d|"), *Member.UserId,
-				static_cast<int32>(Member.ShowcaseArchetype));
+			DisplaySkins.Add(Member.ShowcaseSkin);
+			RosterKey += FString::Printf(TEXT("%s:%d:%d|"), *Member.UserId,
+				static_cast<int32>(Member.ShowcaseArchetype), Member.ShowcaseSkin);
 		}
 	}
 	else
@@ -1199,7 +1203,9 @@ void AFlickGameMode::UpdateMainMenuPresentation()
 		const EFlickPieceArchetype LocalArchetype = Sessions
 			? Sessions->GetShowcaseArchetype() : EFlickPieceArchetype::Standard;
 		DisplayArchetypes.Add(LocalArchetype);
-		RosterKey = FString::Printf(TEXT("SOLO:%d"), static_cast<int32>(LocalArchetype));
+		const int32 Skin = FlickCosmeticCatalog::LoadPuckSkins()[static_cast<int32>(LocalArchetype)];
+		DisplaySkins.Add(Skin);
+		RosterKey = FString::Printf(TEXT("SOLO:%d:%d"), static_cast<int32>(LocalArchetype), Skin);
 	}
 	if (bMenuPartyDisplayInitialized && MenuPartyRosterKey == RosterKey)
 	{
@@ -1221,6 +1227,7 @@ void AFlickGameMode::UpdateMainMenuPresentation()
 		{
 			Piece->EnableTestArenaVisuals();
 			Piece->SetCosmeticPreview(true);
+			Piece->SetPuckSkin(DisplaySkins[Index]);
 			Piece->BeginReplayPresentation();
 		}
 	}

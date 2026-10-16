@@ -7,18 +7,18 @@ namespace FlickQuickChats
  const TArray<FPhrase>& GetPhrases()
  {
   static const TArray<FPhrase> Phrases = {
-   {TEXT("GotIt"), TEXT("I got it!")}, {TEXT("TakeShot"), TEXT("Take the shot!")},
-   {TEXT("Defending"), TEXT("Defending!")}, {TEXT("Switch"), TEXT("Going for the switch!")},
+   {TEXT("GotIt"), TEXT("I got it!"), true}, {TEXT("TakeShot"), TEXT("Take the shot!"), true},
+   {TEXT("Defending"), TEXT("Defending!"), true}, {TEXT("Switch"), TEXT("Going for the switch!"), true},
    {TEXT("NiceShot"), TEXT("Nice shot!")}, {TEXT("GreatPlay"), TEXT("Great play!")},
    {TEXT("NiceSave"), TEXT("What a save!")}, {TEXT("CloseOne"), TEXT("Close one!")},
    {TEXT("Thanks"), TEXT("Thanks!")}, {TEXT("Sorry"), TEXT("Sorry!")},
    {TEXT("NoProblem"), TEXT("No problem.")}, {TEXT("MyBad"), TEXT("My bad!")},
    {TEXT("GoodGame"), TEXT("Good game!")}, {TEXT("WellPlayed"), TEXT("Well played!")},
    {TEXT("GoodLuck"), TEXT("Good luck!")}, {TEXT("Rematch"), TEXT("Rematch?")},
-   {TEXT("Help"), TEXT("Need some help!")}, {TEXT("Careful"), TEXT("Careful near the edge!")},
-   {TEXT("NiceKO"), TEXT("Nice knockout!")}, {TEXT("YourTurn"), TEXT("Your turn!")},
-   {TEXT("GreatPass"), TEXT("Great pass!")}, {TEXT("Ready"), TEXT("Ready!")},
-   {TEXT("HoldOn"), TEXT("Hold on!")}, {TEXT("Teamwork"), TEXT("Great teamwork!")}
+   {TEXT("Help"), TEXT("Need some help!"), true}, {TEXT("Careful"), TEXT("Careful near the edge!"), true},
+   {TEXT("NiceKO"), TEXT("Nice knockout!")}, {TEXT("YourTurn"), TEXT("Your turn!"), true},
+   {TEXT("GreatPass"), TEXT("Great pass!")}, {TEXT("Ready"), TEXT("Ready!"), true},
+   {TEXT("HoldOn"), TEXT("Hold on!"), true}, {TEXT("Teamwork"), TEXT("Great teamwork!")}
   };
   return Phrases;
  }

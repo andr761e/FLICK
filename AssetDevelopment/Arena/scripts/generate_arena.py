@@ -1,10 +1,13 @@
 """Generate the modular Switchyard arena workshop with no Blender add-ons."""
 import bpy, json, math, re
+import sys
 from pathlib import Path
 from mathutils import Vector
 
 ROOT=Path(__file__).resolve().parents[1]
 PROJECT=ROOT.parents[1]
+sys.path.insert(0, str(PROJECT/'Tools'))
+from FlickMeshCleanup import optimize_planar_mesh, export_compact_fbx
 SOURCE=(PROJECT/'Source/FLICK/Arena/FlickTestArena.h').read_text()
 ARENA_SOURCE=(PROJECT/'Source/FLICK/Game/FlickGameMode.h').read_text()
 
@@ -153,11 +156,12 @@ def join_asset(name,objects,origin=(0,0,0)):
     return result
 
 def export_asset(obj):
+    optimize_planar_mesh(obj)
     exports=ROOT/'exports'; exports.mkdir(parents=True,exist_ok=True)
     saved_location=obj.location.copy(); saved_rotation=obj.rotation_euler.copy()
     obj.location=(0,0,0); obj.rotation_euler=(0,0,0)
     bpy.ops.object.select_all(action='DESELECT'); obj.select_set(True); bpy.context.view_layer.objects.active=obj
-    bpy.ops.export_scene.fbx(filepath=str(exports/(obj.name+'.fbx')),use_selection=True,
+    export_compact_fbx(filepath=str(exports/(obj.name+'.fbx')),use_selection=True,
         object_types={'MESH'},add_leaf_bones=False,axis_forward='-Y',axis_up='Z',mesh_smooth_type='FACE')
     bpy.ops.export_scene.gltf(filepath=str(exports/(obj.name+'.glb')),use_selection=True,export_format='GLB')
     obj.location=saved_location; obj.rotation_euler=saved_rotation
@@ -384,6 +388,6 @@ manifest={'arena_radius_cm':arena_radius*100,'arena_thickness_cm':arena_thicknes
           'divider_radial_inset_fraction':divider_radial_inset_fraction,
           'possible_locations':locations,'exports':[asset.name for asset in assets]}
 (ROOT/'dimensions.json').write_text(json.dumps(manifest,indent=2))
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'TestArenaWorkshop.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'TestArenaWorkshop.blend'), compress=True)
 bpy.ops.render.render(write_still=True)
 print('FLICK_TEST_ARENA_GENERATION_COMPLETE',len(assets),'assets',len(locations),'locations')

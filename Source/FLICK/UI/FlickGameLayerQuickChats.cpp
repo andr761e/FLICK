@@ -5,7 +5,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildQuickChatSettings()
 {
 	if (QuickChatPhraseOptions.IsEmpty())
 		for (const auto& Phrase : FlickQuickChats::GetPhrases()) QuickChatPhraseOptions.Add(MakeShared<FString>(Phrase.Id));
-	const auto Label = [](const FString& Id) { const auto* Phrase = FlickQuickChats::Find(Id); return FText::FromString(Phrase ? Phrase->Text : TEXT("")); };
+	const auto Label = [](const FString& Id) { const auto* Phrase = FlickQuickChats::Find(Id); return Phrase ? FText::FromString(FString::Printf(TEXT("[%s] %s"), Phrase->bTeamOnly ? TEXT("TEAM") : TEXT("ALL"), Phrase->Text)) : FText::GetEmpty(); };
 	TSharedRef<SUniformGridPanel> Groups = SNew(SUniformGridPanel).SlotPadding(FMargin(6));
 	for (int32 Group = 0; Group < 4; ++Group)
 	{
@@ -32,7 +32,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildQuickChatSettings()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("QUICK CHAT"))).Font(DisplayFont(25)).ColorAndOpacity(Paper)]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 12)
-		[SNew(STextBlock).Text(FText::FromString(TEXT("Press a group key, then a choice key to send. Team-only, with the same colour, fade and 2-second cooldown as pings. Escape cancels; groups close after 3 seconds. Rebind keys in Controls."))).AutoWrapText(true).Font(UiFont(11)).ColorAndOpacity(Muted)]
+		[SNew(STextBlock).Text(FText::FromString(TEXT("Press a group key, then a choice key to send. [TEAM] tactics stay private. [ALL] reactions and sportsmanship reach both teams and spectators. Chats share the ping cooldown. Escape cancels; groups close after 3 seconds. Rebind keys in Controls."))).AutoWrapText(true).Font(UiFont(11)).ColorAndOpacity(Muted)]
 		+ SVerticalBox::Slot().AutoHeight()[Groups]
 		+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(6, 12)
 		[SNew(SBox).WidthOverride(280)[MakeMenuButton(TEXT("RESTORE QUICK CHAT DEFAULTS"), FOnClicked::CreateLambda([]() { FlickQuickChats::Reset(); return FReply::Handled(); }), false, false, 44)]];

@@ -70,6 +70,9 @@ public:
 	bool ShouldShowPrivateTeamMenu() const;
 	void ClosePrivateTeamMenu() { bPrivateTeamMenuOpen = false; }
 	void OpenPrivateTeamMenu() { bPrivateTeamMenuOpen = true; }
+	// Client-local menu state. Opening it must never pause the server's match.
+	EFlickFrontendScreen GetLocalMatchMenuScreen() const { return LocalMatchMenuScreen; }
+	void SetLocalMatchMenuScreen(EFlickFrontendScreen Screen);
 	void CyclePrivateSpectatorPlayer(int32 Direction);
 	FString GetPrivateSpectatorTargetName() const;
 	bool IsPrivateMatchSpectator() const;
@@ -312,6 +315,7 @@ private:
 	TObjectPtr<AFlickPiece> HoveredPiece;
 	TWeakObjectPtr<AFlickPiece> InspectedPiece;
 	bool bPuckSkinsSubmitted = false;
+	EFlickFrontendScreen LocalMatchMenuScreen = EFlickFrontendScreen::Playing;
 
 	UPROPERTY()
 	TObjectPtr<AFlickPiece> PredictedContactPiece;

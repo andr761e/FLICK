@@ -93,6 +93,28 @@ bool FFlickTrainingUndoTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Normal matches cannot undo"), Mode->UndoTrainingShot());
 	Mode->bTrainingMode = true; Mode->ResetTrainingBoard();
 	TestFalse(TEXT("Saved setup reset invalidates shot history"), Mode->CanUndoTrainingShot());
+	// An untouched, sleeping editor puck used to hover 3 units above the table,
+	// making the airborne guard hold every subsequent shot in ResolvingPhysics.
+	Mode->DestroyPieces();
+	Mode->ActiveMatchVariant = EFlickMatchVariant::Classic;
+	Mode->SelectedMatchVariant = EFlickMatchVariant::Classic;
+	Mode->bTrainingEditMode = true;
+	State->SetMatchPhase(EFlickMatchPhase::Aiming);
+	TestTrue(TEXT("Place first editor puck"), Mode->PlaceTrainingPuck(FVector(-150, 0, 250)));
+	TestTrue(TEXT("Place untouched editor puck"), Mode->PlaceTrainingPuck(FVector(150, 0, 250)));
+	TestTrue(TEXT("All sleeping placements already contact the table"), Mode->AreActivePiecesSettled());
+	AFlickPiece* Edited = Mode->Pieces[0];
+	TestTrue(TEXT("Begin dragging an editor puck"), Mode->BeginTrainingPuckMove(Edited));
+	TestTrue(TEXT("Move editor puck"), Mode->MoveTrainingPuck(Edited, FVector(-180, 50, 250)));
+	Mode->ToggleTrainingEditMode();
+	TestTrue(TEXT("Leaving editor finishes held drag and settles the board"), Mode->AreActivePiecesSettled());
+	TestTrue(TEXT("Shot after editing can launch"), Mode->TryLaunchPiece(Edited, FVector::ForwardVector, .1f));
+	Edited->SettleFlatOnTabletop(Mode->ArenaSurfaceZ);
+	TestTrue(TEXT("Untouched puck no longer prevents resolution"), Mode->AreActivePiecesSettled());
+	Mode->FinishPhysicsResolution(false);
+	TestEqual(TEXT("Shot returns to aiming without a timeout"), State->MatchPhase, EFlickMatchPhase::Aiming);
+	TestTrue(TEXT("Second shot remains available"), Mode->TryLaunchPiece(Edited, FVector::ForwardVector, .1f));
+	Mode->FinishPhysicsResolution(false);
 	World->DestroyWorld(false); GEngine->DestroyWorldContext(World);
 	return true;
 }

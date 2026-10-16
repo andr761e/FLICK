@@ -224,6 +224,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 							{
 								return FText::FromString(TEXT("CHANGE CLASS  (QUEUED)"));
 							}
+							if (Label == TEXT("FORFEIT") && !GameMode.IsValid()) return FText::FromString(TEXT("LEAVE MATCH"));
 							return FText::FromString(Label == TEXT("FORFEIT")
 								&& GameMode.IsValid()
 								&& GameMode->IsTrainingMode()
@@ -264,7 +265,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
 					[
-						MakePauseButton(TEXT("RESUME"), false, FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->TogglePauseMenu(); return FReply::Handled(); }))
+						MakePauseButton(TEXT("RESUME"), false, FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->TogglePauseMenu(); else if (PlayerController.IsValid()) PlayerController->SetLocalMatchMenuScreen(EFlickFrontendScreen::Playing); return FReply::Handled(); }))
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
 					[
@@ -291,6 +292,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 							MakePauseButton(TEXT("CHANGE TEAM / SPECTATE"), false, FOnClicked::CreateLambda([this]()
 							{
 								if (GameMode.IsValid()) GameMode->TogglePauseMenu();
+								else if (PlayerController.IsValid()) PlayerController->SetLocalMatchMenuScreen(EFlickFrontendScreen::Playing);
 								if (PlayerController.IsValid()) PlayerController->OpenPrivateTeamMenu();
 								return FReply::Handled();
 							}))
@@ -298,11 +300,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
 					[
-						MakePauseButton(TEXT("SETTINGS"), false, FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->OpenSettings(); return FReply::Handled(); }))
+						MakePauseButton(TEXT("SETTINGS"), false, FOnClicked::CreateLambda([this]() { bLightingPreview = false; if (GameMode.IsValid()) GameMode->OpenSettings(); else if (PlayerController.IsValid()) PlayerController->SetLocalMatchMenuScreen(EFlickFrontendScreen::Settings); return FReply::Handled(); }))
 					]
 					+ SVerticalBox::Slot().AutoHeight()
 					[
-						MakePauseButton(TEXT("FORFEIT"), true, FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->ReturnToMainMenu(); return FReply::Handled(); }))
+						MakePauseButton(TEXT("FORFEIT"), true, FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->ReturnToMainMenu(); else if (PlayerController.IsValid()) PlayerController->LeaveNetworkSession(); return FReply::Handled(); }))
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 20.0f, 0.0f, 0.0f)
 					[
@@ -738,6 +740,9 @@ TSharedRef<SWidget> SFlickGameLayer::MakeCycleRow(
 
 EVisibility SFlickGameLayer::GetScreenVisibility(const EFlickFrontendScreen Screen) const
 {
+	if (!GameMode.IsValid() && PlayerController.IsValid()
+		&& PlayerController->GetLocalMatchMenuScreen() != EFlickFrontendScreen::Playing)
+		return Screen == PlayerController->GetLocalMatchMenuScreen() ? EVisibility::Visible : EVisibility::Collapsed;
 	const AFlickGameState* State = GetScoreboardGameState();
 	const AFlickPlayerState* LocalPlayerState = PlayerController.IsValid()
 		? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;

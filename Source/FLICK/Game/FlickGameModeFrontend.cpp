@@ -1445,6 +1445,9 @@ void AFlickGameMode::ToggleTrainingEditMode()
 	}
 	else
 	{
+		// Also finish an in-progress drag before saving the setup (e.g. the editor
+		// toggle was pressed while the mouse button was still held).
+		for (AFlickPiece* Piece : Pieces) FinishTrainingPuckMove(Piece);
 		CaptureTrainingResetSnapshot();
 		bTrainingEditMode = false;
 		if (TestArenaActor)
@@ -1616,7 +1619,9 @@ bool AFlickGameMode::PlaceTrainingPuck(const FVector& WorldLocation)
 	{
 		return false;
 	}
-	PlacementLocation.Z = ArenaSurfaceZ + PlacementThickness * 0.5f + 3.0f;
+	// Editor placements are put to sleep below. They must already touch the table,
+	// otherwise an untouched puck can remain suspended and block shot resolution.
+	PlacementLocation.Z = ArenaSurfaceZ + PlacementThickness * 0.5f;
 
 	AFlickPiece* Piece = SpawnPiece(
 		TrainingPlacementTeam,
@@ -1697,9 +1702,7 @@ void AFlickGameMode::FinishTrainingPuckMove(AFlickPiece* Piece)
 		Primitive->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		Primitive->SetSimulatePhysics(true);
 		Piece->ApplyPhysicsSettings();
-		Primitive->SetPhysicsLinearVelocity(FVector::ZeroVector);
-		Primitive->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
-		Primitive->PutRigidBodyToSleep();
+		Piece->SettleFlatOnTabletop(ArenaSurfaceZ);
 	}
 	Piece->ForceNetUpdate();
 }

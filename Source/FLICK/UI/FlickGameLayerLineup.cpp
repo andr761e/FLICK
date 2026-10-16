@@ -1849,7 +1849,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 					+ SVerticalBox::Slot().AutoHeight()
 					[
 						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(150.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { RefreshDisplayOptions(); if (GameMode.IsValid()) GameMode->CloseSettings(); else RemotePartyScreen = EFlickFrontendScreen::MainMenu; return FReply::Handled(); }), false, false, 52.0f)]]
+						+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(150.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]() { RefreshDisplayOptions(); if (GameMode.IsValid()) GameMode->CloseSettings(); else if (PlayerController.IsValid() && PlayerController->GetLocalMatchMenuScreen() == EFlickFrontendScreen::Settings) PlayerController->SetLocalMatchMenuScreen(EFlickFrontendScreen::Paused); else RemotePartyScreen = EFlickFrontendScreen::MainMenu; return FReply::Handled(); }), false, false, 52.0f)]]
 						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(24.0f, 0.0f)
 						[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(SelectedSettingsTab == EFlickSettingsTab::Controls
 								? TEXT("Controls save immediately.") : (SelectedSettingsTab == EFlickSettingsTab::Display ? TEXT("Apply display mode, resolution, V-Sync and FPS changes.") : TEXT("Changes to this tab save immediately."))); }).Font(UiFont(11)).ColorAndOpacity(Muted)]

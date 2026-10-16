@@ -6,6 +6,7 @@ is not part of either export; it is imported only into the Blender preview.
 
 import json
 import math
+import sys
 from pathlib import Path
 
 import bpy
@@ -13,6 +14,8 @@ from mathutils import Vector
 
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT.parents[1] / 'Tools'))
+from FlickMeshCleanup import optimize_planar_mesh, export_compact_fbx
 ARENA_RADIUS_M = 6.50
 ARENA_SURFACE_Z_M = 0.0
 STADIUM_FLOOR_Z_M = -0.50
@@ -249,12 +252,13 @@ def join_asset(name, objects):
 
 
 def export_asset(obj):
+    optimize_planar_mesh(obj)
     export_dir = ROOT / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.export_scene.fbx(filepath=str(export_dir / f"{obj.name}.fbx"), use_selection=True,
+    export_compact_fbx(filepath=str(export_dir / f"{obj.name}.fbx"), use_selection=True,
         object_types={"MESH"}, add_leaf_bones=False, axis_forward="-Y", axis_up="Z", mesh_smooth_type="FACE")
     bpy.ops.export_scene.gltf(filepath=str(export_dir / f"{obj.name}.glb"), use_selection=True, export_format="GLB")
 
@@ -320,6 +324,6 @@ manifest = {
     "exports": [structure_asset.name, lights_asset.name],
 }
 (ROOT / "manifest.json").write_text(json.dumps(manifest, indent=2))
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / "TestStadium.blend"))
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / "TestStadium.blend"), compress=True)
 bpy.ops.render.render(write_still=True)
 print("FLICK_TEST_STADIUM_GENERATION_COMPLETE", json.dumps(manifest))

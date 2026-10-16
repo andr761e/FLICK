@@ -9,13 +9,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPingFeed()
 	TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
 	TSharedRef<SVerticalBox> Choices = SNew(SVerticalBox);
 	Choices->AddSlot().AutoHeight().Padding(0, 0, 0, 6)
-	[SNew(STextBlock).Font(UiFont(11, true)).ColorAndOpacity(Brand).Text_Lambda([Feed]() { return FText::FromString(FString::Printf(TEXT("TEAM QUICK CHAT / %s"), FlickQuickChats::GroupName(Feed() ? Feed()->GetQuickChatGroup() : 0))); })];
+	[SNew(STextBlock).Font(UiFont(11, true)).ColorAndOpacity(Brand).Text_Lambda([Feed]() { return FText::FromString(FString::Printf(TEXT("QUICK CHAT / %s"), FlickQuickChats::GroupName(Feed() ? Feed()->GetQuickChatGroup() : 0))); })];
 	for (int32 Slot = 0; Slot < 4; ++Slot)
 		Choices->AddSlot().AutoHeight().Padding(0, 3)
 		[SNew(STextBlock).Font(UiFont(11)).ColorAndOpacity(Paper).Text_Lambda([Feed, Slot]()
 		{
 			const auto* Phrase = FlickQuickChats::Find(FlickQuickChats::GetSlot(Feed() ? Feed()->GetQuickChatGroup() : 0, Slot));
-			return FText::FromString(FString::Printf(TEXT("[%s]  %s"), *FlickControlBindings::GetKey(FlickQuickChats::ControlId(Slot)).GetDisplayName().ToString(), Phrase ? Phrase->Text : TEXT("")));
+			return FText::FromString(FString::Printf(TEXT("[%s] [%s] %s"), *FlickControlBindings::GetKey(FlickQuickChats::ControlId(Slot)).GetDisplayName().ToString(), Phrase && Phrase->bTeamOnly ? TEXT("TEAM") : TEXT("ALL"), Phrase ? Phrase->Text : TEXT("")));
 		})];
 	Rows->AddSlot().AutoHeight().Padding(0, 0, 0, 8)
 	[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Panel.CopyWithNewOpacity(.95f)).Padding(12)
