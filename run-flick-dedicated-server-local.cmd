@@ -5,7 +5,7 @@ set "PROJECT_ROOT=%~dp0"
 set "SERVER=%PROJECT_ROOT%Binaries\Win64\FLICKServer.exe"
 set "TEAM_SIZE=%~1"
 if "%TEAM_SIZE%"=="" set "TEAM_SIZE=1"
-set "MAP=/Engine/Maps/Templates/OpenWorld?FlickNetworkMatch?FlickMatchmaking?FlickRanked?FlickPlayersPerTeam=%TEAM_SIZE%"
+set "MAP=/Engine/Maps/Entry?FlickNetworkMatch?FlickMatchmaking?FlickRanked?FlickPlayersPerTeam=%TEAM_SIZE%"
 
 if not exist "%SERVER%" (
     echo FLICKServer.exe was not found. Run build-flick-dedicated-server.cmd first.

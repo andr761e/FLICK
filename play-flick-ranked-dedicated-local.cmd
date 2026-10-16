@@ -15,7 +15,7 @@ set "SERVER=%PROJECT_ROOT%Binaries\Win64\FLICKServer.exe"
 set "ENGINE_ROOT=%FLICK_UNREAL_ENGINE_ROOT%"
 if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.8"
 set "UNREAL_EDITOR=%ENGINE_ROOT%\Engine\Binaries\Win64\UnrealEditor.exe"
-set "MAP=/Engine/Maps/Templates/OpenWorld?FlickNetworkMatch?FlickMatchmaking?FlickRanked?FlickPlayersPerTeam=%TEAM_SIZE%"
+set "MAP=/Engine/Maps/Entry?FlickNetworkMatch?FlickMatchmaking?FlickRanked?FlickPlayersPerTeam=%TEAM_SIZE%"
 
 if not exist "%SERVER%" (
     echo FLICKServer.exe was not found. Run build-flick-dedicated-server.cmd first.

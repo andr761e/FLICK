@@ -16,7 +16,7 @@ set "STEAM_APP_ID=%PROJECT_ROOT%Build\Steam\steam_appid.txt"
 if not exist "%RUN_UAT%" (
     echo Unreal Automation Tool was not found at:
     echo   %RUN_UAT%
-    echo Update RUN_UAT in package-flick-development.cmd if Unreal Engine moves.
+    echo Set FLICK_UNREAL_ENGINE_ROOT to your Unreal Engine installation folder.
     exit /b 1
 )
 
@@ -42,9 +42,8 @@ call "%RUN_UAT%" BuildCookRun ^
     -platform=Win64 ^
     -clientconfig=Development ^
     -build ^
-    -nocompileeditor ^
     -cook ^
-    -map=/Engine/Maps/Templates/OpenWorld ^
+    -map=/Engine/Maps/Entry ^
     -stage ^
     -stagingdirectory="%STAGING_ROOT%" ^
     -pak ^
@@ -79,6 +78,22 @@ if not exist "%GAME_BIN%\FLICK.exe" (
 copy /Y "%STEAM_APP_ID%" "%PACKAGE_ROOT%\steam_appid.txt" >nul
 copy /Y "%STEAM_APP_ID%" "%GAME_BIN%\steam_appid.txt" >nul
 
+if /I "%FLICK_SKIP_PACKAGE_STARTUP_TEST%"=="1" goto startup_check_skipped
+echo.
+echo Verifying packaged startup offscreen with isolated profiles...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_ROOT%Tools\Test-FlickPackagedStartup.ps1" -PackageRoot "%PACKAGE_ROOT%" -TimeoutSeconds 120
+if not "%errorlevel%"=="0" (
+    echo.
+    echo Package was built, but its startup check failed. Do not distribute it.
+    echo Review Saved\PackageStartupQA for the failing log.
+    exit /b 1
+)
+goto startup_check_complete
+
+:startup_check_skipped
+echo WARNING: packaged startup test explicitly skipped by FLICK_SKIP_PACKAGE_STARTUP_TEST=1.
+
+:startup_check_complete
 echo.
 echo FLICK Development package is ready:
 echo   %PACKAGE_ROOT%

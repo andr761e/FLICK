@@ -123,14 +123,15 @@ Build `FLICKEditor`, then run:
 .\Tools\Capture-FlickUI.ps1 -Screen Home,Party,Invite -Width 1920 -Height 1080 -CaptureDelaySeconds 8
 .\Tools\Capture-FlickUI.ps1 -Screen Home -Width 3440 -Height 1440 -CaptureDelaySeconds 8
 .\Tools\Capture-FlickUI.ps1 -Screen Lighting,LightingPreview -Width 1280 -Height 720
-.\Tools\Capture-FlickUI.ps1 -Screen TestArenaStates,TestArenaSettings -SettingsTab 7 -PlayersPerTeam 2 -Width 1920 -Height 1080 -Map /Engine/Maps/Templates/OpenWorld
-.\Tools\Capture-FlickUI.ps1 -Screen TestArenaStates,TestArenaSettings -SettingsTab 7 -PlayersPerTeam 3 -Width 1920 -Height 1080 -Map /Engine/Maps/Templates/OpenWorld
+.\Tools\Capture-FlickUI.ps1 -Screen TestArenaStates,TestArenaSettings -SettingsTab 7 -PlayersPerTeam 2 -Width 1920 -Height 1080
+.\Tools\Capture-FlickUI.ps1 -Screen TestArenaStates,TestArenaSettings -SettingsTab 7 -PlayersPerTeam 3 -Width 1920 -Height 1080
 ```
 
 The helper launches Unreal offscreen, captures Slate via `Shot showui`, disables
 Steam and isolates profile saves beneath `Saved/UICaptures`. Its default Entry
-map is an empty host for the game's runtime C++ arena. Pass
-`-Map /Engine/Maps/Templates/OpenWorld` to use the project's normal startup map.
+map is an empty host for the game's runtime C++ arena, and is also the project's
+normal startup/cook map. Do not use the old OpenWorld landscape template; see
+[Packaging.md](Packaging.md) for the packaged startup regression and checks.
 The shader/cache directories stay inside the project. A cold shader cache can
 require `-TimeoutSeconds 600` on the first run.
 

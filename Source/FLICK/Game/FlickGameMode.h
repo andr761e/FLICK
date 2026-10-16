@@ -618,6 +618,7 @@ private:
 	friend class UFlickPracticeComponent;
 	friend class FFlickPracticeTest;
 	friend class FFlickFrontendRecoveryTest;
+	friend class FFlickPackagedStartupTest;
 
 	void SpawnCameraIfNeeded();
 	void SpawnAudioIfNeeded();

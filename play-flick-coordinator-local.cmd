@@ -36,7 +36,7 @@ for /L %%I in (1,1,%TOTAL_PLAYERS%) do (
     set /a ROW=(%%I-1)/3
     set /a POS_X=!COLUMN!*650
     set /a POS_Y=!ROW!*510+30
-    start "FLICK Coordinator - Player %%I" "%UNREAL_EDITOR%" "%PROJECT%" /Engine/Maps/Templates/OpenWorld -game -Multiprocess -nosteam -windowed -ResX=640 -ResY=480 -WinX=!POS_X! -WinY=!POS_Y! -NoSplash -FlickCoordinatorUrl=%COORDINATOR_URL% -FlickCoordinatorAutoQueue -FlickCoordinatorTeamSize=%TEAM_SIZE% -FlickLocalAccountId=LocalPlayer%%I -FlickVariant=%VARIANT% %RANKED_ARG% -FlickNetworkAutoReady -ExecCmds="t.MaxFPS 45"
+    start "FLICK Coordinator - Player %%I" "%UNREAL_EDITOR%" "%PROJECT%" /Engine/Maps/Entry -game -Multiprocess -nosteam -windowed -ResX=640 -ResY=480 -WinX=!POS_X! -WinY=!POS_Y! -NoSplash -FlickCoordinatorUrl=%COORDINATOR_URL% -FlickCoordinatorAutoQueue -FlickCoordinatorTeamSize=%TEAM_SIZE% -FlickLocalAccountId=LocalPlayer%%I -FlickVariant=%VARIANT% %RANKED_ARG% -FlickNetworkAutoReady -ExecCmds="t.MaxFPS 45"
 )
 
 echo.

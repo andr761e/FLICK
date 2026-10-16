@@ -204,6 +204,9 @@ void AFlickGameMode::BeginPlay()
 			RankedQueueRating,
 			bRankedRequested ? FlickRankRules::GetSearchRangeForAttempt(0) : 0);
 	}
+	// Initialize the cosmetic showcase before the first rendered frame, not on
+	// the first world tick. The menu must never present the startup match roster.
+	UpdateMainMenuPresentation();
 	if (!CoordinatorMatchId.IsEmpty())
 	{
 		if (UFlickMatchmakingCoordinatorSubsystem* Coordinator = GetFlickMatchmakingCoordinatorSubsystem())

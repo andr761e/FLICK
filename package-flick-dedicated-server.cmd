@@ -25,7 +25,7 @@ call "%RUN_UAT%" BuildCookRun ^
     -serverconfig=Development ^
     -build ^
     -cook ^
-    -map=/Engine/Maps/Templates/OpenWorld ^
+    -map=/Engine/Maps/Entry ^
     -stage ^
     -pak ^
     -archive ^

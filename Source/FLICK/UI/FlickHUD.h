@@ -82,6 +82,9 @@ public:
 	const TArray<FFlickAimArrowVisual>& GetAimArrows() const { return AimArrows; }
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FFlickPackagedStartupTest;
+#endif
 	void ObserveMatchState(const AFlickGameState& GameState, float Now);
 	void DrawTopBar(const AFlickGameState& GameState, float Width, float Now);
 	void DrawAimPresentation(const AFlickPlayerController& Controller);

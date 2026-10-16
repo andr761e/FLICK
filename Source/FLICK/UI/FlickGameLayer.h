@@ -81,6 +81,7 @@ public:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FFlickPuckInspectionTest;
+	friend class FFlickPackagedStartupTest;
 #endif
 	TSharedRef<SWidget> BuildMainMenu();
 	TSharedRef<SWidget> BuildMainMenuFooter();

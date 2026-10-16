@@ -14,7 +14,7 @@ set "PROJECT=%~dp0FLICK.uproject"
 set "ENGINE_ROOT=%FLICK_UNREAL_ENGINE_ROOT%"
 if "%ENGINE_ROOT%"=="" set "ENGINE_ROOT=C:\Program Files\Epic Games\UE_5.8"
 set "UNREAL_EDITOR=%ENGINE_ROOT%\Engine\Binaries\Win64\UnrealEditor.exe"
-set "MAP=/Engine/Maps/Templates/OpenWorld"
+set "MAP=/Engine/Maps/Entry"
 
 if not exist "%UNREAL_EDITOR%" (
     echo Unreal Editor was not found at:

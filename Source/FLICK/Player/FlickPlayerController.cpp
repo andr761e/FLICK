@@ -20,6 +20,7 @@
 #include "Game/FlickGameInstance.h"
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameState.h"
+#include "GameMapsSettings.h"
 #include "InputCoreTypes.h"
 #include "Math/RotationMatrix.h"
 #include "Misc/Base64.h"
@@ -1645,7 +1646,7 @@ void AFlickPlayerController::LeaveNetworkSession()
 			return;
 		}
 	}
-	ClientTravel(TEXT("/Engine/Maps/Templates/OpenWorld"), ETravelType::TRAVEL_Absolute);
+	ClientTravel(UGameMapsSettings::GetGameDefaultMap(), ETravelType::TRAVEL_Absolute);
 }
 
 void AFlickPlayerController::ReturnToFrontendFromServer(const bool bClearPartyIdentity)
@@ -1928,7 +1929,7 @@ void AFlickPlayerController::ClientReturnToFrontend_Implementation(const bool bC
 			return;
 		}
 	}
-	ClientTravel(TEXT("/Engine/Maps/Templates/OpenWorld"), ETravelType::TRAVEL_Absolute);
+	ClientTravel(UGameMapsSettings::GetGameDefaultMap(), ETravelType::TRAVEL_Absolute);
 }
 
 void AFlickPlayerController::ClientSetPersistentPartyIdentity_Implementation(
