@@ -1,4 +1,5 @@
 #include "Arena/FlickBobArena.h"
+#include "Arena/FlickStadiumCrowd.h"
 
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -32,6 +33,8 @@ AFlickBobArena::AFlickBobArena()
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
+	StadiumCrowd = CreateDefaultSubobject<UFlickStadiumCrowd>(TEXT("StadiumCrowd"));
+	StadiumCrowd->SetupAttachment(SceneRoot);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
@@ -355,6 +358,8 @@ void AFlickBobArena::ApplyArenaShape()
 	}
 	SetLegacyArenaPresentationVisible(!bUsingHighDetailArena);
 	const float StadiumScale = BoardHalfExtent / 620.0f;
+	// Retain the spectator design, but leave stadium seating empty for now.
+	StadiumCrowd->Configure(true, StadiumScale, SurfaceZ, false);
 	for (UStaticMeshComponent* StadiumComponent : {
 		HighDetailStadiumStructure.Get(), HighDetailStadiumLights.Get()})
 	{
@@ -662,6 +667,7 @@ void AFlickBobArena::BuildFloorCollision()
 	{
 		const int32 IA = VertexIndex(A), IB = VertexIndex(B), IC = VertexIndex(C);
 		if (IA == IB || IB == IC || IC == IA) return;
+		if (FVector::CrossProduct(Vertices[IB] - Vertices[IA], Vertices[IC] - Vertices[IA]).SizeSquared() < 1.e-8) return;
 		// Unreal procedural collision flips winding. Clockwise faces point up.
 		Triangles.Append({IA, IC, IB});
 	};
@@ -674,21 +680,29 @@ void AFlickBobArena::BuildFloorCollision()
 		{
 			const FVector A = Polygon[I], B = Polygon[(I + 1) % Polygon.Num()];
 			Triangle(Center, A, B);
-			const FVector Depth(0, 0, -BoardThickness);
-			Triangle(Center + Depth, B + Depth, A + Depth);
 		}
 	};
 	const float Center = BoardHalfExtent - PocketInset;
 	const float Low = Center - PocketRadius, High = Center + PocketRadius;
-	// Split the rectangle boundaries at the same vertices as the pocket fans.
-	// This avoids T-junctions as well as the old independent-convex seams.
+	// Build the pocket rays once and derive ALL rectangle cuts from those exact
+	// snapped endpoints. Separately recomputing sin/cos cuts left tiny T-junctions
+	// that Chaos treated as exposed edges on an otherwise coplanar tabletop.
+	TArray<FVector2D> InnerOffsets, OuterOffsets;
 	TArray<float> Cuts;
-	for (const float Sign : {-1.0f, 1.0f})
 	for (int32 I = 0; I < PocketRimSegmentCount; ++I)
 	{
-		const float Angle = 2 * PI * I / PocketRimSegmentCount;
-		const float X = FMath::Cos(Angle), Y = FMath::Sin(Angle);
-		Cuts.Add(Sign * Center + PocketRadius * X / FMath::Max(FMath::Abs(X), FMath::Abs(Y)));
+		const double Angle = 2.0 * UE_DOUBLE_PI * I / PocketRimSegmentCount;
+		const double X = FMath::Cos(Angle), Y = FMath::Sin(Angle);
+		const double Denominator = FMath::Max(FMath::Abs(X), FMath::Abs(Y));
+		const auto Snap = [](double Value) { return FMath::RoundToDouble(Value * 1000.0) / 1000.0; };
+		InnerOffsets.Add(FVector2D(Snap(PocketRadius * X), Snap(PocketRadius * Y)));
+		const FVector2D Outer(Snap(PocketRadius * X / Denominator), Snap(PocketRadius * Y / Denominator));
+		OuterOffsets.Add(Outer);
+		for (float Sign : {-1.0f, 1.0f})
+		{
+			Cuts.AddUnique(Sign * Center + static_cast<float>(Outer.X));
+			Cuts.AddUnique(Sign * Center + static_cast<float>(Outer.Y));
+		}
 	}
 	Cuts.Sort();
 	const auto Rectangle = [&](float X0, float X1, float Y0, float Y1)
@@ -720,17 +734,14 @@ void AFlickBobArena::BuildFloorCollision()
 		FVector Inner[2], Outer[2];
 		for (int32 J = 0; J < 2; ++J)
 		{
-			const float Angle = 2 * PI * (I + J) / PocketRimSegmentCount;
-			const float X = FMath::Cos(Angle), Y = FMath::Sin(Angle);
-			const FVector Offset(PocketRadius * X, PocketRadius * Y, 0);
-			Inner[J] = FVector(CX, CY, 0) + Offset;
-			Outer[J] = FVector(CX, CY, 0) + Offset / FMath::Max(FMath::Abs(X), FMath::Abs(Y));
+			const int32 Ray = (I + J) % PocketRimSegmentCount;
+			Inner[J] = FVector(CX + InnerOffsets[Ray].X, CY + InnerOffsets[Ray].Y, 0);
+			Outer[J] = FVector(CX + OuterOffsets[Ray].X, CY + OuterOffsets[Ray].Y, 0);
 		}
 		FloorPatch({Inner[0], Outer[0], Outer[1], Inner[1]});
-		const FVector Depth(0, 0, -BoardThickness);
-		Triangle(Inner[0], Inner[1], Inner[1] + Depth);
-		Triangle(Inner[0], Inner[1] + Depth, Inner[0] + Depth);
 	}
+	// Collision represents only the playable plane. The visual well supplies its
+	// walls/depth; no vertical lip or underside can deflect a puck as it falls.
 	FloorCollision->CreateMeshSection(0, Vertices, Triangles, {}, {}, {}, {}, true);
 }
 

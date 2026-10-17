@@ -6,6 +6,7 @@
 #include "FlickBobArena.generated.h"
 
 class UMaterialInstanceDynamic;
+class UFlickStadiumCrowd;
 class UPhysicalMaterial;
 class USceneComponent;
 class UStaticMeshComponent;
@@ -102,6 +103,9 @@ private:
 	/** Separate emissive fixture mesh for the Pocket Foundry venue. */
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> HighDetailStadiumLights;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UFlickStadiumCrowd> StadiumCrowd;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TObjectPtr<UStaticMeshComponent> PlayingSurface;

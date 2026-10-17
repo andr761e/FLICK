@@ -659,6 +659,7 @@ void AFlickGameMode::BeginPlay()
 		FTimerHandle BobTimer;
 		GetWorldTimerManager().SetTimer(BobTimer, [this]()
 		{
+			if (FParse::Param(FCommandLine::Get(), TEXT("FlickBobStrikerPreview"))) return;
 			AFlickGameState* FlickGameState = GetFlickGameState();
 			AFlickPiece* BobStriker = GetBobStriker(FlickGameState ? FlickGameState->CurrentTeam : EFlickTeam::None);
 			if (BobStriker && BobStriker->IsActive())
@@ -887,6 +888,24 @@ void AFlickGameMode::BeginPlay()
 	if (FParse::Value(FCommandLine::Get(), TEXT("FlickCameraView="), CameraViewPreview) && CameraPawn)
 	{
 		CameraPawn->SetGameplayViewIndex(CameraViewPreview, true);
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickBobStrikerPreview")) && CameraPawn)
+	{
+		// Close-up visual QA uses the actual BOB striker, not a separate mock mesh.
+		FTimerHandle StrikerPreviewTimer;
+		GetWorldTimerManager().SetTimer(StrikerPreviewTimer, [this]()
+		{
+			AFlickPiece* Striker = GetBobStriker(EFlickTeam::Player1);
+			if (!Striker || !CameraPawn) return;
+			int32 Skin = 0;
+			FParse::Value(FCommandLine::Get(), TEXT("FlickBobStrikerSkin="), Skin);
+			Striker->SetPuckSkin(FMath::Clamp(Skin, 0, 5));
+			const FVector Center = Striker->GetActorLocation();
+			const FVector Position = Center + FVector(0, -115, 100);
+			CameraPawn->SetFreeCameraEnabled(true);
+			CameraPawn->SetActorLocation(Position);
+			CameraPawn->SetActorRotation((Center - Position).Rotation());
+		}, 1.0f, false);
 	}
 	const bool bStadiumStepPreview = FParse::Param(FCommandLine::Get(), TEXT("FlickStadiumStepPreview"));
 	if ((FParse::Param(FCommandLine::Get(), TEXT("FlickSwitchRimPreview")) || bStadiumStepPreview) && CameraPawn && TestArenaActor)

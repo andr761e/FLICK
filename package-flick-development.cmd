@@ -77,6 +77,11 @@ if not exist "%GAME_BIN%\FLICK.exe" (
 
 copy /Y "%STEAM_APP_ID%" "%PACKAGE_ROOT%\steam_appid.txt" >nul
 copy /Y "%STEAM_APP_ID%" "%GAME_BIN%\steam_appid.txt" >nul
+copy /Y "%PROJECT_ROOT%Build\Review\START_HERE.txt" "%PACKAGE_ROOT%\START_HERE.txt" >nul
+if errorlevel 1 (
+    echo Could not include the review instructions in the package.
+    exit /b 1
+)
 
 if /I "%FLICK_SKIP_PACKAGE_STARTUP_TEST%"=="1" goto startup_check_skipped
 echo.

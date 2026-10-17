@@ -1,4 +1,5 @@
 #include "Arena/FlickTestArena.h"
+#include "Arena/FlickStadiumCrowd.h"
 #include "Engine/StaticMesh.h"
 
 #include "Components/StaticMeshComponent.h"
@@ -166,6 +167,8 @@ AFlickTestArena::AFlickTestArena()
 		WorkshopArenaMesh->SetStaticMesh(WorkshopArenaAsset.Object);
 	}
 	StadiumStructureMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StadiumStructureMesh"));
+	StadiumCrowd = CreateDefaultSubobject<UFlickStadiumCrowd>(TEXT("StadiumCrowd"));
+	StadiumCrowd->SetupAttachment(GetRootComponent());
 	StadiumStructureMesh->SetupAttachment(GetRootComponent());
 	ConfigureVisualComponent(StadiumStructureMesh);
 	// The enclosing wall is presentation geometry, not an actual roof. Let the
@@ -1107,6 +1110,8 @@ void AFlickTestArena::ApplyTestLayout()
 	// workshop arena. Uniform scaling keeps every surrounding detail aligned if
 	// the Test arena radius is tuned later, while its components remain visual-only.
 	const float StadiumScale = ArenaRadius / 650.0f;
+	// Retain the spectator design, but leave stadium seating empty for now.
+	StadiumCrowd->Configure(false, StadiumScale, SurfaceZ, false);
 	for (UStaticMeshComponent* StadiumComponent : {
 		StadiumStructureMesh.Get(), StadiumLightsMesh.Get()})
 	{

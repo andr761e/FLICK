@@ -2,9 +2,11 @@
 #include "Misc/AutomationTest.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/Material.h"
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Game/FlickGameState.h"
 #include "Pieces/FlickPiece.h"
@@ -13,6 +15,8 @@
 #include "UI/FlickPuckHoverWidget.h"
 #include "Core/FlickVisualSettings.h"
 #include "UI/FlickGameLayer.h"
+#include "Game/FlickGameMode.h"
+#include "Widgets/Input/SButton.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPuckInspectionTest, "FLICK.Cosmetics.InspectionAndOwnership",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -238,6 +242,54 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 	Layer->bSocialPanelOpen = false;
 	Layer->bChallengesOpen = true;
 	TestFalse(TEXT("Challenges menu suppresses controls"), Layer->ShouldShowGameplayControls());
+	Layer->bChallengesOpen = false;
+	// Exercise the real training card callback, then cancel the class screen.
+	auto* Mode = World->SpawnActor<AFlickGameMode>();
+	Layer->GameMode = Mode;
+	Layer->SelectedPlayPlaylist = EFlickPlayPlaylist::Training;
+	const auto CardBox = Layer->BuildTrainingActivityCard(
+		EFlickTrainingActivity::BotMatch, TEXT("1V1 VS BOT"), TEXT(""), TEXT(""), FLinearColor::White);
+	const auto Card = StaticCastSharedRef<SButton>(CardBox->GetChildren()->GetChildAt(0));
+	Card->SetClickMethod(EButtonClickMethod::MouseDown);
+	const FPointerEvent Press(0, FVector2D::ZeroVector, FVector2D::ZeroVector,
+		TSet<FKey>{EKeys::LeftMouseButton}, EKeys::LeftMouseButton, 0, FModifierKeysState());
+	TestTrue(TEXT("Training card click is handled"), Card->OnMouseButtonDown(FGeometry(), Press).IsEventHandled());
+	TestEqual(TEXT("Bot card opens class selection"), Mode->GetFrontendScreen(), EFlickFrontendScreen::ClassSelect);
+	Mode->CancelClassSelection();
+	TestEqual(TEXT("Cancel returns to mode selection"), Mode->GetFrontendScreen(), EFlickFrontendScreen::ModeSelect);
+	TestEqual(TEXT("Training grid remains selected, not a nonexistent bot submenu"), Layer->SelectedTrainingActivity, EFlickTrainingActivity::None);
+	// Striker differentiation must survive every skin without changing physics.
+	for (int32 Skin = 0; Skin < 6; ++Skin)
+	{
+		auto* Striker = World->SpawnActor<AFlickPiece>();
+		Striker->InitializePiece(EFlickTeam::Player1, 40, 24, 14, EFlickPieceArchetype::Standard, true);
+		Striker->EnableTestArenaVisuals(); Striker->SetPuckSkin(Skin); Striker->Tick(.016f);
+		TestEqual(TEXT("BOB striker keeps its original radius"), Striker->GetPieceRadius(), 24.0f);
+		TestEqual(TEXT("BOB striker keeps its original thickness"), Striker->GetPieceThickness(), 14.0f);
+		TestFalse(TEXT("No floating striker text or cross"), Striker->Label->IsVisible());
+		// Authored slot prefixes vary; inspect material slots by role instead.
+		bool bFoundGraphiteHousing = false, bFoundTargetFace = false;
+		for (int32 Slot = 0; Slot < Striker->WorkshopMesh->GetNumMaterials(); ++Slot)
+		{
+			const FString Role = Striker->WorkshopMesh->GetStaticMesh()->GetStaticMaterials()[Slot].MaterialSlotName.ToString();
+			FLinearColor Colour;
+			Striker->WorkshopMesh->GetMaterial(Slot)->GetVectorParameterValue(FMaterialParameterInfo(TEXT("BaseColor")), Colour);
+			if (Role.Contains(TEXT("Graphite")))
+			{
+				FLinearColor HousingColour;
+				Striker->WorkshopMesh->GetMaterial(Slot)->GetVectorParameterValue(FMaterialParameterInfo(TEXT("HousingColor")), HousingColour);
+				bFoundGraphiteHousing = HousingColour.R < .1f && HousingColour.G < .1f && HousingColour.B < .1f;
+			}
+			if (Role.Contains(TEXT("Recessed")))
+			{
+				bFoundTargetFace = Colour.R > .8f && Colour.G > .8f && Colour.B > .8f
+					&& Striker->WorkshopMesh->GetMaterial(Slot)->GetMaterial()->GetName() == TEXT("M_BobStrikerFace");
+			}
+		}
+		TestTrue(TEXT("Striker retains a graphite shell for every skin"), bFoundGraphiteHousing);
+		TestTrue(TEXT("Striker target is integrated into its existing face material"), bFoundTargetFace);
+		Striker->Destroy();
+	}
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
 	return true;

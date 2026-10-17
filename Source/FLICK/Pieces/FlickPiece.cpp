@@ -1318,6 +1318,8 @@ void AFlickPiece::EnableTestArenaVisuals()
 		return;
 	}
 	WorkshopMesh->SetStaticMesh(Mesh);
+	UMaterialInterface* StrikerFace = bBobStriker ? LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Game/Cosmetics/Pucks/BOB/M_BobStrikerFace.M_BobStrikerFace")) : nullptr;
 	WorkshopTeamMaterials.Reset();
 	for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
 	{
@@ -1334,7 +1336,8 @@ void AFlickPiece::EnableTestArenaVisuals()
 		}
 		const bool bTeamLightSlot = SlotName.Contains(TEXT("05_Team"))
 			|| SlotName.Contains(TEXT("Cyan"));
-		if (bTeamLightSlot)
+		const bool bStrikerEmblem = bBobStriker && SlotName.Contains(TEXT("center"), ESearchCase::IgnoreCase);
+		if (bTeamLightSlot && !bStrikerEmblem)
 		{
 			if (bUsingHighDetailPuck && PuckSkin == 1)
 			{
@@ -1353,27 +1356,29 @@ void AFlickPiece::EnableTestArenaVisuals()
 		}
 		else if (bBobStriker)
 		{
-			// BOB's controllable strikers retain the Standard silhouette and
-			// physics, but receive a brighter skin-tinted metal crown. The rack
-			// pucks keep the regular Standard treatment, so the shot pieces are
-			// recognizable without adding another broad light source to the board.
+			// A pearl target face distinguishes the striker without floating text
+			// or added geometry. Keep the Standard silhouette and collision intact.
 			const bool bSilverCrown = SlotName.Contains(TEXT("brushed_silver"), ESearchCase::IgnoreCase)
 				|| SlotName.Contains(TEXT("brushed silver"), ESearchCase::IgnoreCase)
 				|| SlotName.Contains(TEXT("Machined_edge"), ESearchCase::IgnoreCase)
 				|| SlotName.Contains(TEXT("Machined edge"), ESearchCase::IgnoreCase);
 			const bool bGraphiteHousing = SlotName.Contains(TEXT("Graphite"), ESearchCase::IgnoreCase);
-			if (bSilverCrown || bGraphiteHousing)
+			const bool bCore = bStrikerEmblem || SlotName.Contains(TEXT("Recessed"), ESearchCase::IgnoreCase);
+			const bool bGasket = SlotName.Contains(TEXT("gasket"), ESearchCase::IgnoreCase);
+			const bool bTargetProjection = bCore || bGraphiteHousing || bGasket;
+			if (bSilverCrown || bTargetProjection)
 			{
+				if (bTargetProjection && StrikerFace) WorkshopMesh->SetMaterial(Slot, StrikerFace);
 				if (UMaterialInstanceDynamic* StrikerMaterial = WorkshopMesh->CreateDynamicMaterialInstance(Slot))
 				{
-					const FLinearColor CrownColor = FMath::Lerp(
-						FLinearColor(0.82f, 0.88f, 0.94f, 1.0f), FlickCosmeticCatalog::GetPuckSkinColor(PuckSkin), 0.34f);
 					StrikerMaterial->SetVectorParameterValue(
 						TEXT("BaseColor"),
-						bSilverCrown ? CrownColor : FMath::Lerp(FLinearColor(0.055f, 0.072f, 0.095f, 1.0f), FlickCosmeticCatalog::GetPuckSkinColor(PuckSkin), 0.13f));
-					StrikerMaterial->SetScalarParameterValue(TEXT("Metallic"), bSilverCrown ? 0.98f : 0.72f);
-					StrikerMaterial->SetScalarParameterValue(TEXT("Roughness"), bSilverCrown ? 0.16f : 0.24f);
-					StrikerMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), bSilverCrown ? 0.40f : 0.10f);
+						bTargetProjection ? FLinearColor(0.90f, 0.92f, 0.88f) : bSilverCrown
+							? FLinearColor(0.68f, 0.74f, 0.78f) : FLinearColor(0.035f, 0.047f, 0.060f));
+					StrikerMaterial->SetVectorParameterValue(TEXT("AccentColor"), FlickCosmeticCatalog::GetPuckSkinColor(PuckSkin));
+					StrikerMaterial->SetScalarParameterValue(TEXT("Metallic"), bTargetProjection ? 0.1f : bSilverCrown ? 0.82f : 0.55f);
+					StrikerMaterial->SetScalarParameterValue(TEXT("Roughness"), bTargetProjection ? 0.48f : bSilverCrown ? 0.32f : 0.42f);
+					StrikerMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), 0.0f);
 				}
 			}
 		}
@@ -1472,7 +1477,7 @@ void AFlickPiece::ApplyVisuals()
 		: 0.0f;
 	const FLinearColor DarkMetal(0.034f, 0.046f, 0.064f, 1.0f);
 	FLinearColor BodyColor = bBobStriker
-		? FLinearColor(0.04f, 0.052f, 0.066f, 1.0f)
+		? FLinearColor(0.035f, 0.047f, 0.060f, 1.0f)
 		: FMath::Lerp(DarkMetal, TeamColor, 0.09f);
 	if (bHovered)
 	{
@@ -1495,7 +1500,7 @@ void AFlickPiece::ApplyVisuals()
 		Archetype == EFlickPieceArchetype::Standard ? 0.18f : 0.72f);
 	if (bBobStriker)
 	{
-		TopColor = FMath::Lerp(FLinearColor(0.055f, 0.067f, 0.078f, 1.0f), TeamColor, 0.08f);
+		TopColor = FLinearColor(0.82f, 0.85f, 0.88f, 1.0f);
 		PipColor = FLinearColor(0.48f, 0.56f, 0.62f, 1.0f);
 	}
 
@@ -1639,11 +1644,7 @@ void AFlickPiece::ApplyVisuals()
 		BaseHaloRelativeScale.Y * Pulse * Width / 1.15f,
 		BaseHaloRelativeScale.Z));
 
-	Label->SetText(FText::FromString(bBobStriker ? TEXT("B") : GetPieceArchetypeMark(Archetype)));
-	Label->SetTextRenderColor((bBobStriker
-		? FMath::Lerp(TeamColor, FLinearColor::White, 0.72f)
-		: FMath::Lerp(VisualAccent, FLinearColor::White, 0.45f)).ToFColor(true));
-	Label->SetWorldSize(bSelected ? 21.0f : 18.0f);
-	Label->SetVisibility(bBobStriker && !bEliminated);
+	// Type marks are part of the face treatment, never floating TextRender labels.
+	Label->SetVisibility(false);
 	UpdateTestArenaVisuals();
 }

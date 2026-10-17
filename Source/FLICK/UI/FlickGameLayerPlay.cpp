@@ -635,7 +635,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 		.Cursor(EMouseCursor::Hand)
 		.OnClicked_Lambda([this, Activity]()
 		{
-			SelectedTrainingActivity = Activity;
+			// Only these activities have a submenu here. Immediate-start activities
+			// must leave the training grid selected when their next screen is cancelled.
+			SelectedTrainingActivity = (Activity == EFlickTrainingActivity::FreePlay
+				|| Activity == EFlickTrainingActivity::PracticePacks) ? Activity : EFlickTrainingActivity::None;
 			if (Activity == EFlickTrainingActivity::PracticePacks)
 			{
 				SelectedPracticeCategory = INDEX_NONE;

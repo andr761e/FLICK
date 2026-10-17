@@ -1,0 +1,175 @@
+FLICK: KNOCKOUT // DEVELOPMENT BUILD
+PLAYTEST INSTRUCTIONS // COFFEE STAIN GROUP
+
+Thank you for taking a look at FLICK: Knockout!
+
+FLICK is a physics-first competitive game about aim, shot power, positioning
+and decision-making. It is deliberately more measured than a reflex-heavy
+action game: small moves can create large consequences. Puck skins and other
+cosmetics do not change gameplay attributes.
+
+
+// 1. DOWNLOAD AND LAUNCH
+
+1. Download the complete ZIP from Google Drive.
+2. Right-click the ZIP and choose "Extract All". Do not launch from inside
+   the ZIP preview.
+3. Open the extracted Windows folder and double-click FLICK.exe.
+4. Keep the Engine and FLICK subfolders and steam_appid.txt beside the
+   executable. Do not move or share the executable on its own.
+
+This is a Windows development build. Unreal Engine, a development environment
+and a Steam key are not required to run the packaged game.
+
+For Steam invitations/private online matches, open Steam and sign in before
+launching FLICK. Offline activities do not require matchmaking servers.
+
+If a Windows security warning appears, only continue if you have verified that
+this is the review build supplied by the developer. Do not disable antivirus
+or firewall protection. If Windows reports missing runtime components, contact
+the developer for help rather than downloading DLLs from third-party sites.
+
+
+// 2. SUGGESTED FIRST PLAYTHROUGH (ABOUT 10-15 MINUTES)
+
+1. PLAY > TRAINING > TUTORIAL: learn aiming, power, knockouts and switches.
+2. PLAY > TRAINING > 1V1 VS BOT: try a complete Knockout match. Start with
+   a lower bot difficulty, then increase it as you get comfortable.
+3. Try BOB VS BOT for the alternative pocketing ruleset.
+4. Explore PRACTICE PACKS, LINEUPS and PROFILE/customization.
+
+You can evaluate the core game alone. A second PC is only needed to test
+online private matches with another player.
+
+
+// 3. HOW TO PLAY
+
+Knockout:
+- Knock your opponent's pucks off the arena while keeping yours in play.
+- A standard 1v1 match gives each player four pucks. Win three rounds to
+  win the match under the default rules.
+- Each round begins with simultaneous kickoff planning: both sides lock
+  in their opening shot, then those shots launch together.
+- After kickoff, players take turns. Let the physics resolve before the
+  next shot. Follow the turn indicator and on-screen prompts.
+- Crossing a colored switch changes its linked divider. Dividers affect
+  shot routes and can launch or flip pucks. Positioning matters.
+- Different puck types have different physical strengths and trade-offs.
+  Use LINEUPS to inspect them and choose your four-puck lineup.
+
+Taking a shot:
+- Hold the left mouse button on one of your selectable pucks.
+- Pull back opposite the direction you want to shoot.
+- Drag farther for more power, then release to launch.
+- Use the aiming preview to judge the direction and likely contact.
+
+BOB:
+- Use your striker to pocket your own colored pucks before your opponent
+  clears theirs. The board has four corner pockets.
+- Turns alternate after shots resolve. Avoid pocketing your own striker:
+  it is returned and can bring back one of your previously pocketed pucks
+  as a penalty.
+
+
+// 4. OFFLINE ACTIVITIES (PLAY > TRAINING)
+
+TUTORIAL
+Four guided lessons covering aiming, power, knockouts and switches.
+
+FREE PLAY
+Experiment without an opponent or build your own shot setup. Choose a
+Knockout arena size or BOB, edit the board, then retry shots. Backspace
+undoes the last Free Play shot; R resets your saved setup.
+
+1V1 VS BOT
+A complete offline Knockout series against an AI opponent. Change BOT
+DIFFICULTY in the Training menu before starting.
+
+BOB VS BOT
+An offline BOB match against an AI opponent, using the pocketing rules.
+
+PRACTICE PACKS
+Choose Precision, Knockouts, Switch Control or BOB Pockets, then Foundation,
+Skilled or Expert difficulty. Each pack contains five scored challenges.
+Aim for five out of five; personal bests are saved locally. In Precision,
+the entire puck must finish inside the marked circle.
+
+
+// 5. PRIVATE MATCHES WITH A FRIEND THROUGH STEAM
+
+Use separate Windows PCs and separate Steam accounts that are Steam friends.
+Each player needs the same complete build. Multiple windows on one PC with
+one Steam account are not a substitute for this setup.
+
+1. Open Steam and sign in on every PC, then launch FLICK on each PC.
+2. The host opens SOCIAL in FLICK and invites their friend to the party.
+3. The friend accepts the invitation. Confirm you are together in the party.
+4. The party leader selects PLAY > PRIVATE MATCH and configures the match.
+5. Players choose available team slots (or spectate) and ready up.
+6. Once all required playing slots are filled and ready, the host starts.
+
+Start with 1v1 for two players. Larger team formats need enough players to
+fill their playing slots; empty slots are not automatically filled by bots.
+Private matches are hosted by the party leader's PC. The host must remain
+in the game; leaving as host ends the current match. Private results do
+not count toward Competitive MMR.
+
+No separate server command, VPN or public matchmaking service is needed
+for the intended Steam private-match flow. If invitations do not work,
+check that Steam is online on both PCs, both have the same build, and the
+game is permitted through Windows Firewall. Offline modes remain available.
+
+
+// 6. USEFUL DEFAULT CONTROLS
+
+Left mouse button       Hold on your puck, pull back and release to shoot
+Escape                  Pause / back / access settings
+Mouse wheel             Adjust camera height/zoom
+Q / E                   Orbit the camera
+V                       Top view
+F                       Reset camera
+Tab                     Scoreboard
+Middle mouse button     Ping a puck or switch
+F1-F4                   Quick chat groups/choices
+Enter                   Skip a cinematic replay
+
+Free Play:
+T                       Toggle the board editor
+1 / 2                   Place your own / target puck while editing
+Delete                  Remove a puck while editing
+Backspace               Undo your last Free Play shot
+R                       Reset the training setup
+
+Controls can be rebound under SETTINGS > CONTROLS. Other settings include
+sound/music, camera, display, lighting, interface and quick-chat preferences.
+Follow the on-screen hints when switching between gameplay and editing.
+
+
+// 7. WHAT IS NOT LIVE IN THIS BUILD
+
+- CASUAL and COMPETITIVE public matchmaking are not available for this
+  review build. Public servers have not been deployed. Please use Training
+  or Steam private matches instead of searching those playlists.
+- The ITEM SHOP is a demonstration/placeholder, not a real-money store.
+- Rank/MMR displays and development testing controls are not evidence of
+  a live ranked population or a production competitive backend.
+- This is an in-development build, not a finished release. Bugs, balancing
+  issues and unfinished presentation may still be encountered.
+
+PROFILE/customization can be explored to see puck colors, trails, spawn
+and knockout effects, banners and other cosmetic presentation options.
+
+
+// 8. FEEDBACK OR TROUBLESHOOTING
+
+Contact: andre2000@hotmail.dk
+
+If something goes wrong, please include what you were doing, the selected
+mode, whether you were host or guest, and a screenshot or short recording
+if possible. The latest FLICK.log under FLICK/Saved/Logs in the extracted
+package is also useful if that folder exists.
+
+If the game becomes unresponsive, Alt+F4 or Windows Task Manager can be
+used to close it. Please report the issue so it can be investigated.
+
+Thank you for your time and feedback!

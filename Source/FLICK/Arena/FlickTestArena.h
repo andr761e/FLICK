@@ -4,6 +4,7 @@
 #include "FlickTestArena.generated.h"
 
 class AFlickPiece;
+class UFlickStadiumCrowd;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UPhysicalMaterial;
@@ -228,6 +229,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TObjectPtr<UStaticMeshComponent> StadiumLightsMesh;
+
+	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
+	TObjectPtr<UFlickStadiumCrowd> StadiumCrowd;
 
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Test Arena|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> DividerCapMeshes;
