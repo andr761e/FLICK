@@ -14,6 +14,17 @@ namespace
 		if (Dynamic) Result->CopyInterpParameters(Dynamic);
 		return Result;
 	}
+
+	UMaterialInstanceDynamic* ArchitecturalFinish(UMaterialInterface* Source, UObject* Owner)
+	{
+		auto* Parent = LoadObject<UMaterialInterface>(nullptr,
+			TEXT("/Game/TestArena/Arena/M_ArchitecturalMetal.M_ArchitecturalMetal"));
+		if (!Parent) return ClonePresentationMaterial(Source, Owner);
+		auto* Result = UMaterialInstanceDynamic::Create(Parent, Owner,
+			FName(*FString::Printf(TEXT("Finish_%s"), *Source->GetName())));
+		Result->CopyMaterialUniformParameters(Source);
+		return Result;
+	}
 }
 
 // Visual-only dressing shared by every Knockout format. Imported art remains the
@@ -74,24 +85,35 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 					OneVsOneOriginalMaterials.Add(Original);
 					const FString Name = FString::Printf(TEXT("OneVsOne_%s_%d_%s"), *Component->GetName(), Slot,
 						Original ? *Original->GetName() : TEXT("Empty"));
-					UMaterialInstanceDynamic* Material = Original ? UMaterialInstanceDynamic::Create(Original, this, FName(*Name)) : nullptr;
+					const FString SourceName = Original ? Original->GetName() : FString();
+					float Emission = 0.0f;
+					if (Original) Original->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), Emission);
+					const bool bArchitecture = Component == WorkshopArenaMesh || Component == StadiumStructureMesh;
+					UMaterialInstanceDynamic* Material = Original
+						? (bArchitecture && Emission < .1f ? ArchitecturalFinish(Original, this)
+							: UMaterialInstanceDynamic::Create(Original, this, FName(*Name))) : nullptr;
 					OneVsOneMaterials.Add(Material);
 					if (!Material) continue;
-					const FString SourceName = Original->GetName();
-					float Emission = 0.0f;
-					Original->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), Emission);
+					// No material light-lift on the architectural metal: real lighting
+					// supplies the depth. Keep existing WPO offsets unchanged.
+					if (bArchitecture && Emission < .1f)
+					{
+						Material->SetScalarParameterValue(TEXT("FinishDetail"), .8f);
+						Material->SetScalarParameterValue(TEXT("SurfaceLift"), 0.f);
+					}
 					if (Component == WorkshopArenaMesh)
 					{
 						if (SourceName.Contains(TEXT("Arena_Surface")) || SourceName.Contains(TEXT("Inner_Field")) || SourceName.Contains(TEXT("Center_Inset")))
 						{
-							// Satin silver: let the existing softboxes and environment
-							// shape the metal instead of flattening it with emissive fill.
-							Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.60f, 0.65f, 0.69f));
+							// Metal base colour is its reflected-light tint, not diffuse
+							// paint. Near-black values were absorbing the reflections.
+							Material->SetVectorParameterValue(TEXT("BaseColor"), OneVsOneDeckTint);
+							Material->SetScalarParameterValue(TEXT("DeckFinish"), 1.f);
 							Material->SetScalarParameterValue(TEXT("Metallic"), OneVsOneDeckMetallic);
 							Material->SetScalarParameterValue(TEXT("Roughness"), OneVsOneDeckRoughness);
 							Material->SetScalarParameterValue(TEXT("Specular"), 0.65f);
-							Material->SetScalarParameterValue(TEXT("Anisotropy"), 0.35f);
-							Material->SetScalarParameterValue(TEXT("SurfaceLift"), 0.025f);
+							Material->SetScalarParameterValue(TEXT("Anisotropy"), 0.12f);
+							Material->SetScalarParameterValue(TEXT("SurfaceLift"), 0.f);
 						}
 						else if (SourceName.Contains(TEXT("Team_Cyan")) || SourceName.Contains(TEXT("Team_Orange")))
 						{
@@ -99,6 +121,28 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 							Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.008f, 0.035f, 0.048f));
 							Material->SetScalarParameterValue(TEXT("Emission"), 0.35f);
 						}
+						else if (SourceName.Contains(TEXT("Rim_Polymer")))
+						{
+							// A reflective graphite chassis, not an unlit black ribbon.
+							// The lens/recess contrast is supplied by the shared shader.
+							Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.065f, .079f, .095f));
+							Material->SetScalarParameterValue(TEXT("Metallic"), .9f);
+							Material->SetScalarParameterValue(TEXT("Roughness"), .22f);
+							Material->SetScalarParameterValue(TEXT("RimSideBand"), 1.f);
+						}
+						else if (SourceName.Contains(TEXT("Brushed_Titanium")) || SourceName.Contains(TEXT("Accent_Metal")))
+						{
+							Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.31f, .35f, .39f));
+							Material->SetScalarParameterValue(TEXT("Metallic"), .94f);
+							Material->SetScalarParameterValue(TEXT("Roughness"), .2f);
+							Material->SetScalarParameterValue(TEXT("Anisotropy"), .16f);
+						}
+						// Confine the optical lens/chamfer treatment to this arena's
+						// existing collar. Switches, pucks and the deck do not opt in.
+						if (Emission < .1f && (SourceName.Contains(TEXT("Rim_Polymer"))
+							|| SourceName.Contains(TEXT("Brushed_Titanium")) || SourceName.Contains(TEXT("Accent_Metal"))
+							|| SourceName.Contains(TEXT("Arena_Graphite")) || SourceName.Contains(TEXT("Deep_Recess"))))
+							Material->SetScalarParameterValue(TEXT("RimCollarFinish"), 1.f);
 					}
 					else if (Component != StadiumStructureMesh && Component != StadiumLightsMesh)
 					{
@@ -126,9 +170,11 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 					}
 					else if (SourceName.Contains(TEXT("Porcelain")) || SourceName.Contains(TEXT("Concrete")))
 					{
-						Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.025f, 0.039f, 0.050f));
-						Material->SetScalarParameterValue(TEXT("Metallic"), 0.38f);
-						Material->SetScalarParameterValue(TEXT("Roughness"), 0.34f);
+						Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.075f, .085f, .10f));
+						// The concourse needs some diffuse response for the amber
+						// skirt wash, not only a sharp mirror image of its LEDs.
+						Material->SetScalarParameterValue(TEXT("Metallic"), SourceName.Contains(TEXT("Porcelain")) ? .68f : .78f);
+						Material->SetScalarParameterValue(TEXT("Roughness"), 0.27f);
 					}
 				}
 			}
@@ -149,13 +195,41 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 		bOneVsOnePresentationEnabled = bEnabled;
 		if (bWasMenu) SetMenuPresentationEnabled(true);
 	}
+	// The architectural shader already draws the complete rounded lens and gasket
+	// on the existing collar. Rendering a second near-coplanar mesh over it adds
+	// unstable depth/coverage and two differently shaded edges to the same light.
+	// Keep the original insert design only as a missing-material fallback.
+	const bool bMaterialLenses = bEnabled && LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Game/TestArena/Arena/M_ArchitecturalMetal.M_ArchitecturalMetal"));
 	for (auto* Component : {RimLensBodies.Get(), RimLensCaps.Get(), RimHousingBodies.Get(), RimHousingCaps.Get()})
 	{
-		Component->SetVisibility(bEnabled);
-		Component->SetHiddenInGame(!bEnabled);
+		Component->SetVisibility(bEnabled && !bMaterialLenses);
+		Component->SetHiddenInGame(!bEnabled || bMaterialLenses);
 	}
-	if (bEnabled) BuildOneVsOneRim();
+	if (bEnabled && !bMaterialLenses) BuildOneVsOneRim();
 	UpdateOneVsOneConcept(true);
+	// Menu MIDs are sibling copies, not children of the live presentation MIDs.
+	// Refresh their cached pattern too, even while they are inactive, so returning
+	// to the menu after a format change cannot restore an old radius/lens layout.
+	// Only material parameters change; all component transforms stay untouched.
+	const auto RefreshPattern = [this](const TArray<TObjectPtr<UMaterialInstanceDynamic>>& Materials)
+	{
+		for (UMaterialInstanceDynamic* Material : Materials)
+			if (Material)
+			{
+				Material->SetScalarParameterValue(TEXT("ArenaSurfaceZ"), SurfaceZ);
+				Material->SetScalarParameterValue(TEXT("ArenaScale"), ArenaThickness / 50.f);
+				Material->SetScalarParameterValue(TEXT("ArenaRadius"), ArenaRadius);
+				Material->SetScalarParameterValue(TEXT("RimLensCount"), FMath::Clamp(RimLensCount, 12, 40));
+				Material->SetScalarParameterValue(TEXT("RimLensStrength"), RimLensEmission);
+				float Deck = 0.f;
+				if (Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("DeckFinish")), Deck) && Deck > .5f)
+					Material->SetVectorParameterValue(TEXT("BaseColor"), OneVsOneDeckTint);
+			}
+	};
+	RefreshPattern(OneVsOneMaterials);
+	RefreshPattern(ConceptMaterials);
+	RefreshPattern(MenuPresentationMaterials);
 }
 
 void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
@@ -191,10 +265,11 @@ void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
 					if (Emission > .1f) Material->SetScalarParameterValue(TEXT("Emission"), Emission * 4.f);
 					if (Name.Contains(TEXT("Arena_Surface")) || Name.Contains(TEXT("Inner_Field")) || Name.Contains(TEXT("Center_Inset")))
 					{
-						Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.21f, .27f, .33f));
+						Material->SetVectorParameterValue(TEXT("BaseColor"), OneVsOneDeckTint);
+						Material->SetScalarParameterValue(TEXT("DeckFinish"), 1.f);
 						Material->SetScalarParameterValue(TEXT("Metallic"), OneVsOneDeckMetallic);
-						Material->SetScalarParameterValue(TEXT("Roughness"), OneVsOneMenuDeckRoughness);
-						Material->SetScalarParameterValue(TEXT("SurfaceLift"), .025f);
+						Material->SetScalarParameterValue(TEXT("Roughness"), OneVsOneDeckRoughness);
+						Material->SetScalarParameterValue(TEXT("SurfaceLift"), 0.f);
 					}
 					else if (Name.Contains(TEXT("Dark_Marking")) || Name.Contains(TEXT("Floor_Lines")))
 					{
@@ -363,14 +438,15 @@ void AFlickTestArena::BuildOneVsOneRim()
 	}
 	if (RimLensMaterial)
 	{
-		RimLensMaterial->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.005f, 0.70f, 1.0f));
+		RimLensMaterial->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.12f, 0.72f, 1.0f));
 		RimLensMaterial->SetScalarParameterValue(TEXT("Emission"), RimLensEmission);
 		RimLensMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), 0.0f);
 		RimLensMaterial->SetScalarParameterValue(TEXT("RenderLayerOffset"), 0.0f);
 	}
 	if (RimHousingMaterial)
 	{
-		RimHousingMaterial->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.015f, 0.035f, 0.046f));
+		RimHousingMaterial->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.075f, 0.10f, 0.12f));
+		RimHousingMaterial->SetScalarParameterValue(TEXT("Metallic"), .94f);
 		RimHousingMaterial->SetScalarParameterValue(TEXT("Roughness"), 0.20f);
 		RimHousingMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), 0.0f);
 		RimHousingMaterial->SetScalarParameterValue(TEXT("RenderLayerOffset"), 0.0f);

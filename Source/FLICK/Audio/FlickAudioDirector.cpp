@@ -10,7 +10,9 @@ AFlickAudioDirector::AFlickAudioDirector()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bTickEvenWhenPaused = true;
-	PrimaryActorTick.TickInterval = 0.1f;
+	// Interval ticks depend on game time and can stall while paused, even with
+	// bTickEvenWhenPaused. UI/replay voices still need real-time cleanup then.
+	PrimaryActorTick.TickInterval = 0.0f;
 	bReplicates = true;
 	bAlwaysRelevant = true;
 }
@@ -18,10 +20,64 @@ AFlickAudioDirector::AFlickAudioDirector()
 void AFlickAudioDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	UpdateVoices(FPlatformTime::Seconds(), UGameplayStatics::IsGamePaused(this));
 	if (!bReplayMusicActive || !IsValid(ReplayMusicComponent)) return;
 	const auto* Settings = GetGameInstance<UFlickGameInstance>();
 	ReplayMusicComponent->SetVolumeMultiplier(Settings
 		? (Settings->IsReplayMusicMutedForStreaming() ? 0.0f : 0.72f * Settings->GetMasterVolume() * Settings->GetMusicVolume()) : 0.72f);
+}
+
+void AFlickAudioDirector::TrackVoice(UAudioComponent* Component, float Duration, float Pitch, bool bPauseWithGame)
+{
+	if (!Component) return;
+	const double Now = FPlatformTime::Seconds();
+	if (ActiveVoices.IsEmpty()) LastVoiceUpdate = Now;
+	FFlickActiveAudioVoice& Voice = ActiveVoices.AddDefaulted_GetRef();
+	Voice.Component = Component;
+	// Allow the queued mixer buffers to play their tail, including pitched cues.
+	Voice.StopAt = Now + Duration / FMath::Max(Pitch, .01f) + .15f;
+	Voice.bPauseWithGame = bPauseWithGame;
+}
+
+void AFlickAudioDirector::UpdateVoices(double Now, bool bPaused)
+{
+	const double Delta = FMath::Max(0.0, Now - LastVoiceUpdate);
+	LastVoiceUpdate = Now;
+	for (int32 Index = ActiveVoices.Num() - 1; Index >= 0; --Index)
+	{
+		FFlickActiveAudioVoice& Voice = ActiveVoices[Index];
+		if (bPaused && Voice.bPauseWithGame) Voice.StopAt += Delta;
+		if (!IsValid(Voice.Component) || !Voice.Component->IsPlaying() || Now >= Voice.StopAt)
+		{
+			if (Voice.Component == ReplayMusicComponent)
+			{
+				bReplayMusicActive = false;
+				ReplayMusicComponent = nullptr;
+				ReplayMusicSound = nullptr;
+			}
+			if (IsValid(Voice.Component))
+			{
+				Voice.Component->Stop();
+				Voice.Component->DestroyComponent();
+			}
+			ActiveVoices.RemoveAtSwap(Index);
+		}
+	}
+}
+
+void AFlickAudioDirector::EndPlay(const EEndPlayReason::Type Reason)
+{
+	for (const FFlickActiveAudioVoice& Voice : ActiveVoices)
+		if (IsValid(Voice.Component))
+		{
+			Voice.Component->Stop();
+			Voice.Component->DestroyComponent();
+		}
+	ActiveVoices.Empty();
+	ReplayMusicComponent = nullptr;
+	ReplayMusicSound = nullptr;
+	bReplayMusicActive = false;
+	Super::EndPlay(Reason);
 }
 
 void AFlickAudioDirector::PlayUi(const bool bConfirm)
@@ -214,6 +270,7 @@ void AFlickAudioDirector::PlayLocalNotification(const bool bOwnTurn)
 	Cue.Duration = bOwnTurn ? 0.48f : 0.22f;
 	Cue.Frequency = bOwnTurn ? 523.25f : 880.0f;
 	Cue.Volume = bOwnTurn ? 0.55f : 0.35f;
+	Cue.Seed = SoundSeed++;
 	PlayLocalCue(Cue);
 }
 
@@ -256,7 +313,7 @@ void AFlickAudioDirector::PlayReplayMusicLocal(const float Duration, const EFlic
 		// result cue, producing an intermittent and very obvious audio hole.
 		FMath::Clamp(Duration + 0.45f, 1.25f, 8.0f),
 		Root,
-		SoundSeed++,
+		173,
 		0.62f,
 		1.0f);
 	if (!Sound)
@@ -265,7 +322,8 @@ void AFlickAudioDirector::PlayReplayMusicLocal(const float Duration, const EFlic
 	}
 	Sound->SoundGroup = SOUNDGROUP_Music;
 	ReplayMusicSound = Sound;
-	ReplayMusicComponent = UGameplayStatics::SpawnSound2D(this, Sound, MixedVolume, 1.0f);
+	ReplayMusicComponent = UGameplayStatics::SpawnSound2D(this, Sound, MixedVolume, 1.0f, 0.0f, nullptr, false, false);
+	TrackVoice(ReplayMusicComponent, Sound->Duration, 1.0f, false);
 	bReplayMusicActive = IsValid(ReplayMusicComponent);
 }
 
@@ -297,11 +355,6 @@ USoundWaveProcedural* AFlickAudioDirector::CreateSound(
 	Sound->SoundGroup = SOUNDGROUP_Effects;
 	Sound->bLooping = false;
 	Sound->QueueAudio(reinterpret_cast<const uint8*>(Samples.GetData()), Samples.Num() * sizeof(int16));
-	GeneratedSounds.Add(Sound);
-	if (GeneratedSounds.Num() > 128)
-	{
-		GeneratedSounds.RemoveAt(0, 32, EAllowShrinking::No);
-	}
 	return Sound;
 }
 
@@ -325,6 +378,7 @@ void AFlickAudioDirector::PlayGenerated(
 	Cue.Location = Location ? *Location : FVector::ZeroVector;
 	Cue.Timbre = Timbre;
 	Cue.Intensity = Intensity;
+	Cue.Seed = SoundSeed++;
 	if (Kind == EFlickGeneratedSoundKind::UiNavigate || Kind == EFlickGeneratedSoundKind::UiConfirm)
 		PlayLocalCue(Cue);
 	else if (HasAuthority())
@@ -351,7 +405,7 @@ void AFlickAudioDirector::PlayLocalCue(const FFlickAudioCue& Cue)
 		return;
 	}
 
-	USoundWaveProcedural* Sound = CreateSound(Kind, Cue.Duration, Cue.Frequency, SoundSeed++, Cue.Timbre, Cue.Intensity);
+	USoundWaveProcedural* Sound = CreateSound(Kind, Cue.Duration, Cue.Frequency, Cue.Seed, Cue.Timbre, Cue.Intensity);
 	if (!Sound)
 	{
 		return;
@@ -372,18 +426,21 @@ void AFlickAudioDirector::PlayLocalCue(const FFlickAudioCue& Cue)
 			SpatialAttenuation->Attenuation.AttenuationShapeExtents = FVector(3600.0f, 0.0f, 0.0f);
 			SpatialAttenuation->Attenuation.FalloffDistance = 2400.0f;
 		}
-		UGameplayStatics::PlaySoundAtLocation(
+		UAudioComponent* Voice = UGameplayStatics::SpawnSoundAtLocation(
 			this,
 			Sound,
 			Cue.Location,
+			FRotator::ZeroRotator,
 			MixedVolume,
 			Cue.Pitch,
 			0.0f,
-			SpatialAttenuation);
+			SpatialAttenuation, nullptr, false);
+		TrackVoice(Voice, Sound->Duration, Cue.Pitch, true);
 	}
 	else
 	{
-		UGameplayStatics::PlaySound2D(this, Sound, MixedVolume, Cue.Pitch);
+		UAudioComponent* Voice = UGameplayStatics::SpawnSound2D(this, Sound, MixedVolume, Cue.Pitch, 0.0f, nullptr, false, false);
+		TrackVoice(Voice, Sound->Duration, Cue.Pitch, false);
 	}
 }
 

@@ -16,7 +16,18 @@ float UFlickPostMatchPresentationComponent::GetElapsed() const
 {
 	const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
 	const float Elapsed = State ? FMath::Max(0.0f, State->GetServerWorldTimeSeconds() - MatchStart) : 0.0f;
-	return ContinuedAt >= 0.0f ? FMath::Max(Elapsed, ShowcaseSeconds + Elapsed - ContinuedAt) : Elapsed;
+	// Manual Continue retains a short fade before moving the camera, just like
+	// the automatic transition. Never rewind a pullback already in progress.
+	return ContinuedAt >= 0.0f
+		? FMath::Max(Elapsed, ShowcaseSeconds - WinnerStatsFadeSeconds + Elapsed - ContinuedAt) : Elapsed;
+}
+
+float UFlickPostMatchPresentationComponent::GetWinnerStatsOpacity() const
+{
+	// Projected winner positions converge during pullback, but Slate cards keep
+	// their screen-space width. Remove them before that movement can overlap text;
+	// the complete statistics remain available in the summary scoreboard.
+	return bActive ? FMath::Clamp((ShowcaseSeconds - GetElapsed()) / WinnerStatsFadeSeconds, 0.0f, 1.0f) : 0.0f;
 }
 
 FVector UFlickPostMatchPresentationComponent::GetWinnerPosition(const int32 Slot) const

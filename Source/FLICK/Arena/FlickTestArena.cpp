@@ -162,6 +162,12 @@ AFlickTestArena::AFlickTestArena()
 	WorkshopArenaMesh->SetupAttachment(GetRootComponent());
 	ConfigureVisualComponent(WorkshopArenaMesh);
 	WorkshopArenaMesh->SetCastShadow(true);
+	// Flush inlays use small material offsets for stable raster depth. Hardware
+	// Lumen must trace that same surface, not the unshifted deck/hidden markings
+	// above it; otherwise reflection rays immediately hit invisible geometry.
+	// The setter is a no-op before a scene proxy exists, so initialize the
+	// component property here before registration builds that proxy.
+	WorkshopArenaMesh->bEvaluateWorldPositionOffsetInRayTracing = true;
 	if (bUsingWorkshopAssets)
 	{
 		WorkshopArenaMesh->SetStaticMesh(WorkshopArenaAsset.Object);

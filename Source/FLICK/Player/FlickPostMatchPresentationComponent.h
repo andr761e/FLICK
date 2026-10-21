@@ -15,10 +15,12 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	void ContinueToSummary() { bContinueRequested = true; }
 	bool ShowsDetails() const { return bActive && GetElapsed() >= ShowcaseSeconds + PullbackSeconds; }
+	float GetWinnerStatsOpacity() const;
 	FVector GetWinnerPosition(int32 Slot) const;
 	float GetElapsed() const;
 	static constexpr float ShowcaseSeconds = 5.0f;
 	static constexpr float PullbackSeconds = 1.4f;
+	static constexpr float WinnerStatsFadeSeconds = 0.25f;
 private:
 	void ClearPresentation();
 	void BuildWinner(int32 Slot);

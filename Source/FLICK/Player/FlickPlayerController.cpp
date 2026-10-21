@@ -1173,6 +1173,7 @@ EFlickTeam AFlickPlayerController::GetLocalTeam() const
 	const AFlickPlayerState* FlickPlayerState = GetPlayerState<AFlickPlayerState>();
 	const AFlickGameState* FlickGameState = GetFlickGameState();
 	if (FlickPlayerState && FlickGameState
+		&& FlickGameState->bPrivateMatchActive
 		&& FlickPlayerState->ControlsPrivateSlot(
 			FlickGameState->CurrentTeam,
 			FlickGameState->CurrentTeamPlayerSlot))

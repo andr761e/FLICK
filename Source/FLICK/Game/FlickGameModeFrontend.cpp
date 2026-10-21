@@ -1098,6 +1098,17 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 	bHasTrainingResetSnapshot = false;
 	if (bAgainstBot)
 	{
+		// Offline bot play always seats the human at Player 1 / slot 0. Menu
+		// spectators and previous private roles must not leak into ownership UI.
+		if (APlayerController* LocalController = UGameplayStatics::GetPlayerController(this, 0))
+		{
+			if (AFlickPlayerState* LocalPlayer = LocalController->GetPlayerState<AFlickPlayerState>())
+			{
+				LocalPlayer->SetPrivateControlledSlots({});
+				LocalPlayer->SetTeam(EFlickTeam::Player1);
+				LocalPlayer->SetTeamPlayerSlot(0);
+			}
+		}
 		SelectedMatchVariant = NormalizeMatchVariant(SelectedMatchVariant);
 		if (!bTestArenaMode)
 		{

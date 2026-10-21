@@ -595,7 +595,7 @@ public:
 	float OneVsOneGameplaySoftboxMultiplier = 250.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Sky Light Multiplier", ClampMin = "1.0", ClampMax = "4.0"))
-	float OneVsOneSkyLightMultiplier = 2.25f;
+	float OneVsOneSkyLightMultiplier = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Fill Light Intensity (650 cm Base)", ClampMin = "0.0", ClampMax = "300000.0"))
 	float OneVsOneFillLightIntensity = 150000.0f;

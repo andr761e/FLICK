@@ -168,4 +168,10 @@ if abs(dimensions[0] - 1308.0) > 1.0 or abs(dimensions[1] - 1308.0) > 1.0:
     "materials": mapped,
     "floor_collision_hulls": mesh_editor.get_convex_collision_count(mesh),
 }, indent=2))
+# Keep reimports on the same canonical material-only presentation as the game.
+# Scope to this importer so importing the arena does not require the stadium.
+material_script = project / "Tools/Build-FlickBobArchitecturalMaterials.py"
+exec(compile(material_script.read_text(encoding="utf-8"), str(material_script), "exec"),
+     {"__name__": "_flick_bob_materials", "__file__": str(material_script),
+      "bob_material_directories": (destination,)})
 u.log("FLICK_BOB_ARENA_IMPORT_COMPLETE")

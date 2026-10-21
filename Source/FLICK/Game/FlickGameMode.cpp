@@ -859,9 +859,18 @@ void AFlickGameMode::BeginPlay()
 	{
 		float CaptureDelaySeconds = 2.0f;
 		FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureDelaySeconds="), CaptureDelaySeconds);
+		int32 CaptureFrames = 1;
+		FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureFrames="), CaptureFrames);
+		const auto FramesLeft = MakeShared<int32>(FMath::Clamp(CaptureFrames, 1, 32));
 		const TWeakObjectPtr<AFlickGameMode> WeakThis(this);
-		FTimerHandle CaptureTimer;
-		GetWorldTimerManager().SetTimer(CaptureTimer, [WeakThis]()
+		const auto CaptureTimer = MakeShared<FTimerHandle>();
+		FTimerManagerTimerParameters CaptureParameters;
+		CaptureParameters.bLoop = true;
+		// Screenshot encoding can stall a frame; timer catch-up must not request
+		// several shots of that same frame and silently coalesce the requests.
+		CaptureParameters.bMaxOncePerFrame = true;
+		CaptureParameters.FirstDelay = FMath::Clamp(CaptureDelaySeconds, 1.0f, 30.0f);
+		GetWorldTimerManager().SetTimer(*CaptureTimer, [WeakThis, FramesLeft, CaptureTimer]()
 		{
 			AFlickGameMode* FlickGameMode = WeakThis.Get();
 			if (!FlickGameMode)
@@ -872,6 +881,8 @@ void AFlickGameMode::BeginPlay()
 			{
 				PlayerController->ConsoleCommand(TEXT("Shot showui"));
 			}
+			if (--*FramesLeft > 0) return;
+			FlickGameMode->GetWorldTimerManager().ClearTimer(*CaptureTimer);
 
 			FTimerHandle QuitTimer;
 			FlickGameMode->GetWorldTimerManager().SetTimer(QuitTimer, [WeakThis]()
@@ -881,7 +892,7 @@ void AFlickGameMode::BeginPlay()
 					ValidGameMode->QuitGame();
 				}
 			}, 1.0f, false);
-		}, FMath::Clamp(CaptureDelaySeconds, 1.0f, 30.0f), false);
+		}, .125f, CaptureParameters);
 	}
 
 	int32 CameraViewPreview = 0;

@@ -1,4 +1,5 @@
 #if WITH_DEV_AUTOMATION_TESTS
+#include "Camera/CameraComponent.h"
 #include "Misc/AutomationTest.h"
 #include "Core/FlickLightingSettings.h"
 #include "Core/FlickModeRules.h"
@@ -76,6 +77,42 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Both gameplay softboxes are overhead, not low edge spotlights"),
 			KeyActor->GetActorLocation().Z >= 800.0f && RimActor->GetActorLocation().Z >= 800.0f);
 		const FlickArenaLighting::FParameters DefaultRig;
+		const auto InitialRimSpillLights = FlickArenaLighting::FindRig(World).RimSpillLights;
+		const auto CheckRimSpill = [&](float Radius, float SurfaceZ, float WarmPreference, float ReflectionPreference)
+		{
+			const float Scale = Radius / 650.f;
+			const auto Rig = FlickArenaLighting::FindRig(World);
+			for (int32 Index = 0; Index < Rig.RimSpillLights.Num(); ++Index)
+			{
+				const auto* Actor = Rig.RimSpillLights[Index].Get();
+				if (!TestNotNull(TEXT("Every rim segment has one local spill source"), Actor)) continue;
+				TestTrue(TEXT("Rim sources retain their identity across formats and settings"), Actor == InitialRimSpillLights[Index]);
+				TestTrue(TEXT("Rim source has a stable lookup tag"),
+					Actor->ActorHasTag(FName(*FString::Printf(TEXT("FLICK.RimSpill%d"), Index))));
+				TestFalse(TEXT("Rim sources are cosmetic, not replicated gameplay actors"), Actor->GetIsReplicated());
+				const FVector Position = Actor->GetActorLocation();
+				TestTrue(TEXT("Warm spill stays just outside the arena skirt"),
+					FMath::IsNearlyEqual(Position.Size2D(), Radius + 5.f * Scale, .01f));
+				TestTrue(TEXT("Warm spill stays below the playing plane"),
+					FMath::IsNearlyEqual(Position.Z, SurfaceZ - 18.f * Scale, .01f));
+				const FVector Radial = FVector(Position.X, Position.Y, 0.f).GetSafeNormal();
+				TestTrue(TEXT("Elongated rim sources run tangentially around the edge"),
+					FMath::IsNearlyZero(FVector::DotProduct(Actor->GetActorUpVector(), Radial), .001f)
+					&& FMath::IsNearlyZero(Actor->GetActorUpVector().Z, .001f));
+				const UPointLightComponent* Light = Actor->PointLightComponent;
+				TestEqual(TEXT("Rim range scales locally rather than flooding the arena"), Light->AttenuationRadius, 450.f * Scale);
+				TestEqual(TEXT("Rim source width scales with arena size"), Light->SourceRadius, 15.f * Scale);
+				TestEqual(TEXT("Rim reflection softness scales with arena size"), Light->SoftSourceRadius, 32.f * Scale);
+				TestEqual(TEXT("Rim source length scales with arena size"), Light->SourceLength, 140.f * Scale);
+				TestEqual(TEXT("Rim spill is stable direct light, without a second stochastic indirect bounce"), Light->IndirectLightingIntensity, 0.f);
+				TestFalse(TEXT("Rim spill adds no dynamic shadow passes"), Light->CastShadows);
+				TestTrue(TEXT("Warm spill power follows the warm preference and board area"),
+					FMath::IsNearlyEqual(Light->Intensity, DefaultRig.RimSpillLightLumens * FMath::Square(Scale) * WarmPreference, .01f));
+				TestEqual(TEXT("Rim reflections follow the reflection preference without exposed source glare"), Light->SpecularScale, ReflectionPreference * .12f);
+			}
+		};
+		CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ,
+			GetValue(EScene::Gameplay, EControl::Rim), GetValue(EScene::Gameplay, EControl::Highlights));
 		TestEqual(TEXT("Key reflection source spans the deck instead of a narrow card"), Key->SourceWidth, DefaultRig.SwitchyardKeySourceWidth);
 		TestEqual(TEXT("Key reflection source is broad on both axes"), Key->SourceHeight, DefaultRig.SwitchyardKeySourceHeight);
 		TestEqual(TEXT("Warm reflection source is broad on both axes"), Rim->SourceHeight, DefaultRig.SwitchyardRimSourceHeight);
@@ -110,6 +147,8 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 			const float Scale = Mode->ArenaRadius / 650.f;
 			TestEqual(TEXT("Large boards retain broad key coverage"), Key->SourceWidth, DefaultRig.SwitchyardKeySourceWidth * Scale);
 			TestEqual(TEXT("Large boards retain broad warm coverage"), Rim->SourceHeight, DefaultRig.SwitchyardRimSourceHeight * Scale);
+			CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ,
+				GetValue(EScene::Gameplay, EControl::Rim), GetValue(EScene::Gameplay, EControl::Highlights));
 		}
 		Mode->CurrentPlayersPerTeam = 1;
 		Mode->ArenaRadius = 650.f;
@@ -134,9 +173,33 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 			Camera->ApplyCameraSettings();
 			Camera->Tick(1.0f);
 			const FVector View = Camera->GetActorLocation();
-			const FRotator LightFrame(0.0f, FMath::RadiansToDegrees(FMath::Atan2(View.Y, View.X)) + 56.0f, 0.0f);
+			const FRotator LightFrame(0.0f, FMath::RadiansToDegrees(FMath::Atan2(View.Y, View.X)) + 90.0f, 0.0f);
 			TestTrue(TEXT("Camera tick actually moves the softboxes, not just the setup helper"),
-				KeyActor->GetActorLocation().Equals(LightFrame.RotateVector(FVector(-100.0f, 900.0f, 950.0f)), 0.01f));
+				KeyActor->GetActorLocation().Equals(LightFrame.RotateVector(FVector(-100.0f, 1600.0f, 950.0f)), 0.01f));
+			const auto* ViewCamera = Camera->FindComponentByClass<UCameraComponent>();
+			if (TestNotNull(TEXT("Runtime view camera"), ViewCamera))
+			{
+				const auto& Post = ViewCamera->PostProcessSettings;
+				const auto CheckStableTrace = [&]()
+				{
+					TestTrue(TEXT("Switchyard uses stable scene-traced GI in the menu and game"),
+						Post.bOverride_LumenFinalGatherScreenTraces && !Post.LumenFinalGatherScreenTraces);
+					TestTrue(TEXT("Switchyard keeps Lumen reflections without screen-edge radiance switching"),
+						Post.bOverride_LumenReflectionsScreenTraces && !Post.LumenReflectionsScreenTraces);
+				};
+				CheckStableTrace();
+				Camera->SetMenuPresentation(false);
+				Camera->SetTestArenaPresentation(true);
+				CheckStableTrace();
+				Camera->SetTestArenaPresentation(false);
+				Camera->SetOneVsOneArenaPresentation(false);
+				Camera->SetBobGameplayFraming(true);
+				TestFalse(TEXT("BOB retains its original GI trace path"), Post.bOverride_LumenFinalGatherScreenTraces);
+				TestFalse(TEXT("BOB retains its original reflection trace path"), Post.bOverride_LumenReflectionsScreenTraces);
+				Camera->SetBobGameplayFraming(false);
+				Camera->SetOneVsOneArenaPresentation(true);
+				Camera->SetMenuPresentation(true);
+			}
 		}
 		Mode->FrontendScreen = EFlickFrontendScreen::Settings;
 		Mode->SettingsReturnScreen = EFlickFrontendScreen::MainMenu;
@@ -157,6 +220,21 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		SetValue(EScene::Gameplay, EControl::Direct, 0.5f);
 		SetValue(EScene::Gameplay, EControl::Highlights, 0.2f);
 		Mode->SpawnLightingIfNeeded(); Mode->SpawnLightingIfNeeded();
+		const auto ArchitecturalRig = FlickArenaLighting::FindRig(World);
+		CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ, .8f, .2f);
+		int32 WarmFixtureCount = 0;
+		for (TActorIterator<ARectLight> It(World); It; ++It)
+			if (It->GetName().StartsWith(TEXT("RectLight")))
+				for (int32 Index = 0; Index < 4; ++Index)
+					if (It->ActorHasTag(FName(*FString::Printf(TEXT("FLICK.StadiumWarm%d"), Index)))) ++WarmFixtureCount;
+		TestEqual(TEXT("Repeated lighting applications never duplicate stadium fixtures"), WarmFixtureCount, 4);
+		for (const auto& Fixture : ArchitecturalRig.StadiumWarmLights)
+			if (TestNotNull(TEXT("Each seating bank has one warm source"), Fixture.Get()))
+			{
+				TestFalse(TEXT("Seating spill never adds dynamic shadow passes"), Fixture->RectLightComponent->CastShadows);
+				TestTrue(TEXT("Seating warmth follows the saved warm-light preference"),
+					FMath::IsNearlyEqual(Fixture->RectLightComponent->Intensity, DefaultRig.StadiumWarmLightLumens * .8f, .1f));
+			}
 		TestEqual(TEXT("Ambient preference applies live"), Sky->Intensity, 1.05f * Mode->OneVsOneSkyLightMultiplier * 1.5f);
 		TestEqual(TEXT("Fill preference applies without compounding"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 2.0f);
 		TestEqual(TEXT("Cool softbox preference applies"), Key->Intensity, Mode->TestPuckKeyLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * 0.5f);
@@ -164,6 +242,15 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Team accent preference applies"), Mode->Player1AccentLight->PointLightComponent->Intensity, Mode->MenuAccentLightIntensity * 2.0f);
 		TestEqual(TEXT("Overhead preference applies"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, 1.45f * 0.68f * 0.5f);
 		TestEqual(TEXT("Reflection preference applies without changing diffuse fill"), Key->SpecularScale, 0.2f);
+		SetValue(EScene::Gameplay, EControl::Highlights, 0.f);
+		Mode->SpawnLightingIfNeeded();
+		CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ, .8f, 0.f);
+		SetValue(EScene::Gameplay, EControl::Highlights, .2f);
+		SetValue(EScene::Gameplay, EControl::Rim, 0.f);
+		Mode->SpawnLightingIfNeeded();
+		CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ, 0.f, .2f);
+		SetValue(EScene::Gameplay, EControl::Rim, .8f);
+		Mode->SpawnLightingIfNeeded();
 		// Exercise the same local-controller path used without an authoritative game mode.
 		AFlickGameState* ClientState = World->SpawnActor<AFlickGameState>();
 		AFlickPlayerController* ClientController = World->SpawnActor<AFlickPlayerController>();
@@ -227,8 +314,9 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 				FMath::IsNearlyEqual(KeyActor->GetActorLocation().Z, 250.f + 700.f * Scale, .01f));
 			TestTrue(TEXT("Larger formats scale saved softbox power with board area"),
 				FMath::IsNearlyEqual(Key->Intensity, Mode->TestPuckKeyLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * 0.5f * FMath::Square(Scale), 0.1f));
-			TestEqual(TEXT("Larger formats scale softbox range"), Key->AttenuationRadius, 1850.0f * Scale);
+			TestEqual(TEXT("Larger formats scale the far-rim softbox range"), Key->AttenuationRadius, 2500.0f * Scale);
 			TestEqual(TEXT("Larger formats share reflection preference"), Key->SpecularScale, 0.2f);
+			CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ, .8f, .2f);
 			Mode->FrontendScreen = EFlickFrontendScreen::MainMenu;
 			Mode->SpawnLightingIfNeeded();
 			TestEqual(TEXT("Larger format menus retain shared ambient settings"), Sky->Intensity, 1.05f * Mode->OneVsOneSkyLightMultiplier * 1.5f);
@@ -248,8 +336,8 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 				Camera->SetOneVsOneArenaPresentation(false);
 				Camera->Tick(1.0f);
 				const FVector View = Camera->GetActorLocation();
-				const FRotator Frame(0.0f, FMath::RadiansToDegrees(FMath::Atan2(View.Y, View.X)) + 56.0f, 0.0f);
-				FVector Expected = Frame.RotateVector(FVector(-100.0f, 900.0f, 950.0f) * Scale);
+				const FRotator Frame(0.0f, FMath::RadiansToDegrees(FMath::Atan2(View.Y, View.X)) + 90.0f, 0.0f);
+				FVector Expected = Frame.RotateVector(FVector(-100.0f, 1600.0f, 950.0f) * Scale);
 				Expected.Z = 250.0f + 700.0f * Scale;
 				TestTrue(TEXT("Larger-format camera tick uses its actual arena size for softbox tracking"),
 					KeyActor->GetActorLocation().Equals(Expected, 0.01f));
@@ -262,22 +350,25 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		Mode->FrontendScreen = EFlickFrontendScreen::Playing;
 		Mode->SpawnLightingIfNeeded();
 		Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("BOB fill uses saved preferences without compounding"), Fill->Intensity, 520.0f);
-		TestEqual(TEXT("BOB ambient uses saved preferences"), Sky->Intensity, 0.55f * 1.5f);
-		TestEqual(TEXT("BOB key uses saved preferences"), Key->Intensity, Mode->TestPuckKeyLightIntensity * 12.0f * 0.5f);
-		TestEqual(TEXT("BOB rim uses saved preferences"), Rim->Intensity, Mode->TestPuckRimLightIntensity * 12.0f * 0.8f);
-		TestEqual(TEXT("BOB accents use saved preferences"), Mode->Player1AccentLight->PointLightComponent->Intensity, 410.0f);
-		TestEqual(TEXT("BOB direct light uses saved preferences"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, 1.32f * 0.5f);
+		TestEqual(TEXT("BOB fill uses saved preferences without compounding"), Fill->Intensity, DefaultRig.BobFillLightLumens * 2.0f);
+		TestEqual(TEXT("BOB ambient uses saved preferences"), Sky->Intensity, DefaultRig.BobSkyIntensity * 1.5f);
+		TestEqual(TEXT("BOB key uses saved preferences"), Key->Intensity, DefaultRig.BobKeyLightLumens * 0.5f);
+		TestEqual(TEXT("BOB rim uses saved preferences"), Rim->Intensity, DefaultRig.BobRimLightLumens * 0.8f);
+		TestEqual(TEXT("BOB accents use saved preferences"), Mode->Player1AccentLight->PointLightComponent->Intensity, DefaultRig.BobWarmRailLightLumens * 2.0f);
+		TestEqual(TEXT("BOB direct light uses saved preferences"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, DefaultRig.BobDirectionalIntensity * 0.5f);
 		TestEqual(TEXT("BOB highlights use saved preferences"), Key->SpecularScale, 0.2f);
 		TestEqual(TEXT("BOB fill does not create reflection glare"), Fill->SpecularScale, 0.0f);
+		for (const auto& Actor : FlickArenaLighting::FindRig(World).RimSpillLights)
+			if (TestNotNull(TEXT("Switching to BOB retains reusable rim sources"), Actor.Get()))
+				TestEqual(TEXT("Switchyard rim spill never illuminates the BOB arena"), Actor->PointLightComponent->Intensity, 0.f);
 		if (ClientState && ClientController)
 		{
 			ClientState->ActiveMatchVariant = EFlickMatchVariant::Bob;
 			ClientState->bPartyActive = false;
 			ClientState->SetMatchPhase(EFlickMatchPhase::Aiming);
 			ClientController->RefreshLocalLighting();
-			TestEqual(TEXT("BOB remote-client path applies the local fill preference"), Fill->Intensity, 520.0f);
-			TestEqual(TEXT("BOB remote-client path applies the local key preference"), Key->Intensity, 1560.0f);
+			TestEqual(TEXT("BOB remote-client path applies the local fill preference"), Fill->Intensity, DefaultRig.BobFillLightLumens * 2.0f);
+			TestEqual(TEXT("BOB remote-client path applies the local key preference"), Key->Intensity, DefaultRig.BobKeyLightLumens * 0.5f);
 			ClientState->ActiveMatchVariant = EFlickMatchVariant::Classic;
 		}
 		for (int32 Index = 0; Index < static_cast<int32>(EControl::Count); ++Index)
@@ -291,7 +382,7 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("BOB direct light can be disabled"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, 0.0f);
 		TestEqual(TEXT("BOB highlights can be disabled"), Key->SpecularScale, 0.0f);
 		ResetToDefaults(); Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("BOB reset restores the shared gameplay fill default"), Fill->Intensity, 260.0f * 1.0f);
+		TestEqual(TEXT("BOB reset restores the shared gameplay fill default"), Fill->Intensity, DefaultRig.BobFillLightLumens);
 		SetValue(EScene::Gameplay, EControl::Fill, 2.0f);
 		Mode->bTestArenaMode = true;
 		Mode->ActiveMatchVariant = EFlickMatchVariant::Classic;
@@ -302,16 +393,28 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Returning to 1v1 restores its custom fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 2.0f);
 		ResetToDefaults(); Mode->SpawnLightingIfNeeded();
 		TestEqual(TEXT("Reset applies live"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 1.0f);
+		CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ,
+			GetValue(EScene::Gameplay, EControl::Rim), GetValue(EScene::Gameplay, EControl::Highlights));
 		const FlickArenaLighting::FRig Found = FlickArenaLighting::FindRig(World);
 		TestTrue(TEXT("Client-side lookup reuses the same rig"), Found.ArenaFillLight == FillActor && Found.TestPuckKeyLight == KeyActor);
 		TestTrue(TEXT("Existing light actors are reused across formats and screens"),
 			Mode->ArenaFillLight == FillActor && Mode->TestPuckKeyLight == KeyActor
 			&& Mode->TestPuckRimLight == RimActor && Mode->SkyLightActor == SkyActor);
+		auto NonPremiumRig = Found;
+		auto NonPremiumParameters = DefaultRig;
+		NonPremiumParameters.bPremiumArena = false;
+		FlickArenaLighting::Configure(World, NonPremiumRig, NonPremiumParameters);
+		for (const auto& Actor : NonPremiumRig.RimSpillLights)
+			if (Actor)
+				TestEqual(TEXT("Non-premium scenes disable the local rim ring"), Actor->PointLightComponent->Intensity, 0.f);
+		Mode->SpawnLightingIfNeeded();
+		CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ,
+			GetValue(EScene::Gameplay, EControl::Rim), GetValue(EScene::Gameplay, EControl::Highlights));
 		int32 PointLights = 0, RectLights = 0;
 		for (TActorIterator<APointLight> It(World); It; ++It) ++PointLights;
 		for (TActorIterator<ARectLight> It(World); It; ++It) ++RectLights;
-		TestEqual(TEXT("No extra point lights were added"), PointLights, 3);
-		TestEqual(TEXT("No extra softboxes were added"), RectLights, 2);
+		TestEqual(TEXT("One rig contains three broad lights and exactly twelve local rim sources"), PointLights, 15);
+		TestEqual(TEXT("One rig contains two softboxes and four seating sources"), RectLights, 6);
 	}
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
@@ -333,8 +436,11 @@ bool FFlickLightingRigLookupTest::RunTest(const FString& Parameters)
 	Accent->Tags = {TEXT("FLICK.Player1AccentLight"), TEXT("FLICK.Player2AccentLight")};
 	auto* Fill = World->SpawnActor<APointLight>();
 	Fill->Tags.Add(TEXT("FLICK.ArenaFillLight"));
+	auto* RimSpill = World->SpawnActor<APointLight>();
+	RimSpill->Tags = {TEXT("FLICK.RimSpill0"), TEXT("FLICK.RimSpill11")};
 	auto* Duplicate = World->SpawnActor<APointLight>();
-	Duplicate->Tags = {TEXT("FLICK.Player1AccentLight"), TEXT("FLICK.Player2AccentLight"), TEXT("FLICK.ArenaFillLight")};
+	Duplicate->Tags = {TEXT("FLICK.Player1AccentLight"), TEXT("FLICK.Player2AccentLight"), TEXT("FLICK.ArenaFillLight"),
+		TEXT("FLICK.RimSpill0"), TEXT("FLICK.RimSpill11")};
 	auto* Key = World->SpawnActor<ARectLight>();
 	Key->Tags.Add(TEXT("FLICK.TestPuckKeyLight"));
 	auto* Rim = World->SpawnActor<ARectLight>();
@@ -344,8 +450,32 @@ bool FFlickLightingRigLookupTest::RunTest(const FString& Parameters)
 	const auto Rig = FlickArenaLighting::FindRig(World);
 	TestTrue(TEXT("Multi-tag actor can supply both accents"), Rig.Player1AccentLight == Accent && Rig.Player2AccentLight == Accent);
 	TestTrue(TEXT("First matching fill wins over duplicates"), Rig.ArenaFillLight == Fill);
+	TestTrue(TEXT("First matching rim sources win over duplicates at both ends of the tag range"),
+		Rig.RimSpillLights[0] == RimSpill && Rig.RimSpillLights[11] == RimSpill);
+	TestNull(TEXT("Lookup never creates an absent rim source"), Rig.RimSpillLights[1].Get());
 	TestTrue(TEXT("First matching softboxes win over duplicates"), Rig.TestPuckKeyLight == Key && Rig.TestPuckRimLight == Rim);
 	TestNull(TEXT("Lookup never creates absent directional fixtures"), Rig.DirectionalLightActor.Get());
+#if WITH_EDITOR
+	// Exercise the real dedicated-server guard without opening a network socket.
+	const auto CountActors = [World]()
+	{
+		int32 Count = 0;
+		for (TActorIterator<AActor> It(World); It; ++It) ++Count;
+		return Count;
+	};
+	const int32 ExistingActors = CountActors();
+	World->WorldType = EWorldType::PIE;
+	World->SetPlayInEditorInitialNetMode(NM_DedicatedServer);
+	TestEqual(TEXT("Fixture represents a dedicated server"), World->GetNetMode(), NM_DedicatedServer);
+	FlickArenaLighting::FRig DedicatedRig;
+	FlickArenaLighting::Configure(World, DedicatedRig, FlickArenaLighting::FParameters());
+	TestNull(TEXT("Dedicated servers never create or configure a presentation fill"), DedicatedRig.ArenaFillLight.Get());
+	TestNull(TEXT("Dedicated servers never create presentation softboxes"), DedicatedRig.TestPuckKeyLight.Get());
+	for (const auto& Source : DedicatedRig.RimSpillLights)
+		TestNull(TEXT("Dedicated servers never create rim sources"), Source.Get());
+	TestEqual(TEXT("Dedicated lighting configuration never spawns cosmetic actors"), CountActors(), ExistingActors);
+	World->WorldType = EWorldType::Game;
+#endif
 	return true;
 }
 #endif

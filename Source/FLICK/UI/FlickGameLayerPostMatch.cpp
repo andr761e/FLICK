@@ -176,10 +176,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
    }
    return FMargin(Screen.X, Screen.Y, 0, 0);
   })
-  [SNew(SBox).WidthOverride(245).HeightOverride(108).Visibility_Lambda([this, Slot, ShowDetails]()
+  [SNew(SBox).WidthOverride(245).HeightOverride(108).Visibility_Lambda([this, Slot, Presentation]()
   {
    const auto* State = GetScoreboardGameState();
-   return !ShowDetails() && State && State->WinnerTeam != EFlickTeam::None && Slot < State->PlayersPerTeam
+   const auto* View = Presentation();
+   return View && View->GetWinnerStatsOpacity() > 0.0f && State && State->WinnerTeam != EFlickTeam::None && Slot < State->PlayersPerTeam
     ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
   })
    [SNew(SVerticalBox)
@@ -262,7 +263,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
    [SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
     [CenteredLine(TAttribute<FText>::CreateLambda(DecisiveMoment), 11, Brand)]]]
  ]
- + SOverlay::Slot()[Winners]
+ + SOverlay::Slot()
+ [SNew(SBorder).BorderImage(FAppStyle::GetBrush("NoBrush")).Padding(0)
+  .Visibility(EVisibility::HitTestInvisible)
+  .ColorAndOpacity_Lambda([Presentation]()
+  { const auto* View = Presentation(); return FLinearColor(1, 1, 1, View ? View->GetWinnerStatsOpacity() : 0.0f); })
+  [Winners]]
  + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0, 0, 0, 30)
  [SNew(SBox).Visibility_Lambda([ShowDetails]() { return ShowDetails() ? EVisibility::Collapsed : EVisibility::Visible; })
   [Action(TEXT("CONTINUE TO SUMMARY"), FOnClicked::CreateLambda([Presentation]()

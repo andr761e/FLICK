@@ -16,13 +16,27 @@
 
 namespace FlickArenaLighting
 {
-	// This off-axis angle reproduces the calmer highlights seen after the old
-	// startup orbit. Tracking the view prevents the softboxes crossing its mirror axis.
+	namespace
+	{
+		FName RimSpillTag(int32 Index)
+		{
+			static const auto Tags = []
+			{
+				TStaticArray<FName, 12> Result;
+				for (int32 Slot = 0; Slot < Result.Num(); ++Slot)
+					Result[Slot] = FName(*FString::Printf(TEXT("FLICK.RimSpill%d"), Slot));
+				return Result;
+			}();
+			return Tags[Index];
+		}
+	}
+	// Keep the broad key opposite the view so its highlight stays on the far
+	// center of the deck instead of washing across the left half during orbit.
 	void UpdateMenuSoftboxes(ARectLight* Key, ARectLight* Rim, const FVector& CameraLocation, float ArenaRadius, float ArenaSurfaceZ)
 	{
 		if (FVector2D(CameraLocation.X, CameraLocation.Y).IsNearlyZero()) return;
 		const float CameraAzimuth = FMath::RadiansToDegrees(FMath::Atan2(CameraLocation.Y, CameraLocation.X));
-		const FRotator Rotation(0.0f, CameraAzimuth + 56.0f, 0.0f);
+		const FRotator Rotation(0.0f, CameraAzimuth + 90.0f, 0.0f);
 		const float Scale = ArenaRadius / 650.0f;
 		const auto Move = [&](ARectLight* Light, const FVector& Offset)
 		{
@@ -32,8 +46,10 @@ namespace FlickArenaLighting
 			Light->SetActorLocation(Location);
 			Light->SetActorRotation((FVector(0.0f, 0.0f, ArenaSurfaceZ) - Location).Rotation());
 		};
-		Move(Key, FVector(-100.0f, 900.0f, 950.0f));
-		Move(Rim, FVector(350.0f, 800.0f, 800.0f));
+		// Light from beyond the far rim: the reflected panels sit behind the
+		// pucks, rather than forming a pale hotspot across the near half of play.
+		Move(Key, FVector(-100.0f, 1600.0f, 950.0f));
+		Move(Rim, FVector(350.0f, 1500.0f, 800.0f));
 	}
 
 	// Tags identify only this rig; repeated applications never stack extra fixtures.
@@ -51,13 +67,16 @@ namespace FlickArenaLighting
 			if (!Rig.Player1AccentLight && It->ActorHasTag(TEXT("FLICK.Player1AccentLight"))) Rig.Player1AccentLight = *It;
 			if (!Rig.Player2AccentLight && It->ActorHasTag(TEXT("FLICK.Player2AccentLight"))) Rig.Player2AccentLight = *It;
 			if (!Rig.ArenaFillLight && It->ActorHasTag(TEXT("FLICK.ArenaFillLight"))) Rig.ArenaFillLight = *It;
-			if (Rig.Player1AccentLight && Rig.Player2AccentLight && Rig.ArenaFillLight) break;
+			for (int32 Index = 0; Index < Rig.RimSpillLights.Num(); ++Index)
+				if (!Rig.RimSpillLights[Index] && It->ActorHasTag(RimSpillTag(Index))) Rig.RimSpillLights[Index] = *It;
 		}
 		for (TActorIterator<ARectLight> It(World); It; ++It)
 		{
+			for (int32 Index = 0; Index < Rig.StadiumWarmLights.Num(); ++Index)
+				if (!Rig.StadiumWarmLights[Index] && It->ActorHasTag(FName(*FString::Printf(TEXT("FLICK.StadiumWarm%d"), Index))))
+					Rig.StadiumWarmLights[Index] = *It;
 			if (!Rig.TestPuckKeyLight && It->ActorHasTag(TEXT("FLICK.TestPuckKeyLight"))) Rig.TestPuckKeyLight = *It;
 			if (!Rig.TestPuckRimLight && It->ActorHasTag(TEXT("FLICK.TestPuckRimLight"))) Rig.TestPuckRimLight = *It;
-			if (Rig.TestPuckKeyLight && Rig.TestPuckRimLight) break;
 		}
 		return Rig;
 	}
@@ -99,10 +118,10 @@ namespace FlickArenaLighting
 		const float Ambient = Value(EControl::Ambient), Fill = Value(EControl::Fill), Key = Value(EControl::Key);
 		const float Rim = Value(EControl::Rim), Accents = Value(EControl::Accents), Direct = Value(EControl::Direct);
 		const float Highlights = Value(EControl::Highlights);
-		const float ArenaScale = ArenaRadius / FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius;
+		const float ArenaScale = ArenaRadius / (bBobArenaLighting ? 620.f : FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
 		// Fixture dimensions/distances scale with the board. Scale local light
 		// power by area to preserve illumination instead of darkening large arenas.
-		const float LocalPowerScale = bPremiumArena ? FMath::Square(ArenaScale) : 1.0f;
+		const float LocalPowerScale = bPremiumArena || bBobArenaLighting ? FMath::Square(ArenaScale) : 1.0f;
 		const auto ScaleLocation = [=](const FVector& Location)
 		{
 			FVector Scaled = Location * ArenaScale;
@@ -159,9 +178,9 @@ namespace FlickArenaLighting
 				? FLinearColor(0.92f, 0.95f, 1.0f)
 				: bClassicArenaLighting
 					? FLinearColor(0.82f, 0.88f, 0.96f)
-					: FLinearColor(0.9f, 0.94f, 1.0f));
+					: bBobArenaLighting ? FLinearColor(1.f, .95f, .86f) : FLinearColor(0.9f, 0.94f, 1.0f));
 			Light->SetIntensity(
-				(bTestArenaMode ? 1.45f : bClassicArenaLighting ? 0.78f : bBobArenaLighting ? 1.32f : 1.15f)
+				(bTestArenaMode ? 1.45f : bClassicArenaLighting ? 0.78f : bBobArenaLighting ? Parameters.BobDirectionalIntensity : 1.15f)
 				* DirectionalMultiplier * Direct);
 			Light->SetLightSourceAngle(bTestArenaMode ? 5.0f : 3.0f);
 			Light->SetSpecularScale(bShowcaseLighting ? Highlights : bTestArenaMode ? 0.60f * Highlights : bClassicArenaLighting ? 0.14f : 0.32f * Highlights);
@@ -173,7 +192,7 @@ namespace FlickArenaLighting
 			auto* Sky = SkyLightActor->GetLightComponent();
 			Sky->SetMobility(EComponentMobility::Movable);
 			// Metallic workshop surfaces need an environment to reflect even on an empty map.
-			if (bTestArenaMode || bShowcaseLighting)
+			if (bTestArenaMode || bShowcaseLighting || bBobArenaLighting)
 			{
 				if (auto* Environment = LoadObject<UTextureCube>(nullptr,
 					TEXT("/Game/TestArena/Pucks/T_PuckEnvironment.T_PuckEnvironment")))
@@ -189,7 +208,7 @@ namespace FlickArenaLighting
 				Sky->SetCubemap(nullptr);
 			}
 			Sky->SetIntensity(
-				(bTestArenaMode ? 1.05f : bClassicArenaLighting ? 0.34f : bBobArenaLighting ? 0.55f : 0.28f)
+				(bTestArenaMode ? 1.05f : bClassicArenaLighting ? 0.34f : bBobArenaLighting ? Parameters.BobSkyIntensity : 0.28f)
 				* SkyMultiplier * Ambient);
 		}
 
@@ -207,6 +226,34 @@ namespace FlickArenaLighting
 			{
 				UPointLightComponent* Light = LightActor->PointLightComponent;
 				Light->SetMobility(EComponentMobility::Movable);
+				if (bBobArenaLighting)
+				{
+					// Use the two existing accents beside the actual service rails,
+					// not as a whole-board colour flood. +X is screen-left/amber.
+					const bool bWarm = LightActor == Player1AccentLight;
+					LightActor->SetActorLocation(FVector((bWarm ? 730.f : -730.f) * ArenaScale, 0.f,
+						ArenaSurfaceZ - 14.f * ArenaScale));
+					LightActor->SetActorRotation(FRotationMatrix::MakeFromZ(FVector::YAxisVector).Rotator());
+					Light->SetIntensityUnits(ELightUnits::Lumens);
+					Light->SetIntensity((bWarm ? Parameters.BobWarmRailLightLumens : Parameters.BobCoolRailLightLumens)
+						* Accents * LocalPowerScale);
+					Light->SetLightColor(bWarm ? FLinearColor(1.f, .48f, .15f) : FLinearColor(.07f, .62f, 1.f));
+					Light->SetSourceLength(760.f * ArenaScale);
+					Light->SetSourceRadius(6.f * ArenaScale);
+					Light->SetSoftSourceRadius(30.f * ArenaScale);
+					Light->SetAttenuationRadius(500.f * ArenaScale);
+					Light->SetSpecularScale(.35f * Highlights);
+					Light->SetIndirectLightingIntensity(0.f);
+					Light->SetVolumetricScatteringIntensity(0.f);
+					Light->SetCastShadows(false);
+					return;
+				}
+				// Reused actors must not retain BOB's lumen/capsule state in Knockout.
+				Light->SetIntensityUnits(ELightUnits::Unitless);
+				Light->SetSourceLength(0.f);
+				Light->SetSoftSourceRadius(0.f);
+				Light->SetVolumetricScatteringIntensity(1.f);
+				LightActor->SetActorRotation(FRotator::ZeroRotator);
 				LightActor->SetActorLocation(Location);
 				// Preserve the neutral gameplay wash, but let the main-menu orbit show
 				// the arena's team colors and material highlights without a screen tint.
@@ -252,6 +299,16 @@ namespace FlickArenaLighting
 			ArenaFillLight->PointLightComponent->SetSpecularScale(bPremiumArena || bBobArenaLighting ? 0.0f : bTestArenaMode ? 0.32f : bClassicArenaLighting ? 0.06f : 0.26f);
 			ArenaFillLight->PointLightComponent->SetIndirectLightingIntensity(bClassicArenaLighting ? 0.45f : 0.34f);
 			ArenaFillLight->PointLightComponent->SetCastShadows(false);
+			ArenaFillLight->PointLightComponent->SetIntensityUnits(bBobArenaLighting ? ELightUnits::Lumens : ELightUnits::Unitless);
+			if (bBobArenaLighting)
+			{
+				UPointLightComponent* Light = ArenaFillLight->PointLightComponent;
+				ArenaFillLight->SetActorLocation(ScaleLocation(FVector(0.f, 0.f, 1100.f)));
+				Light->SetLightColor(FLinearColor(1.f, .94f, .84f));
+				Light->SetIntensity(Parameters.BobFillLightLumens * Fill * LocalPowerScale);
+				Light->SetSourceRadius(400.f * ArenaScale);
+				Light->SetAttenuationRadius(1800.f * ArenaScale);
+			}
 		}
 
 		// Large neutral cards create narrow, moving highlight bands on the prototype's
@@ -284,26 +341,41 @@ namespace FlickArenaLighting
 			Light->SetLightColor(Color);
 			const float Multiplier = bPremiumArena
 				? (bPremiumMenu ? OneVsOneMenuSoftboxMultiplier : OneVsOneGameplaySoftboxMultiplier)
-				: (bShowcaseLighting ? MenuSoftboxLightMultiplier : bBobArenaLighting ? Parameters.BobSoftboxLightMultiplier : 1.0f);
+				: (bShowcaseLighting ? MenuSoftboxLightMultiplier : 1.0f);
 			Light->SetIntensity(bShowcaseLighting || bTestArenaMode || bBobArenaLighting ? Intensity * Multiplier * PowerScale * LocalPowerScale : 0.0f);
-			Light->SetAttenuationRadius((bPremiumArena || bBobArenaLighting ? 1850.0f : 1250.0f) * ArenaScale);
+			Light->SetAttenuationRadius((bPremiumArena ? 2500.0f : bBobArenaLighting ? 1850.0f : 1250.0f) * ArenaScale);
 			Light->SetSourceWidth(Width * ArenaScale);
 			Light->SetSourceHeight(Height * ArenaScale);
 			Light->SetSpecularScale(Highlights);
 			Light->SetIndirectLightingIntensity(0.05f);
 			Light->SetCastShadows(false);
+			Light->SetIntensityUnits(bBobArenaLighting ? ELightUnits::Lumens : ELightUnits::Unitless);
+			if (bBobArenaLighting)
+			{
+				const bool bKey = LightActor == TestPuckKeyLight;
+				// The key sits across the board from the default gameplay camera.
+				// Its reflection is a broad satin streak, not an overhead white flood.
+				const FVector Position = ScaleLocation(bKey ? FVector(-250.f, 1250.f, 1100.f) : FVector(500.f, 600.f, 1000.f));
+				LightActor->SetActorLocation(Position);
+				LightActor->SetActorRotation((FVector(0.f, 0.f, ArenaSurfaceZ) - Position).Rotation());
+				Light->SetLightColor(bKey ? FLinearColor(1.f, .88f, .72f) : FLinearColor(.72f, .86f, 1.f));
+				Light->SetIntensity((bKey ? Parameters.BobKeyLightLumens : Parameters.BobRimLightLumens) * PowerScale * LocalPowerScale);
+				Light->SetSourceWidth((bKey ? 900.f : 650.f) * ArenaScale);
+				Light->SetSourceHeight((bKey ? 700.f : 500.f) * ArenaScale);
+				Light->SetAttenuationRadius((bKey ? 2400.f : 1900.f) * ArenaScale);
+			}
 		};
 		// Wide luminous panels, not narrow highlight cards. The menu UI used to
 		// hide their overlapping mirror patches; a full-board gameplay view exposes
 		// them. Keep total power but distribute reflected radiance over a larger area.
 		ConfigurePuckSoftbox(TestPuckKeyLight,
-			bShowcaseLighting ? (bPremiumArena ? FVector(-100.0f, 900.0f, 950.0f) : FVector(-380.0f, 420.0f, 820.0f))
+			bShowcaseLighting ? (bPremiumArena ? FVector(-100.0f, 1600.0f, 950.0f) : FVector(-380.0f, 420.0f, 820.0f))
 				: bPremiumArena || bBobArenaLighting ? FVector(-360.0f, -280.0f, 1050.0f) : FVector(-620.0f, -420.0f, 560.0f),
 			bPremiumArena ? FLinearColor(0.92f, 0.97f, 1.0f) : bShowcaseLighting ? FLinearColor(0.48f, 0.82f, 1.0f) : FLinearColor(0.82f, 0.91f, 1.0f),
 			TestPuckKeyLightIntensity, bPremiumArena ? Parameters.SwitchyardKeySourceWidth : bBobArenaLighting ? (bShowcaseLighting ? 220.0f : 600.0f) : 460.0f,
 			bPremiumArena ? Parameters.SwitchyardKeySourceHeight : bBobArenaLighting ? 580.0f : 170.0f, Key);
 		ConfigurePuckSoftbox(TestPuckRimLight,
-			bShowcaseLighting ? (bPremiumArena ? FVector(350.0f, 800.0f, 800.0f) : FVector(0.0f, 600.0f, 660.0f))
+			bShowcaseLighting ? (bPremiumArena ? FVector(350.0f, 1500.0f, 800.0f) : FVector(0.0f, 600.0f, 660.0f))
 				: bPremiumArena || bBobArenaLighting ? FVector(360.0f, 300.0f, 1050.0f) : FVector(600.0f, 300.0f, 450.0f),
 			bPremiumArena ? (bShowcaseLighting ? FLinearColor(1.0f, 0.66f, 0.35f) : FLinearColor(1.0f, 0.86f, 0.69f))
 				: bShowcaseLighting ? FLinearColor(1.0f, 0.53f, 0.22f) : FLinearColor(1.0f, 0.86f, 0.72f),
@@ -311,6 +383,78 @@ namespace FlickArenaLighting
 			bPremiumArena ? Parameters.SwitchyardRimSourceHeight : bBobArenaLighting && !bShowcaseLighting ? 420.0f : 130.0f, Rim);
 		if (bPremiumArena && bShowcaseLighting)
 			UpdateMenuSoftboxes(TestPuckKeyLight, TestPuckRimLight, FVector(170.0f, -1600.0f, 1140.0f), ArenaRadius, ArenaSurfaceZ);
+		// Visible LED strips do not reliably illuminate nearby geometry through
+		// Lumen alone (tiny emitters inside one large mesh/card). Match them with
+		// a bounded, soft source ring below the playing plane, outside the skirt.
+		// Both host and client paths recover the same tagged actors on reapply.
+		for (TActorIterator<APointLight> It(World); It; ++It)
+			for (int32 Index = 0; Index < Rig.RimSpillLights.Num(); ++Index)
+				if (!IsValid(Rig.RimSpillLights[Index]) && It->ActorHasTag(RimSpillTag(Index))) Rig.RimSpillLights[Index] = *It;
+		for (int32 Index = 0; Index < Rig.RimSpillLights.Num(); ++Index)
+		{
+			auto& Actor = Rig.RimSpillLights[Index];
+			if (!IsValid(Actor) && bPremiumArena)
+			{
+				Actor = World->SpawnActor<APointLight>();
+				if (Actor) Actor->Tags.AddUnique(RimSpillTag(Index));
+			}
+			if (!IsValid(Actor) || !Actor->PointLightComponent) continue;
+			UPointLightComponent* Light = Actor->PointLightComponent;
+			const float Angle = UE_TWO_PI * (Index + .5f) / Rig.RimSpillLights.Num();
+			const FVector Radial(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
+			const FVector Tangent(-Radial.Y, Radial.X, 0.f);
+			Light->SetMobility(EComponentMobility::Movable);
+			Actor->SetActorLocation(Radial * (ArenaRadius + 5.f * ArenaScale)
+				+ FVector(0.f, 0.f, ArenaSurfaceZ - 18.f * ArenaScale));
+			// UE's finite point-light source runs along local Z, not forward.
+			Actor->SetActorRotation(FRotationMatrix::MakeFromZ(Tangent).Rotator());
+			Light->SetIntensityUnits(ELightUnits::Lumens);
+			Light->SetIntensity(bPremiumArena ? Parameters.RimSpillLightLumens * LocalPowerScale * Rim : 0.f);
+			Light->SetLightColor(FLinearColor(1.f, .46f, .13f));
+			Light->SetSourceRadius(15.f * ArenaScale);
+			Light->SetSoftSourceRadius(32.f * ArenaScale);
+			Light->SetSourceLength(140.f * ArenaScale);
+			Light->SetAttenuationRadius(450.f * ArenaScale);
+			// The strips are inset, not freestanding bright bars in the floor.
+			// A broad source and restrained specular proxy produce their soft pool.
+			Light->SetSpecularScale(Highlights * .12f);
+			Light->SetCastShadows(false);
+			Light->SetIndirectLightingIntensity(0.f);
+			Light->SetVolumetricScatteringIntensity(0.f);
+		}
+		// The game mode retains the original rig members, whereas clients find
+		// the whole rig by tags. Recover these shared fixtures on either path.
+		for (TActorIterator<ARectLight> It(World); It; ++It)
+			for (int32 Index = 0; Index < Rig.StadiumWarmLights.Num(); ++Index)
+				if (!IsValid(Rig.StadiumWarmLights[Index]) && It->ActorHasTag(FName(*FString::Printf(TEXT("FLICK.StadiumWarm%d"), Index))))
+					Rig.StadiumWarmLights[Index] = *It;
+		for (int32 Index = 0; Index < Rig.StadiumWarmLights.Num(); ++Index)
+		{
+			auto& Actor = Rig.StadiumWarmLights[Index];
+			if (!Actor && bPremiumArena)
+			{
+				Actor = World->SpawnActor<ARectLight>();
+				if (Actor) Actor->Tags.AddUnique(FName(*FString::Printf(TEXT("FLICK.StadiumWarm%d"), Index)));
+			}
+			if (!IsValid(Actor) || !Actor->RectLightComponent) continue;
+			URectLightComponent* Light = Actor->RectLightComponent;
+			const float Angle = FMath::DegreesToRadians(44.f + (Index % 2) * 92.f + (Index / 2) * 180.f);
+			const FVector Radial(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
+			const FVector Position = Radial * (1220.f * ArenaScale) + FVector(0.f, 0.f, ArenaSurfaceZ - 8.f * ArenaScale);
+			const FVector Target = Radial * (980.f * ArenaScale) + FVector(0.f, 0.f, ArenaSurfaceZ - 50.f * ArenaScale);
+			Light->SetMobility(EComponentMobility::Movable);
+			Actor->SetActorLocation(Position);
+			Actor->SetActorRotation((Target - Position).Rotation());
+			Light->SetIntensityUnits(ELightUnits::Lumens);
+			Light->SetIntensity(bPremiumArena ? Parameters.StadiumWarmLightLumens * LocalPowerScale * Rim : 0.f);
+			Light->SetLightColor(FLinearColor(1.f, .55f, .24f));
+			Light->SetSourceWidth(480.f * ArenaScale);
+			Light->SetSourceHeight(24.f * ArenaScale);
+			Light->SetAttenuationRadius(650.f * ArenaScale);
+			Light->SetSpecularScale(Highlights);
+			Light->SetIndirectLightingIntensity(.25f);
+			Light->SetCastShadows(false);
+		}
 		if (DirectionalLightActor) DirectionalLightActor->Tags.AddUnique(TEXT("FLICK.DirectionalLightActor"));
 		if (SkyLightActor) SkyLightActor->Tags.AddUnique(TEXT("FLICK.SkyLightActor"));
 		if (Player1AccentLight) Player1AccentLight->Tags.AddUnique(TEXT("FLICK.Player1AccentLight"));

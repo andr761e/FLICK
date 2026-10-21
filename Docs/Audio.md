@@ -47,9 +47,19 @@ Gameplay cue duration, pitch, volume and spatial attenuation remain easy to tune
 in the director. Music has a conservative 45% default volume. No physics values,
 colliders, puck stats or timing rules are changed.
 
+Procedural one-shots and replay beds have explicitly owned, finite audio voices.
+Unreal's streaming wave queues otherwise output silence indefinitely after their
+PCM drains, consuming mixer channels. The director stops/destroys each voice after
+its pitch-adjusted duration plus a short mixer tail, preserves physical voices
+while gameplay is paused, and releases all voices on travel. No rolling cache
+retains finished one-shot waves. Network cues carry the synthesis seed, so local
+UI activity cannot change how the same event sounds on different peers. Replay
+music uses a fixed seed independent of prior effects.
+
 ## Review
 
 Run `FLICK.Audio.Synthesis`, `FLICK.Audio.RadioSynthesis`,
+`FLICK.Audio.VoiceLifecycle` (with audio enabled),
 `FLICK.Audio.RadioContext`, `FLICK.Audio.RadioResume` and `FLICK.Match.TeamPings`. Add
 `-FlickExportSoundReview` to export cue WAVs and complete radio tracks to
 `Saved/AudioReview`. Automated tests cover deterministic generation, sample

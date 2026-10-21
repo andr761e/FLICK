@@ -30,6 +30,17 @@ bool FFlickPostMatchPresentationTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Local controller has presentation component"), View);
 	if (View)
 	{
+		const auto Advance = [World, View](float Seconds)
+		{
+			while (Seconds > KINDA_SMALL_NUMBER)
+			{
+				const float Step = FMath::Min(Seconds, .05f);
+				++GFrameCounter;
+				World->Tick(LEVELTICK_TimeOnly, Step);
+				View->TickComponent(Step, LEVELTICK_All, nullptr);
+				Seconds -= Step;
+			}
+		};
 		for (int32 Count = 1; Count <= 3; ++Count)
 		{
 			State->SetTeamFormat(Count);
@@ -64,9 +75,32 @@ bool FFlickPostMatchPresentationTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("One visual-only puck per winning player"), DisplayCount, Count);
 			for (int32 Slot = 0; Slot < Count; ++Slot)
 				TestTrue(TEXT("Presentation preserves gameplay transforms"), Pieces[Slot]->GetActorTransform().Equals(Transforms[Slot]));
+			TestEqual(TEXT("Winner stats start fully visible"), View->GetWinnerStatsOpacity(), 1.0f);
+			Advance(View->ShowcaseSeconds - View->WinnerStatsFadeSeconds * .5f);
+			TestTrue(TEXT("Stats fade before automatic pullback"), FMath::IsNearlyEqual(View->GetWinnerStatsOpacity(), .5f, .02f));
+			Advance(View->WinnerStatsFadeSeconds * .5f + .01f);
+			TestEqual(TEXT("Stats are hidden when pullback begins"), View->GetWinnerStatsOpacity(), 0.0f);
+			TestFalse(TEXT("Pullback precedes summary"), View->ShowsDetails());
+			Advance(View->PullbackSeconds);
+			TestTrue(TEXT("Summary appears after pullback"), View->ShowsDetails());
+			TestEqual(TEXT("Stats stay hidden on summary"), View->GetWinnerStatsOpacity(), 0.0f);
+
+			// Restart the presentation to exercise the manual Continue path too.
+			State->bSeriesComplete = false;
+			View->TickComponent(.016f, LEVELTICK_All, nullptr);
+			State->bSeriesComplete = true;
+			State->PostMatchStartServerTime = State->GetServerWorldTimeSeconds();
+			View->TickComponent(.016f, LEVELTICK_All, nullptr);
 			View->ContinueToSummary();
 			View->TickComponent(.016f, LEVELTICK_All, nullptr);
 			TestFalse(TEXT("Continue still allows camera pullback before menu"), View->ShowsDetails());
+			TestEqual(TEXT("Continue starts with visible stats instead of an abrupt cut"), View->GetWinnerStatsOpacity(), 1.0f);
+			Advance(View->WinnerStatsFadeSeconds * .5f);
+			TestTrue(TEXT("Continue fades stats before moving camera"), FMath::IsNearlyEqual(View->GetWinnerStatsOpacity(), .5f, .02f));
+			Advance(View->WinnerStatsFadeSeconds * .5f + .01f);
+			TestEqual(TEXT("Continue hides stats throughout pullback"), View->GetWinnerStatsOpacity(), 0.0f);
+			Advance(View->PullbackSeconds);
+			TestTrue(TEXT("Continue reaches summary"), View->ShowsDetails());
 			// Re-entering gameplay removes all local copies and restores visibility.
 			State->bSeriesComplete = false;
 			View->TickComponent(.016f, LEVELTICK_All, nullptr);

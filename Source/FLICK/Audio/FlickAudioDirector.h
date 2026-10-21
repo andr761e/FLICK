@@ -24,6 +24,17 @@ struct FFlickAudioCue
 	UPROPERTY() bool bSpatial = false;
 	UPROPERTY() float Timbre = 0.5f;
 	UPROPERTY() float Intensity = 1;
+	UPROPERTY() int32 Seed = 173;
+};
+
+// Procedural waves are streams: draining their PCM does not finish the voice.
+USTRUCT()
+struct FFlickActiveAudioVoice
+{
+	GENERATED_BODY()
+	UPROPERTY(Transient) TObjectPtr<UAudioComponent> Component;
+	double StopAt = 0;
+	bool bPauseWithGame = false;
 };
 
 UCLASS(NotBlueprintable)
@@ -34,6 +45,7 @@ class FLICK_API AFlickAudioDirector : public AActor
 public:
 	AFlickAudioDirector();
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 	void PlayUi(bool bConfirm);
 	void PlayLaunch(EFlickPieceArchetype Archetype, float Power, const FVector& Location);
@@ -56,6 +68,11 @@ public:
 	void PlayLocalNotification(bool bOwnTurn);
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FFlickAudioLifecycleTest;
+#endif
+	void TrackVoice(UAudioComponent* Component, float Duration, float Pitch, bool bPauseWithGame);
+	void UpdateVoices(double Now, bool bPaused);
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastImpactCue(const FFlickAudioCue& Cue);
 	UFUNCTION(NetMulticast, Reliable)
@@ -86,7 +103,8 @@ private:
 	float GetInterfaceVolume() const;
 
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<USoundWaveProcedural>> GeneratedSounds;
+	TArray<FFlickActiveAudioVoice> ActiveVoices;
+	double LastVoiceUpdate = 0;
 
 	UPROPERTY(Transient)
 	TObjectPtr<USoundAttenuation> SpatialAttenuation;

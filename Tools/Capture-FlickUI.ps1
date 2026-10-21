@@ -21,6 +21,9 @@ param(
     [string]$Map = '/Engine/Maps/Entry',
     [ValidateRange(0, 3)]
     [int]$CameraView = 0,
+    # Isolated visual QA framing only; never changes the normal player profile.
+    [ValidateRange(0.75, 1.25)]
+    [float]$CameraDistance = 0.9,
     [ValidateRange(0, 5)]
     [int]$PuckSkin = 0,
     [ValidateRange(1, 3)]
@@ -46,6 +49,10 @@ param(
     [int]$TimeoutSeconds = 120,
     [ValidateRange(1, 30)]
     [float]$CaptureDelaySeconds = 2,
+    # Consecutive live frames for temporal shimmer checks; retained in UserDir.
+    [ValidateRange(1, 32)]
+    [int]$CaptureFrames = 1,
+    [switch]$HideControlOverview,
     # Opt in for audio-system checks; ordinary visual captures stay silent.
     [switch]$EnableAudio,
     [ValidateSet('Default', 'D3D11')]
@@ -129,13 +136,18 @@ foreach ($screenName in $Screen) {
         '-ddc=InstalledNoZenLocalFallback',
         '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame', "-FlickCaptureDelaySeconds=$CaptureDelaySeconds",
+        "-FlickCaptureFrames=$CaptureFrames",
         "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickLockerItem=$LockerItem", "-FlickProfilePage=$ProfilePage", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
+        "-ini:GameUserSettings:[FLICK.GameplaySettings]:GameplayCameraDistance=$($CameraDistance.ToString([System.Globalization.CultureInfo]::InvariantCulture))",
         "-FlickPracticeCategory=$PracticeCategory", "-FlickPracticeDifficulty=$PracticeDifficulty",
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
         ('-ShaderWorkingDir="{0}/"' -f (Join-Path $projectRoot 'Intermediate\UIShaders').Replace('\', '/')),
         ('-abslog="{0}"' -f $logPath)
     ) + $(if ($GraphicsAPI -eq 'D3D11') { @('-d3d11') } else { @() }) + $previewFlags[$screenName]
     if (-not $EnableAudio) { $arguments += '-nosound' }
+    if ($HideControlOverview) {
+        $arguments += '-ini:GameUserSettings:[FLICK.GameplaySettings]:ControlOverviewEnabled=False'
+    }
     $arguments += @("-FlickShopInspect=$ShopItem", "-FlickShopFilter=$ShopFilter")
     $arguments += "-FlickBobStrikerSkin=$PuckSkin"
     if ($ShopOwnedPreview) { $arguments += '-FlickShopOwnedPreview' }
@@ -166,6 +178,10 @@ foreach ($screenName in $Screen) {
         Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
     if (-not $screenshot) {
         throw "Unreal exited without a UI screenshot for $screenName. See $logPath"
+    }
+    $frameCount = @(Get-ChildItem -LiteralPath $screenshot.DirectoryName -Filter '*.png' -File).Count
+    if ($frameCount -ne $CaptureFrames) {
+        throw "Expected $CaptureFrames live screenshots, got $frameCount for $screenName. See $logPath"
     }
     $outputPath = Join-Path $captureRoot ($captureName + '.png')
     Copy-Item -LiteralPath $screenshot.FullName -Destination $outputPath

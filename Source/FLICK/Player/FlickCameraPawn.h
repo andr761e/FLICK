@@ -131,7 +131,7 @@ public:
 	float MenuColorSaturation = 1.22f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "0.0", ClampMax = "2.0"))
-	float OneVsOneMenuBloomIntensity = 0.85f;
+	float OneVsOneMenuBloomIntensity = 0.38f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "1.0", ClampMax = "4.0"))
 	float OneVsOneMenuFstop = 1.2f;
@@ -158,13 +158,13 @@ public:
 	float ClassicExposureBias = -0.58f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "2.0"))
-	float BobBloomIntensity = 0.62f;
+	float BobBloomIntensity = 0.25f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "10.0"))
-	float BobBloomThreshold = 0.72f;
+	float BobBloomThreshold = 1.15f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "-3.0", ClampMax = "3.0"))
-	float BobExposureBias = -0.2f;
+	float BobExposureBias = -0.65f;
 
 	// The divider arena uses emissive surfaces throughout the frame. Fixing its
 	// exposure prevents eye adaptation from dimming the attractive initial look.

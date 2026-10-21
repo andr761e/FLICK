@@ -364,13 +364,31 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 	const bool bPremiumMenu = bMenuPresentation && bMenuOrbitEnabled;
 	const bool bShowcaseGrade = bPremiumMenu || bTestArenaPresentation;
 	const bool bOneVsOneMenu = bTestArenaPresentation || (bPremiumMenu && bOneVsOneArenaPresentation);
-	Camera->PostProcessSettings.ColorGamma = bOneVsOneMenu ? FVector4(1.0f, 1.0f, 1.0f, 1.0f) : FVector4(0.96f, 0.975f, 1.0f, 1.0f);
+	const bool bBobGrade = bBobGameplayFraming && !bTestArenaPresentation;
+	Camera->PostProcessSettings.ColorGamma = bOneVsOneMenu || bBobGrade ? FVector4(1.0f, 1.0f, 1.0f, 1.0f) : FVector4(0.96f, 0.975f, 1.0f, 1.0f);
 	if (bOneVsOneMenu) Camera->PostProcessSettings.AutoExposureBias = 0.0f;
+	// Architectural metal carries its own restrained roughness detail. Avoid
+	// artificial grain/sharpened contrast competing with the real reflections.
+	Camera->PostProcessSettings.FilmGrainIntensity = bOneVsOneMenu || bBobGrade ? 0.f : .07f;
+	Camera->PostProcessSettings.AmbientOcclusionIntensity = bOneVsOneMenu || bBobGrade ? 1.05f : 1.28f;
+	Camera->PostProcessSettings.bOverride_ScreenSpaceReflectionQuality = bOneVsOneMenu;
+	Camera->PostProcessSettings.ScreenSpaceReflectionQuality = 75.f;
+	Camera->PostProcessSettings.bOverride_LumenReflectionQuality = bOneVsOneMenu;
+	Camera->PostProcessSettings.LumenReflectionQuality = 1.5f;
+	// Tiny rim LEDs fluctuate when screen-space hits alternate with Lumen's
+	// scene cache. Use scene traces consistently in Switchyard; retain Lumen
+	// reflections and the player's hardware/software tracing preference.
+	// Clear the overrides on exit so BOB/other scenes keep their normal path.
+	Camera->PostProcessSettings.bOverride_LumenFinalGatherScreenTraces = bOneVsOneMenu;
+	Camera->PostProcessSettings.LumenFinalGatherScreenTraces = false;
+	Camera->PostProcessSettings.bOverride_LumenReflectionsScreenTraces = bOneVsOneMenu;
+	Camera->PostProcessSettings.LumenReflectionsScreenTraces = false;
 	Camera->PostProcessSettings.ColorSaturation = bShowcaseGrade
 		? FVector4(MenuColorSaturation, MenuColorSaturation, MenuColorSaturation, 1.0f) : FVector4(1.02f, 1.02f, 1.02f, 1.0f);
 	Camera->PostProcessSettings.ColorContrast = bShowcaseGrade
-		? FVector4(1.24f, 1.24f, 1.24f, 1.0f) : FVector4(1.16f, 1.16f, 1.16f, 1.0f);
-	Camera->PostProcessSettings.VignetteIntensity = bShowcaseGrade ? 0.36f : 0.43f;
+		? (bOneVsOneMenu ? FVector4(1.12f, 1.12f, 1.12f, 1.0f) : FVector4(1.24f, 1.24f, 1.24f, 1.0f))
+		: bBobGrade ? FVector4(1.10f, 1.10f, 1.10f, 1.0f) : FVector4(1.16f, 1.16f, 1.16f, 1.0f);
+	Camera->PostProcessSettings.VignetteIntensity = bBobGrade ? .25f : bShowcaseGrade ? 0.36f : 0.43f;
 	Camera->PostProcessSettings.bOverride_DepthOfFieldFocalDistance = bPremiumMenu;
 	Camera->PostProcessSettings.bOverride_DepthOfFieldFstop = bPremiumMenu;
 	Camera->PostProcessSettings.bOverride_DepthOfFieldSensorWidth = bPremiumMenu && bOneVsOneMenu;
@@ -379,7 +397,7 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 	if (bShowcaseGrade)
 	{
 		Camera->PostProcessSettings.BloomIntensity = bOneVsOneMenu ? OneVsOneMenuBloomIntensity : MenuBloomIntensity;
-		Camera->PostProcessSettings.BloomThreshold = bOneVsOneMenu ? 0.5f : 0.8f;
+		Camera->PostProcessSettings.BloomThreshold = bOneVsOneMenu ? 1.15f : 0.8f;
 	}
 }
 

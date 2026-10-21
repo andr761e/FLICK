@@ -5,6 +5,11 @@
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameState.h"
 #include "Pieces/FlickPiece.h"
+#include "Player/FlickPlayerController.h"
+#include "Player/FlickPlayerState.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
+#include "Core/FlickVisualSettings.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickTrainingFeedbackTest, "FLICK.Training.TutorialFeedback",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -48,6 +53,55 @@ bool FFlickTrainingFeedbackTest::RunTest(const FString& Parameters)
     Mode->ResolutionActivatedSwitchMask = 0;
     Mode->ResolveTutorialShot();
     TestTrue(TEXT("Missed switch explains where to aim"), Mode->GetTutorialHint().Contains(TEXT("switch dot")));
+    // Enter bot training with either a menu spectator role or a stale opponent
+    // private seat. Ownership must follow the human, never the current turn.
+    auto* Controller = World->SpawnActor<AFlickPlayerController>();
+    Controller->SetAsLocalPlayerController();
+    World->AddController(Controller);
+    auto* Player = World->SpawnActor<AFlickPlayerState>();
+    Controller->PlayerState = Player;
+    const int32 PreviousIndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
+    Mode->bTutorialMode = false;
+    for (EFlickTeam PreviousTeam : {EFlickTeam::None, EFlickTeam::Player2})
+    for (EFlickMatchVariant Variant : {EFlickMatchVariant::Classic, EFlickMatchVariant::Bob})
+    {
+        Player->SetTeam(PreviousTeam);
+        Player->SetTeamPlayerSlot(2);
+        Player->SetPrivateControlledSlots({EncodePrivatePlayerSlot(EFlickTeam::Player2, 0)});
+        Mode->SelectedMatchVariant = Variant;
+        Mode->MatchmakingPlayersPerTeam = 1;
+        Mode->BeginTrainingActivity(true);
+        TestEqual(TEXT("Bot training assigns the human to Player 1"), Player->GetTeam(), EFlickTeam::Player1);
+        TestEqual(TEXT("Bot training assigns human slot zero"), Player->GetTeamPlayerSlot(), 0);
+        TestFalse(TEXT("Bot training clears stale private ownership"), Player->ControlsPrivateSlot(EFlickTeam::Player2, 0));
+        for (EFlickTeam Turn : {EFlickTeam::Player1, EFlickTeam::Player2})
+        for (int32 Style : {0, 1, 2})
+        {
+            State->SetCurrentTeam(Turn);
+            State->SetMatchPhase(Turn == EFlickTeam::Player1 ? EFlickMatchPhase::KickoffPlanning : EFlickMatchPhase::Aiming);
+            FlickVisualSettings::SetPuckIndicatorStyle(Style);
+            TestEqual(TEXT("Local team does not change on the bot's turn"), Controller->GetLocalTeam(), EFlickTeam::Player1);
+            int32 OwnCount = 0, BotCount = 0;
+            for (AFlickPiece* Piece : Mode->Pieces)
+            {
+                const bool bOwn = Piece->GetTeam() == EFlickTeam::Player1;
+                bOwn ? ++OwnCount : ++BotCount;
+                TestEqual(TEXT("Only human pucks are locally owned"), Controller->OwnsPieceLocally(Piece), bOwn);
+                Piece->Tick(.016f);
+                for (UStaticMeshComponent* Component : TInlineComponentArray<UStaticMeshComponent*>(Piece))
+                    if (bOwn && (Component->GetName() == TEXT("SelectionHalo") || Component->GetName().StartsWith(TEXT("TeamIndicatorDash"))))
+                        TestFalse(TEXT("Human pucks have no ownership ring in any indicator style"), Component->IsVisible());
+                for (UTextRenderComponent* Label : TInlineComponentArray<UTextRenderComponent*>(Piece))
+                    if (Label->GetName() == TEXT("TeamIndicatorLabel"))
+                    {
+                        if (bOwn) TestFalse(TEXT("Human pucks have no opponent label"), Label->IsVisible());
+                        else if (Style == 2) TestEqual(TEXT("Bot pucks remain marked FOE"), Label->Text.ToString(), FString(TEXT("FOE")));
+                    }
+            }
+            TestTrue(TEXT("Regression exercised actual human and bot formations"), OwnCount > 0 && BotCount > 0);
+        }
+    }
+    FlickVisualSettings::SetPuckIndicatorStyle(PreviousIndicatorStyle);
     World->DestroyWorld(false);
     GEngine->DestroyWorldContext(World);
     return true;

@@ -7,6 +7,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/Material.h"
 #include "Misc/AutomationTest.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickArenaConceptTest, "FLICK.Arena.ConceptPresentation",
@@ -26,11 +27,88 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 		GEngine->DestroyWorldContext(World);
 		return false;
 	}
+	const int32 DefaultLensCount = Arena->RimLensCount;
+	const float DefaultLensEmission = Arena->RimLensEmission;
+	const auto CheckParameter = [this](const UMaterialInterface* Material, const TCHAR* Name, float Expected)
+	{
+		float Value = -1.f;
+		const FString Context = FString::Printf(TEXT("%s: %s"), *Material->GetName(), Name);
+		TestTrue(Context + TEXT(" exists on the runtime material"),
+			Material->GetScalarParameterValue(FMaterialParameterInfo(Name), Value));
+		TestEqual(Context + TEXT(" follows the current arena presentation"), Value, Expected);
+	};
 	for (const int32 TeamSize : {1, 2, 3, 1})
 	{
 		const float Radius = FlickModeRules::GetArenaRadius(EFlickMatchVariant::Classic, TeamSize);
+		// Exercise cached MID refresh with non-default values, then return to 1v1.
+		Arena->RimLensCount = TeamSize == 2 ? 22 : DefaultLensCount;
+		Arena->RimLensEmission = TeamSize == 3 ? DefaultLensEmission * .75f : DefaultLensEmission;
 		Arena->InitializeTestArena(Radius, 50.f, 250.f, TeamSize);
+		const auto CheckPatternScale = [&](const UMaterialInterface* Material)
+		{
+			CheckParameter(Material, TEXT("ArenaRadius"), Radius);
+			CheckParameter(Material, TEXT("ArenaScale"), Arena->ArenaThickness / 50.f);
+			CheckParameter(Material, TEXT("ArenaSurfaceZ"), Arena->SurfaceZ);
+			CheckParameter(Material, TEXT("RimLensCount"), static_cast<float>(FMath::Clamp(Arena->RimLensCount, 12, 40)));
+			CheckParameter(Material, TEXT("RimLensStrength"), Arena->RimLensEmission);
+		};
 		TestTrue(FString::Printf(TEXT("Concept applies to %dv%d"), TeamSize, TeamSize), Arena->bConceptApplied);
+		TestTrue(TEXT("Reflections trace the same offset deck as the raster view"),
+			Arena->WorkshopArenaMesh->EvaluateWorldPositionOffsetInRayTracing());
+		for (const auto* Insert : {Arena->RimLensBodies.Get(), Arena->RimLensCaps.Get(), Arena->RimHousingBodies.Get(), Arena->RimHousingCaps.Get()})
+		{
+			TestFalse(TEXT("Material lenses never overlap a second near-coplanar light/edge mesh"), Insert->IsVisible());
+			TestEqual(TEXT("Material-only rim needs no duplicate insert instances"), Insert->GetInstanceCount(), 0);
+		}
+		int32 CollarMaterialCount = 0;
+		for (int32 Slot = 0; Slot < Arena->WorkshopArenaMesh->GetNumMaterials(); ++Slot)
+		{
+			const auto* Source = Arena->WorkshopArenaMesh->GetStaticMesh()->GetMaterial(Slot);
+			if (Source && Source->GetName().Contains(TEXT("Rim_Polymer")))
+			{
+				++CollarMaterialCount;
+				auto* Finish = Arena->WorkshopArenaMesh->GetMaterial(Slot);
+				float Band = 0.f;
+				Finish->GetScalarParameterValue(FMaterialParameterInfo(TEXT("RimSideBand")), Band);
+				TestEqual(TEXT("The existing rim sidewall carries the amber light segments"), Band, 1.f);
+				CheckParameter(Finish, TEXT("RimCollarFinish"), 1.f);
+				CheckParameter(Finish, TEXT("IndirectEmissionScale"), .15f);
+				CheckPatternScale(Finish);
+			}
+			if (Source && Source->GetName().Contains(TEXT("Brushed_Titanium")))
+			{
+				++CollarMaterialCount;
+				auto* Finish = Arena->WorkshopArenaMesh->GetMaterial(Slot);
+				CheckParameter(Finish, TEXT("RimCollarFinish"), 1.f);
+				CheckPatternScale(Finish);
+			}
+			if (!Source || !Source->GetName().Contains(TEXT("Arena_Surface"))) continue;
+			auto* Finish = Arena->WorkshopArenaMesh->GetMaterial(Slot);
+			TestEqual(TEXT("Deck uses the cooked architectural shader"), Finish->GetMaterial()->GetName(), FString(TEXT("M_ArchitecturalMetal")));
+			CheckParameter(Finish, TEXT("RimCollarFinish"), 0.f);
+			CheckParameter(Finish, TEXT("DeckFinish"), 1.f);
+			CheckPatternScale(Finish);
+			FLinearColor Color;
+			Finish->GetVectorParameterValue(FMaterialParameterInfo(TEXT("BaseColor")), Color);
+			TestTrue(TEXT("Deck uses the tuneable neutral gunmetal reflectance tint"), Color.Equals(Arena->OneVsOneDeckTint));
+			float Roughness = 1.f;
+			Finish->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Roughness")), Roughness);
+			TestTrue(TEXT("Deck finish retains visible scene reflections"), Roughness <= .20f);
+			float Lift = -1, Offset = 0, SourceOffset = 0;
+			Finish->GetScalarParameterValue(FMaterialParameterInfo(TEXT("SurfaceLift")), Lift);
+			Finish->GetScalarParameterValue(FMaterialParameterInfo(TEXT("RenderLayerOffset")), Offset);
+			Source->GetScalarParameterValue(FMaterialParameterInfo(TEXT("RenderLayerOffset")), SourceOffset);
+			TestEqual(TEXT("Deck has no artificial emissive fill"), Lift, 0.f);
+			TestEqual(TEXT("Finish preserves authored render depth"), Offset, SourceOffset);
+		}
+		TestTrue(TEXT("The authored arena contains opt-in collar materials"), CollarMaterialCount > 0);
+		for (int32 Slot = 0; Slot < Arena->StadiumStructureMesh->GetNumMaterials(); ++Slot)
+		{
+			const auto* Material = Arena->StadiumStructureMesh->GetMaterial(Slot);
+			if (!Material || Material->GetMaterial()->GetName() != TEXT("M_ArchitecturalMetal")) continue;
+			CheckParameter(Material, TEXT("RimCollarFinish"), 0.f);
+			CheckPatternScale(Material);
+		}
 		TestTrue(TEXT("Reduced guide set is built"), Arena->ConceptGuides->GetInstanceCount() > 0);
 		TestEqual(TEXT("Every designed socket has a dark channel"), Arena->ConceptSocketDark->GetInstanceCount(), Arena->GetPossibleLocationCount());
 		TestEqual(TEXT("Every designed socket has four metal frame bars"), Arena->ConceptSocketMetal->GetInstanceCount(), Arena->GetPossibleLocationCount() * 4);
@@ -68,6 +146,9 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 			for (int32 Slot = 0; Slot < Housing->GetNumMaterials(); ++Slot)
 			{
 				UMaterialInterface* Material = Housing->GetMaterial(Slot);
+				float Collar = 0.f;
+				if (Material) Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("RimCollarFinish")), Collar);
+				TestEqual(TEXT("Arena collar lighting never opts switch housings or lenses in"), Collar, 0.f);
 				if (!Material || Slot != Housing->GetMaterialIndex(TEXT("05_Deep_Recess"))) continue;
 				TestTrue(TEXT("Switch backing uses the authored shader, not the primitive fallback"),
 					Material->GetMaterial() == Housing->GetStaticMesh()->GetMaterial(Slot)->GetMaterial());
@@ -88,6 +169,14 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 		}
 		Arena->SetMenuPresentationEnabled(true);
 		TestTrue(TEXT("Menu presentation is enabled"), Arena->bMenuMaterialsEnabled);
+		for (int32 Slot = 0; Slot < Arena->WorkshopArenaMesh->GetNumMaterials(); ++Slot)
+		{
+			const auto* Source = Arena->WorkshopArenaMesh->GetStaticMesh()->GetMaterial(Slot);
+			if (!Source || !Source->GetName().Contains(TEXT("Rim_Polymer"))) continue;
+			const auto* Material = Arena->WorkshopArenaMesh->GetMaterial(Slot);
+			CheckParameter(Material, TEXT("RimCollarFinish"), 1.f);
+			CheckPatternScale(Material);
+		}
 		Arena->SetMenuPresentationEnabled(false);
 		TestTrue(TEXT("New arena appearance remains active after leaving menus"), Arena->bConceptApplied && Arena->ConceptGuides->IsVisible());
 		for (UMaterialInstanceDynamic* Material : Arena->ConceptMaterials)

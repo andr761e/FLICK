@@ -125,4 +125,10 @@ structure = next((row for row in report if row["name"] == "SM_BobStadium_Structu
 if structure and (structure["dimensions_cm"][0] < 4100.0 or structure["dimensions_cm"][0] > 4400.0):
     raise RuntimeError("BOB stadium import scale mismatch: " + str(structure["dimensions_cm"]))
 (project / "Saved/BobStadiumImportReport.json").write_text(json.dumps(report, indent=2))
+# Reapply the shared finish without importing/rebuilding either group again.
+# A separate namespace keeps this importer's manifest/report variables intact.
+material_script = project / "Tools/Build-FlickBobArchitecturalMaterials.py"
+exec(compile(material_script.read_text(encoding="utf-8"), str(material_script), "exec"),
+     {"__name__": "_flick_bob_materials", "__file__": str(material_script),
+      "bob_material_directories": (destination,)})
 u.log("FLICK_BOB_STADIUM_IMPORT_COMPLETE")

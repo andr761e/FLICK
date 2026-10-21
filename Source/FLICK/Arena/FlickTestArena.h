@@ -77,16 +77,19 @@ public:
 	int32 RimLensCount = 28;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (ClampMin = "10.0", ClampMax = "120.0"))
-	float RimLensEmission = 55.0f;
+	float RimLensEmission = 30.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Reflectance Tint"))
+	FLinearColor OneVsOneDeckTint = FLinearColor(.18f, .215f, .25f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Metallic", ClampMin = "0.0", ClampMax = "1.0"))
-	float OneVsOneDeckMetallic = 0.78f;
+	float OneVsOneDeckMetallic = 0.92f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Roughness", ClampMin = "0.12", ClampMax = "0.45"))
-	float OneVsOneDeckRoughness = 0.24f;
+	float OneVsOneDeckRoughness = 0.18f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Menu Deck Roughness", ClampMin = "0.12", ClampMax = "0.45"))
-	float OneVsOneMenuDeckRoughness = 0.20f;
+	float OneVsOneMenuDeckRoughness = 0.18f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "24.0", ClampMax = "70.0"))
 	float ControlZoneRadius = 40.0f;
