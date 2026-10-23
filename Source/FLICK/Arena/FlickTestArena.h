@@ -70,6 +70,7 @@ public:
 	void EndReplayPresentation();
 	// Local presentation overrides; imported assets and gameplay materials remain untouched.
 	void SetMenuPresentationEnabled(bool bEnabled);
+	void SetLockerPresentationEnabled(bool bEnabled);
 
 	// Historical OneVsOne property/subobject names are retained for saved asset
 	// compatibility; these presentation settings now serve 1v1, 2v2 and 3v3.
@@ -80,7 +81,11 @@ public:
 	float RimLensEmission = 30.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Reflectance Tint"))
-	FLinearColor OneVsOneDeckTint = FLinearColor(.18f, .215f, .25f);
+	FLinearColor OneVsOneDeckTint = FLinearColor(.105f, .155f, .20f);
+
+	// Shader-normal relief only, in world centimetres. Never displaces the deck.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Finish Relief", ClampMin = "0.0", ClampMax = "0.3"))
+	float DeckFinishRelief = .16f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Metallic", ClampMin = "0.0", ClampMax = "1.0"))
 	float OneVsOneDeckMetallic = 0.92f;
@@ -223,6 +228,12 @@ private:
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> MenuPresentationMaterials;
 
 	bool bMenuMaterialsEnabled = false;
+	// Reversible locker-only visual finish; originals include the active menu MIDs.
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInterface>> LockerOriginalMaterials;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> LockerPresentationMaterials;
+	bool bLockerMaterialsEnabled = false;
 
 	// The surrounding stadium is presentation-only. Keeping its shell and
 	// emissive details separate lets us tune visibility and lighting without

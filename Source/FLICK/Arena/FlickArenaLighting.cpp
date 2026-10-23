@@ -49,7 +49,7 @@ namespace FlickArenaLighting
 		// Light from beyond the far rim: the reflected panels sit behind the
 		// pucks, rather than forming a pale hotspot across the near half of play.
 		Move(Key, FVector(-100.0f, 1600.0f, 950.0f));
-		Move(Rim, FVector(350.0f, 1500.0f, 800.0f));
+		Move(Rim, FVector(650.0f, 1500.0f, 800.0f));
 	}
 
 	// Tags identify only this rig; repeated applications never stack extra fixtures.
@@ -365,19 +365,18 @@ namespace FlickArenaLighting
 				Light->SetAttenuationRadius((bKey ? 2400.f : 1900.f) * ArenaScale);
 			}
 		};
-		// Wide luminous panels, not narrow highlight cards. The menu UI used to
-		// hide their overlapping mirror patches; a full-board gameplay view exposes
-		// them. Keep total power but distribute reflected radiance over a larger area.
+		// Separated cool/warm strip reflections reveal the deck's fine normal relief.
+		// Reuse the same two shadow-free fixtures and the existing preference controls.
 		ConfigurePuckSoftbox(TestPuckKeyLight,
 			bShowcaseLighting ? (bPremiumArena ? FVector(-100.0f, 1600.0f, 950.0f) : FVector(-380.0f, 420.0f, 820.0f))
 				: bPremiumArena || bBobArenaLighting ? FVector(-360.0f, -280.0f, 1050.0f) : FVector(-620.0f, -420.0f, 560.0f),
-			bPremiumArena ? FLinearColor(0.92f, 0.97f, 1.0f) : bShowcaseLighting ? FLinearColor(0.48f, 0.82f, 1.0f) : FLinearColor(0.82f, 0.91f, 1.0f),
+			bPremiumArena ? Parameters.SwitchyardKeyColor : bShowcaseLighting ? FLinearColor(0.48f, 0.82f, 1.0f) : FLinearColor(0.82f, 0.91f, 1.0f),
 			TestPuckKeyLightIntensity, bPremiumArena ? Parameters.SwitchyardKeySourceWidth : bBobArenaLighting ? (bShowcaseLighting ? 220.0f : 600.0f) : 460.0f,
 			bPremiumArena ? Parameters.SwitchyardKeySourceHeight : bBobArenaLighting ? 580.0f : 170.0f, Key);
 		ConfigurePuckSoftbox(TestPuckRimLight,
-			bShowcaseLighting ? (bPremiumArena ? FVector(350.0f, 1500.0f, 800.0f) : FVector(0.0f, 600.0f, 660.0f))
+			bShowcaseLighting ? (bPremiumArena ? FVector(650.0f, 1500.0f, 800.0f) : FVector(0.0f, 600.0f, 660.0f))
 				: bPremiumArena || bBobArenaLighting ? FVector(360.0f, 300.0f, 1050.0f) : FVector(600.0f, 300.0f, 450.0f),
-			bPremiumArena ? (bShowcaseLighting ? FLinearColor(1.0f, 0.66f, 0.35f) : FLinearColor(1.0f, 0.86f, 0.69f))
+			bPremiumArena ? Parameters.SwitchyardWarmColor
 				: bShowcaseLighting ? FLinearColor(1.0f, 0.53f, 0.22f) : FLinearColor(1.0f, 0.86f, 0.72f),
 			TestPuckRimLightIntensity, bPremiumArena ? Parameters.SwitchyardRimSourceWidth : bBobArenaLighting && !bShowcaseLighting ? 520.0f : 360.0f,
 			bPremiumArena ? Parameters.SwitchyardRimSourceHeight : bBobArenaLighting && !bShowcaseLighting ? 420.0f : 130.0f, Rim);
@@ -410,7 +409,7 @@ namespace FlickArenaLighting
 			Actor->SetActorRotation(FRotationMatrix::MakeFromZ(Tangent).Rotator());
 			Light->SetIntensityUnits(ELightUnits::Lumens);
 			Light->SetIntensity(bPremiumArena ? Parameters.RimSpillLightLumens * LocalPowerScale * Rim : 0.f);
-			Light->SetLightColor(FLinearColor(1.f, .46f, .13f));
+			Light->SetLightColor(FLinearColor(1.f, .36f, .08f));
 			Light->SetSourceRadius(15.f * ArenaScale);
 			Light->SetSoftSourceRadius(32.f * ArenaScale);
 			Light->SetSourceLength(140.f * ArenaScale);
@@ -440,17 +439,19 @@ namespace FlickArenaLighting
 			URectLightComponent* Light = Actor->RectLightComponent;
 			const float Angle = FMath::DegreesToRadians(44.f + (Index % 2) * 92.f + (Index / 2) * 180.f);
 			const FVector Radial(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
-			const FVector Position = Radial * (1220.f * ArenaScale) + FVector(0.f, 0.f, ArenaSurfaceZ - 8.f * ArenaScale);
-			const FVector Target = Radial * (980.f * ArenaScale) + FVector(0.f, 0.f, ArenaSurfaceZ - 50.f * ArenaScale);
+			// Above-deck fixtures can be reflected by the playing surface. The old
+			// below-plane placement could light only the outside concourse.
+			const FVector Position = Radial * (1220.f * ArenaScale) + FVector(0.f, 0.f, ArenaSurfaceZ + 450.f * ArenaScale);
+			const FVector Target = Radial * (700.f * ArenaScale) + FVector(0.f, 0.f, ArenaSurfaceZ);
 			Light->SetMobility(EComponentMobility::Movable);
 			Actor->SetActorLocation(Position);
 			Actor->SetActorRotation((Target - Position).Rotation());
 			Light->SetIntensityUnits(ELightUnits::Lumens);
 			Light->SetIntensity(bPremiumArena ? Parameters.StadiumWarmLightLumens * LocalPowerScale * Rim : 0.f);
 			Light->SetLightColor(FLinearColor(1.f, .55f, .24f));
-			Light->SetSourceWidth(480.f * ArenaScale);
-			Light->SetSourceHeight(24.f * ArenaScale);
-			Light->SetAttenuationRadius(650.f * ArenaScale);
+			Light->SetSourceWidth(120.f * ArenaScale);
+			Light->SetSourceHeight(60.f * ArenaScale);
+			Light->SetAttenuationRadius(1250.f * ArenaScale);
 			Light->SetSpecularScale(Highlights);
 			Light->SetIndirectLightingIntensity(.25f);
 			Light->SetCastShadows(false);

@@ -9,9 +9,11 @@
 class SFlickShopArtwork final : public SLeafWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SFlickShopArtwork) : _ItemIndex(0), _Cover(false) {}
+	SLATE_BEGIN_ARGS(SFlickShopArtwork) : _ItemIndex(0), _Cover(false), _Hero(false), _CutSize(0) {}
 		SLATE_ATTRIBUTE(int32, ItemIndex)
 		SLATE_ARGUMENT(bool, Cover)
+		SLATE_ARGUMENT(bool, Hero)
+		SLATE_ARGUMENT(float, CutSize)
 	SLATE_END_ARGS()
 	void Construct(const FArguments& Args);
 	virtual void Tick(const FGeometry&, double, float) override;
@@ -21,6 +23,8 @@ public:
 private:
 	TAttribute<int32> ItemIndex;
 	bool bCover = false;
+	bool bHero = false;
+	float CutSize = 0;
 	int32 LoadedIndex = INDEX_NONE;
 	TStrongObjectPtr<UTexture2D> Texture;
 	mutable FSlateBrush Brush;

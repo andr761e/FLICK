@@ -38,11 +38,17 @@ bool FFlickMainMenuStyleTest::RunTest(const FString& Parameters)
 						Points[(Index + 2) % Points.Num()] - Points[(Index + 1) % Points.Num()]) > 0.0);
 			}
 		}
-		// The existing bottom-anchored profile and dynamically centered puck
-		// selector have enough room, including on 720p and compressed ultrawide.
+		// The bottom-anchored profile stays clear of navigation, including 720p
+		// and compressed ultrawide. The selector now lives under the hero puck.
 		const float ProfileTop = Canvas.Y - 48.0f - 82.0f * ColumnScale;
-		TestTrue(TEXT("QUIT leaves enough room for the display puck selector above the profile"),
+		TestTrue(TEXT("QUIT and the profile retain their breathing room"),
 			ProfileTop - PreviousBottom >= 32.0f * ColumnScale + 12.0f);
+		TestTrue(TEXT("Combined rank/social panel does not reach into the navigation glass"),
+			Canvas.X - RightInset - StatusWidth > Bottom);
+		TestTrue(TEXT("Status header is above the challenges area"), StatusTop + StatusHeight < 200.f);
+		TestTrue(TEXT("Radio stays clear of the centred display selector"),
+			Canvas.X - RightInset - RightColumnWidth > Canvas.X * .5f + 175.f);
+		TestTrue(TEXT("Display selector leaves room below the live puck"), Canvas.Y - SelectorBottom - 42.f > 700.f);
 	}
 	TestTrue(TEXT("PLAY is the dominant action by height"), Navigation::PrimaryHeight > Navigation::SecondaryHeight);
 	TestEqual(TEXT("Navigation container accommodates the widest card without squeezing the swept edges"),

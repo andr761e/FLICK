@@ -109,6 +109,7 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 							// paint. Near-black values were absorbing the reflections.
 							Material->SetVectorParameterValue(TEXT("BaseColor"), OneVsOneDeckTint);
 							Material->SetScalarParameterValue(TEXT("DeckFinish"), 1.f);
+							Material->SetScalarParameterValue(TEXT("DeckRelief"), DeckFinishRelief);
 							Material->SetScalarParameterValue(TEXT("Metallic"), OneVsOneDeckMetallic);
 							Material->SetScalarParameterValue(TEXT("Roughness"), OneVsOneDeckRoughness);
 							Material->SetScalarParameterValue(TEXT("Specular"), 0.65f);
@@ -164,17 +165,17 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 					else if (Emission > 0.1f)
 					{
 						const bool bWarmFixture = SourceName.Contains(TEXT("Warm"));
-						Material->SetScalarParameterValue(TEXT("Emission"), Emission * (bWarmFixture ? 0.55f : 2.0f));
+							Material->SetScalarParameterValue(TEXT("Emission"), Emission * (bWarmFixture ? 0.40f : 2.0f));
 						if (bWarmFixture)
 							Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(1.0f, 0.56f, 0.25f));
 					}
 					else if (SourceName.Contains(TEXT("Porcelain")) || SourceName.Contains(TEXT("Concrete")))
 					{
-						Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.075f, .085f, .10f));
+						Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.045f, .062f, .08f));
 						// The concourse needs some diffuse response for the amber
 						// skirt wash, not only a sharp mirror image of its LEDs.
-						Material->SetScalarParameterValue(TEXT("Metallic"), SourceName.Contains(TEXT("Porcelain")) ? .68f : .78f);
-						Material->SetScalarParameterValue(TEXT("Roughness"), 0.27f);
+						Material->SetScalarParameterValue(TEXT("Metallic"), SourceName.Contains(TEXT("Porcelain")) ? .76f : .82f);
+						Material->SetScalarParameterValue(TEXT("Roughness"), 0.24f);
 					}
 				}
 			}
@@ -267,6 +268,7 @@ void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
 					{
 						Material->SetVectorParameterValue(TEXT("BaseColor"), OneVsOneDeckTint);
 						Material->SetScalarParameterValue(TEXT("DeckFinish"), 1.f);
+						Material->SetScalarParameterValue(TEXT("DeckRelief"), DeckFinishRelief);
 						Material->SetScalarParameterValue(TEXT("Metallic"), OneVsOneDeckMetallic);
 						Material->SetScalarParameterValue(TEXT("Roughness"), OneVsOneDeckRoughness);
 						Material->SetScalarParameterValue(TEXT("SurfaceLift"), 0.f);

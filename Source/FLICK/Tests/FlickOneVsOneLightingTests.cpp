@@ -77,6 +77,11 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Both gameplay softboxes are overhead, not low edge spotlights"),
 			KeyActor->GetActorLocation().Z >= 800.0f && RimActor->GetActorLocation().Z >= 800.0f);
 		const FlickArenaLighting::FParameters DefaultRig;
+		TestTrue(TEXT("Cool fixture is cyan-blue rather than a white ceiling reflection"),
+			Key->GetLightColor().B > Key->GetLightColor().R * 2.f);
+		TestTrue(TEXT("Warm fixture remains distinctly amber"), Rim->GetLightColor().R > Rim->GetLightColor().B * 2.f);
+		TestTrue(TEXT("Cool source is a continuous elongated stadium strip"), Key->SourceWidth > Key->SourceHeight * 3.f);
+		TestTrue(TEXT("Warm source is a continuous elongated stadium strip"), Rim->SourceWidth > Rim->SourceHeight * 3.f);
 		const auto InitialRimSpillLights = FlickArenaLighting::FindRig(World).RimSpillLights;
 		const auto CheckRimSpill = [&](float Radius, float SurfaceZ, float WarmPreference, float ReflectionPreference)
 		{
@@ -182,6 +187,8 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 				const auto& Post = ViewCamera->PostProcessSettings;
 				const auto CheckStableTrace = [&]()
 				{
+					TestTrue(TEXT("Switchyard uses the standard reconstruction budget without extra samples"),
+						Post.bOverride_LumenReflectionQuality && Post.LumenReflectionQuality == 1.0f);
 					TestTrue(TEXT("Switchyard uses stable scene-traced GI in the menu and game"),
 						Post.bOverride_LumenFinalGatherScreenTraces && !Post.LumenFinalGatherScreenTraces);
 					TestTrue(TEXT("Switchyard keeps Lumen reflections without screen-edge radiance switching"),
@@ -232,6 +239,8 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 			if (TestNotNull(TEXT("Each seating bank has one warm source"), Fixture.Get()))
 			{
 				TestFalse(TEXT("Seating spill never adds dynamic shadow passes"), Fixture->RectLightComponent->CastShadows);
+				TestTrue(TEXT("Stadium sources sit above the playing plane so the deck can reflect them"),
+					Fixture->GetActorLocation().Z > Mode->ArenaSurfaceZ + 300.f);
 				TestTrue(TEXT("Seating warmth follows the saved warm-light preference"),
 					FMath::IsNearlyEqual(Fixture->RectLightComponent->Intensity, DefaultRig.StadiumWarmLightLumens * .8f, .1f));
 			}
@@ -418,6 +427,33 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 	}
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickEpicReflectionBudgetTest, "FLICK.Visuals.EpicReflectionBudget",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickEpicReflectionBudgetTest::RunTest(const FString& Parameters)
+{
+	FConfigFile Config;
+	const FString ConfigPath = FPaths::Combine(FPaths::ProjectConfigDir(), TEXT("DefaultScalability.ini"));
+	if (!TestTrue(TEXT("Project reflection scalability config exists"),
+		IFileManager::Get().FileExists(*ConfigPath))) return false;
+	Config.Read(ConfigPath);
+	int32 Factor = 0, Checkerboard = 0;
+	TestTrue(TEXT("Epic explicitly sets a reflection tracing factor"),
+		Config.GetInt(TEXT("ReflectionQuality@3"), TEXT("r.Lumen.Reflections.DownsampleFactor"), Factor));
+	TestTrue(TEXT("Epic explicitly enables checkerboard reconstruction"),
+		Config.GetInt(TEXT("ReflectionQuality@3"), TEXT("r.Lumen.Reflections.DownsampleCheckerboard"), Checkerboard));
+	TestEqual(TEXT("Epic traces half the pixels, not a quarter-resolution grid"), Factor, 2);
+	TestEqual(TEXT("Epic retains full vertical reflection tracing resolution"), Checkerboard, 1);
+	for (const TCHAR* Section : {TEXT("ReflectionQuality@0"), TEXT("ReflectionQuality@1"),
+		TEXT("ReflectionQuality@2"), TEXT("ReflectionQuality@Cine")})
+	{
+		Checkerboard = -1;
+		TestTrue(TEXT("Other presets explicitly reset the checkerboard state"),
+			Config.GetInt(Section, TEXT("r.Lumen.Reflections.DownsampleCheckerboard"), Checkerboard));
+		TestEqual(FString::Printf(TEXT("%s does not inherit Epic checkerboarding"), Section), Checkerboard, 0);
+	}
 	return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickLightingRigLookupTest, "FLICK.Visuals.LightingRigLookup",

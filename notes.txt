@@ -17,10 +17,4 @@ Til OH;
 
 Til André;
 Tjek at dette virker:
-- Colour of pucks do not update right away when someone joins a party
-- Pucks displayed change do not change when a party members is in lighting arena preview
-- Non host in a party cannot enter settings when pressing escape. They also cant leave
-- Some quick chats should be seen by both teams. 
-- After setting up the board in free play, there can be a bug where you canoot take a shot more because "Puck in motion" keeps on being the status
-
--Reduce surfaces on 1v1, 2v2 and 3v3 arenas. And on Knockout and Bob stadiums. 
+- 

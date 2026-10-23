@@ -2,6 +2,30 @@
 #include "Core/FlickShopCatalog.h"
 #include "Engine/Texture2D.h"
 #include "Misc/AutomationTest.h"
+#include "UI/FlickShopStyle.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickShopPresentationTest, "FLICK.Shop.PresentationGeometry",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FFlickShopPresentationTest::RunTest(const FString& Parameters)
+{
+	using namespace FlickShopStyle;
+	for (const float Width : {1104.f, 1504.f, 2037.f})
+	{
+		const int32 Count = Columns(Width);
+		TestEqual(TEXT("Compact cards fit their row without overflow"), Count * CardWidth(Width) + (Count - 1) * CardGap, Width - 2);
+		TestTrue(TEXT("Labels have at least the original minimum card width"), CardWidth(Width) >= 180);
+		const FVector2D Area(Width, HeroHeight - 3), Image = HeroImageSize(Area), Origin = HeroImageOffset(Area);
+		TestTrue(TEXT("Featured artwork keeps its source 3:2 aspect"), FMath::IsNearlyEqual(Image.X / Image.Y, 1.5));
+		// Product silhouette bounds in the existing Ion Shift source, not the image background.
+		const FVector2D ProductMin = Origin + Image * FVector2D(.38, .27);
+		const FVector2D ProductMax = Origin + Image * FVector2D(.95, .75);
+		TestTrue(TEXT("Featured puck stays clear of the 430-unit text column"), ProductMin.X > 460);
+		TestTrue(TEXT("Complete featured puck fits inside the banner"), ProductMin.Y >= 0 && ProductMax.Y <= Area.Y && ProductMax.X < Area.X);
+	}
+	TestEqual(TEXT("Normal and ultrawide screens keep all six products in one row"), Columns(1504), 6);
+	TestEqual(TEXT("Narrower screens use a scrollable three-column grid"), Columns(1104), 3);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickShopCatalogTest, "FLICK.Shop.CatalogAndFilters",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

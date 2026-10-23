@@ -1,6 +1,7 @@
 #include "Player/FlickCameraPawn.h"
 #include "Arena/FlickArenaLighting.h"
 #include "Core/FlickModeRules.h"
+#include "UI/FlickLockerStyle.h"
 #include "Engine/RectLight.h"
 
 #include "Camera/CameraComponent.h"
@@ -99,8 +100,10 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	FRotator MenuTargetRotation = MenuCameraRotation;
 	if (bMenuPresentation && bMenuOrbitEnabled)
 	{
-		const FVector MenuFocus(0.0f, 0.0f, bOneVsOneArenaPresentation ? OneVsOneMenuFocusHeight : MenuOrbitFocusHeight);
 		const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
+		// Frame the real display puck, not the historical board datum below it.
+		const FVector MenuFocus(0.0f, 0.0f, bOneVsOneArenaPresentation
+			? (State ? State->ArenaSurfaceZ : 250.0f) + OneVsOneMenuFocusHeight : MenuOrbitFocusHeight);
 		const FVector OpticalFocus = bOneVsOneArenaPresentation
 			? FVector(0.0f, 0.0f, (State ? State->ArenaSurfaceZ : 250.0f) + 20.0f) : MenuFocus;
 		Camera->PostProcessSettings.DepthOfFieldFocalDistance = bOneVsOneArenaPresentation
@@ -136,6 +139,12 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 			+ (LockerPreviewMode == 2 ? FVector(500.0f, 0.0f, -110.0f)
 				: LockerPreviewMode == 4 ? FVector(240.0f, 0.0f, -20.0f)
 				: LockerPreviewMode == 3 ? FVector(300.0f, 0.0f, -110.0f) : FVector(200.0f, 0.0f, -110.0f)));
+		if (LockerPreviewMode == 1)
+		{
+			// A close product view of the actual puck. Other previews retain
+			// their wider framing for travel, arrival and knockout effects.
+			FlickLockerStyle::PuckView(SurfaceZ, ArenaFramingScale, Camera->AspectRatio, TargetLocation, TargetRotation);
+		}
 	}
 	float TargetFieldOfView = bMenuPresentation
 		? MenuFieldOfView
@@ -152,6 +161,8 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	}
 	if (bMenuPresentation && LockerPreviewMode > 0)
 		TargetFieldOfView = LockerPreviewMode == 2 ? 46.0f : LockerPreviewMode == 3 ? 44.0f : LockerPreviewMode == 4 ? 42.0f : 38.0f;
+	if (bMenuPresentation && LockerPreviewMode == 1)
+		TargetFieldOfView = FlickLockerStyle::PuckFieldOfView(Camera->AspectRatio);
 	if (!bMenuPresentation && !bCinematicReplay)
 	{
 		if (const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>())
@@ -191,6 +202,12 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	const FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, BlendSpeed);
 	SetActorLocation(NewLocation);
 	SetActorRotation(NewRotation);
+	if (bMenuPresentation && LockerPreviewMode == 1)
+	{
+		const auto* State = GetWorld()->GetGameState<AFlickGameState>();
+		const FVector PuckFocus(0, 0, (State ? State->ArenaSurfaceZ : 250.f) + 20.f);
+		Camera->PostProcessSettings.DepthOfFieldFocalDistance = FMath::Max(1.f, FVector::DotProduct(PuckFocus - NewLocation, GetActorForwardVector()));
+	}
 	if (bTestArenaPresentation || (bMenuPresentation && bMenuOrbitEnabled && bOneVsOneArenaPresentation))
 	{
 		if (!MenuKeyLight.IsValid() || !MenuRimLight.IsValid())
@@ -374,7 +391,10 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 	Camera->PostProcessSettings.bOverride_ScreenSpaceReflectionQuality = bOneVsOneMenu;
 	Camera->PostProcessSettings.ScreenSpaceReflectionQuality = 75.f;
 	Camera->PostProcessSettings.bOverride_LumenReflectionQuality = bOneVsOneMenu;
-	Camera->PostProcessSettings.LumenReflectionQuality = 1.5f;
+	// Use Epic's normal reconstruction budget rather than multiplying its five
+	// samples to eight. Temporal filtering and the stable scene-trace path below
+	// remain enabled; reflection tracing layout belongs to scalability settings.
+	Camera->PostProcessSettings.LumenReflectionQuality = 1.0f;
 	// Tiny rim LEDs fluctuate when screen-space hits alternate with Lumen's
 	// scene cache. Use scene traces consistently in Switchyard; retain Lumen
 	// reflections and the player's hardware/software tracing preference.
@@ -393,11 +413,18 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 	Camera->PostProcessSettings.bOverride_DepthOfFieldFstop = bPremiumMenu;
 	Camera->PostProcessSettings.bOverride_DepthOfFieldSensorWidth = bPremiumMenu && bOneVsOneMenu;
 	Camera->PostProcessSettings.DepthOfFieldSensorWidth = OneVsOneMenuSensorWidth;
-	Camera->PostProcessSettings.DepthOfFieldFstop = bOneVsOneArenaPresentation ? OneVsOneMenuFstop : 3.2f;
+	Camera->PostProcessSettings.DepthOfFieldFstop = bMenuPresentation && LockerPreviewMode == 1 ? 2.4f
+		: bOneVsOneArenaPresentation ? OneVsOneMenuFstop : 3.2f;
 	if (bShowcaseGrade)
 	{
 		Camera->PostProcessSettings.BloomIntensity = bOneVsOneMenu ? OneVsOneMenuBloomIntensity : MenuBloomIntensity;
 		Camera->PostProcessSettings.BloomThreshold = bOneVsOneMenu ? 1.15f : 0.8f;
+	}
+	if (bMenuPresentation && LockerPreviewMode > 0)
+	{
+		Camera->PostProcessSettings.AutoExposureBias -= .45f;
+		Camera->PostProcessSettings.BloomIntensity = .32f;
+		Camera->PostProcessSettings.BloomThreshold = 1.35f;
 	}
 }
 

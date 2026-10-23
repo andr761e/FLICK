@@ -2,6 +2,9 @@
 #include "UI/FlickGameLayerPrivate.h"
 #include "Misc/Paths.h"
 #include "UI/FlickCosmeticWidgets.h"
+#include "UI/FlickLockerStyle.h"
+#include "UI/FlickProfileStyle.h"
+#include "UI/FlickProfileWidgets.h"
 
 static TAutoConsoleVariable<int32> CVarFlickMainMenuBackdrop(
 	TEXT("flick.MainMenuBackdrop"), 0,
@@ -74,6 +77,27 @@ TSharedRef<SWidget> SFlickGameLayer::BuildStartupOverlay()
 		.BorderBackgroundColor(FLinearColor(0.0f, 0.002f, 0.006f, 1.0f));
 }
 
+TSharedRef<SWidget> SFlickGameLayer::BuildDisplayPuckSelector()
+{
+	const auto Cycle = [this](int32 Direction) { if (auto* Sessions = GetDisplayedSessionSubsystem()) Sessions->CycleShowcaseArchetype(Direction); return FReply::Handled(); };
+	return SNew(SBox).WidthOverride(350).HeightOverride(42)
+		.RenderTransform_Lambda([this]() { return FSlateRenderTransform(FVector2D(0, IsDisplayedPartyActive() || bPartyTrayPreview ? -70.f : 0.f)); })
+	[
+		SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Cyan.CopyWithNewOpacity(.7f)).UseAccentForOutline(true).BorderWidth(.8f).CutSize(10).Padding(FMargin(20, 4))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("DISPLAY PUCK"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(9, 0, 0, 0)[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(10)).ColorAndOpacity(Cyan)]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(14, 0)[SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(8, 0)).ToolTipText(FText::FromString(TEXT("Previous display puck")))
+				.OnClicked_Lambda([Cycle]() { return Cycle(-1); })[SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(16, true)).ColorAndOpacity(Brand)]]
+			+ SHorizontalBox::Slot().FillWidth(1).HAlign(HAlign_Center).VAlign(VAlign_Center)
+			[SNew(STextBlock).Text_Lambda([this]() { const auto* Sessions = GetDisplayedSessionSubsystem(); return FText::FromString(GetPieceArchetypeName(Sessions ? Sessions->GetShowcaseArchetype() : EFlickPieceArchetype::Standard)); }).Font(UiFont(10, true)).ColorAndOpacity(Paper)]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(8, 0, 0, 0)[SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(8, 0)).ToolTipText(FText::FromString(TEXT("Next display puck")))
+				.OnClicked_Lambda([Cycle]() { return Cycle(1); })[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(16, true)).ColorAndOpacity(Brand)]]
+		]
+	];
+}
+
 TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 {
 	return SNew(SOverlay)
@@ -138,8 +162,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			+ SVerticalBox::Slot().AutoHeight().Padding(-5.0f, 7.0f, 0.0f, 0.0f)
 			[
 				SNew(SBox)
-				.WidthOverride(428.0f)
-				.HeightOverride(142.0f)
+				.WidthOverride(400.0f)
+				.HeightOverride(133.0f)
 				[
 					SNew(SScaleBox)
 					.Stretch(EStretch::ScaleToFit)
@@ -152,7 +176,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 					]
 				]
 			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
 			[SNew(STextBlock).Text(FText::FromString(TEXT("Small move. Big consequences."))).Font(WordmarkTaglineFont(15)).ColorAndOpacity(Muted)
 				.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->GetFrontendScreen() == EFlickFrontendScreen::Profile ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })]
 			]
@@ -256,6 +280,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			]
 			]
 		+ SOverlay::Slot()
+		.HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0, 0, 0, FlickMainMenuStyle::SelectorBottom)
+		[SNew(SBox).Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::Visible; })[BuildDisplayPuckSelector()]]
+		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Bottom)
 		.Padding(52.0f, 0.0f, 0.0f, 48.0f)
@@ -263,70 +290,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
 			[
 			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight()
-			[
-				SAssignNew(MainMenuPuckAnchor, SBox).WidthOverride(410.0f).HeightOverride(32.0f)
-				[
-				SNew(SBox).WidthOverride(410.0f).HeightOverride(32.0f)
-				.RenderTransform_Lambda([this]()
-				{
-					if (!MainMenuQuitCard.IsValid() || !MainMenuProfileCard.IsValid() || !MainMenuPuckAnchor.IsValid())
-					{
-						return FSlateRenderTransform();
-					}
-					const FSlateRect QuitBounds = MainMenuQuitCard->GetCachedGeometry().GetRenderBoundingRect();
-					const FSlateRect ProfileBounds = MainMenuProfileCard->GetCachedGeometry().GetRenderBoundingRect();
-					const FGeometry AnchorGeometry = MainMenuPuckAnchor->GetCachedGeometry();
-					if (QuitBounds.GetSize().Y <= 0.0f || ProfileBounds.GetSize().Y <= 0.0f
-						|| AnchorGeometry.GetLocalSize().Y <= 0.0f)
-					{
-						return FSlateRenderTransform();
-					}
-					const float MidpointY = (QuitBounds.Bottom + ProfileBounds.Top) * 0.5f;
-					const FVector2D MidpointAbsolute(AnchorGeometry.GetAbsolutePosition().X, MidpointY);
-					const float MidpointLocalY = AnchorGeometry.AbsoluteToLocal(MidpointAbsolute).Y;
-					return FSlateRenderTransform(FVector2D(0.0f, MidpointLocalY - AnchorGeometry.GetLocalSize().Y * 0.5f));
-				})
-				[
-					SNew(SFlickMainMenuPanel)
-					.Premium(true)
-					.BackgroundColor(FLinearColor::FromSRGBColor(FColor(5, 13, 19, 245)))
-					.AccentColor(Cyan.CopyWithNewOpacity(0.9f))
-					.CutSize(6.0f).BorderWidth(1.0f).Padding(FMargin(11.0f, 2.0f))
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-						[
-							SNew(STextBlock).Text(FText::FromString(TEXT("DISPLAY PUCK"))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.63f, 0.75f, 0.79f))
-							]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12.0f, 0.0f)
-						[SNew(SBox).WidthOverride(1.0f).HeightOverride(12.0f)
-							[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FlickMainMenuStyle::Ice.CopyWithNewOpacity(0.30f))]]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-						[
-							SNew(SButton).ButtonStyle(&TransparentButtonStyle)
-							.OnClicked_Lambda([this]() { if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) Sessions->CycleShowcaseArchetype(-1); return FReply::Handled(); })
-							[SNew(STextBlock).Text(FText::FromString(TEXT("\u2039"))).Font(UiFont(17, true)).ColorAndOpacity(FlickMainMenuStyle::Lime)]
-						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.0f, 0.0f)
-						[
-							SNew(SBox).WidthOverride(82.0f).HAlign(HAlign_Center)
-							[
-								SNew(STextBlock)
-								.Text_Lambda([this]() { const UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem(); return FText::FromString(GetPieceArchetypeName(Sessions ? Sessions->GetShowcaseArchetype() : EFlickPieceArchetype::Standard)); })
-								.Font(UiFont(9, true)).ColorAndOpacity(Paper)
-							]
-						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-						[
-							SNew(SButton).ButtonStyle(&TransparentButtonStyle)
-							.OnClicked_Lambda([this]() { if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem()) Sessions->CycleShowcaseArchetype(1); return FReply::Handled(); })
-							[SNew(STextBlock).Text(FText::FromString(TEXT("\u203A"))).Font(UiFont(17, true)).ColorAndOpacity(FlickMainMenuStyle::Lime)]
-						]
-					]
-				]
-				]
-			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
 			[
 			SAssignNew(MainMenuProfileCard, SBox).WidthOverride(410.0f).HeightOverride(82.0f)
@@ -446,131 +409,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Right)
 		.VAlign(VAlign_Center)
-		.Padding(0.0f, 0.0f, 34.0f, 0.0f)
+		.Padding(0.0f, 0.0f, FlickMainMenuStyle::RightInset, 0.0f)
 		[
-			SNew(SBox).WidthOverride(390.0f)
+			SNew(SBox).WidthOverride(FlickMainMenuStyle::RightColumnWidth)
 			[BuildChallengePreview()]
 		]
-		+ SOverlay::Slot()
-		.HAlign(HAlign_Right)
-		.VAlign(VAlign_Top)
-		.Padding(0.0f, 24.0f, 276.0f, 0.0f)
-		[
-			SNew(SBox).WidthOverride(404.0f).HeightOverride(70.0f)
-			.Visibility_Lambda([this]() { return bSocialPanelOpen ? EVisibility::Collapsed : EVisibility::Visible; })
-			[
-				SNew(SFlickMainMenuPanel)
-				.Premium(true)
-				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(5, 13, 19, 246)))
-				.AccentColor(Brand)
-				.CutSize(12.0f)
-				.BorderWidth(1.3f)
-				.Padding(FMargin(20.0f, 9.0f, 12.0f, 9.0f))
-				[
-					SNew(SOverlay)
-					+ SOverlay::Slot()
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 18.0f, 0.0f)
-						[
-							SNew(SFlickRankBadge).Size(48)
-							.Progress_Lambda([this]()
-							{
-								const UFlickRankingSubsystem* Ranking = GetRankingSubsystem();
-								return Ranking ? Ranking->GetDisplayProgress(GameMode.IsValid() ? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic,
-									GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1) : FFlickRankProgress();
-							})
-						]
-						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight()
-							[
-								SNew(STextBlock)
-								.Text_Lambda([this]()
-								{
-									if (!GameMode.IsValid()) return FText::FromString(TEXT("CURRENT RANK"));
-									const EFlickMatchVariant Variant = GameMode->GetActiveMatchVariant();
-									return FText::FromString(Variant == EFlickMatchVariant::Bob
-										? TEXT("BOB RANK")
-										: FString::Printf(TEXT("%dV%d CURRENT RANK"), GameMode->GetPlayersPerTeam(), GameMode->GetPlayersPerTeam()));
-								})
-								.Font(UiFont(11, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
-							]
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
-							[
-								SNew(STextBlock)
-								.Text_Lambda([this]()
-								{
-									const UFlickRankingSubsystem* Ranking = GetRankingSubsystem();
-									const EFlickMatchVariant Variant = GameMode.IsValid()
-										? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic;
-									const int32 TeamSize = GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1;
-									return FText::FromString(Ranking
-										? Ranking->GetDisplayProgressLabel(Variant, TeamSize)
-										: TEXT("UNAVAILABLE"));
-								})
-								.Font(UiFont(14, true)).ColorAndOpacity(Brand)
-							]
-						]
-					]
-				]
-			]
-		]
-		+ SOverlay::Slot()
-		.HAlign(HAlign_Right)
-		.VAlign(VAlign_Top)
-		.Padding(0.0f, 24.0f, 34.0f, 0.0f)
-		[
-			SNew(SBox).WidthOverride(226.0f).HeightOverride(70.0f)
-			.Visibility_Lambda([this]() { return bSocialPanelOpen ? EVisibility::Collapsed : EVisibility::Visible; })
-			[
-				SNew(SFlickMainMenuPanel)
-				.Premium(true)
-				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(5, 13, 19, 246)))
-				.AccentColor(Brand)
-				.CutSize(12.0f)
-				.BorderWidth(1.3f)
-				.Padding(FMargin(1.5f))
-				[
-					SNew(SButton)
-					.ButtonStyle(&TransparentButtonStyle)
-					.HAlign(HAlign_Center)
-					.VAlign(VAlign_Center)
-					.ContentPadding(FMargin(14.0f, 8.0f))
-					.OnClicked_Lambda([this]()
-				{
-					bSocialPanelOpen = !bSocialPanelOpen;
-					if (bSocialPanelOpen)
-					{
-						if (UFlickSessionSubsystem* Sessions = GetDisplayedSessionSubsystem())
-						{
-							Sessions->RefreshFriends();
-						}
-					}
-					return FReply::Handled();
-				})
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 17.0f, 0.0f)
-						[
-							SNew(SFlickMainMenuIcon)
-							.Icon(EFlickMainMenuIcon::Social)
-							.Color(FLinearColor(0.92f, 0.96f, 0.98f, 1.0f))
-						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-						[
-							SNew(STextBlock)
-							.Text(FText::FromString(TEXT("SOCIAL")))
-							.Font(UiFont(17, true))
-							.ColorAndOpacity(FLinearColor::White)
-						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(15.0f, 0.0f, 0.0f, 0.0f)
-						[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(18)).ColorAndOpacity(Paper)]
-					]
-				]
-			]
-			]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)
+		.Padding(0, FlickMainMenuStyle::StatusTop, FlickMainMenuStyle::RightInset, 0)
+		[BuildHomeStatusPanel()]
 			+ SOverlay::Slot()
 			[
 				SNew(SButton)
@@ -614,7 +460,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuFooter()
 {
 	return SNew(SBox)
-		.HeightOverride(32.0f)
+		.HeightOverride(24.0f).RenderOpacity(.6f)
 		.Clipping(EWidgetClipping::ClipToBounds)
 		.Visibility_Lambda([this]()
 		{
@@ -779,6 +625,94 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 		];
 }
 
+TSharedRef<SWidget> SFlickGameLayer::BuildProfileIdentityCard(const bool bExpanded)
+{
+	const auto Showcase = [this]() { const auto* Sessions = GetDisplayedSessionSubsystem();
+		return Sessions ? Sessions->GetShowcaseArchetype() : EFlickPieceArchetype::Standard; };
+	if (bExpanded)
+	{
+		const auto Name = [this]() { const auto* Sessions=GetDisplayedSessionSubsystem();
+			return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER")); };
+		return SNew(SFlickAngularBorder).Tag(TEXT("ProfileIdentityCard")).RefinedSurface(true)
+			.BackgroundColor(FlickProfileStyle::Surface).AccentColor(Cyan.CopyWithNewOpacity(.75f))
+			.UseAccentForOutline(true).CutSize(16).Padding(1.5f)
+			[SNew(SOverlay)
+				+ SOverlay::Slot().VAlign(VAlign_Bottom)
+				[SNew(SBox).HeightOverride(304)
+					[SNew(SOverlay)
+						+ SOverlay::Slot()[SNew(SFlickMenuArtwork).Tag(TEXT("ProfileShowcaseStage")).Artwork(EFlickMenuArtwork::ProfileShowcaseFloor).CutSize(14.5f).EdgeFade(FMargin(0,54,0,0))]
+						+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0,144,0,0)
+						[SNew(SBox).WidthOverride(270).HeightOverride(54)[SNew(FlickProfileWidgets::SContactShadow)]]
+						+ SOverlay::Slot()[SNew(SFlickPuckThumbnail).Tag(TEXT("ProfileShowcase")).View(EFlickPuckThumbnailView::ProfileCutout).CutSize(14.5f)
+							.Archetype_Lambda(Showcase).Skin_Lambda([this,Showcase]() { return SelectedPuckSkins[static_cast<int32>(Showcase())]; })]]]
+				+ SOverlay::Slot().Padding(22)
+				[SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[SNew(SBox).HeightOverride(132)
+						[SNew(SFlickMainMenuPanel).Premium(true).CutSize(11).Padding(0)
+							.BackgroundColor_Lambda([this]() { return GetBannerBackground(SelectedBannerStyle); })
+							.ImageBrush_Lambda([this]() { return GetCosmeticImageBrush(0,SelectedBannerStyle); }).AccentColor(Cyan.CopyWithNewOpacity(.6f))
+							[SNew(SOverlay)
+								+ SOverlay::Slot()[SNew(SFlickMenuArtwork).Artwork(EFlickMenuArtwork::ProfileIdentityBanner).CutSize(11)
+									.Visibility_Lambda([this]() { return SelectedBannerStyle==0 ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })]
+								+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center).Padding(7)
+								[SNew(SBox).WidthOverride(116).HeightOverride(116)
+									[SNew(SOverlay)
+										+ SOverlay::Slot()[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink).CutSize(11)
+											.AccentColor_Lambda([this]() { return GetAvatarFrameColor(SelectedAvatarBorder); }).Padding(5)
+											[SNew(SFlickPuckThumbnail).View(EFlickPuckThumbnailView::Locker).CutSize(7).Zoom(1.25f)
+												.Archetype_Lambda(Showcase).Skin_Lambda([this,Showcase]() { return SelectedPuckSkins[static_cast<int32>(Showcase())]; })]]
+										+ SOverlay::Slot().Padding(7)[SNew(SImage).Image_Lambda([this]() { auto* S=GetDisplayedSessionSubsystem(); return S ? S->GetLocalAvatarBrush() : nullptr; })]
+										+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this]() { return GetCosmeticImageBrush(2,SelectedAvatarBorder); })]
+										+ SOverlay::Slot()[SNew(SFlickCosmeticSwatch).Category(2).Item_Lambda([this]() { return SelectedAvatarBorder; }).Visibility(EVisibility::HitTestInvisible)]]]]]]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0,14,0,6)
+					[SNew(SBox).HeightOverride(40).VAlign(VAlign_Center)
+						[SNew(STextBlock).Text_Lambda(Name).ToolTipText_Lambda(Name).Font(DisplayFont(29)).ColorAndOpacity(Paper)
+							.OverflowPolicy(ETextOverflowPolicy::Ellipsis)]]
+					+ SVerticalBox::Slot().AutoHeight()
+					[SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0,0,8,0)
+						[SNew(SBox).WidthOverride(9).HeightOverride(9)[SNew(SFlickRoundPip).Color(Brand).Filled(true)]]
+						+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)
+						[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(FlickCosmeticCatalog::GetItems(1)[SelectedBannerTag]); })
+							.Font_Lambda([this]() { return GetBannerTagFont(SelectedBannerTag,12); }).ColorAndOpacity_Lambda([this]() { return GetBannerTagColor(SelectedBannerTag); })]]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0,19,0,0)
+					[SNew(SBox).HeightOverride(1)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(.24f))]]]];
+	}
+	const TSharedRef<SWidget> Identity = SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			SNew(SBox).HeightOverride(112)
+			[
+				SNew(SFlickMainMenuPanel).BackgroundColor_Lambda([this]() { return GetBannerBackground(SelectedBannerStyle); })
+				.ImageBrush_Lambda([this]() { return GetCosmeticImageBrush(0, SelectedBannerStyle); }).AccentColor(Cyan).CutSize(10).Padding(14)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth()
+					[
+						SNew(SBox).WidthOverride(80).HeightOverride(80)
+						[
+							SNew(SOverlay)
+							+ SOverlay::Slot()[SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor_Lambda([this]() { return GetAvatarFrameColor(SelectedAvatarBorder); }).CutSize(12).Padding(10)
+								[SNew(SFlickStatusGlobe).Color(Cyan)]]
+							+ SOverlay::Slot().Padding(9)[SNew(SImage).Image_Lambda([this]() { auto* Sessions = GetDisplayedSessionSubsystem(); return Sessions ? Sessions->GetLocalAvatarBrush() : nullptr; })]
+							+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this]() { return GetCosmeticImageBrush(2, SelectedAvatarBorder); })]
+							+ SOverlay::Slot()[SNew(SFlickCosmeticSwatch).Category(2).Item_Lambda([this]() { return SelectedAvatarBorder; }).Visibility(EVisibility::HitTestInvisible)]
+						]
+					]
+				]
+			]
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(0, 18, 0, 6)
+		[SNew(STextBlock).Text_Lambda([this]() { const auto* Sessions = GetDisplayedSessionSubsystem(); return FText::FromString(Sessions ? Sessions->GetLocalDisplayName() : TEXT("LOCAL PLAYER")); })
+			.Font(DisplayFont(29)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+		+ SVerticalBox::Slot().AutoHeight()
+		[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(FlickCosmeticCatalog::GetItems(1)[SelectedBannerTag]); })
+			.Font_Lambda([this]() { return GetBannerTagFont(SelectedBannerTag, 12); }).ColorAndOpacity_Lambda([this]() { return GetBannerTagColor(SelectedBannerTag); }) ];
+	return SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.9f))
+		.AccentColor(Cyan).CutSize(16).Padding(22)[Identity];
+}
+
 TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 {
 	TSharedRef<SVerticalBox> LockerCategories = SNew(SVerticalBox);
@@ -786,47 +720,37 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 	for (int32 Category = 0; Category < FlickCosmeticCatalog::CategoryCount; ++Category)
 	{
 		const FString CategoryName = FlickCosmeticCatalog::GetCategoryName(Category);
-		if (Category == 0 || Category == FlickCosmeticCatalog::PuckCategoryStart
-			|| Category == FlickCosmeticCatalog::TrailCategory)
+		if (Category == 0 || Category == FlickCosmeticCatalog::PuckCategoryStart || Category == FlickCosmeticCatalog::TrailCategory)
 		{
-			LockerCategories->AddSlot().AutoHeight().Padding(4.0f, Category == 0 ? 0.0f : 9.0f, 0.0f, 6.0f)
-			[SNew(STextBlock).Text(FText::FromString(Category == 0 ? TEXT("PLAYER IDENTITY")
-				: Category == FlickCosmeticCatalog::TrailCategory ? TEXT("PUCK EFFECTS") : TEXT("PUCK APPEARANCES"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)];
+			if (Category != 0)
+				LockerCategories->AddSlot().AutoHeight().Padding(12, 8, 12, 10)
+				[SNew(SBox).HeightOverride(1)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline.CopyWithNewOpacity(.45f))]];
+			LockerCategories->AddSlot().AutoHeight().Padding(12, 0, 0, 7)
+			[SNew(STextBlock).Text(FText::FromString(Category == 0 ? TEXT("PLAYER IDENTITY  //")
+				: Category == FlickCosmeticCatalog::TrailCategory ? TEXT("EFFECTS  //") : TEXT("PUCK APPEARANCES  //")))
+				.Font(DisplayFont(10)).ColorAndOpacity(Cyan)];
 		}
-		LockerCategories->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 5.0f)
-		[
-			SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0.0f)
-			.OnClicked_Lambda([this, Category]() { SelectedLockerCategory = Category; return FReply::Handled(); })
-			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor_Lambda([this, Category]() { return SelectedLockerCategory == Category ? PanelRaised : Panel; })
-				.AccentColor_Lambda([this, Category]() { return SelectedLockerCategory == Category ? Brand : Hairline; })
-				.CutSize(6.0f).BorderWidth(1.0f).UseAccentForOutline(true).Padding(FMargin(13.0f, 8.0f))
-				[
-					SNew(STextBlock).Text(FText::FromString(CategoryName)).Font(UiFont(10, true))
-					.ColorAndOpacity_Lambda([this, Category]() { return SelectedLockerCategory == Category ? Brand : Paper; })
-				]
-			]
-		];
+		LockerCategories->AddSlot().AutoHeight().Padding(0, 0, 0, 1)[BuildLockerCategory(Category)];
 
 		TSharedRef<SGridPanel> Items = SNew(SGridPanel);
 		const TArray<FString>& Names = FlickCosmeticCatalog::GetItems(Category);
 		for (int32 Index = 0; Index < Names.Num(); ++Index)
 		{
+			if (FlickCosmeticCatalog::IsPuckCategory(Category))
+			{
+				Items->AddSlot(Index % 3, Index / 3).Padding(0, 0, Index % 3 == 2 ? 0.f : FlickLockerStyle::CardGap, FlickLockerStyle::CardGap)
+					[BuildLockerPuckCard(Category, Index)];
+				continue;
+			}
 			const FLinearColor PreviewAccent = Category == 1 ? GetBannerTagColor(Index)
 				: Category == 2 ? GetAvatarFrameColor(Index)
 				: FlickCosmeticCatalog::GetCollection(Category, Index) != INDEX_NONE
 					? FlickCosmeticCatalog::GetCollectionColor(FlickCosmeticCatalog::GetCollection(Category, Index))
 				: Category == 0 ? (Index == 1 ? Orange : Index == 2 ? Cyan : Brand) : Brand;
 			const bool bWide = Category == 0 || Category == 1;
-			const bool bPuck = FlickCosmeticCatalog::IsPuckCategory(Category);
-			// The locker keeps one width. Use two substantial cards for banners and
-			// puck skins, or three compact cards for avatar borders and effects.
-			// Including border and grid padding, either row fits the 508-unit item pane.
-			const int32 Columns = bWide || bPuck ? 2 : 3;
-			const float CardWidth = bWide || bPuck ? 220.0f : 140.0f;
-			const float CardHeight = bWide ? 132.0f : bPuck ? 170.0f
-				: Category == 2 ? 150.0f : 112.0f;
+			const int32 Columns = bWide ? 2 : 3;
+			const float CardWidth = bWide ? 220.0f : 140.0f;
+			const float CardHeight = bWide ? 132.0f : Category == 2 ? 150.0f : 112.0f;
 			TSharedRef<SWidget> Preview = SNew(SBox);
 			if (Category == 0)
 			{
@@ -866,16 +790,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 					+ SOverlay::Slot()[SNew(SFlickCosmeticSwatch).Category(2).Item(Index).Visibility(EVisibility::HitTestInvisible)]
 				];
 			}
-			else if (FlickCosmeticCatalog::IsPuckCategory(Category))
-			{
-				Preview = SNew(SBox).WidthOverride(132.0f).HeightOverride(132.0f)
-				[
-					SNew(SFlickPuckDisc)
-					.Archetype(FlickCosmeticCatalog::GetPuckArchetype(Category))
-					.TeamColor(FlickCosmeticCatalog::GetPuckSkinColor(Index)).AccentColor(Brand)
-					.Selected(true).RadiusScale(1.05f)
-				];
-			}
 			else
 			{
 				Preview = SNew(SBox).HeightOverride(65.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
@@ -886,20 +800,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 			TSharedRef<SButton> Button = SNew(SButton).ButtonStyle(&TransparentButtonStyle)
 				.ToolTipText(FText::FromString(FlickCosmeticCatalog::GetDescription(Category, Index)))
 				.ContentPadding(0.0f).Cursor(EMouseCursor::Hand)
-				.OnClicked_Lambda([this, Category, Index]()
-				{
-					if (Category == 0) SelectedBannerStyle = Index;
-					else if (Category == 1) SelectedBannerTag = Index;
-					else if (Category == 2) SelectedAvatarBorder = Index;
-					else if (FlickCosmeticCatalog::IsPuckCategory(Category)) SelectedPuckSkins[Category - FlickCosmeticCatalog::PuckCategoryStart] = Index;
-					else SelectedPuckEffects[Category - FlickCosmeticCatalog::TrailCategory] = Index;
-					GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), *FlickCosmeticCatalog::GetConfigKey(Category), Index, GGameUserSettingsIni);
-					GConfig->Flush(false, GGameUserSettingsIni);
-					if (FlickCosmeticCatalog::IsPuckCategory(Category) && PlayerController.IsValid()) PlayerController->SubmitLocalPuckSkins();
-					if (Category >= FlickCosmeticCatalog::TrailCategory && PlayerController.IsValid()) PlayerController->SubmitLocalPuckEffects();
-					if (GameMode.IsValid() && SelectedProfileTab == EFlickProfileTab::Customization) GameMode->SetLockerPreview(Category);
-					return FReply::Handled();
-				});
+				.Tag(FName(*FString::Printf(TEXT("LockerItem%d_%d"), Category, Index)))
+				.OnClicked_Lambda([this, Category, Index]() { EquipLockerItem(Category, Index); return FReply::Handled(); });
 			const TWeakPtr<SButton> WeakButton = Button;
 			Button->SetContent(
 				SNew(SFlickAngularBorder)
@@ -937,18 +839,20 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				.Padding(0.0f, 0.0f, 8.0f, 8.0f)[Button];
 		}
 		TSharedRef<SScrollBox> ItemScroller = SNew(SScrollBox) + SScrollBox::Slot()[Items];
-		const int32 Columns = Category <= 1 || FlickCosmeticCatalog::IsPuckCategory(Category) ? 2 : 3;
+		const int32 Columns = Category <= 1 ? 2 : 3;
 		const float RowStep = Category <= 1 ? 156.0f : Category == 2 ? 174.0f
-			: FlickCosmeticCatalog::IsPuckCategory(Category) ? 194.0f : 136.0f;
-		ItemScroller->SetScrollOffset((GetSelectedCosmeticIndex(Category) / Columns) * RowStep);
+			: FlickCosmeticCatalog::IsPuckCategory(Category) ? FlickLockerStyle::CardHeight + FlickLockerStyle::CardGap : 136.0f;
+		ItemScroller->SetScrollOffset(FlickCosmeticCatalog::IsPuckCategory(Category) ? 0.f : (GetSelectedCosmeticIndex(Category) / Columns) * RowStep);
 		LockerContents->AddSlot()
 		[
 			SNew(SBox).Visibility_Lambda([this, Category]() { return SelectedLockerCategory == Category ? EVisibility::Visible : EVisibility::Collapsed; })
 			[
 				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 12)
+				[SNew(SBox).HeightOverride(1)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(.35f))]]
 				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(CategoryName)).Font(DisplayFont(25)).ColorAndOpacity(Paper)]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 14.0f)
-				[SNew(STextBlock).Text(FText::FromString(FString::Printf(TEXT("OWNED  %d  //  SELECT AN ITEM TO EQUIP"), Names.Num()))).Font(UiFont(10, true)).ColorAndOpacity(Muted)]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 5, 0, 18)
+				[SNew(STextBlock).Text(FText::FromString(FString::Printf(TEXT("OWNED  %d / %d  //  SELECT AN ITEM TO EQUIP"), Names.Num(), Names.Num()))).Font(DisplayFont(10)).ColorAndOpacity(Muted)]
 				+ SVerticalBox::Slot().FillHeight(1.0f)
 				[
 					ItemScroller
@@ -1030,101 +934,23 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		];
 	}
 
-	const auto MakeProfileChoice = [this](EFlickProfileTab Page, const int32 Order, const FString& Title,
-		const FString& Subtitle, const FLinearColor& Accent) -> TSharedRef<SWidget>
-	{
-		TSharedRef<SButton> Button = SNew(SButton).ButtonStyle(&TransparentButtonStyle)
-			.ContentPadding(0.0f).Cursor(EMouseCursor::Hand)
-			.RenderTransform_Lambda([this, Order]()
-			{
-				const float Progress = FMath::Clamp((ProfileEntranceElapsed - Order * 0.075f) / 0.42f, 0.0f, 1.0f);
-				const float Eased = 1.0f - FMath::Pow(1.0f - Progress, 3.0f);
-				return FSlateRenderTransform(FVector2D((Order % 2 ? 1.0f : -1.0f) * (1.0f - Eased) * 62.0f,
-					(1.0f - Eased) * 24.0f));
-			})
-			.OnClicked_Lambda([this, Page]() { SelectedProfileTab = Page; return FReply::Handled(); });
-		const TWeakPtr<SButton> WeakButton = Button;
-		Button->SetContent(SNew(SFlickAngularBorder).CutSize(12.0f)
-			.BorderWidth(1.2f).Padding(FMargin(24.0f, 20.0f))
-			.AccentColor(Accent)
-			.BackgroundColor_Lambda([this, WeakButton]()
-			{
-				const auto Pinned = WeakButton.Pin();
-				return Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus()) ? PanelRaised : Panel;
-			})
-			[
-				SNew(SBox).WidthOverride(700.0f).HeightOverride(72.0f)
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()
-						[SNew(STextBlock).Text(FText::FromString(Title)).Font(DisplayFont(25)).ColorAndOpacity(Paper)]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
-						[SNew(STextBlock).Text(FText::FromString(Subtitle)).Font(UiFont(11)).ColorAndOpacity(Muted)]
-					]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-					[SNew(STextBlock).Text(FText::FromString(TEXT("OPEN  >"))).Font(UiFont(11, true)).ColorAndOpacity(Accent)]
-				]
-			]);
-		return Button;
-	};
 	return SNew(SOverlay)
-		// Keep the locker arena preview free of the other profile pages' screen-wide scrims.
-		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.004f, 0.012f, 0.02f, 0.82f))
+		// Illustrated overview and live locker each own their presentation.
+		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.004f, 0.012f, 0.02f, 0.32f))
 		.Visibility_Lambda([this]()
 		{
-			return SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
+			return SelectedProfileTab == EFlickProfileTab::Customization || SelectedProfileTab == EFlickProfileTab::Overview ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
 		})]
-		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Opacity(0.22f).Visibility_Lambda([this]()
+		+ SOverlay::Slot()[SNew(SFlickInterfaceBackdrop).Opacity(0.08f).Visibility_Lambda([this]()
 		{
-			return SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
+			return SelectedProfileTab == EFlickProfileTab::Customization || SelectedProfileTab == EFlickProfileTab::Overview ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
 		})]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-		[
-			SNew(SBox).WidthOverride(1360.0f).HeightOverride(680.0f)
-			.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Overview ? EVisibility::Visible : EVisibility::Collapsed; })
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth()
-				[
-					SNew(SBox).WidthOverride(470.0f)
-					[
-						SNew(SFlickAngularBorder).BackgroundColor(Panel.CopyWithNewOpacity(0.96f))
-						.AccentColor(Cyan).UseAccentForOutline(true).CutSize(20.0f)
-						.BorderWidth(1.2f).Padding(FMargin(36.0f, 31.0f))
-						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight()
-							[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK  //  PLAYER PROFILE"))).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 23.0f, 0.0f, 0.0f)
-							[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR\nSTORY."))).Font(DisplayFont(53)).ColorAndOpacity(Paper)]
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
-							[SNew(STextBlock).Text(FText::FromString(TEXT("Every shot leaves a mark.\nWhere do you want to look?"))).Font(UiFont(15)).ColorAndOpacity(Muted)]
-							+ SVerticalBox::Slot().FillHeight(1.0f)[SNew(SBox)]
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 26.0f)
-							[SNew(STextBlock).Text(FText::FromString(TEXT("01  //  RECORD    02  //  RANK\n03  //  HISTORY   04  //  IDENTITY"))).Font(UiFont(10, true)).ColorAndOpacity(Cyan)]
-							+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left)
-							[SNew(SBox).WidthOverride(160.0f)[MakeMenuButton(TEXT("BACK"), FOnClicked::CreateLambda([this]()
-							{ if (GameMode.IsValid()) GameMode->CloseProfile(); else RemotePartyScreen = EFlickFrontendScreen::MainMenu; return FReply::Handled(); }))]]
-					]
-				]
-				]
-				+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(22.0f, 0.0f, 0.0f, 0.0f)
-				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 9.0f)
-					[MakeProfileChoice(EFlickProfileTab::Stats, 0, TEXT("STATS"), TEXT("Your performance across every playlist."), Cyan)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 9.0f)
-					[MakeProfileChoice(EFlickProfileTab::Leaderboards, 1, TEXT("COMPETITIVE RANKS"), TEXT("Your placement, MMR and the rank ladder."), Brand)]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 9.0f)
-					[MakeProfileChoice(EFlickProfileTab::MatchHistory, 2, TEXT("MATCH HISTORY"), TEXT("Revisit your most recent series."), Orange)]
-					+ SVerticalBox::Slot().AutoHeight()
-					[MakeProfileChoice(EFlickProfileTab::Customization, 3, TEXT("CUSTOMIZE"), TEXT("Identity, puck skins and live effects."), Cyan)]
-				]
-			]
-		]
+		+ SOverlay::Slot()
+		[SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Visible : EVisibility::Collapsed; })
+			[BuildLockerPage(LockerCategories, LockerContents)]]
+		+ SOverlay::Slot()
+		[SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Overview ? EVisibility::Visible : EVisibility::Collapsed; })
+			[BuildProfileOverview()]]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(42.0f)
 		[
 			SNew(SBox).HeightOverride_Lambda([this]()
@@ -1145,7 +971,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 					: SelectedProfileTab == EFlickProfileTab::MatchHistory ? 1100.0f
 					: SelectedProfileTab == EFlickProfileTab::Leaderboards ? 1240.0f : 1180.0f;
 			})
-			.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Overview ? EVisibility::Collapsed : EVisibility::Visible; })
+			.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Overview || SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Collapsed : EVisibility::Visible; })
 			.RenderTransform_Lambda([this]()
 			{
 				const float Alpha = FMath::Clamp(ProfileEntranceElapsed / 0.38f, 0.0f, 1.0f);
@@ -1218,37 +1044,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 				})
 				[
 				SNew(SOverlay)
-				+ SOverlay::Slot()
-				[
-					SNew(SBox)
-					.Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Visible : EVisibility::Collapsed; })
-					[
-						SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Brand).UseAccentForOutline(false).CutSize(14.0f).BorderWidth(1.1f).Padding(FMargin(24.0f, 16.0f))
-						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR LOCKER"))).Font(DisplayFont(27)).ColorAndOpacity(Paper)]
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 13.0f)
-							[SNew(STextBlock).Text(FText::FromString(TEXT("Choose a category, then equip an item from your collection."))).Font(UiFont(10)).ColorAndOpacity(Muted)]
-							+ SVerticalBox::Slot().FillHeight(1.0f)
-							[
-								SNew(SHorizontalBox)
-								+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 18.0f, 0.0f)
-								[
-									SNew(SBox).WidthOverride(230.0f)
-									[
-										SNew(SScrollBox)
-										+ SScrollBox::Slot()[LockerCategories]
-									]
-								]
-								+ SHorizontalBox::Slot().FillWidth(1.0f)
-								[
-									SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(Hairline).CutSize(8.0f).BorderWidth(1.0f).Padding(FMargin(20.0f, 15.0f))
-									[LockerContents]
-								]
-							]
-						]
-					]
-				]
 				+ SOverlay::Slot()
 				[
 					SNew(SBox)

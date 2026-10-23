@@ -285,6 +285,19 @@ bool AFlickBobArena::IsCapturedByPocket(const FVector& WorldLocation, const floa
 	return false;
 }
 
+bool AFlickBobArena::IsCapturedByPocketOnPath(const FVector& Previous, const FVector& Current, const float PieceRadius) const
+{
+	if (IsCapturedByPocket(Current, PieceRadius)) return true;
+	const FVector LocalPrevious = GetActorTransform().InverseTransformPosition(Previous);
+	const FVector LocalCurrent = GetActorTransform().InverseTransformPosition(Current);
+	const float Plane = SurfaceZ - PocketCaptureDepth;
+	if (LocalPrevious.Z <= Plane || LocalCurrent.Z > Plane) return false;
+	const float Fraction = (LocalPrevious.Z - Plane) / (LocalPrevious.Z - LocalCurrent.Z);
+	FVector Crossing = FMath::Lerp(LocalPrevious, LocalCurrent, Fraction);
+	Crossing.Z = Plane - .01f;
+	return IsCapturedByPocket(GetActorTransform().TransformPosition(Crossing), PieceRadius);
+}
+
 bool AFlickBobArena::IsSafeForTabletopSelfRighting(
 	const FVector& WorldLocation,
 	const float PieceRadius) const

@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket', 'BobStriker')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'TrainingMenu', 'FreePlayMenu', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket', 'BobStriker')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -28,6 +28,13 @@ param(
     [int]$PuckSkin = 0,
     [ValidateRange(1, 3)]
     [int]$PlayersPerTeam = 1,
+    [ValidateRange(0, 4)]
+    [int]$PlaySelection = 0,
+    [ValidateRange(0, 3)]
+    [int]$LineupSlot = 0,
+    [ValidateRange(-1, 8)]
+    [int]$LineupHover = -1,
+    [switch]$LineupRadar,
     [ValidateRange(0, 14)]
     [int]$LockerCategory = 0,
     [ValidateRange(-1, 64)]
@@ -109,10 +116,14 @@ $previewFlags = @{
     AimArrow = @('-Flick4v4Preview', '-FlickAimArrowPreview')
     PuckHover = @('-Flick4v4Preview', '-FlickPuckHoverPreview')
     Training = @('-FlickTrainingPreview')
+    TrainingMenu = @('-FlickModeSelectPreview', '-FlickTrainingMenuPreview')
+    FreePlayMenu = @('-FlickModeSelectPreview', '-FlickFreePlayMenuPreview')
     Practice = @('-FlickPracticePreview')
     PracticePacks = @('-FlickModeSelectPreview', '-FlickPracticeMenuPreview')
     Pause = @('-FlickPausePreview')
-    Result = @('-FlickMatchResultPreview', '-FlickRoundOverPreview')
+    # A completed series opens the winner cinematic over the round panel.
+    # Preview a live board instead so Result captures the actual round overlay.
+    Result = @('-Flick4v4Preview', '-FlickRoundOverPreview')
     Scoreboard = @('-Flick4v4Preview', '-FlickScoreboardPreview')
 }
 $runName = '{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), ([guid]::NewGuid().ToString('N').Substring(0, 6))
@@ -150,6 +161,9 @@ foreach ($screenName in $Screen) {
     }
     $arguments += @("-FlickShopInspect=$ShopItem", "-FlickShopFilter=$ShopFilter")
     $arguments += "-FlickBobStrikerSkin=$PuckSkin"
+    $arguments += "-FlickPlaySelection=$PlaySelection"
+    $arguments += @("-FlickLineupSlot=$LineupSlot", "-FlickLineupHover=$LineupHover")
+    if ($LineupRadar) { $arguments += '-FlickLineupRadar' }
     if ($ShopOwnedPreview) { $arguments += '-FlickShopOwnedPreview' }
     Write-Host "Capturing $screenName at ${Width}x${Height}..."
     $previousCachePath = [Environment]::GetEnvironmentVariable('UE-LocalDataCachePath', 'Process')

@@ -54,7 +54,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 			.WidthOverride(356.0f)
 			.HeightOverride(62.0f)
 			[
-				SNew(SFlickAngularBorder)
+				SNew(SFlickAngularBorder).RefinedSurface(true)
 				.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.015f, 0.84f))
 				.AccentColor(Brand.CopyWithNewOpacity(0.6f))
 				.CutSize(7.0f)
@@ -207,7 +207,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 				SNew(SBox).WidthOverride(370.0f).HeightOverride(78.0f)
 				[
 					SNew(SFlickMainMenuPanel)
-					.BackgroundColor(Panel.CopyWithNewOpacity(0.95f))
+					.BackgroundColor(Ink.CopyWithNewOpacity(0.95f))
 					.AccentColor_Lambda([this, ReplayTeam]() { return GetTeamAccent(ReplayTeam()); })
 					.CutSize(10.0f).BorderWidth(1.4f).Padding(FMargin(12.0f, 9.0f))
 					[
@@ -216,7 +216,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 						[
 							SNew(SBox).WidthOverride(58.0f).HeightOverride(58.0f)
 							[
-								SNew(SFlickAngularBorder).BackgroundColor(PanelRaised).AccentColor(Hairline).CutSize(8.0f).Padding(2.0f)
+								SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink).AccentColor(Hairline).CutSize(8.0f).Padding(2.0f)
 								[
 									SNew(SOverlay)
 									+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerAvatarBrush(ReplayTeam(), ReplaySlot()); })]
@@ -278,8 +278,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardOverlay(const bool bEmbedded
 				[
 				SNew(SBox).WidthOverride(900.0f)
 				[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(Panel.CopyWithNewOpacity(0.97f))
+				SNew(SFlickAngularBorder).RefinedSurface(true)
+				.BackgroundColor(Ink.CopyWithNewOpacity(0.97f))
 				.AccentColor(Cyan.CopyWithNewOpacity(0.65f))
 				.CutSize(11.0f)
 				.BorderWidth(0.9f)
@@ -367,8 +367,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardTeamSection(const EFlickTeam
 		[
 			SNew(SBox).HeightOverride(67.0f)
 			[
-				SNew(SFlickAngularBorder)
-				.BackgroundColor(FMath::Lerp(PanelRaised, Accent, 0.055f))
+				SNew(SFlickAngularBorder).RefinedSurface(true)
+				.BackgroundColor(FMath::Lerp(Ink, Accent, 0.018f))
 				.AccentColor(Accent.CopyWithNewOpacity(0.48f))
 				.CutSize(5.0f)
 				.BorderWidth(0.8f)
@@ -492,7 +492,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 
 	return SNew(SBox).HeightOverride(44.0f)
 		[
-			SNew(SFlickAngularBorder)
+			SNew(SFlickAngularBorder).RefinedSurface(true)
 			.BackgroundColor_Lambda([this, Team, PlayerSlot, Accent]()
 			{
 				const AFlickGameState* State = GetScoreboardGameState();
@@ -503,7 +503,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 				const AFlickPlayerState* RowPlayer = FindScoreboardPlayerState(Team, PlayerSlot);
 				const bool bLocalPlayer = RowPlayer && PlayerController.IsValid()
 					&& RowPlayer == PlayerController->PlayerState;
-				return FMath::Lerp(Panel, Accent, bActive ? 0.10f : bLocalPlayer ? 0.07f : 0.025f);
+				return FMath::Lerp(Ink, Accent, bActive ? 0.045f : bLocalPlayer ? 0.03f : 0.012f);
 			})
 			.AccentColor_Lambda([this, Team, PlayerSlot, Accent]()
 			{
@@ -529,8 +529,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 				[
 					SNew(SBox).WidthOverride(32.0f).HeightOverride(32.0f)
 					[
-						SNew(SFlickAngularBorder)
-						.BackgroundColor(PanelRaised)
+						SNew(SFlickAngularBorder).RefinedSurface(true)
+						.BackgroundColor(Ink)
 						.AccentColor(Accent.CopyWithNewOpacity(0.65f))
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(1.0f))
 						[
@@ -614,7 +614,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 			SNew(SOverlay)
 			+ SOverlay::Slot()
 			[
-				SNew(SFlickAngularBorder)
+				SNew(SFlickAngularBorder).RefinedSurface(true)
 			.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.015f, 0.84f))
 			.AccentColor_Lambda([this, Team, IsTeamToPlay]() { return GetTeamAccent(Team).CopyWithNewOpacity(IsTeamToPlay() ? 0.85f : 0.38f); })
 			.CutSize(7.0f)
@@ -776,7 +776,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 		.WidthOverride(320.0f)
 		.MinDesiredHeight(128.0f)
 		[
-			SNew(SFlickAngularBorder)
+			SNew(SFlickAngularBorder).RefinedSurface(true)
 			.BackgroundColor(FLinearColor(0.002f, 0.01f, 0.018f, 0.95f))
 			.AccentColor(Cyan.CopyWithNewOpacity(0.82f))
 			.CutSize(14.0f)
@@ -880,7 +880,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTutorialOverlay()
 		})
 		.WidthOverride(430.0f)
 		[
-			SNew(SFlickAngularBorder)
+			SNew(SFlickAngularBorder).RefinedSurface(true)
 			.BackgroundColor(FLinearColor(0.003f, 0.014f, 0.024f, 0.94f))
 			.AccentColor(Cyan.CopyWithNewOpacity(0.82f))
 			.CutSize(12.0f)
@@ -953,7 +953,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 		{
 			HintRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 6.0f, 0.0f)
 			[
-				SNew(SFlickAngularBorder)
+				SNew(SFlickAngularBorder).RefinedSurface(true)
 				.BackgroundColor(FLinearColor(0.014f, 0.03f, 0.045f, 0.98f))
 				.AccentColor(Accent.CopyWithNewOpacity(0.72f))
 				.CutSize(4.0f)
@@ -1061,7 +1061,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildControlHintPanel(const bool bRightSide
 				: EVisibility::Collapsed;
 		})
 		[
-			SNew(SFlickAngularBorder)
+			SNew(SFlickAngularBorder).RefinedSurface(true)
 			.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.017f, 0.94f))
 			.AccentColor((bRightSide ? Orange : Cyan).CopyWithNewOpacity(0.7f))
 			.CutSize(13.0f)
@@ -1130,8 +1130,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPowerMeter()
 		.WidthOverride(320.0f)
 		.Visibility_Lambda([this]() { return GetPowerVisibility(); })
 		[
-			SNew(SFlickAngularBorder)
-			.BackgroundColor(Panel)
+			SNew(SFlickAngularBorder).RefinedSurface(true)
+			.BackgroundColor(Ink)
 			.AccentColor(Brand)
 			.CutSize(0.0f)
 			.Padding(FMargin(18.0f, 14.0f))
@@ -1187,7 +1187,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 				: EVisibility::Collapsed;
 		})
 		[
-			SNew(SFlickAngularBorder)
+			SNew(SFlickAngularBorder).RefinedSurface(true)
 			.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.017f, 0.94f))
 			.AccentColor(Cyan.CopyWithNewOpacity(0.7f))
 			.CutSize(11.0f)
@@ -1214,7 +1214,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
-						SNew(SFlickAngularBorder)
+						SNew(SFlickAngularBorder).RefinedSurface(true)
 						.BackgroundColor(FLinearColor(0.014f, 0.03f, 0.045f, 0.98f))
 						.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
@@ -1238,7 +1238,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 								: EVisibility::Visible;
 						})
 						[
-							SNew(SFlickAngularBorder)
+							SNew(SFlickAngularBorder).RefinedSurface(true)
 							.BackgroundColor(FLinearColor(0.014f, 0.03f, 0.045f, 0.98f))
 							.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
 							.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
@@ -1273,7 +1273,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
-						SNew(SFlickAngularBorder)
+						SNew(SFlickAngularBorder).RefinedSurface(true)
 						.BackgroundColor(FLinearColor(0.014f, 0.03f, 0.045f, 0.98f))
 						.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
@@ -1303,9 +1303,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildEventFeed()
 			.WidthOverride(320.0f)
 			.Visibility_Lambda([this, Index]() { return GetEventVisibility(Index); })
 			[
-				SNew(SBorder)
-				.BorderImage(WhiteBrush())
-				.BorderBackgroundColor(Panel.CopyWithNewOpacity(0.95f))
+				SNew(SFlickAngularBorder).RefinedSurface(true)
+				.BackgroundColor(Ink.CopyWithNewOpacity(0.95f)).AccentColor(Cyan).CutSize(6)
 				.Padding(FMargin(0.0f))
 				[
 					SNew(SHorizontalBox)

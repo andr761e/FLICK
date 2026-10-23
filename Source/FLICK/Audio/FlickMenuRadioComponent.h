@@ -21,6 +21,7 @@ public:
 	FString GetTrackTitle() const;
 	FString GetStatus() const;
 	bool IsEnabled() const;
+	bool HasAudiblePlayback() const { return bAudible; }
 	float GetProgress() const;
 private:
 #if WITH_DEV_AUTOMATION_TESTS

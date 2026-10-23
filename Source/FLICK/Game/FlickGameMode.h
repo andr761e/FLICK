@@ -150,6 +150,7 @@ public:
 	virtual void Logout(AController* Exiting) override;
 	void RefreshLightingSettings();
 	void SetLockerPreview(int32 Category);
+	void RotateLockerPreview(float DeltaDegrees);
 	void UpdateLockerPreview(float DeltaSeconds);
 
 	bool CanSelectPiece(const AFlickPiece* Piece) const;
@@ -594,8 +595,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Gameplay Softbox Multiplier", ClampMin = "0.0", ClampMax = "1000.0"))
 	float OneVsOneGameplaySoftboxMultiplier = 250.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Sky Light Multiplier", ClampMin = "1.0", ClampMax = "4.0"))
-	float OneVsOneSkyLightMultiplier = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Sky Light Multiplier", ClampMin = "0.0", ClampMax = "4.0"))
+	float OneVsOneSkyLightMultiplier = .65f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Fill Light Intensity (650 cm Base)", ClampMin = "0.0", ClampMax = "300000.0"))
 	float OneVsOneFillLightIntensity = 150000.0f;
@@ -612,6 +613,7 @@ public:
 private:
 	friend class FFlickOneVsOneLightingTest;
 	friend class FFlickBobGameplayTest;
+	friend class FFlickBobResolutionReliabilityTest;
 	friend class FFlickRematchFlowTest;
 	friend class FFlickTrainingFeedbackTest;
 	friend class FFlickTrainingUndoTest;
@@ -739,6 +741,7 @@ private:
 	void UpdateGameStateCounts() const;
 	void AwardRoundSurvivalPoints() const;
 	bool AreActivePiecesSettled() const;
+	bool HasRestingSupport(const AFlickPiece* Piece) const;
 	bool ApplyResolutionTimeoutCleanup();
 	void FinishPhysicsResolution(bool bUsedTimeout);
 	void CheckWinOrAdvanceTurn();
@@ -818,6 +821,7 @@ private:
 	TArray<TObjectPtr<AFlickPiece>> Pieces;
 	int32 LockerPreviewCategory = INDEX_NONE;
 	float LockerPreviewElapsed = 0.0f;
+	float LockerPreviewYaw = 0.0f;
 	int32 LockerPreviewCycle = INDEX_NONE;
 	mutable TWeakObjectPtr<AFlickWorldFeedback> LockerSpawnFeedback;
 	mutable TWeakObjectPtr<AFlickWorldFeedback> LockerKnockoutFeedback;
@@ -935,6 +939,8 @@ private:
 
 	float ResolutionElapsed = 0.0f;
 	float SettledElapsed = 0.0f;
+	// Sweep the pocket capture plane between rendered frames, not just endpoints.
+	TMap<int32, FVector> BobPocketPreviousLocations;
 	float LastImpactFeedbackTime = -100.0f;
 	float LastStrongImpactEventTime = -100.0f;
 	bool bNetworkMatchRequested = false;

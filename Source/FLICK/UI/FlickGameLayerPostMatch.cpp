@@ -26,8 +26,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
  {
   return SNew(SBox).HeightOverride(52)
   [SNew(SFlickMainMenuFrame).Primary(bPrimary)
-   .StartColor(bPrimary ? Brand : Panel).EndColor(bPrimary ? FLinearColor(.82f, 1.0f, .025f) : PanelRaised)
-   .BorderColor(bPrimary ? Brand : Hairline).HoverBorderColor(Cyan).Padding(2)
+   .StartColor(bPrimary ? Brand : Ink).EndColor(bPrimary ? Brand : Ink)
+   .BorderColor(bPrimary ? Brand : Cyan.CopyWithNewOpacity(.55f)).HoverBorderColor(Brand).Padding(2)
    [SNew(SButton).ButtonStyle(&TransparentButtonStyle)
    .OnClicked(Click).ContentPadding(FMargin(16, 8))
    [SNew(STextBlock).Text_Lambda([this, Label, bPrimary]()
@@ -280,7 +280,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
     [SNew(SHorizontalBox)
      + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 30, 0)
      [SNew(SBox).WidthOverride(300)
-      [SNew(SFlickAngularBorder).BackgroundColor(Panel.CopyWithNewOpacity(.94f)).AccentColor(Brand).Padding(20)[Menu]]]
+      [SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.94f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(18).Padding(20)[Menu]]]
      + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[BuildScoreboardOverlay(true)]
     ]
    ]

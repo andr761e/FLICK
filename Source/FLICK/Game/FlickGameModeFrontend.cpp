@@ -798,6 +798,7 @@ void AFlickGameMode::SetLockerPreview(const int32 Category)
 			Preview->BeginReplayPresentation();
 		LockerPreviewElapsed = 0.0f;
 		LockerPreviewCycle = Category == FlickCosmeticCatalog::KnockoutCategory ? 0 : INDEX_NONE;
+		LockerPreviewYaw = 0.0f;
 		if (Preview && Category == FlickCosmeticCatalog::KnockoutCategory)
 			Preview->Launch(FVector::ForwardVector, 0.38f, MaxLaunchSpeed);
 		bMenuPartyDisplayInitialized = false;
@@ -834,6 +835,13 @@ void AFlickGameMode::SetLockerPreview(const int32 Category)
 	if (CameraPawn) CameraPawn->SetLockerPreviewMode(Category == FlickCosmeticCatalog::KnockoutCategory ? 2
 		: Category == FlickCosmeticCatalog::TrailCategory ? 3 : Category == FlickCosmeticCatalog::SpawnCategory ? 4 : 1);
 	if (bCategoryChanged) SetCameraForFrontend();
+}
+
+void AFlickGameMode::RotateLockerPreview(const float DeltaDegrees)
+{
+	if (FrontendScreen != EFlickFrontendScreen::Profile || !FlickCosmeticCatalog::IsPuckCategory(LockerPreviewCategory)
+		|| !FMath::IsFinite(DeltaDegrees)) return;
+	LockerPreviewYaw = FMath::UnwindDegrees(LockerPreviewYaw + FMath::Clamp(DeltaDegrees, -90.f, 90.f));
 }
 
 void AFlickGameMode::UpdateLockerPreview(const float DeltaSeconds)
@@ -900,7 +908,9 @@ void AFlickGameMode::UpdateLockerPreview(const float DeltaSeconds)
 	// uses a much smaller scale, so preserve it while moving the locker preview.
 	const FVector PreviewScale(Preview->GetPieceRadius() / 50.0f,
 		Preview->GetPieceRadius() / 50.0f, Preview->GetPieceThickness() / 100.0f);
-	Preview->ApplyReplayPresentation(FTransform(FQuat::Identity, Location, PreviewScale), true);
+	const FQuat Rotation = FlickCosmeticCatalog::IsPuckCategory(LockerPreviewCategory)
+		? FRotator(0, LockerPreviewYaw, 0).Quaternion() : FQuat::Identity;
+	Preview->ApplyReplayPresentation(FTransform(Rotation, Location, PreviewScale), true);
 }
 
 void AFlickGameMode::PreparePrivatePlayerClass(AFlickPlayerState* PlayerState)

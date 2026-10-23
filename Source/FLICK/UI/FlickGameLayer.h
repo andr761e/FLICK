@@ -84,6 +84,8 @@ private:
 	friend class FFlickPackagedStartupTest;
 #endif
 	TSharedRef<SWidget> BuildMainMenu();
+	TSharedRef<SWidget> BuildHomeStatusPanel();
+	TSharedRef<SWidget> BuildDisplayPuckSelector();
 	TSharedRef<SWidget> BuildMainMenuFooter();
 	TSharedRef<SWidget> BuildMenuRadio();
 	TSharedRef<SWidget> BuildChallengePreview();
@@ -97,6 +99,12 @@ private:
 	EFlickPieceArchetype GetDisplayedLoadoutPiece(int32 SlotIndex) const;
 	void SetDisplayedLoadoutPiece(int32 SlotIndex, EFlickPieceArchetype Archetype);
 	TSharedRef<SWidget> BuildProfile();
+	TSharedRef<SWidget> BuildProfileOverview();
+	TSharedRef<SWidget> BuildProfileIdentityCard(bool bExpanded);
+	TSharedRef<SWidget> BuildLockerPage(const TSharedRef<SWidget>& Categories, const TSharedRef<SWidget>& Contents);
+	TSharedRef<SWidget> BuildLockerCategory(int32 Category);
+	TSharedRef<SWidget> BuildLockerPuckCard(int32 Category, int32 Index);
+	void EquipLockerItem(int32 Category, int32 Index);
 	TSharedRef<SWidget> BuildRankedProfilePanel();
 	TSharedRef<SWidget> BuildProfileStatsPanel();
 	TSharedRef<SWidget> BuildStartupOverlay();
@@ -273,7 +281,9 @@ private:
 	FButtonStyle CompactPrimaryButtonStyle;
 	FButtonStyle CompactDangerButtonStyle;
 	FButtonStyle TransparentButtonStyle;
+	FEditableTextBoxStyle LineupNameStyle;
 	FCheckBoxStyle ToggleStyle;
+	FCheckBoxStyle SwitchToggleStyle;
 	FComboBoxStyle DropdownStyle;
 	FTableRowStyle DropdownRowStyle;
 	FSliderStyle SliderStyle;
@@ -324,6 +334,7 @@ private:
 	int32 SelectedPlayFormat = 0;
 	EFlickTrainingActivity SelectedTrainingActivity = EFlickTrainingActivity::None;
 	int32 SelectedPracticeCategory = INDEX_NONE;
+	int32 SelectedPracticeDifficulty = 0;
 	EFlickProfileTab SelectedProfileTab = EFlickProfileTab::Overview;
 	EFlickProfileTab AnimatedProfileTab = EFlickProfileTab::Overview;
 	float ProfileEntranceElapsed = 0.0f;

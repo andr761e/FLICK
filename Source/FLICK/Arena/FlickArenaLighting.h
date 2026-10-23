@@ -38,18 +38,20 @@ namespace FlickArenaLighting
 		float MenuSoftboxLightMultiplier = 80.0f;
 		float OneVsOneMenuSoftboxMultiplier = 250.0f;
 		float OneVsOneGameplaySoftboxMultiplier = 250.0f;
-		// Broad source areas avoid concentrated mirror patches on the metallic deck.
-		float SwitchyardKeySourceWidth = 1000.0f;
-		float SwitchyardKeySourceHeight = 550.0f;
-		float SwitchyardRimSourceWidth = 650.0f;
-		float SwitchyardRimSourceHeight = 500.0f;
-		float OneVsOneSkyLightMultiplier = 1.0f;
+		// Long strip sources reflect as stadium fixtures, not a white ceiling sheet.
+		float SwitchyardKeySourceWidth = 800.0f;
+		float SwitchyardKeySourceHeight = 180.0f;
+		float SwitchyardRimSourceWidth = 540.0f;
+		float SwitchyardRimSourceHeight = 120.0f;
+		FLinearColor SwitchyardKeyColor = FLinearColor(.18f, .52f, 1.f);
+		FLinearColor SwitchyardWarmColor = FLinearColor(1.f, .44f, .14f);
+		float OneVsOneSkyLightMultiplier = .65f;
 		float OneVsOneFillLightIntensity = 150000.0f;
 		// Four local, shadow-free sources aligned with the authored seating banks.
 		float StadiumWarmLightLumens = 180.0f;
 		// Short-range capsule sources represent the segmented amber skirt LEDs.
 		// No shadow maps, emissive GI noise or full-stadium light overlap.
-		float RimSpillLightLumens = 32.0f;
+		float RimSpillLightLumens = 24.0f;
 		// BOB's ivory/walnut presentation reuses the existing rig, with explicit
 		// local-light units and source-board scaling (620 cm half extent).
 		float BobKeyLightLumens = 650.f;

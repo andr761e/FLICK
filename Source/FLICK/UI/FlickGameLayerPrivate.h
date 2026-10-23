@@ -4,6 +4,8 @@
 #include "UI/FlickGameLayer.h"
 #include "UI/FlickUITheme.h"
 #include "UI/FlickMainMenuStyle.h"
+#include "UI/FlickMenuArtwork.h"
+#include "UI/FlickPuckThumbnail.h"
 
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Core/FlickCosmeticCatalog.h"
@@ -352,6 +354,7 @@ namespace
 			, _HoverBorderColor(Cyan)
 			, _Highlighted(false)
 			, _Primary(false)
+			, _HomePresentation(false)
 			, _BorderWidth(1.0f)
 			, _Padding(FMargin(0.0f))
 		{}
@@ -363,6 +366,7 @@ namespace
 			SLATE_ATTRIBUTE(FLinearColor, HoverBorderColor)
 			SLATE_ATTRIBUTE(bool, Highlighted)
 			SLATE_ATTRIBUTE(bool, Primary)
+			SLATE_ARGUMENT(bool, HomePresentation)
 			SLATE_ARGUMENT(float, BorderWidth)
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
@@ -378,6 +382,7 @@ namespace
 			HoverBorderColor = InArgs._HoverBorderColor;
 			Highlighted = InArgs._Highlighted;
 			Primary = InArgs._Primary;
+			bHomePresentation = InArgs._HomePresentation;
 			BorderWidth = InArgs._BorderWidth;
 			SetCanTick(true);
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
@@ -424,10 +429,10 @@ namespace
 			TArray<FVector2D> Shadow = Outline;
 			for (FVector2D& Point : Shadow) Point.Y += 4.0f;
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Shadow,
-				ESlateDrawEffect::None, FLinearColor(0.0f, 0.0f, 0.0f, 0.32f) * Tint, true, 12.0f);
+				ESlateDrawEffect::None, FLinearColor(0.0f, 0.0f, 0.0f, 0.32f) * Tint, true, bHomePresentation ? 6.0f : 12.0f);
 			if (bPrimary || HighlightAlpha > 0.01f)
 				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline,
-					FlickMainMenuStyle::Lime * Tint, bPrimary ? 1.6f : HighlightAlpha * 0.8f);
+					FlickMainMenuStyle::Lime * Tint, bPrimary ? (bHomePresentation ? .8f : 1.6f) : HighlightAlpha * .8f);
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			const FLinearColor Left = FMath::Lerp(StartColor.Get(), HoverStartColor.Get(), HighlightAlpha) * InWidgetStyle.GetColorAndOpacityTint();
 			const FLinearColor Right = FMath::Lerp(EndColor.Get(), HoverEndColor.Get(), HighlightAlpha) * InWidgetStyle.GetColorAndOpacityTint();
@@ -459,7 +464,7 @@ namespace
 				Indices.Append({0, static_cast<SlateIndex>(Index + 1), static_cast<SlateIndex>((Index + 1) % Points.Num() + 1)});
 			FSlateDrawElement::MakeCustomVerts(
 				OutDrawElements, LayerId + 1, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
-			if (bPrimary)
+			if (bPrimary && !bHomePresentation)
 			{
 				TArray<FVector2D> OuterFrame = Outline;
 				for (FVector2D& Point : OuterFrame)
@@ -494,11 +499,13 @@ namespace
 					ESlateDrawEffect::None, Color, true, Width);
 			};
 
-			DrawRail({FVector2D(10.0f, 1.0f), FVector2D(42.0f, 1.0f)}, RailColor, bPrimary ? 2.0f : 1.35f);
+			if (!bHomePresentation) DrawRail({FVector2D(10.0f, 1.0f), FVector2D(42.0f, 1.0f)}, RailColor, bPrimary ? 2.0f : 1.35f);
 			const TArray<FVector2D> SweptRail = {Points[1] - FVector2D(22.0f, 0.0f), Points[1], Points[2], Points[3], Points[4], Points[4] - FVector2D(18.0f, 0.0f)};
-			if (!bPrimary)
+			if (!bHomePresentation && !bPrimary)
 				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 2, SweptRail, FlickMainMenuStyle::Lime * Tint, 0.65f);
-			DrawRail(SweptRail, bPrimary ? RailColor : FlickMainMenuStyle::Lime * Tint, bPrimary ? 1.0f : 1.6f);
+			if (!bHomePresentation) DrawRail(SweptRail, bPrimary ? RailColor : FlickMainMenuStyle::Lime * Tint, bPrimary ? 1.0f : 1.6f);
+			else if (!bPrimary) DrawRail({Points[4] - FVector2D(18, 0), Points[4], Points[3]}, FlickMainMenuStyle::Lime * Tint, 1.f);
+			else DrawRail({FVector2D(-5, 10), FVector2D(-5, Size.Y - 2)}, FlickMainMenuStyle::Lime * Tint, 3.f);
 
 			if (bPrimary || HighlightAlpha > 0.01f)
 			{
@@ -518,6 +525,7 @@ namespace
 		TAttribute<FLinearColor> HoverBorderColor;
 		TAttribute<bool> Highlighted;
 		TAttribute<bool> Primary;
+		bool bHomePresentation = false;
 		float HighlightAlpha = 0.0f;
 		float BorderWidth = 1.0f;
 	};
@@ -537,7 +545,8 @@ namespace
 		Rank,
 		Social,
 		Whistle,
-		Target
+		Target,
+		Camera, Display, Sound, Controls, Chat, Code, Brush, Previous, Next, Pause
 	};
 
 	class SFlickMainMenuIcon final : public SLeafWidget
@@ -606,6 +615,45 @@ namespace
 
 			switch (Icon)
 			{
+			case EFlickMainMenuIcon::Camera:
+				DrawLines({{5, 12}, {12, 12}, {15, 7}, {25, 7}, {28, 12}, {35, 12}, {35, 32}, {5, 32}, {5, 12}});
+				DrawLines(CirclePoints(Center + FVector2D(0, 2), 7));
+				break;
+			case EFlickMainMenuIcon::Display:
+				DrawLines({{4, 7}, {36, 7}, {36, 29}, {4, 29}, {4, 7}});
+				DrawLines({{20, 29}, {20, 35}, {11, 35}, {29, 35}});
+				break;
+			case EFlickMainMenuIcon::Sound:
+				DrawLines({{5, 15}, {12, 15}, {22, 7}, {22, 33}, {12, 25}, {5, 25}, {5, 15}});
+				DrawLines({{28, 13}, {32, 19}, {32, 21}, {28, 27}});
+				DrawLines({{33, 7}, {38, 17}, {38, 23}, {33, 33}}, 1.5f);
+				break;
+			case EFlickMainMenuIcon::Controls:
+				DrawLines({{9, 12}, {31, 12}, {36, 18}, {37, 31}, {31, 32}, {25, 25}, {15, 25}, {9, 32}, {3, 31}, {4, 18}, {9, 12}});
+				DrawLines({{9, 19}, {17, 19}}); DrawLines({{13, 15}, {13, 23}});
+				DrawLines(CirclePoints({29, 18}, 1.5f)); DrawLines(CirclePoints({25, 22}, 1.5f));
+				break;
+			case EFlickMainMenuIcon::Chat:
+				DrawLines({{5, 7}, {35, 7}, {35, 28}, {16, 28}, {7, 35}, {7, 28}, {5, 28}, {5, 7}});
+				for (int32 Dot = 0; Dot < 3; ++Dot) DrawLines(CirclePoints({12.0 + Dot * 8, 18}, 1));
+				break;
+			case EFlickMainMenuIcon::Code:
+				DrawLines({{12, 10}, {3, 20}, {12, 30}}); DrawLines({{28, 10}, {37, 20}, {28, 30}});
+				DrawLines({{24, 5}, {16, 35}});
+				break;
+			case EFlickMainMenuIcon::Brush:
+				DrawLines({{13, 26}, {29, 5}, {35, 10}, {19, 30}, {13, 26}});
+				DrawLines({{13, 26}, {7, 26}, {4, 36}, {14, 34}, {19, 30}});
+				break;
+			case EFlickMainMenuIcon::Previous:
+				DrawLines({{9, 9}, {9, 31}}, 3); DrawLines({{30, 9}, {13, 20}, {30, 31}, {30, 9}}, 3);
+				break;
+			case EFlickMainMenuIcon::Next:
+				DrawLines({{31, 9}, {31, 31}}, 3); DrawLines({{10, 9}, {27, 20}, {10, 31}, {10, 9}}, 3);
+				break;
+			case EFlickMainMenuIcon::Pause:
+				DrawLines({{15, 9}, {15, 31}}, 5); DrawLines({{25, 9}, {25, 31}}, 5);
+				break;
 			case EFlickMainMenuIcon::Play:
 			{
 				const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
@@ -698,6 +746,60 @@ namespace
 		EFlickMainMenuIcon Icon = EFlickMainMenuIcon::Play;
 		TAttribute<FLinearColor> Color;
 		bool bGlow = false;
+	};
+
+	TSharedRef<SWidget> FrontendBrandHeader(const FString& Breadcrumb)
+	{
+		return SNew(SBox).HeightOverride(60)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[SNew(SBox).WidthOverride(180).HeightOverride(60)
+				[SNew(SFlickLogoWidget).VectorPath(TEXT("UI/FlickKnockoutWordmark.svg"))
+				.TexturePath(TEXT("/Game/UI/FlickKnockoutWordmark.FlickKnockoutWordmark")).DesiredSize({2048, 683})]]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(24, 10)
+			[SNew(SBox).WidthOverride(1)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(.55f))]]
+			+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)
+			[SNew(STextBlock).Text(FText::FromString(Breadcrumb)).Font(UiFont(12, true)).ColorAndOpacity(Ice)]
+		];
+	}
+
+	class SFlickToggleGlyph final : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SFlickToggleGlyph) {} SLATE_ATTRIBUTE(ECheckBoxState, State) SLATE_END_ARGS()
+		void Construct(const FArguments& Args) { State = Args._State; SetCanTick(false); }
+		virtual FVector2D ComputeDesiredSize(float) const override { return {54, 28}; }
+		virtual int32 OnPaint(const FPaintArgs&, const FGeometry& Geometry, const FSlateRect&,
+			FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle& Style, bool) const override
+		{
+			static const FSlateRoundedBoxBrush On(Brand, 14.f), Off(Track, 14.f), Knob(Paper, 11.f);
+			const bool bOn = State.Get() == ECheckBoxState::Checked;
+			FSlateDrawElement::MakeBox(Elements, Layer, Geometry.ToPaintGeometry(), bOn ? &On : &Off,
+				ESlateDrawEffect::None, (bOn ? Brand : Track) * Style.GetColorAndOpacityTint());
+			FSlateDrawElement::MakeBox(Elements, Layer + 1, Geometry.ToPaintGeometry(FVector2D(22, 22),
+				FSlateLayoutTransform(FVector2D(bOn ? 29 : 3, 3))), &Knob, ESlateDrawEffect::None, Paper * Style.GetColorAndOpacityTint());
+			return Layer + 1;
+		}
+	private:
+		TAttribute<ECheckBoxState> State;
+	};
+
+	class SFlickPreviewDrag final : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SFlickPreviewDrag) {} SLATE_EVENT(FOnFloatValueChanged, OnRotate) SLATE_END_ARGS()
+		void Construct(const FArguments& Args) { OnRotate = Args._OnRotate; SetCanTick(false); SetCursor(EMouseCursor::GrabHand); }
+		virtual FVector2D ComputeDesiredSize(float) const override { return {100, 100}; }
+		virtual int32 OnPaint(const FPaintArgs&, const FGeometry&, const FSlateRect&, FSlateWindowElementList&, int32 Layer, const FWidgetStyle&, bool) const override { return Layer; }
+		virtual FReply OnMouseButtonDown(const FGeometry&, const FPointerEvent& Event) override
+		{ return Event.GetEffectingButton() == EKeys::LeftMouseButton ? FReply::Handled().CaptureMouse(SharedThis(this)) : FReply::Unhandled(); }
+		virtual FReply OnMouseMove(const FGeometry&, const FPointerEvent& Event) override
+		{ if (!HasMouseCapture()) return FReply::Unhandled(); OnRotate.ExecuteIfBound(Event.GetCursorDelta().X * .45f); return FReply::Handled(); }
+		virtual FReply OnMouseButtonUp(const FGeometry&, const FPointerEvent& Event) override
+		{ return Event.GetEffectingButton() == EKeys::LeftMouseButton && HasMouseCapture() ? FReply::Handled().ReleaseMouseCapture() : FReply::Unhandled(); }
+	private:
+		FOnFloatValueChanged OnRotate;
 	};
 
 	class SFlickMainMenuTechLines final : public SLeafWidget
@@ -1379,6 +1481,7 @@ namespace
 				, _BorderWidth(1.0f)
 				, _DrawNeutralOutline(true)
 				, _UseAccentForOutline(false)
+				, _RefinedSurface(false)
 				, _Padding(FMargin(0.0f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, BackgroundColor)
@@ -1387,6 +1490,7 @@ namespace
 				SLATE_ARGUMENT(float, BorderWidth)
 				SLATE_ARGUMENT(bool, DrawNeutralOutline)
 				SLATE_ARGUMENT(bool, UseAccentForOutline)
+				SLATE_ARGUMENT(bool, RefinedSurface)
 				SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
@@ -1399,6 +1503,7 @@ namespace
 			BorderWidth = InArgs._BorderWidth;
 			bDrawNeutralOutline = InArgs._DrawNeutralOutline;
 			bUseAccentForOutline = InArgs._UseAccentForOutline;
+			bRefinedSurface = InArgs._RefinedSurface;
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
 		}
 
@@ -1413,7 +1518,10 @@ namespace
 			const TArray<FVector2D> Points = FlickUITheme::GetPanelOutline(Size, Cut);
 			const FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
 			const FLinearColor Fill = BackgroundColor.Get();
-			const FLinearColor Highlight = FlickUITheme::GetSurfaceHighlight(Fill);
+			// Opt-in graphite glass: less milky fill, with a thin inset bevel.
+			// Existing HUD and gameplay panels keep their established rendering.
+			const FLinearColor Highlight = bRefinedSurface
+				? FMath::Lerp(Fill, FlickUITheme::GetSurfaceHighlight(Fill), .42f) : FlickUITheme::GetSurfaceHighlight(Fill);
 			const FLinearColor Accent = AccentColor.Get() * Tint;
 			const auto& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			TArray<FSlateVertex> Vertices;
@@ -1430,6 +1538,14 @@ namespace
 			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
 			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
 				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
+			if (bRefinedSurface && bDrawNeutralOutline && Fill.A > .1f && Size.X > 12 && Size.Y > 12)
+			{
+				auto Inset = FlickUITheme::GetPanelOutline(Size - FVector2D(6,6), FMath::Max(0.f,Cut-2));
+				for (auto& Point : Inset) Point += FVector2D(3,3);
+				const FVector2D First = Inset[0]; Inset.Add(First);
+				FSlateDrawElement::MakeLines(OutDrawElements,LayerId+1,AllottedGeometry.ToPaintGeometry(),Inset,
+					Effect, Paper.CopyWithNewOpacity(.055f)*Tint,true,.65f);
+			}
 			if (bDrawNeutralOutline)
 			{
 				TArray<FVector2D> Outline = Points;
@@ -1466,6 +1582,7 @@ namespace
 		float BorderWidth = 1.0f;
 		bool bDrawNeutralOutline = true;
 		bool bUseAccentForOutline = false;
+		bool bRefinedSurface = false;
 	};
 
 	// Image-capable shared frame. Premium treatment is reserved for feature

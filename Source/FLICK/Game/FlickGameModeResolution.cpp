@@ -17,6 +17,11 @@ void AFlickGameMode::BeginResolutionTracking(
 	LastReplayCaptureTime = -100.0f;
 	bReplayPlayedForResolution = false;
 	ResolutionElapsed = 0.0f;
+	BobPocketPreviousLocations.Reset();
+	if (IsBobMode())
+		for (const AFlickPiece* Piece : Pieces)
+			if (IsValid(Piece) && Piece->IsActive())
+				BobPocketPreviousLocations.Add(Piece->GetPieceId(), Piece->GetActorLocation());
 	ResolutionPlayer1Eliminated = 0;
 	ResolutionPlayer2Eliminated = 0;
 	ResolutionImpactCount = 0;
@@ -905,8 +910,28 @@ void AFlickGameMode::UpdateBobPockets()
 			continue;
 		}
 
-		if (!BobArenaActor->IsCapturedByPocket(Piece->GetActorLocation(), Piece->GetPieceRadius()))
+		const FVector Location = Piece->GetActorLocation();
+		const FVector* Previous = BobPocketPreviousLocations.Find(Piece->GetPieceId());
+		const bool bCaptured = BobArenaActor->IsCapturedByPocketOnPath(
+			Previous ? *Previous : Location, Location, Piece->GetPieceRadius());
+		BobPocketPreviousLocations.Add(Piece->GetPieceId(), Location);
+		if (!bCaptured)
 		{
+			// An escaped puck is not a scored pocket or striker foul. Restore it
+			// only after it is clearly below the playing bed; never cancel flight.
+			const FVector Local = BobArenaActor->GetActorTransform().InverseTransformPosition(Location);
+			const float OutsideExtent = BobArenaActor->BoardHalfExtent + Piece->GetPieceRadius();
+			const bool bOutside = FMath::Abs(Local.X) > OutsideExtent || FMath::Abs(Local.Y) > OutsideExtent;
+			const bool bOnStadiumFloor = bOutside && Local.Z < BobArenaActor->SurfaceZ - Piece->GetPieceThickness();
+			const bool bBelowBoard = Local.Z < BobArenaActor->SurfaceZ
+				- FMath::Max(BobArenaActor->BoardThickness * 1.5f, Piece->GetPieceThickness() * 4.f);
+			if (bOnStadiumFloor || bBelowBoard || Location.Z < KillZ)
+			{
+				const FVector Recovery = FindBobRespawnLocation();
+				ResetBobPieceAt(Piece, Piece->GetTeam(), Recovery, Piece->IsBobStriker());
+				BobPocketPreviousLocations.Add(Piece->GetPieceId(), Recovery);
+				UE_LOG(LogFlick, Warning, TEXT("BOB recovered escaped puck %d without awarding a pocket"), Piece->GetPieceId());
+			}
 			continue;
 		}
 
@@ -1068,6 +1093,19 @@ void AFlickGameMode::UpdateGameStateCounts() const
 	}
 }
 
+bool AFlickGameMode::HasRestingSupport(const AFlickPiece* Piece) const
+{
+	if (!Piece || !GetWorld()) return false;
+	const FVector Up = Piece->GetActorUpVector().GetSafeNormal();
+	const float Extent = Piece->GetPieceRadius() * FMath::Sqrt(FMath::Max(0.f, 1.f - Up.Z * Up.Z))
+		+ Piece->GetPieceThickness() * .5f * FMath::Abs(Up.Z);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(FlickRestingSupport), false, Piece);
+	FHitResult Hit;
+	return GetWorld()->LineTraceSingleByChannel(Hit, Piece->GetActorLocation(),
+		Piece->GetActorLocation() - FVector(0, 0, Extent + KnockoutBoundsTolerance + 2.f), ECC_Visibility, Query)
+		&& Hit.Component.IsValid() && Hit.Component->GetCollisionEnabled() != ECollisionEnabled::NoCollision;
+}
+
 bool AFlickGameMode::AreActivePiecesSettled() const
 {
 	if (TestArenaActor && (TestArenaActor->HasMovingDividers() || TestArenaActor->HasPiecesOnDividerCrowns(Pieces))) return false;
@@ -1082,9 +1120,10 @@ bool AFlickGameMode::AreActivePiecesSettled() const
 		const FVector Up = Piece->GetActorUpVector().GetSafeNormal();
 		const float VerticalExtent = Piece->GetPieceRadius() * FMath::Sqrt(FMath::Max(0.f, 1.f - Up.Z * Up.Z))
 			+ Piece->GetPieceThickness() * .5f * FMath::Abs(Up.Z);
-		if (Piece->GetActorLocation().Z - VerticalExtent > ArenaSurfaceZ + KnockoutBoundsTolerance
-			|| Piece->GetLinearVelocity().Size() > SleepLinearVelocityThreshold
-			|| Piece->GetAngularVelocityDegrees().Size() > SleepAngularVelocityThreshold)
+		if (Piece->GetLinearVelocity().Size() > SleepLinearVelocityThreshold
+			|| Piece->GetAngularVelocityDegrees().Size() > SleepAngularVelocityThreshold
+			|| (Piece->GetActorLocation().Z - VerticalExtent > ArenaSurfaceZ + KnockoutBoundsTolerance
+				&& (!IsBobMode() || !HasRestingSupport(Piece))))
 		{
 			return false;
 		}
@@ -1107,8 +1146,9 @@ bool AFlickGameMode::ApplyResolutionTimeoutCleanup()
 		const FVector Up = Piece->GetActorUpVector().GetSafeNormal();
 		const float VerticalExtent = Piece->GetPieceRadius() * FMath::Sqrt(FMath::Max(0.f, 1.f - Up.Z * Up.Z))
 			+ Piece->GetPieceThickness() * .5f * FMath::Abs(Up.Z);
-		if (Piece->GetActorLocation().Z - VerticalExtent > ArenaSurfaceZ + KnockoutBoundsTolerance
-			|| LinearSpeed > SleepLinearVelocityThreshold * 6.0f || AngularSpeed > SleepAngularVelocityThreshold * 4.0f)
+		if (LinearSpeed > SleepLinearVelocityThreshold * 6.0f || AngularSpeed > SleepAngularVelocityThreshold * 4.0f
+			|| (Piece->GetActorLocation().Z - VerticalExtent > ArenaSurfaceZ + KnockoutBoundsTolerance
+				&& (!IsBobMode() || !HasRestingSupport(Piece))))
 		{
 			bHasMeaningfulMotion = true;
 			continue;

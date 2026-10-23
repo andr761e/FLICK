@@ -33,6 +33,8 @@ base = param("BaseColor", u.LinearColor(.12, .15, .18, 1))
 rough = param("Roughness", .32)
 detail = param("FinishDetail", .7)
 deck = param("DeckFinish", 0.)
+# Opt-in shader relief: zero preserves the existing concourse/locker finish.
+relief = param("DeckRelief", 0.)
 collar = param("RimCollarFinish", 0.)
 radius = param("ArenaRadius", 650.)
 arena_scale = param("ArenaScale", 1.)
@@ -43,7 +45,7 @@ position = edit.create_material_expression(material, u.MaterialExpressionWorldPo
 pattern = edit.create_material_expression(material, u.MaterialExpressionCustom)
 pattern.set_editor_property("output_type", u.CustomMaterialOutputType.CMOT_FLOAT4)
 inputs = []
-for key in ("P", "N", "Detail", "Deck", "Roughness", "Base", "Collar", "Radius", "ArenaScale", "SurfaceZ", "LensCount", "Band"):
+for key in ("P", "N", "Detail", "Deck", "Relief", "Roughness", "Base", "Collar", "Radius", "ArenaScale", "SurfaceZ", "LensCount", "Band"):
     entry = u.CustomInput()
     entry.set_editor_property("input_name", key)
     inputs.append(entry)
@@ -79,6 +81,8 @@ float scratch=saturate((.04-across)/max(fwidth(across),.04)+.5)
  *(1.-smoothstep(4.,12.,along))*step(.78,f.hash(cell+41.));
 float3 color=Base.rgb*(1.+Detail*((broad-.5)*.035+Deck*(wear-.3)*.05+scratch*.05));
 float roughness=clamp(Roughness+Detail*(variation+scratch*.025),.12,.85);
+// Fine satin wear varies reflection width, not painted albedo. Opt-in deck only.
+roughness=clamp(roughness+Deck*Relief*(f.noise(P.xy*.24)-.5)*.28,.12,.85);
 // Existing flat collar faces receive a polished crown and dark lens gaskets.
 // This is material shading only: neither vertices nor the collision surface move.
 float scale=max(Radius/650.,.1), r=length(P.xy);
@@ -104,7 +108,7 @@ color=lerp(color,float3(.008,.010,.014),recess*.8);
 return float4(color,roughness);
 """)
 side_band = param("RimSideBand", 0.)
-for node, slot in ((position, "P"), (vertex_normal, "N"), (detail, "Detail"), (deck, "Deck"), (rough, "Roughness"), (base, "Base"),
+for node, slot in ((position, "P"), (vertex_normal, "N"), (detail, "Detail"), (deck, "Deck"), (relief, "Relief"), (rough, "Roughness"), (base, "Base"),
                    (collar, "Collar"), (radius, "Radius"), (arena_scale, "ArenaScale"), (surface_z, "SurfaceZ"),
                    (lens_count, "LensCount"), (side_band, "Band")):
     connect(node, pattern, slot)
@@ -131,7 +135,7 @@ for key, value, prop in (("Metallic", .8, u.MaterialProperty.MP_METALLIC),
 normal = edit.create_material_expression(material, u.MaterialExpressionCustom)
 normal.set_editor_property("output_type", u.CustomMaterialOutputType.CMOT_FLOAT3)
 inputs = []
-for key in ("P", "N", "Detail", "Collar", "Radius", "ArenaScale", "SurfaceZ"):
+for key in ("P", "N", "Detail", "Deck", "Relief", "Collar", "Radius", "ArenaScale", "SurfaceZ"):
     entry = u.CustomInput()
     entry.set_editor_property("input_name", key)
     inputs.append(entry)
@@ -150,6 +154,16 @@ float2 p=P.xy;
 float fineCoord=max(length(ddx(p)),length(ddy(p)))*.32;
 float height=f.noise(p*.10)*.012
  +f.noise(float2(p.x*.045,p.y*.32))*.003*exp2(-fineCoord*fineCoord);
+// A few-centimetre-scale finish breaks up the broad reflected fixtures.
+// Screen-footprint filtering suppresses detail before it can become sparkle.
+// This height exists ONLY in shading derivatives: no WPO or physics displacement.
+float footprint=max(length(ddx(p)),length(ddy(p)));
+// Rotate and warp the machining coordinates: an axis-aligned value-noise
+// gradient otherwise reads as tiny rectangular tiles under a long light strip.
+float2 machining=float2(dot(p,float2(.8,.6)),dot(p,float2(-.6,.8)));
+machining+=float2(f.noise(p*.037),f.noise(p*.037+31.))*18.;
+height+=Deck*Relief*.6*(f.noise(machining*.24)*exp2(-pow(footprint*.40,2.))
+ +f.noise(machining*.62)*.10*exp2(-pow(footprint*.80,2.)));
 float3 n=normalize(N), dx=ddx(P), dy=ddy(P);
 float3 a=cross(dy,n), b=cross(n,dx);
 float det=dot(dx,a);
@@ -168,6 +182,8 @@ return normalize(n-gradient*Detail*(1.-rim)+crown);
 connect(position, normal, "P")
 connect(vertex_normal, normal, "N")
 connect(detail, normal, "Detail")
+connect(deck, normal, "Deck")
+connect(relief, normal, "Relief")
 for node, slot in ((collar, "Collar"), (radius, "Radius"), (arena_scale, "ArenaScale"), (surface_z, "SurfaceZ")):
     connect(node, normal, slot)
 assert edit.connect_material_property(normal, "", u.MaterialProperty.MP_NORMAL)
@@ -194,7 +210,7 @@ float aa=max(fwidth(segment),.002);
 float ends=1.-smoothstep(.29-aa,.29+aa,segment);
 float stripe=1.-smoothstep(3.1,3.1+max(fwidth(z),.08),abs(z+23.));
 float core=1.-smoothstep(1.35,1.35+max(fwidth(z),.08),abs(z+23.));
-float3 amber=Band*ends*stripe*(float3(1.,.38,.075)*8.+float3(1.,.73,.40)*core*6.);
+float3 amber=Band*ends*stripe*(float3(1.,.38,.075)*5.+float3(1.,.73,.40)*core*3.5);
 // Broaden the existing cyan insert optically across its host collar, rather
 // than adding raised lights or changing its 3.2-cm primitive geometry. Centers
 // and lengths match BuildOneVsOneRim exactly; all edges are derivative filtered.

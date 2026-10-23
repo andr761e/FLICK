@@ -52,6 +52,14 @@ SFlickGameLayer::SFlickGameLayer()
 		.SetCheckedPressedImage(FSlateRoundedBoxBrush(Ice, 3.0f))
 		.SetPadding(FMargin(0.0f));
 	// Own these styles for the lifetime of the widget; Slate keeps pointers.
+	LineupNameStyle = FCoreStyle::Get().GetWidgetStyle<FEditableTextBoxStyle>("NormalEditableTextBox");
+	LineupNameStyle.SetBackgroundImageNormal(FSlateNoResource()).SetBackgroundImageHovered(FSlateNoResource())
+		.SetBackgroundImageFocused(FSlateNoResource()).SetBackgroundImageReadOnly(FSlateNoResource())
+		.SetPadding(FMargin(4, 2)).SetFont(UiFont(11)).SetForegroundColor(Paper);
+	SwitchToggleStyle = ToggleStyle;
+	SwitchToggleStyle.SetUncheckedImage(FSlateNoResource()).SetUncheckedHoveredImage(FSlateNoResource())
+		.SetUncheckedPressedImage(FSlateNoResource()).SetCheckedImage(FSlateNoResource())
+		.SetCheckedHoveredImage(FSlateNoResource()).SetCheckedPressedImage(FSlateNoResource());
 	DropdownStyle = FCoreStyle::Get().GetWidgetStyle<FComboBoxStyle>("ComboBox");
 	DropdownStyle.ComboButtonStyle.ButtonStyle = CompactMenuButtonStyle;
 	DropdownStyle.ComboButtonStyle.SetMenuBorderBrush(FSlateRoundedBoxBrush(Ink, 3.0f, Hairline, 1.0f));
@@ -170,10 +178,49 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		SelectedTrainingActivity = EFlickTrainingActivity::PracticePacks;
 		FParse::Value(FCommandLine::Get(), TEXT("FlickPracticeCategory="), SelectedPracticeCategory);
 		SelectedPracticeCategory = FMath::Clamp(SelectedPracticeCategory, -1, 3);
+		FParse::Value(FCommandLine::Get(), TEXT("FlickPracticeDifficulty="), SelectedPracticeDifficulty);
+		SelectedPracticeDifficulty = FMath::Clamp(SelectedPracticeDifficulty, 0, 2);
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickTrainingMenuPreview")))
+	{
+		SelectedPlayPlaylist = EFlickPlayPlaylist::Training;
+		SelectedTrainingActivity = EFlickTrainingActivity::None;
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickFreePlayMenuPreview")))
+	{
+		SelectedPlayPlaylist = EFlickPlayPlaylist::Training;
+		SelectedTrainingActivity = EFlickTrainingActivity::FreePlay;
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickPlayFormatPreview")) || FParse::Param(FCommandLine::Get(), TEXT("FlickFreePlayMenuPreview")))
+	{
+		int32 PreviewSelection = 0;
+		if (FParse::Value(FCommandLine::Get(), TEXT("FlickPlaySelection="), PreviewSelection))
+		{
+			SelectedPlayFormat = FMath::Clamp(PreviewSelection, 0, 4);
+			if (GameMode.IsValid() && SelectedPlayFormat != 0)
+			{
+				GameMode->SetMatchmakingPlayersPerTeam(SelectedPlayFormat == 4 ? 1 : SelectedPlayFormat);
+				GameMode->SelectMatchVariant(SelectedPlayFormat == 4 ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic);
+			}
+		}
 	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickLoadoutComparePreview")))
 	{
 		Player1HoveredLoadoutArchetype = EFlickPieceArchetype::Heavy;
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("Flick4v4LoadoutPreview")))
+	{
+		int32 PreviewSlot = 0, PreviewHover = -1;
+		FParse::Value(FCommandLine::Get(), TEXT("FlickLineupSlot="), PreviewSlot);
+		SelectLoadoutSlot(EFlickTeam::Player1, FMath::Clamp(PreviewSlot, 0, 3));
+		if (FParse::Value(FCommandLine::Get(), TEXT("FlickLineupHover="), PreviewHover) && PreviewHover >= 0 && PreviewHover < 9)
+			Player1HoveredLoadoutArchetype = static_cast<EFlickPieceArchetype>(PreviewHover);
+		else if (FParse::Param(FCommandLine::Get(), TEXT("FlickLoadoutComparePreview")))
+			Player1HoveredLoadoutArchetype = EFlickPieceArchetype::Heavy;
+		bReadableLineup = !FParse::Param(FCommandLine::Get(), TEXT("FlickLineupRadar"));
+		// Normal menu entry resets the selection on its first Tick. Capture-only
+		// state must survive that first tick without changing ordinary navigation.
+		LastFocusedScreen = EFlickFrontendScreen::Loadout;
 	}
 #endif
 	if (GameMode.IsValid() && GameMode->GetFrontendScreen() == EFlickFrontendScreen::Settings)
@@ -411,7 +458,8 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 			SNew(SBox)
 			.Visibility_Lambda([this]()
 			{
-				return PlayerController.IsValid() && PlayerController->ShouldShowPrivateTeamMenu()
+				return (PlayerController.IsValid() && PlayerController->ShouldShowPrivateTeamMenu())
+					|| FParse::Param(FCommandLine::Get(), TEXT("FlickPrivateRolePreview"))
 					? EVisibility::Visible : EVisibility::Collapsed;
 			})
 			[
@@ -465,7 +513,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		[
 			BuildMainMenuFooter()
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0, 0, 34, 48)
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0, 0, FlickMainMenuStyle::RightInset, FlickMainMenuStyle::RadioBottom)
 		[
 			SNew(SBox).Visibility_Lambda([this]()
 			{

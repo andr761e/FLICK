@@ -24,6 +24,7 @@ public:
 	void InitializeArena(float InHalfExtent, float InThickness, float InSurfaceZ);
 	bool IsInsidePocket(const FVector& WorldLocation) const;
 	bool IsCapturedByPocket(const FVector& WorldLocation, float PieceRadius) const;
+	bool IsCapturedByPocketOnPath(const FVector& Previous, const FVector& Current, float PieceRadius) const;
 	bool IsSafeForTabletopSelfRighting(const FVector& WorldLocation, float PieceRadius) const;
 	FVector GetPocketWorldLocation(int32 PocketIndex) const;
 	FVector GetStrikerStart(EFlickTeam Team, float PieceThickness) const;

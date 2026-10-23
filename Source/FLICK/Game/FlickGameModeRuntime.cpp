@@ -354,6 +354,7 @@ void AFlickGameMode::SpawnLightingIfNeeded()
 		&& FrontendScreen != EFlickFrontendScreen::Paused && !bSettingsOverMatch && !bClassSelectionOverMatch;
 	// Keep menu lighting while editing it; opening settings must not change the preview preset.
 	Parameters.bPremiumMenu = FrontendScreen == EFlickFrontendScreen::MainMenu
+		|| (FrontendScreen == EFlickFrontendScreen::Profile && LockerPreviewCategory != INDEX_NONE)
 		|| (FrontendScreen == EFlickFrontendScreen::Settings && SettingsReturnScreen == EFlickFrontendScreen::MainMenu);
 	Parameters.bPremiumArena = bTestArenaMode;
 	Parameters.ArenaRadius = ArenaRadius;
@@ -1278,7 +1279,10 @@ void AFlickGameMode::SetCameraForFrontend()
 			&& FrontendScreen != EFlickFrontendScreen::Paused
 			&& !bSettingsOverMatch
 			&& !bClassSelectionOverMatch);
-		CameraPawn->SetMenuOrbitEnabled(bMenuContext);
+		const bool bBrowseMenu = bMenuContext || FrontendScreen == EFlickFrontendScreen::Loadout
+			|| FrontendScreen == EFlickFrontendScreen::Profile || FrontendScreen == EFlickFrontendScreen::ModeSelect
+			|| FrontendScreen == EFlickFrontendScreen::ItemShop;
+		CameraPawn->SetMenuOrbitEnabled(bBrowseMenu);
 	}
 	// Existing light actors are reused across frontend and gameplay. Retune them
 	// whenever presentation state changes so showcase exposure cannot leak into
@@ -1286,6 +1290,8 @@ void AFlickGameMode::SetCameraForFrontend()
 	SpawnLightingIfNeeded();
 	if (TestArenaActor) TestArenaActor->SetMenuPresentationEnabled(bMenuContext
 		|| (FrontendScreen == EFlickFrontendScreen::Profile && LockerPreviewCategory != INDEX_NONE));
+	if (TestArenaActor) TestArenaActor->SetLockerPresentationEnabled(
+		FrontendScreen == EFlickFrontendScreen::Profile && LockerPreviewCategory != INDEX_NONE);
 }
 
 void AFlickGameMode::SetCameraViewForTeam(const EFlickTeam Team, const bool bSnap)

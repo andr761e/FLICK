@@ -10,13 +10,22 @@ namespace FlickMainMenuStyle
 	inline const FLinearColor Ice = FlickUITheme::Ice;
 	constexpr float LeftPadding = 52.0f;
 	constexpr float NavigationTop = 256.0f;
+	// One right-hand grid: header, challenges and radio share the same inset.
+	constexpr float RightInset = 34.0f;
+	constexpr float RightColumnWidth = 390.0f;
+	constexpr float StatusWidth = 650.0f;
+	constexpr float StatusHeight = 82.0f;
+	constexpr float StatusTop = 32.0f;
+	constexpr float RadioHeight = 150.0f;
+	constexpr float RadioBottom = 48.0f;
+	constexpr float SelectorBottom = 86.0f;
 
 	namespace Navigation
 	{
 		constexpr float PrimaryHeight = 92.0f;
 		constexpr float SecondaryHeight = 62.0f;
 		constexpr float Gap = 10.0f;
-		constexpr float FirstWidth = 460.0f;
+		constexpr float FirstWidth = 410.0f;
 		constexpr float RightEdgeSlope = 0.075f;
 
 		constexpr float GetRowTop(const int32 Index)
@@ -43,7 +52,7 @@ namespace FlickMainMenuStyle
 
 	inline float GetDiagonalBottomEdgeX(const FVector2D Size, const float ColumnScale)
 	{
-		return FMath::Min(Size.X, Size.Y * (16.0f / 9.0f)) * 0.410f * ColumnScale;
+		return FMath::Min(Size.X, Size.Y * (16.0f / 9.0f)) * 0.355f * ColumnScale;
 	}
 
 	inline float GetDiagonalTopEdgeX(const FVector2D Size, const float ColumnScale)
@@ -55,6 +64,6 @@ namespace FlickMainMenuStyle
 		const float PlayBottom = NavigationTop + Navigation::PrimaryHeight * ColumnScale;
 		const float Alpha = FMath::Clamp(PlayBottom / FMath::Max(1.0, Size.Y), 0.0f, 0.9f);
 		const float MinimumTop = (LeftPadding + Navigation::FirstWidth * ColumnScale + 22.0f - Bottom * Alpha) / (1.0f - Alpha);
-		return FMath::Max(DesignWidth * 0.292f * ColumnScale, MinimumTop);
+		return FMath::Max(DesignWidth * 0.250f * ColumnScale, MinimumTop);
 	}
 }

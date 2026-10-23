@@ -87,6 +87,7 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Deck uses the cooked architectural shader"), Finish->GetMaterial()->GetName(), FString(TEXT("M_ArchitecturalMetal")));
 			CheckParameter(Finish, TEXT("RimCollarFinish"), 0.f);
 			CheckParameter(Finish, TEXT("DeckFinish"), 1.f);
+			CheckParameter(Finish, TEXT("DeckRelief"), Arena->DeckFinishRelief);
 			CheckPatternScale(Finish);
 			FLinearColor Color;
 			Finish->GetVectorParameterValue(FMaterialParameterInfo(TEXT("BaseColor")), Color);
@@ -107,6 +108,7 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 			const auto* Material = Arena->StadiumStructureMesh->GetMaterial(Slot);
 			if (!Material || Material->GetMaterial()->GetName() != TEXT("M_ArchitecturalMetal")) continue;
 			CheckParameter(Material, TEXT("RimCollarFinish"), 0.f);
+			CheckParameter(Material, TEXT("DeckRelief"), 0.f);
 			CheckPatternScale(Material);
 		}
 		TestTrue(TEXT("Reduced guide set is built"), Arena->ConceptGuides->GetInstanceCount() > 0);

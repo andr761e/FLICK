@@ -605,6 +605,7 @@ bool AFlickTestArena::ToggleTrainingMechanismAtWorldLocation(
 
 void AFlickTestArena::SetMenuPresentationEnabled(const bool bEnabled)
 {
+	SetLockerPresentationEnabled(false);
 	if (!WorkshopArenaMesh || bMenuMaterialsEnabled == bEnabled) return;
 	if (bEnabled && MenuPresentationMaterials.IsEmpty())
 	{
@@ -642,6 +643,48 @@ void AFlickTestArena::SetMenuPresentationEnabled(const bool bEnabled)
 			? static_cast<UMaterialInterface*>(MenuPresentationMaterials[Index].Get()) : MenuOriginalMaterials[Index].Get());
 	}
 	bMenuMaterialsEnabled = bEnabled;
+}
+
+void AFlickTestArena::SetLockerPresentationEnabled(const bool bEnabled)
+{
+	if (!WorkshopArenaMesh || bLockerMaterialsEnabled == bEnabled) return;
+	if (!bEnabled)
+	{
+		for (int32 Slot = 0; Slot < LockerOriginalMaterials.Num(); ++Slot)
+			WorkshopArenaMesh->SetMaterial(Slot, LockerOriginalMaterials[Slot]);
+		LockerOriginalMaterials.Reset();
+		LockerPresentationMaterials.Reset();
+		bLockerMaterialsEnabled = false;
+		return;
+	}
+	// Reuse the existing architectural shader only for the broad deck. It adds
+	// brushed-metal reflections to the locker without touching the arena mesh,
+	// its physical material, coloured indicators or other screens' materials.
+	auto* Parent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/TestArena/Arena/M_ArchitecturalMetal.M_ArchitecturalMetal"));
+	if (!Parent || !WorkshopArenaMesh->GetStaticMesh()) return;
+	for (int32 Slot = 0; Slot < WorkshopArenaMesh->GetNumMaterials(); ++Slot)
+	{
+		UMaterialInterface* Original = WorkshopArenaMesh->GetMaterial(Slot);
+		LockerOriginalMaterials.Add(Original);
+		auto* Source = WorkshopArenaMesh->GetStaticMesh()->GetMaterial(Slot);
+		const FString Name = Source ? Source->GetName() : FString();
+		if (!Original || (!Name.Contains(TEXT("Arena_Surface")) && !Name.Contains(TEXT("Inner_Field")) && !Name.Contains(TEXT("Center_Inset")))) continue;
+		auto* Finish = UMaterialInstanceDynamic::Create(Parent, this);
+		Finish->CopyMaterialUniformParameters(Original);
+		Finish->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.14f, .18f, .21f));
+		Finish->SetScalarParameterValue(TEXT("Metallic"), .92f);
+		Finish->SetScalarParameterValue(TEXT("Roughness"), .24f);
+		Finish->SetScalarParameterValue(TEXT("Specular"), .65f);
+		Finish->SetScalarParameterValue(TEXT("DeckFinish"), 1.f);
+		Finish->SetScalarParameterValue(TEXT("FinishDetail"), .8f);
+		Finish->SetScalarParameterValue(TEXT("Anisotropy"), .12f);
+		Finish->SetScalarParameterValue(TEXT("ArenaSurfaceZ"), SurfaceZ);
+		Finish->SetScalarParameterValue(TEXT("ArenaRadius"), ArenaRadius);
+		Finish->SetScalarParameterValue(TEXT("ArenaScale"), ArenaThickness / 50.f);
+		LockerPresentationMaterials.Add(Finish);
+		WorkshopArenaMesh->SetMaterial(Slot, Finish);
+	}
+	bLockerMaterialsEnabled = true;
 }
 
 void AFlickTestArena::BeginReplayPresentation()

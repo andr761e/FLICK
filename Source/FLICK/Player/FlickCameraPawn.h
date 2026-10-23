@@ -119,7 +119,7 @@ public:
 
 	// Dolly the rotating menu view toward its focus without changing its viewing angle.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.4", ClampMax = "1.0"))
-	float MenuOrbitZoomScale = 0.65f;
+	float MenuOrbitZoomScale = 0.47f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Menu", meta = (ClampMin = "0.0", ClampMax = "300.0"))
 	float MenuOrbitFocusHeight = 175.0f;
@@ -145,8 +145,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "1.0", ClampMax = "1.25"))
 	float OneVsOneMenuHeightMultiplier = 1.18f;
 
+	// Menu-only focus offset above the actual arena surface (not world-space Z).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|1v1", meta = (ClampMin = "0.0", ClampMax = "250.0"))
-	float OneVsOneMenuFocusHeight = 115.0f;
+	float OneVsOneMenuFocusHeight = 20.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Image", meta = (ClampMin = "0.0", ClampMax = "2.0"))
 	float ClassicBloomIntensity = 0.28f;

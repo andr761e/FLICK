@@ -3,6 +3,11 @@
 BOB's ivory/walnut/foundry finish changes materials, the existing local lighting
 rig and camera grading only. It does not change the board, stadium or puck meshes.
 
+For the subsequent fixed-rate physics, resolution recovery and faster Epic
+reflection-lighting configuration, see [PhysicsTiming.md](PhysicsTiming.md).
+The presentation-pass benchmark below records the earlier lighting mode, not
+the optimized mode described in that document.
+
 ## Materials
 
 `Tools/Build-FlickBobArchitecturalMaterials.py` is the canonical authoring pass.

@@ -167,7 +167,7 @@ bool FFlickOneVsOneArenaTest::RunTest(const FString& Parameters)
 						Component->GetMaterial(Slot)->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), Emission);
 						if (OriginalEmission > 0.1f)
 							TestTrue(TEXT("All formats share the balanced warm/cyan stadium emitters"),
-								FMath::IsNearlyEqual(Emission, OriginalEmission * (Source->GetName().Contains(TEXT("Warm")) ? 0.55f : 2.0f)));
+								FMath::IsNearlyEqual(Emission, OriginalEmission * (Source->GetName().Contains(TEXT("Warm")) ? 0.40f : 2.0f)));
 					}
 				}
 				if (Component->GetName().StartsWith(TEXT("OneVsOneRim")))

@@ -391,7 +391,7 @@ void AFlickGameMode::BeginPlay()
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickSettingsPreview")))
 	{
-		FrontendScreen = EFlickFrontendScreen::Settings;
+		OpenSettings(); // Capture the same camera/presentation transition as real input.
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickProfilePreview")))
 	{
@@ -659,7 +659,8 @@ void AFlickGameMode::BeginPlay()
 		FTimerHandle BobTimer;
 		GetWorldTimerManager().SetTimer(BobTimer, [this]()
 		{
-			if (FParse::Param(FCommandLine::Get(), TEXT("FlickBobStrikerPreview"))) return;
+			if (FParse::Param(FCommandLine::Get(), TEXT("FlickBobStrikerPreview"))
+				|| FParse::Param(FCommandLine::Get(), TEXT("FlickPerformancePreview"))) return;
 			AFlickGameState* FlickGameState = GetFlickGameState();
 			AFlickPiece* BobStriker = GetBobStriker(FlickGameState ? FlickGameState->CurrentTeam : EFlickTeam::None);
 			if (BobStriker && BobStriker->IsActive())
@@ -1482,8 +1483,19 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 	UpdatePrivateMatchAssignment();
 	UpdatePuckArrival();
 	UpdateRoundAdvanceTimer();
-	UpdateShotClock();
-	UpdateTrainingBot(DeltaSeconds);
+	// Rendering comparisons must not change formations when a slower capture
+	// reaches the shot deadline before a faster one. Keep the real physics,
+	// arrivals, rendering and other ticks; suppress only automated shot input.
+#if !UE_BUILD_SHIPPING
+	static const bool bPerformancePreview = FParse::Param(FCommandLine::Get(), TEXT("FlickPerformancePreview"));
+#else
+	constexpr bool bPerformancePreview = false;
+#endif
+	if (!bPerformancePreview)
+	{
+		UpdateShotClock();
+		UpdateTrainingBot(DeltaSeconds);
+	}
 	UpdateTutorial(DeltaSeconds);
 	if (bCinematicReplayActive)
 	{
