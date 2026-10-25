@@ -210,17 +210,34 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	}
 	if (bTestArenaPresentation || (bMenuPresentation && bMenuOrbitEnabled && bOneVsOneArenaPresentation))
 	{
-		if (!MenuKeyLight.IsValid() || !MenuRimLight.IsValid())
+		if (!MenuKeyLight.IsValid() || !MenuRimLight.IsValid() || !MenuDeckReflectionLight.IsValid())
 		{
 			const FlickArenaLighting::FRig Rig = FlickArenaLighting::FindRig(GetWorld());
 			MenuKeyLight = Rig.TestPuckKeyLight;
 			MenuRimLight = Rig.TestPuckRimLight;
+			MenuDeckReflectionLight = Rig.DeckReflectionLight;
 		}
 		const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
 		const float Radius = FlickModeRules::GetArenaRadius(EFlickMatchVariant::Classic, State ? State->PlayersPerTeam : 1)
 			* (State && State->bPrivateMatchActive ? FMath::Clamp(State->PrivateMatchSettings.ArenaScale, 0.85f, 1.3f) : 1.0f);
 		FlickArenaLighting::UpdateMenuSoftboxes(MenuKeyLight.Get(), MenuRimLight.Get(),
-			GetActorLocation(), Radius, State ? State->ArenaSurfaceZ : 250.0f);
+			GetActorLocation(), Radius, State ? State->ArenaSurfaceZ : 250.0f, MenuDeckReflectionLight.Get());
+	}
+	if (bTestArenaPresentation || bBobGameplayFraming || (bMenuPresentation && bOneVsOneArenaPresentation))
+	{
+		if (!PuckStudioKeyLight.IsValid() || !PuckStudioFillLight.IsValid())
+		{
+			const auto Rig = FlickArenaLighting::FindRig(GetWorld());
+			PuckStudioKeyLight = Rig.PuckFinishLight;
+			PuckStudioFillLight = Rig.PuckFillLight;
+		}
+		const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
+		const auto Variant = bBobGameplayFraming ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic;
+		float Radius = FlickModeRules::GetArenaRadius(Variant, State ? State->PlayersPerTeam : 1);
+		if (State && State->bPrivateMatchActive && Variant == EFlickMatchVariant::Classic)
+			Radius *= FMath::Clamp(State->PrivateMatchSettings.ArenaScale, .85f, 1.3f);
+		FlickArenaLighting::UpdatePuckStudioLights(PuckStudioKeyLight.Get(), PuckStudioFillLight.Get(),
+			GetActorLocation(), Radius / (bBobGameplayFraming ? 620.f : 650.f), State ? State->ArenaSurfaceZ : 250.f);
 	}
 	bGameplayViewTransitioning = !bMenuPresentation
 		&& (!NewLocation.Equals(TargetLocation, 1.0f) || !NewRotation.Equals(TargetRotation, 0.08f));
@@ -485,6 +502,23 @@ void AFlickCameraPawn::RotateGameplayOrbit(const float Direction, const float De
 	bGameplayViewTransitioning = true;
 }
 
+void AFlickCameraPawn::MoveGameplayElevation(const float Direction, const float DeltaSeconds, const float Sensitivity)
+{
+	if (FMath::IsNearlyZero(Direction) || DeltaSeconds <= 0.f || bMenuPresentation || bGameplayElevationLocked || bTopDownView || bFreeCameraEnabled || bCinematicReplay) return;
+	SetGameplayElevation(GameplayElevationAngle + FMath::Clamp(Direction, -1.f, 1.f) * GameplayElevationDegreesPerSecond
+		* FMath::Lerp(.35f, 1.5f, FMath::Clamp(Sensitivity, 0.f, 1.f)) * DeltaSeconds);
+	GameplayElevationPresetIndex = 1;
+}
+
+void AFlickCameraPawn::AdjustGameplayZoom(const int32 StepDirection)
+{
+	if (StepDirection == 0 || bMenuPresentation || bFreeCameraEnabled || bCinematicReplay) return;
+	GameplayZoomScale = FMath::Clamp(GameplayZoomScale - FMath::Sign(StepDirection) * GameplayZoomStep,
+		GameplayMinimumZoomScale, GameplayMaximumZoomScale);
+	ShakeTrauma = 0.f;
+	bGameplayViewTransitioning = true;
+}
+
 void AFlickCameraPawn::AdjustGameplayElevationFine(const int32 StepDirection, const float Sensitivity)
 {
 	if (StepDirection == 0 || bMenuPresentation || bGameplayElevationLocked || bTopDownView)
@@ -518,6 +552,7 @@ void AFlickCameraPawn::ToggleTopDownView()
 
 void AFlickCameraPawn::ResetGameplayView(const int32 InViewIndex, const bool bResetElevation)
 {
+	GameplayZoomScale = 1.f;
 	bGameplayOrbitManuallyControlled = false;
 	SetGameplayViewIndex(InViewIndex, false);
 	if (bResetElevation && !bGameplayElevationLocked)
@@ -725,12 +760,13 @@ void AFlickCameraPawn::SetFreeCameraSensitivity(const float LookSensitivity, con
 
 FVector AFlickCameraPawn::GetGameplayTargetLocation() const
 {
+	const AFlickGameState* MatchState = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
+	const FVector ArenaFocus(0.f, 0.f, MatchState ? MatchState->ArenaSurfaceZ : 250.f);
 	if (bTopDownView)
 	{
 		const float Height = (bBobGameplayFraming ? 2450.0f : 2200.0f) * ArenaFramingScale;
-		return FVector(0.0f, 0.0f, Height);
+		return ArenaFocus + (FVector(0.0f, 0.0f, Height) - ArenaFocus) * GameplayZoomScale;
 	}
-	const AFlickGameState* MatchState = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
 	const float TeamSizeDistance = MatchState
 		&& MatchState->ActiveMatchVariant == EFlickMatchVariant::Classic
 		&& MatchState->PlayersPerTeam > 1
@@ -750,7 +786,7 @@ FVector AFlickCameraPawn::GetGameplayTargetLocation() const
 	{
 		TargetLocation += AimFocusPoint * FMath::Clamp(AimFocusPanStrength, 0.0f, 0.5f);
 	}
-	return TargetLocation;
+	return ArenaFocus + (TargetLocation - ArenaFocus) * GameplayZoomScale;
 }
 
 FRotator AFlickCameraPawn::GetGameplayTargetRotation() const

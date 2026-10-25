@@ -61,6 +61,7 @@ void UFlickPostMatchPresentationComponent::BuildWinner(const int32 Slot)
 	Display->SetRootComponent(Copy);
 	Display->AddInstanceComponent(Copy);
 	Copy->SetStaticMesh(Mesh->GetStaticMesh());
+	Copy->SetLightingChannels(Mesh->LightingChannels.bChannel0, Mesh->LightingChannels.bChannel1, Mesh->LightingChannels.bChannel2);
 	for (int32 Material = 0; Material < Mesh->GetNumMaterials(); ++Material)
 		Copy->SetMaterial(Material, Mesh->GetMaterial(Material));
 	Copy->SetCollisionEnabled(ECollisionEnabled::NoCollision);

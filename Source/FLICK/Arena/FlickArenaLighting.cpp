@@ -32,7 +32,7 @@ namespace FlickArenaLighting
 	}
 	// Keep the broad key opposite the view so its highlight stays on the far
 	// center of the deck instead of washing across the left half during orbit.
-	void UpdateMenuSoftboxes(ARectLight* Key, ARectLight* Rim, const FVector& CameraLocation, float ArenaRadius, float ArenaSurfaceZ)
+	void UpdateMenuSoftboxes(ARectLight* Key, ARectLight* Rim, const FVector& CameraLocation, float ArenaRadius, float ArenaSurfaceZ, ARectLight* SecondKey)
 	{
 		if (FVector2D(CameraLocation.X, CameraLocation.Y).IsNearlyZero()) return;
 		const float CameraAzimuth = FMath::RadiansToDegrees(FMath::Atan2(CameraLocation.Y, CameraLocation.X));
@@ -46,10 +46,28 @@ namespace FlickArenaLighting
 			Light->SetActorLocation(Location);
 			Light->SetActorRotation((FVector(0.0f, 0.0f, ArenaSurfaceZ) - Location).Rotation());
 		};
-		// Light from beyond the far rim: the reflected panels sit behind the
-		// pucks, rather than forming a pale hotspot across the near half of play.
-		Move(Key, FVector(-100.0f, 1600.0f, 950.0f));
-		Move(Rim, FVector(650.0f, 1500.0f, 800.0f));
+		const FParameters Defaults;
+		Move(Key, Defaults.DeckKeyOffset);
+		Move(SecondKey, Defaults.DeckSecondKeyOffset);
+		Move(Rim, Defaults.DeckWarmOffset);
+	}
+
+	void UpdatePuckStudioLights(ARectLight* Key, ARectLight* Fill, const FVector& CameraLocation, float ArenaScale, float ArenaSurfaceZ)
+	{
+		if (FVector2D(CameraLocation.X, CameraLocation.Y).IsNearlyZero()) return;
+		const float Azimuth = FMath::RadiansToDegrees(FMath::Atan2(CameraLocation.Y, CameraLocation.X));
+		const FRotator Frame(0.f, Azimuth + 90.f, 0.f);
+		const FParameters Defaults;
+		const auto Move = [&](ARectLight* Actor, const FVector& Offset)
+		{
+			if (!IsValid(Actor)) return;
+			FVector Position = Frame.RotateVector(Offset * ArenaScale);
+			Position.Z = ArenaSurfaceZ + (Offset.Z - 250.f) * ArenaScale;
+			Actor->SetActorLocation(Position);
+			Actor->SetActorRotation((FVector(0.f, 0.f, ArenaSurfaceZ) - Position).Rotation());
+		};
+		Move(Key, Defaults.PuckKeyOffset);
+		Move(Fill, Defaults.PuckFillOffset);
 	}
 
 	// Tags identify only this rig; repeated applications never stack extra fixtures.
@@ -77,6 +95,9 @@ namespace FlickArenaLighting
 					Rig.StadiumWarmLights[Index] = *It;
 			if (!Rig.TestPuckKeyLight && It->ActorHasTag(TEXT("FLICK.TestPuckKeyLight"))) Rig.TestPuckKeyLight = *It;
 			if (!Rig.TestPuckRimLight && It->ActorHasTag(TEXT("FLICK.TestPuckRimLight"))) Rig.TestPuckRimLight = *It;
+			if (!Rig.PuckFinishLight && It->ActorHasTag(TEXT("FLICK.PuckFinishLight"))) Rig.PuckFinishLight = *It;
+			if (!Rig.PuckFillLight && It->ActorHasTag(TEXT("FLICK.PuckFillLight"))) Rig.PuckFillLight = *It;
+			if (!Rig.DeckReflectionLight && It->ActorHasTag(TEXT("FLICK.DeckReflectionLight"))) Rig.DeckReflectionLight = *It;
 		}
 		return Rig;
 	}
@@ -115,7 +136,8 @@ namespace FlickArenaLighting
 		const auto Value = [bPremiumArena, bBobArenaLighting, Scene](EControl Control) { return bPremiumArena || bBobArenaLighting ? GetValue(Scene, Control) : 1.0f; };
 		// Share the menu's base rig in Switchyard matches; preferences still use their own scene.
 		const bool bShowcaseLighting = bPremiumMenu || bPremiumArena;
-		const float Ambient = Value(EControl::Ambient), Fill = Value(EControl::Fill), Key = Value(EControl::Key);
+		const float Ambient = bPremiumArena || bBobArenaLighting ? AmbientIntensityScale(Value(EControl::Ambient)) : 1.f;
+		const float Fill = Value(EControl::Fill), Key = Value(EControl::Key);
 		const float Rim = Value(EControl::Rim), Accents = Value(EControl::Accents), Direct = Value(EControl::Direct);
 		const float Highlights = Value(EControl::Highlights);
 		const float ArenaScale = ArenaRadius / (bBobArenaLighting ? 620.f : FlickModeRules::Get(EFlickMatchVariant::Classic).ArenaRadius);
@@ -368,20 +390,29 @@ namespace FlickArenaLighting
 		// Separated cool/warm strip reflections reveal the deck's fine normal relief.
 		// Reuse the same two shadow-free fixtures and the existing preference controls.
 		ConfigurePuckSoftbox(TestPuckKeyLight,
-			bShowcaseLighting ? (bPremiumArena ? FVector(-100.0f, 1600.0f, 950.0f) : FVector(-380.0f, 420.0f, 820.0f))
+			bShowcaseLighting ? (bPremiumArena ? Parameters.DeckKeyOffset : FVector(-380.0f, 420.0f, 820.0f))
 				: bPremiumArena || bBobArenaLighting ? FVector(-360.0f, -280.0f, 1050.0f) : FVector(-620.0f, -420.0f, 560.0f),
 			bPremiumArena ? Parameters.SwitchyardKeyColor : bShowcaseLighting ? FLinearColor(0.48f, 0.82f, 1.0f) : FLinearColor(0.82f, 0.91f, 1.0f),
 			TestPuckKeyLightIntensity, bPremiumArena ? Parameters.SwitchyardKeySourceWidth : bBobArenaLighting ? (bShowcaseLighting ? 220.0f : 600.0f) : 460.0f,
 			bPremiumArena ? Parameters.SwitchyardKeySourceHeight : bBobArenaLighting ? 580.0f : 170.0f, Key);
 		ConfigurePuckSoftbox(TestPuckRimLight,
-			bShowcaseLighting ? (bPremiumArena ? FVector(650.0f, 1500.0f, 800.0f) : FVector(0.0f, 600.0f, 660.0f))
+			bShowcaseLighting ? (bPremiumArena ? Parameters.DeckWarmOffset : FVector(0.0f, 600.0f, 660.0f))
 				: bPremiumArena || bBobArenaLighting ? FVector(360.0f, 300.0f, 1050.0f) : FVector(600.0f, 300.0f, 450.0f),
 			bPremiumArena ? Parameters.SwitchyardWarmColor
 				: bShowcaseLighting ? FLinearColor(1.0f, 0.53f, 0.22f) : FLinearColor(1.0f, 0.86f, 0.72f),
 			TestPuckRimLightIntensity, bPremiumArena ? Parameters.SwitchyardRimSourceWidth : bBobArenaLighting && !bShowcaseLighting ? 520.0f : 360.0f,
 			bPremiumArena ? Parameters.SwitchyardRimSourceHeight : bBobArenaLighting && !bShowcaseLighting ? 420.0f : 130.0f, Rim);
+		if (!IsValid(Rig.DeckReflectionLight)) Rig.DeckReflectionLight = FindRig(World).DeckReflectionLight;
+		if (bPremiumArena)
+		{
+			ConfigurePuckSoftbox(Rig.DeckReflectionLight, Parameters.DeckSecondKeyOffset,
+				Parameters.SwitchyardKeyColor, TestPuckKeyLightIntensity * .75f,
+				Parameters.SwitchyardKeySourceWidth, Parameters.SwitchyardKeySourceHeight, Key);
+			if (Rig.DeckReflectionLight) Rig.DeckReflectionLight->Tags.AddUnique(TEXT("FLICK.DeckReflectionLight"));
+		}
+		else if (IsValid(Rig.DeckReflectionLight)) Rig.DeckReflectionLight->RectLightComponent->SetIntensity(0.f);
 		if (bPremiumArena && bShowcaseLighting)
-			UpdateMenuSoftboxes(TestPuckKeyLight, TestPuckRimLight, FVector(170.0f, -1600.0f, 1140.0f), ArenaRadius, ArenaSurfaceZ);
+			UpdateMenuSoftboxes(TestPuckKeyLight, TestPuckRimLight, FVector(170.0f, -1600.0f, 1140.0f), ArenaRadius, ArenaSurfaceZ, Rig.DeckReflectionLight);
 		// Visible LED strips do not reliably illuminate nearby geometry through
 		// Lumen alone (tiny emitters inside one large mesh/card). Match them with
 		// a bounded, soft source ring below the playing plane, outside the skirt.
@@ -449,13 +480,45 @@ namespace FlickArenaLighting
 			Light->SetIntensityUnits(ELightUnits::Lumens);
 			Light->SetIntensity(bPremiumArena ? Parameters.StadiumWarmLightLumens * LocalPowerScale * Rim : 0.f);
 			Light->SetLightColor(FLinearColor(1.f, .55f, .24f));
-			Light->SetSourceWidth(120.f * ArenaScale);
-			Light->SetSourceHeight(60.f * ArenaScale);
+			Light->SetSourceWidth(Parameters.StadiumWarmSourceWidth * ArenaScale);
+			Light->SetSourceHeight(Parameters.StadiumWarmSourceHeight * ArenaScale);
 			Light->SetAttenuationRadius(1250.f * ArenaScale);
-			Light->SetSpecularScale(Highlights);
+			// Preserve warm diffuse spill without a pale mirror-card at diagonal views.
+			Light->SetSpecularScale(Highlights * Parameters.StadiumWarmSpecularScale);
 			Light->SetIndirectLightingIntensity(.25f);
 			Light->SetCastShadows(false);
 		}
+		// One shared studio pair, not lights per puck. No saved arena preference
+		// changes their energy; channel 1 cannot illuminate the board or stadium.
+		const FRig FoundStudio = FindRig(World);
+		if (!IsValid(Rig.PuckFinishLight)) Rig.PuckFinishLight = FoundStudio.PuckFinishLight;
+		if (!IsValid(Rig.PuckFillLight)) Rig.PuckFillLight = FoundStudio.PuckFillLight;
+		const auto ConfigureStudio = [&](TObjectPtr<ARectLight>& Actor, bool bFill)
+		{
+			if (!IsValid(Actor)) Actor = World->SpawnActor<ARectLight>();
+			if (!IsValid(Actor) || !Actor->RectLightComponent) return;
+			URectLightComponent* Light = Actor->RectLightComponent;
+			Light->SetMobility(EComponentMobility::Movable);
+			const FVector Position = ScaleLocation(bFill ? Parameters.PuckFillOffset : Parameters.PuckKeyOffset);
+			Actor->SetActorLocation(Position);
+			Actor->SetActorRotation((FVector(0, 0, ArenaSurfaceZ) - Position).Rotation());
+			Light->SetLightingChannels(false, true, false);
+			Light->SetLightColor(bFill ? FLinearColor(.82f, .9f, 1.f) : FLinearColor(1.f, .97f, .94f));
+			Light->SetIntensityUnits(ELightUnits::Lumens);
+			Light->SetIntensity((bFill ? Parameters.PuckFillLightLumens : Parameters.PuckFinishLightLumens) * LocalPowerScale);
+			Light->SetDiffuseScale(1.f);
+			// Broad silver bands without a white mirror plate over the crown.
+			Light->SetSpecularScale(bFill ? .15f : .55f);
+			Light->SetSourceWidth((bFill ? 900.f : 1100.f) * ArenaScale);
+			Light->SetSourceHeight((bFill ? 600.f : 650.f) * ArenaScale);
+			Light->SetAttenuationRadius(2200.f * ArenaScale);
+			Light->SetCastShadows(false);
+			Light->SetIndirectLightingIntensity(0.f);
+			Light->SetVolumetricScatteringIntensity(0.f);
+			Actor->Tags.AddUnique(bFill ? TEXT("FLICK.PuckFillLight") : TEXT("FLICK.PuckFinishLight"));
+		};
+		ConfigureStudio(Rig.PuckFinishLight, false);
+		ConfigureStudio(Rig.PuckFillLight, true);
 		if (DirectionalLightActor) DirectionalLightActor->Tags.AddUnique(TEXT("FLICK.DirectionalLightActor"));
 		if (SkyLightActor) SkyLightActor->Tags.AddUnique(TEXT("FLICK.SkyLightActor"));
 		if (Player1AccentLight) Player1AccentLight->Tags.AddUnique(TEXT("FLICK.Player1AccentLight"));

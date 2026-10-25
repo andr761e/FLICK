@@ -21,11 +21,20 @@ param(
     [string]$Map = '/Engine/Maps/Entry',
     [ValidateRange(0, 3)]
     [int]$CameraView = 0,
+    # Small orbit offsets reproduce view-dependent material glare.
+    [ValidateRange(-180, 180)]
+    [float]$CameraOrbit = 0,
     # Isolated visual QA framing only; never changes the normal player profile.
     [ValidateRange(0.75, 1.25)]
     [float]$CameraDistance = 0.9,
+    # Isolated lighting experiments; only these seven presentation controls exist.
+    [hashtable]$LightingValues = @{},
+    [ValidateRange(0, 3)]
+    [int]$Quality = 3,
     [ValidateRange(0, 5)]
     [int]$PuckSkin = 0,
+    [ValidateRange(-1, 5)]
+    [int]$MatchPuckSkin = -1,
     [ValidateRange(1, 3)]
     [int]$PlayersPerTeam = 1,
     [ValidateRange(0, 4)]
@@ -56,7 +65,7 @@ param(
     [int]$TimeoutSeconds = 120,
     [ValidateRange(1, 30)]
     [float]$CaptureDelaySeconds = 2,
-    # Consecutive live frames for temporal shimmer checks; retained in UserDir.
+    # Sequence of live samples for temporal shimmer checks; retained in UserDir.
     [ValidateRange(1, 32)]
     [int]$CaptureFrames = 1,
     [switch]$HideControlOverview,
@@ -149,6 +158,7 @@ foreach ($screenName in $Screen) {
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame', "-FlickCaptureDelaySeconds=$CaptureDelaySeconds",
         "-FlickCaptureFrames=$CaptureFrames",
         "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickLockerItem=$LockerItem", "-FlickProfilePage=$ProfilePage", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
+        "-FlickCaptureOrbit=$($CameraOrbit.ToString([System.Globalization.CultureInfo]::InvariantCulture))",
         "-ini:GameUserSettings:[FLICK.GameplaySettings]:GameplayCameraDistance=$($CameraDistance.ToString([System.Globalization.CultureInfo]::InvariantCulture))",
         "-FlickPracticeCategory=$PracticeCategory", "-FlickPracticeDifficulty=$PracticeDifficulty",
         ('-UserDir="{0}/"' -f $userDir.Replace('\', '/')),
@@ -160,7 +170,22 @@ foreach ($screenName in $Screen) {
         $arguments += '-ini:GameUserSettings:[FLICK.GameplaySettings]:ControlOverviewEnabled=False'
     }
     $arguments += @("-FlickShopInspect=$ShopItem", "-FlickShopFilter=$ShopFilter")
+    foreach ($setting in $LightingValues.GetEnumerator()) {
+        if ($setting.Key -notin @('Ambient', 'Fill', 'Key', 'Rim', 'Accents', 'Direct', 'Highlights')) {
+            throw "Unknown lighting control: $($setting.Key)"
+        }
+        $value = [float]$setting.Value
+        $maximum = if ($setting.Key -eq 'Highlights') { 1.0 } else { 3.0 }
+        if ([float]::IsNaN($value) -or [float]::IsInfinity($value) -or $value -lt 0 -or $value -gt $maximum) {
+            throw "Lighting control $($setting.Key) must be between 0 and $maximum"
+        }
+        $arguments += "-ini:GameUserSettings:[FLICK.LightingSettings]:Menu.$($setting.Key)=$($value.ToString([System.Globalization.CultureInfo]::InvariantCulture))"
+    }
+    foreach ($group in @('ViewDistance', 'AntiAliasing', 'Shadow', 'GlobalIllumination', 'Reflection', 'PostProcess', 'Texture', 'Effects', 'Foliage', 'Shading')) {
+        $arguments += "-ini:GameUserSettings:[ScalabilityGroups]:sg.${group}Quality=$Quality"
+    }
     $arguments += "-FlickBobStrikerSkin=$PuckSkin"
+    $arguments += "-FlickCapturePuckSkin=$MatchPuckSkin"
     $arguments += "-FlickPlaySelection=$PlaySelection"
     $arguments += @("-FlickLineupSlot=$LineupSlot", "-FlickLineupHover=$LineupHover")
     if ($LineupRadar) { $arguments += '-FlickLineupRadar' }
@@ -203,6 +228,11 @@ foreach ($screenName in $Screen) {
         Screen = $screenName
         Width = $Width
         Height = $Height
+        Quality = $Quality
+        CameraView = $CameraView
+        CameraOrbit = $CameraOrbit
+        LightingValues = $LightingValues
+        MatchPuckSkin = $MatchPuckSkin
         Screenshot = $outputPath
         Log = $logPath
     }

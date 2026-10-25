@@ -32,6 +32,9 @@ public:
 	void SetArenaFramingScale(float InArenaFramingScale);
 	void SetGameplayViewIndex(int32 InViewIndex, bool bSnap = false);
 	void RotateGameplayOrbit(float Direction, float DeltaSeconds, float Sensitivity = 0.35f);
+	void MoveGameplayElevation(float Direction, float DeltaSeconds, float Sensitivity = 0.35f);
+	void AdjustGameplayZoom(int32 StepDirection);
+	float GetGameplayZoomScale() const { return GameplayZoomScale; }
 	void AdjustGameplayElevationFine(int32 StepDirection, float Sensitivity = 0.35f);
 	void ResetGameplayView(int32 InViewIndex, bool bResetElevation = true);
 	void ResetRoundView(int32 InViewIndex);
@@ -184,6 +187,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Orbit", meta = (ClampMin = "10.0", ClampMax = "180.0"))
 	float GameplayOrbitDegreesPerSecond = 72.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Orbit", meta = (ClampMin = "5.0", ClampMax = "60.0"))
+	float GameplayElevationDegreesPerSecond = 24.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Orbit", meta = (ClampMin = "0.01", ClampMax = "0.2"))
+	float GameplayZoomStep = .08f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Orbit", meta = (ClampMin = "0.4", ClampMax = "1.0"))
+	float GameplayMinimumZoomScale = .65f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Orbit", meta = (ClampMin = "1.0", ClampMax = "2.0"))
+	float GameplayMaximumZoomScale = 1.4f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Camera|Elevation", meta = (ClampMin = "-30.0", ClampMax = "0.0"))
 	float LowGameplayElevation = -9.0f;
 
@@ -256,6 +271,7 @@ private:
 	float CurrentFieldOfView = 46.0f;
 	float GameplayElevationAngle = 0.0f;
 	float GameplayOrbitAngle = 0.0f;
+	float GameplayZoomScale = 1.f;
 	int32 GameplayElevationPresetIndex = 1;
 	float ArenaFramingScale = 1.0f;
 	FVector ReplayFocus = FVector::ZeroVector;
@@ -271,6 +287,8 @@ private:
 	int32 LockerPreviewMode = 0;
 	TWeakObjectPtr<class ARectLight> MenuKeyLight;
 	TWeakObjectPtr<class ARectLight> MenuRimLight;
+	TWeakObjectPtr<class ARectLight> MenuDeckReflectionLight;
+	TWeakObjectPtr<class ARectLight> PuckStudioKeyLight, PuckStudioFillLight;
 	bool bMenuOrbitInitialized = false;
 	float MenuOrbitAngle = 0.0f;
 	bool bBobGameplayFraming = false;

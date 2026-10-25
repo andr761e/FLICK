@@ -151,7 +151,7 @@ run `Tools/Test-FlickUISmoke.ps1` and inspect its PNGs for clipping and overlap.
 - Are the turn banner and top score bar readable for both players?
 - Does the interface still fit at 1280x720 and 1920x1080?
 - Does each Player 1 turn begin from the Player 1 home side and each Player 2 turn from the opposite home side?
-- Before aiming, can Q/E and middle mouse reach all four board sides in 1v1, 2v2, 3v3, and BOB?
+- Before aiming, can A/D reach all four board sides in 1v1, 2v2, 3v3, and BOB? Does holding W/S change elevation smoothly, and does the wheel zoom without changing elevation? Does F reset zoom and orientation?
 - On controller, can D-pad up/down reach all four sides without changing the focused puck?
 - Does the four-segment camera indicator highlight the active side with the current player's color?
 - Is puck selection temporarily unavailable during a camera blend and restored as soon as the view settles?

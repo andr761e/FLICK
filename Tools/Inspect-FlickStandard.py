@@ -8,10 +8,20 @@ args = sys.argv[sys.argv.index('--') + 1:]
 bpy.ops.import_scene.fbx(filepath=args[0])
 objects = [o for o in bpy.context.scene.objects if o.type == 'MESH']
 points = [o.matrix_world @ Vector(p) for o in objects for p in o.bound_box]
+center = Vector([(min(p[i] for p in points) + max(p[i] for p in points)) * .5 for i in range(3)])
+face_radius = (max(p.x for p in points) - min(p.x for p in points)) * .2
+face_materials = {}
+for obj in objects:
+    for polygon in obj.data.polygons:
+        position = obj.matrix_world @ polygon.center
+        if position.z > center.z and (position - center).xy.length < face_radius and polygon.normal.z > .8:
+            name = obj.data.materials[polygon.material_index].name
+            face_materials[name] = face_materials.get(name, 0) + polygon.area
 print('PUCK_INSPECT ' + json.dumps({
     'bounds': [[min(p[i] for p in points), max(p[i] for p in points)] for i in range(3)],
     'materials': sorted({m.name for o in objects for m in o.data.materials if m}),
     'objects': len(objects),
+    'top_face_material_areas': face_materials,
 }))
 if len(args) > 1:
     center = Vector([(min(p[i] for p in points) + max(p[i] for p in points)) * .5 for i in range(3)])

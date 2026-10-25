@@ -21,10 +21,12 @@ namespace FlickControlBindings
 			{TEXT("TopView"), TEXT("TOP VIEW"), TEXT("CAMERA"), EKeys::V},
 			{TEXT("FreeCamera"), TEXT("FREE CAMERA"), TEXT("CAMERA"), EKeys::X},
 			{TEXT("CameraReset"), TEXT("RESET CAMERA"), TEXT("CAMERA"), EKeys::F},
-			{TEXT("CameraUp"), TEXT("CAMERA HIGHER / ZOOM"), TEXT("CAMERA"), EKeys::MouseScrollUp},
-			{TEXT("CameraDown"), TEXT("CAMERA LOWER / ZOOM"), TEXT("CAMERA"), EKeys::MouseScrollDown},
-			{TEXT("OrbitLeft"), TEXT("ORBIT LEFT"), TEXT("CAMERA"), EKeys::Q},
-			{TEXT("OrbitRight"), TEXT("ORBIT RIGHT"), TEXT("CAMERA"), EKeys::E},
+			{TEXT("CameraUp"), TEXT("CAMERA HIGHER"), TEXT("CAMERA"), EKeys::W},
+			{TEXT("CameraDown"), TEXT("CAMERA LOWER"), TEXT("CAMERA"), EKeys::S},
+			{TEXT("CameraZoomIn"), TEXT("CAMERA ZOOM IN"), TEXT("CAMERA"), EKeys::MouseScrollUp},
+			{TEXT("CameraZoomOut"), TEXT("CAMERA ZOOM OUT"), TEXT("CAMERA"), EKeys::MouseScrollDown},
+			{TEXT("OrbitLeft"), TEXT("ORBIT LEFT"), TEXT("CAMERA"), EKeys::A},
+			{TEXT("OrbitRight"), TEXT("ORBIT RIGHT"), TEXT("CAMERA"), EKeys::D},
 			{TEXT("MoveForward"), TEXT("FREE CAMERA FORWARD"), TEXT("FREE CAMERA"), EKeys::W},
 			{TEXT("MoveBack"), TEXT("FREE CAMERA BACK"), TEXT("FREE CAMERA"), EKeys::S},
 			{TEXT("MoveLeft"), TEXT("FREE CAMERA LEFT"), TEXT("FREE CAMERA"), EKeys::A},
@@ -40,7 +42,9 @@ namespace FlickControlBindings
 			{TEXT("OwnPuck"), TEXT("PLACE OWN PUCK"), TEXT("TRAINING"), EKeys::One},
 			{TEXT("TargetPuck"), TEXT("PLACE TARGET PUCK"), TEXT("TRAINING"), EKeys::Two},
 			{TEXT("Clear"), TEXT("CLEAR BOARD"), TEXT("TRAINING"), EKeys::C},
-			{TEXT("Remove"), TEXT("REMOVE PUCK"), TEXT("TRAINING"), EKeys::Delete}};
+			{TEXT("Remove"), TEXT("REMOVE PUCK"), TEXT("TRAINING"), EKeys::Delete},
+			{TEXT("PreviousPuckType"), TEXT("PREVIOUS PUCK TYPE"), TEXT("TRAINING"), EKeys::Q},
+			{TEXT("NextPuckType"), TEXT("NEXT PUCK TYPE"), TEXT("TRAINING"), EKeys::E}};
 		return Controls;
 	}
 
@@ -69,7 +73,20 @@ namespace FlickControlBindings
 		for (const FControl& Control : GetControls())
 		{
 			bKnown |= FCString::Strcmp(Control.Id, Id) == 0;
-			if (FCString::Strcmp(Control.Id, Id) != 0 && GetKey(Control.Id) == Key) return false;
+			const auto IsOrbitMovement = [](const TCHAR* Name)
+			{
+				return FCString::Strcmp(Name, TEXT("OrbitLeft")) == 0 || FCString::Strcmp(Name, TEXT("OrbitRight")) == 0
+					|| FCString::Strcmp(Name, TEXT("CameraUp")) == 0 || FCString::Strcmp(Name, TEXT("CameraDown")) == 0;
+			};
+			const auto IsFreeMovement = [](const TCHAR* Name)
+			{
+				return FCString::Strcmp(Name, TEXT("MoveForward")) == 0 || FCString::Strcmp(Name, TEXT("MoveBack")) == 0
+					|| FCString::Strcmp(Name, TEXT("MoveLeft")) == 0 || FCString::Strcmp(Name, TEXT("MoveRight")) == 0;
+			};
+			// Orbit/elevation and free movement never run in the same camera mode.
+			const bool bExclusiveModes = (IsOrbitMovement(Id) && IsFreeMovement(Control.Id))
+				|| (IsFreeMovement(Id) && IsOrbitMovement(Control.Id));
+			if (!bExclusiveModes && FCString::Strcmp(Control.Id, Id) != 0 && GetKey(Control.Id) == Key) return false;
 		}
 		if (!bKnown) return false;
 		GConfig->SetString(Section, Id, *Key.GetFName().ToString(), GGameUserSettingsIni);

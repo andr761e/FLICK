@@ -12,12 +12,77 @@
 #include "Player/FlickCameraPawn.h"
 #include "Arena/FlickTestArena.h"
 #include "Core/FlickPieceArchetypeRules.h"
+#include "Core/FlickPuckFinish.h"
+#include "Core/FlickPuckPalette.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickWorkshopPuckTest, "FLICK.Visuals.WorkshopPucks",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPuckSkinTest, "FLICK.Visuals.PuckSkins",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPuckFaceGlareTest, "FLICK.Visuals.PuckFaceGlare",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickPuckFaceGlareTest::RunTest(const FString& Parameters)
+{
+	const FString Base = TEXT("/Game/TestArena/Pucks/PrototypeStandard/");
+	for (int32 Skin = 0; Skin < 6; ++Skin)
+	{
+		const auto Check = [this, Skin, &Base](const TCHAR* Role, const TCHAR* Slot, const TCHAR* Asset)
+		{
+			const FString Path = Skin < 2 ? Base + Asset : FlickPuckPalette::MaterialPath(Skin, Slot);
+			UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, *Path);
+			if (!TestNotNull(*FString::Printf(TEXT("Skin %d %s material"), Skin, Role), Material)) return;
+			const auto Scalar = [this, Material](const TCHAR* Name)
+			{
+				float Value = -1.f;
+				TestTrue(*FString::Printf(TEXT("%s has %s"), *Material->GetName(), Name),
+					Material->GetScalarParameterValue(FMaterialParameterInfo(Name), Value));
+				return Value;
+			};
+			TestTrue(TEXT("Arena environment is secondary to fixed puck lighting"), Scalar(TEXT("PuckEnvironmentResponse")) <= .2f);
+			if (FCString::Strcmp(Role, TEXT("Core")) == 0)
+			{
+				TestTrue(TEXT("Dark insert is coated, not bare reflective metal"), Scalar(TEXT("Metallic")) <= .05f);
+				TestTrue(TEXT("Dark insert has a low-glare dielectric response"), Scalar(TEXT("Specular")) <= .04f);
+				TestTrue(TEXT("Dark insert keeps satin roughness"), FMath::IsWithinInclusive(Scalar(TEXT("Roughness")), .4f, .5f));
+			}
+			else if (FCString::Strcmp(Role, TEXT("Housing")) == 0)
+			{
+				TestTrue(TEXT("Sidewall retains its metallic finish"), Scalar(TEXT("Metallic")) >= .75f);
+				TestEqual(TEXT("Standard's housing-assigned center receives the coating"), Scalar(TEXT("FinishFaceCoating")), 1.f);
+				TestTrue(TEXT("Center mask keeps reflection down"), Scalar(TEXT("FaceCoatingSpecular")) <= .04f);
+				TestTrue(TEXT("Center mask keeps satin roughness"), Scalar(TEXT("FaceCoatingRoughness")) >= .4f);
+			}
+			else if (FCString::Strcmp(Role, TEXT("Crown")) == 0)
+			{
+				TestTrue(TEXT("Silver crown stays polished metal"), Scalar(TEXT("Metallic")) >= .9f);
+				TestTrue(TEXT("Silver crown keeps its controlled highlights"), Scalar(TEXT("Roughness")) <= .25f);
+				TestEqual(TEXT("Silver crown is not coated by the center treatment"), Scalar(TEXT("FinishFaceCoating")), 0.f);
+			}
+			else
+			{
+				TestTrue(TEXT("LED retains its hue under reflected light"), Scalar(TEXT("Specular")) <= .06f);
+				TestEqual(TEXT("LED emission budget is unchanged"), Scalar(TEXT("Emission")), FlickPuckFinish::IdleEmission);
+			}
+		};
+		Check(TEXT("Core"), TEXT("Recessed dark titanium"), TEXT("MI_03_Recessed_dark_titanium"));
+		Check(TEXT("Housing"), TEXT("Graphite anodized housing"), TEXT("MI_01_Graphite_anodized_housing"));
+		Check(TEXT("Crown"), TEXT("Circular brushed silver"), TEXT("MI_02_Circular_brushed_silver"));
+		Check(TEXT("Diffuser"), TEXT("Cyan light diffuser"), TEXT("MI_04_Cyan_light_diffuser"));
+		Check(TEXT("Emblem"), TEXT("Cyan center emblem"), TEXT("MI_07_Cyan_center_emblem"));
+	}
+	for (const TCHAR* Name : {TEXT("MI_Orange_Light_Diffuser"), TEXT("MI_Orange_Center_Emblem")})
+	{
+		UMaterialInterface* Orange = LoadObject<UMaterialInterface>(nullptr, *(FString(TEXT("/Game/TestArena/Pucks/HighDetail/")) + Name));
+		if (!TestNotNull(TEXT("Classic Orange LED"), Orange)) continue;
+		float Specular = -1.f;
+		TestTrue(TEXT("Classic Orange has the same low-glare LED response"),
+			Orange->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Specular")), Specular) && Specular >= 0.f && Specular <= .06f);
+	}
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickTestArenaExposureTest, "FLICK.Visuals.TestArenaExposure",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -191,6 +256,7 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Physics mesh preserved"), Root->GetStaticMesh() == CollisionMesh);
 			TestEqual(TEXT("Physics mass preserved"), Root->GetMass(), Mass);
 			TestTrue(TEXT("Root still simulates physics"), Root->IsSimulatingPhysics());
+			TestTrue(TEXT("Hidden existing cylinder retains the floor contact shadow"), Root->CastShadow && Root->bCastHiddenShadow);
 			if (Index == 0 && Team == EFlickTeam::Player1)
 			{
 				const FVector StartingLocation = Piece->GetActorLocation();
@@ -244,6 +310,16 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 					TestTrue(TEXT("Low classes sit below collider silhouette"), VisualHeight < Piece->GetPieceThickness() * 0.9f);
 				}
 				bool bFoundTeamMaterial = false;
+				TestTrue(TEXT("Puck render mesh receives its studio, not arena direct lights"),
+					!Visual->LightingChannels.bChannel0 && Visual->LightingChannels.bChannel1);
+				for (int32 Slot = 0; Slot < Visual->GetNumMaterials(); ++Slot)
+				{
+					const auto* Material = Visual->GetMaterial(Slot);
+					float Emission = 0, Lift = 0;
+					if (Material && Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), Emission)
+						&& Emission == 0 && Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("SurfaceLift")), Lift))
+						TestEqual(TEXT("Neutral metal uses real illumination, not a self-lit wash"), Lift, 0.f);
+				}
 				int32 TeamMaterialCount = 0;
 				for (int32 Slot = 0; Slot < Visual->GetNumMaterials(); ++Slot)
 				{
@@ -254,9 +330,9 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 						const FLinearColor BaseColor = Dynamic->K2_GetVectorParameterValue(TEXT("BaseColor"));
 						TestTrue(TEXT("Unlit diffuser tint matches owner"),
 							Team == EFlickTeam::Player2 ? BaseColor.R > BaseColor.B : BaseColor.B > BaseColor.R);
-						TestTrue(TEXT("Team LED emission remains gameplay-readable"),
-							Dynamic->K2_GetScalarParameterValue(TEXT("Emission"))
-								>= (bHighDetailPuck ? 5.5f : 9.0f));
+						TestEqual(TEXT("Team LED uses the saturated idle energy budget"),
+							Dynamic->K2_GetScalarParameterValue(TEXT("Emission")),
+							bHighDetailPuck ? FlickPuckFinish::IdleEmission : 10.0f);
 						bFoundTeamMaterial = true;
 						++TeamMaterialCount;
 					}
@@ -267,6 +343,8 @@ bool FFlickWorkshopPuckTest::RunTest(const FString& Parameters)
 				TestTrue(TEXT("Selection keeps imported mesh visible"), Visual->IsVisible());
 				TestFalse(TEXT("Selection does not restore old body"), Root->IsVisible());
 			}
+			Piece->Eliminate();
+			TestFalse(TEXT("Eliminated puck leaves no hidden contact shadow"), Root->CastShadow);
 			Piece->Destroy();
 		}
 	}

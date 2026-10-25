@@ -2,7 +2,7 @@
 
 Choose **Spectate** in the private-match role picker. Spectators automatically
 follow the first Blue seat. Use the card arrows or the configured Orbit Left /
-Orbit Right keys (Q / E by default) to cycle every Blue and Orange seat, including
+Orbit Right keys (A / D by default) to cycle every Blue and Orange seat, including
 bots. The card below the arena names the selected player or bot in team colour.
 Use X / Free Camera for the existing movable camera; X or Escape returns to the
 same followed seat. Joining a team or leaving the room clears follow mode.

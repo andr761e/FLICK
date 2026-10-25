@@ -10,4 +10,6 @@ importers = ("Import-FlickHighDetailPucks.py",) if geometry_only else (
     "Import-FlickBlueStandardPrototype.py", "Import-FlickHighDetailPucks.py")
 for importer in importers:
     runpy.run_path(str(project / "Tools" / importer), run_name="__main__")
+if not geometry_only:
+    runpy.run_path(str(project / "Tools/Build-FlickPuckFinish.py"), run_name="__main__")
 u.log("FLICK_PUCK_UPDATE_COMPLETE")

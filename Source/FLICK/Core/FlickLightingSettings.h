@@ -17,6 +17,8 @@ namespace FlickLightingSettings
 		float GameplayDefault;
 	};
 	const FControl& GetControl(EControl Control);
+	// Ambient is a brightness trim, retaining soft base illumination at minimum.
+	float AmbientIntensityScale(float SliderValue);
 	float GetValue(EScene Scene, EControl Control, const FString& IniFile = FString());
 	void SetValue(EScene Scene, EControl Control, float Value, const FString& IniFile = FString());
 	void ResetToDefaults(const FString& IniFile = FString());

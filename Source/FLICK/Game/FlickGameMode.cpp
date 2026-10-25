@@ -901,6 +901,30 @@ void AFlickGameMode::BeginPlay()
 	{
 		CameraPawn->SetGameplayViewIndex(CameraViewPreview, true);
 	}
+	float CaptureOrbit = 0.f;
+	int32 CapturePuckSkin = INDEX_NONE;
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCaptureFrame"))
+		&& FParse::Value(FCommandLine::Get(), TEXT("FlickCapturePuckSkin="), CapturePuckSkin)
+		&& CapturePuckSkin >= 0 && CapturePuckSkin < 6)
+	{
+		for (AFlickPiece* Piece : Pieces) if (IsValid(Piece)) Piece->SetPuckSkin(CapturePuckSkin);
+		// Local cosmetic synchronization runs just after BeginPlay. Apply the
+		// isolated QA palette once it has completed, never to the saved profile.
+		FTimerHandle CaptureSkinTimer;
+		GetWorldTimerManager().SetTimer(CaptureSkinTimer, [this, CapturePuckSkin]()
+		{
+			for (AFlickPiece* Piece : Pieces) if (IsValid(Piece)) Piece->SetPuckSkin(CapturePuckSkin);
+		}, 1.f, false);
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCaptureFrame")) && CameraPawn
+		&& FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureOrbit="), CaptureOrbit)
+		&& FMath::IsFinite(CaptureOrbit) && CameraPawn->GameplayOrbitDegreesPerSecond > UE_SMALL_NUMBER)
+	{
+		// Capture-only: exercise the real orbit without changing saved camera settings.
+		CaptureOrbit = FMath::Clamp(CaptureOrbit, -180.f, 180.f);
+		CameraPawn->RotateGameplayOrbit(FMath::Sign(CaptureOrbit),
+			FMath::Abs(CaptureOrbit) / (CameraPawn->GameplayOrbitDegreesPerSecond * 1.5f), 1.f);
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickBobStrikerPreview")) && CameraPawn)
 	{
 		// Close-up visual QA uses the actual BOB striker, not a separate mock mesh.

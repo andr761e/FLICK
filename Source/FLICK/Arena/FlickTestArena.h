@@ -81,20 +81,20 @@ public:
 	float RimLensEmission = 30.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Reflectance Tint"))
-	FLinearColor OneVsOneDeckTint = FLinearColor(.105f, .155f, .20f);
+	FLinearColor OneVsOneDeckTint = FLinearColor(.12f, .17f, .21f);
 
 	// Shader-normal relief only, in world centimetres. Never displaces the deck.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Finish Relief", ClampMin = "0.0", ClampMax = "0.3"))
-	float DeckFinishRelief = .16f;
+	float DeckFinishRelief = .10f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Metallic", ClampMin = "0.0", ClampMax = "1.0"))
 	float OneVsOneDeckMetallic = 0.92f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Deck Roughness", ClampMin = "0.12", ClampMax = "0.45"))
-	float OneVsOneDeckRoughness = 0.18f;
+	float OneVsOneDeckRoughness = 0.23f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Arena Presentation", meta = (DisplayName = "Menu Deck Roughness", ClampMin = "0.12", ClampMax = "0.45"))
-	float OneVsOneMenuDeckRoughness = 0.18f;
+	float OneVsOneMenuDeckRoughness = 0.23f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Test Arena", meta = (ClampMin = "24.0", ClampMax = "70.0"))
 	float ControlZoneRadius = 40.0f;

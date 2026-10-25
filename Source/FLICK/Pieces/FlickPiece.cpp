@@ -1,5 +1,6 @@
 #include "Pieces/FlickPiece.h"
 #include "Core/FlickPuckPalette.h"
+#include "Core/FlickPuckFinish.h"
 #include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickVisualSettings.h"
 #include "ProceduralMeshComponent.h"
@@ -745,6 +746,7 @@ void AFlickPiece::ApplyEliminatedState()
 {
 	if (PieceMesh)
 	{
+		if (PieceMesh->bCastHiddenShadow) PieceMesh->SetCastShadow(false);
 		PieceMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
 		PieceMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 		PieceMesh->SetSimulatePhysics(false);
@@ -1318,6 +1320,7 @@ void AFlickPiece::EnableTestArenaVisuals()
 		return;
 	}
 	WorkshopMesh->SetStaticMesh(Mesh);
+	WorkshopMesh->SetLightingChannels(false, true, false);
 	UMaterialInterface* StrikerFace = bBobStriker ? LoadObject<UMaterialInterface>(nullptr,
 		TEXT("/Game/Cosmetics/Pucks/BOB/M_BobStrikerFace.M_BobStrikerFace")) : nullptr;
 	WorkshopTeamMaterials.Reset();
@@ -1401,7 +1404,10 @@ void AFlickPiece::EnableTestArenaVisuals()
 	AccentLight->SetSpecularScale(bUsingHighDetailPuck ? 0.36f : 0.28f);
 	AccentLight->SetIndirectLightingIntensity(0.03f);
 	AccentLight->SetVolumetricScatteringIntensity(0.0f);
-	PieceMesh->SetCastShadow(false);
+	// The existing hidden cylinder keeps the contact shadow on arena channel 0;
+	// the detailed render mesh is lit exclusively by the fixed studio channel.
+	PieceMesh->SetCastHiddenShadow(true);
+	PieceMesh->SetCastShadow(!bEliminated);
 	ApplyVisuals();
 	UE_LOG(LogFlick, Log, TEXT("Test arena Blender puck ready: %s, team %d"), Names[Index], static_cast<int32>(Team));
 }
@@ -1410,6 +1416,7 @@ void AFlickPiece::UpdateTestArenaVisuals()
 {
 	if (!HasTestArenaVisuals()) return;
 	PieceMesh->SetVisibility(false);
+	PieceMesh->SetCastShadow(!bEliminated);
 	for (USceneComponent* Child : VisualRoot->GetAttachChildren())
 	{
 		if (Child != WorkshopMesh && Child != SelectionHalo && Child != AccentLight
@@ -1437,8 +1444,10 @@ void AFlickPiece::UpdateTestArenaVisuals()
 			{
 				TeamMaterial->SetVectorParameterValue(TEXT("BaseColor"), DiffuserBaseColor);
 			}
-			const float IdleEmission = bUsingHighDetailPuck ? (bBobStriker ? 7.5f : 6.0f) : 10.0f;
-			const float HighlightEmission = bUsingHighDetailPuck ? (bBobStriker ? 9.5f : 8.0f) : 14.0f;
+			const float IdleEmission = bUsingHighDetailPuck
+				? (bBobStriker ? FlickPuckFinish::StrikerIdleEmission : FlickPuckFinish::IdleEmission) : 10.0f;
+			const float HighlightEmission = bUsingHighDetailPuck
+				? (bBobStriker ? FlickPuckFinish::StrikerHighlightEmission : FlickPuckFinish::HighlightEmission) : 14.0f;
 			TeamMaterial->SetScalarParameterValue(
 				TEXT("Emission"), (bSelected || bHovered ? HighlightEmission : IdleEmission) + Flash);
 		}

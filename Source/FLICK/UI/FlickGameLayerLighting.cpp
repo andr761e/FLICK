@@ -35,7 +35,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLightingSettings()
 					]
 				]
 				+ SHorizontalBox::Slot().FillWidth(0.14f).VAlign(VAlign_Center).HAlign(HAlign_Right)
-				[SNew(STextBlock).Text_Lambda([Scene, Control]() { return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(GetValue(Scene(), Control) * 100.0f))); }).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
+				[SNew(STextBlock).Text_Lambda([Scene, Control]()
+				{
+					const float Value = GetValue(Scene(), Control);
+					const float Intensity = Control == EControl::Ambient ? AmbientIntensityScale(Value) : Value;
+					return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Intensity * 100.f)));
+				}).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
 			]
 		];
 	}
@@ -45,9 +50,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLightingSettings()
 		+ SVerticalBox::Slot().AutoHeight()
 		[SNew(STextBlock).Text(FText::FromString(TEXT("ARENA LIGHTING"))).Font(DisplayFont(25)).ColorAndOpacity(Paper).AutoWrapText(true)]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 12.0f)
-		[SNew(STextBlock).Text(FText::FromString(TEXT("One shared preset for the main menu, Knockout and BOB; saved locally."))).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)]
+		[SNew(STextBlock).Text(FText::FromString(TEXT("Arena and stadium lighting; shared across the main menu, Knockout and BOB. Puck lighting stays consistent. Saved locally."))).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 4.0f)
-		[SNew(STextBlock).Text(FText::FromString(TEXT("Live in this scene. Fill increases brightness without adding glare."))).Font(UiFont(10)).ColorAndOpacity(Cyan).AutoWrapText(true)]
+		[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(bLightingPreview
+			? TEXT("LIVE ARENA // Fill improves visibility without adding glare.")
+			: TEXT("PREVIEW ARENA shows live changes; this backdrop is concept artwork.")); }).Font(UiFont(10)).ColorAndOpacity(Cyan).AutoWrapText(true)]
 		+ SVerticalBox::Slot().AutoHeight()[Rows]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
 		[

@@ -577,13 +577,13 @@ public:
 	float ReplayPullbackDuration = 1.85f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Test Arena", meta = (ClampMin = "0.0", ClampMax = "1000.0"))
-	float TestPuckKeyLightIntensity = 260.0f;
+	float TestPuckKeyLightIntensity = 190.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Test Arena", meta = (ClampMin = "0.0", ClampMax = "1000.0"))
-	float TestPuckRimLightIntensity = 180.0f;
+	float TestPuckRimLightIntensity = 150.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "0.0", ClampMax = "10000.0"))
-	float MenuAccentLightIntensity = 3200.0f;
+	float MenuAccentLightIntensity = 1800.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "0.0", ClampMax = "150.0"))
 	float MenuSoftboxLightMultiplier = 80.0f;
@@ -596,10 +596,10 @@ public:
 	float OneVsOneGameplaySoftboxMultiplier = 250.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Sky Light Multiplier", ClampMin = "0.0", ClampMax = "4.0"))
-	float OneVsOneSkyLightMultiplier = .65f;
+	float OneVsOneSkyLightMultiplier = .75f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Knockout", meta = (DisplayName = "Fill Light Intensity (650 cm Base)", ClampMin = "0.0", ClampMax = "300000.0"))
-	float OneVsOneFillLightIntensity = 150000.0f;
+	float OneVsOneFillLightIntensity = 195000.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Presentation|Frontend", meta = (ClampMin = "1.0", ClampMax = "2.0"))
 	float FrontendArenaDirectionalLightMultiplier = 1.22f;

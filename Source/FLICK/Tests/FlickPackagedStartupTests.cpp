@@ -31,6 +31,15 @@
 
 namespace
 {
+	int32 CountWidgetType(const TSharedRef<SWidget>& Widget, const FString& Type)
+	{
+		int32 Count = Widget->GetTypeAsString() == Type ? 1 : 0;
+		FChildren* Children = Widget->GetChildren();
+		for (int32 Index = 0; Index < Children->Num(); ++Index)
+			Count += CountWidgetType(Children->GetChildAt(Index), Type);
+		return Count;
+	}
+
 	bool ContainsLabel(const TSharedRef<SWidget>& Widget, const FString& Label)
 	{
 		if (Widget->GetTypeAsString() == TEXT("STextBlock")
@@ -160,6 +169,17 @@ bool FFlickPackagedStartupTest::RunTest(const FString& Parameters)
 		}
 		TestTrue(TEXT("Combined header Social accepts input"), ActivateButton(Layer, TEXT("SOCIAL")));
 		TestTrue(TEXT("Social opens"), Layer->bSocialPanelOpen);
+		TestTrue(TEXT("Social uses the shared framed drawer"), FindVisibleTag(Layer, TEXT("SocialDrawer")).IsValid());
+		TestTrue(TEXT("Social Online tab accepts input"), ActivateTag(Layer, TEXT("SocialTab1")));
+		TestTrue(TEXT("Social Online tab selects the online filter"), Layer->bShowingOnlineFriends && !Layer->bShowingRecentPlayers);
+		TestTrue(TEXT("Social Recent tab accepts input"), ActivateTag(Layer, TEXT("SocialTab2")));
+		TestTrue(TEXT("Social Recent tab selects recent players"), Layer->bShowingRecentPlayers && !Layer->bShowingOnlineFriends);
+		TestTrue(TEXT("Social All tab accepts input"), ActivateTag(Layer, TEXT("SocialTab0")));
+		TestFalse(TEXT("Social All restores the unfiltered list"), Layer->bShowingRecentPlayers || Layer->bShowingOnlineFriends);
+		// Only refresh the null/offline service during automation; never send
+		// real platform requests or invitations from this visual-input check.
+		if (FParse::Param(FCommandLine::Get(), TEXT("nosteam")))
+			TestTrue(TEXT("Social Refresh accepts input offline"), ActivateTag(Layer, TEXT("SocialAction_REFRESH")));
 		TestTrue(TEXT("Social closes"), ActivateButton(Layer, TEXT("X")));
 		TestFalse(TEXT("Social close restores the header"), Layer->bSocialPanelOpen);
 		if (auto* Radio = Controller->GetMenuRadio())
@@ -374,6 +394,16 @@ bool FFlickPackagedStartupTest::RunTest(const FString& Parameters)
 		{
 			TestTrue(TEXT("Each illustrated profile card accepts input"), ActivateTag(Layer,FName(*FString::Printf(TEXT("ProfileChoice%d"),Destination))));
 			TestEqual(TEXT("Profile destination keeps its existing page mapping"), static_cast<int32>(Layer->SelectedProfileTab),Destination+1);
+			if (Destination == 1)
+			{
+				const auto Ranks = FindVisibleTag(Layer, TEXT("RankedProfileContents"));
+				if (TestTrue(TEXT("Competitive rank content is visible"), Ranks.IsValid()))
+				{
+					TestEqual(TEXT("Ranks need no scroll container"), CountWidgetType(Ranks.ToSharedRef(), TEXT("SScrollBox")), 0);
+					TestEqual(TEXT("All four playlist badges and 22 ladder badges remain"), CountWidgetType(Ranks.ToSharedRef(), TEXT("SFlickRankBadge")), 26);
+					TestTrue(TEXT("Complete rank explanation is retained"), FindVisibleTag(Ranks.ToSharedRef(), TEXT("RankedProfileFooter")).IsValid());
+				}
+			}
 			TestTrue(TEXT("Detail page returns to overview"),ActivateButton(Layer,TEXT("PROFILE MENU")));
 			TestTrue(TEXT("Overview is restored"), Layer->SelectedProfileTab == EFlickProfileTab::Overview);
 		}

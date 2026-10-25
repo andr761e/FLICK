@@ -94,7 +94,9 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Deck uses the tuneable neutral gunmetal reflectance tint"), Color.Equals(Arena->OneVsOneDeckTint));
 			float Roughness = 1.f;
 			Finish->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Roughness")), Roughness);
-			TestTrue(TEXT("Deck finish retains visible scene reflections"), Roughness <= .20f);
+			TestEqual(TEXT("Deck uses the tuneable reflection roughness"), Roughness, Arena->OneVsOneDeckRoughness);
+			TestTrue(TEXT("Deck retains softened scene reflections rather than a mirror or matte finish"),
+				FMath::IsWithinInclusive(Roughness, .16f, .28f));
 			float Lift = -1, Offset = 0, SourceOffset = 0;
 			Finish->GetScalarParameterValue(FMaterialParameterInfo(TEXT("SurfaceLift")), Lift);
 			Finish->GetScalarParameterValue(FMaterialParameterInfo(TEXT("RenderLayerOffset")), Offset);

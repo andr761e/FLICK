@@ -135,8 +135,10 @@ private:
 	void HandlePrimaryPressed();
 	void HandleTeamPingPressed();
 	void HandlePrimaryReleased();
-	void HandleCameraElevationUpPressed();
-	void HandleCameraElevationDownPressed();
+	void HandleNextPuckTypePressed();
+	void HandlePreviousPuckTypePressed();
+	void HandleCameraZoomInPressed();
+	void HandleCameraZoomOutPressed();
 	void HandleCameraResetPressed();
 	void HandleScoreboardPressed();
 	void HandleScoreboardReleased();
@@ -170,7 +172,7 @@ private:
 	float GetPowerExponent() const;
 	void SubmitLaunch(AFlickPiece* Piece, const FVector& Direction, float NormalizedPower);
 	void UpdateLocalCameraOrbit(float DeltaSeconds);
-	void AdjustLocalCameraElevation(int32 Direction);
+	void AdjustLocalCameraZoom(int32 Direction);
 	AFlickPiece* FindPieceUnderCursor() const;
 	bool GetCursorPointOnArenaPlane(FVector& OutWorldPoint) const;
 	AFlickGameMode* GetFlickGameMode() const;

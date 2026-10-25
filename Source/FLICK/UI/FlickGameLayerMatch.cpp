@@ -827,7 +827,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 						{
 							return FText::FromString(GameMode->IsBobMode()
 								? TEXT("1 OWN  2 TARGET  |  LMB PLACE/DRAG  |  DEL REMOVE NON-STRIKERS")
-								: TEXT("WHEEL TYPE  |  LMB PLACE/DRAG PUCK OR TOGGLE DIVIDER  |  DEL REMOVE"));
+								: TEXT("Q/E TYPE  |  WHEEL ZOOM  |  LMB PLACE/DRAG PUCK OR TOGGLE DIVIDER  |  DEL REMOVE"));
 						}
 						return FText::FromString(TEXT("Undo restores the board before your last shot. Reset restores your saved setup."));
 					})
@@ -1220,23 +1220,17 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(8.0f, 3.0f))
 						[
 							SNew(STextBlock)
-							.Text_Lambda([this]() { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("WASD") : TEXT("Q / E")); })
+							.Text(FText::FromString(TEXT("WASD")))
 							.Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
 						]
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(7.0f, 0.0f, 14.0f, 0.0f)
 					[
-					SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("MOVE") : TEXT("ORBIT")); }).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
+					SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive() ? TEXT("MOVE") : TEXT("ORBIT / HEIGHT")); }).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
 						SNew(SBox)
-						.Visibility_Lambda([this]()
-						{
-							return GameMode.IsValid() && GameMode->IsTrainingEditMode() && GameMode->IsBobMode()
-								? EVisibility::Collapsed
-								: EVisibility::Visible;
-						})
 						[
 							SNew(SFlickAngularBorder).RefinedSurface(true)
 							.BackgroundColor(FLinearColor(0.014f, 0.03f, 0.045f, 0.98f))
@@ -1254,19 +1248,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCameraOrbitHint()
 						SNew(STextBlock)
 						.Text_Lambda([this]()
 						{
-							if (GameMode.IsValid() && GameMode->IsTrainingEditMode())
-							{
-								if (GameMode->IsBobMode())
-								{
-									return FText::FromString(TEXT("STANDARD PUCKS ONLY"));
-								}
-								return FText::FromString(FString::Printf(
-									TEXT("PUCK TYPE  /  %s"),
-									*GetPieceArchetypeName(GameMode->GetTrainingPlacementArchetype())));
-							}
 							return FText::FromString(PlayerController.IsValid() && PlayerController->IsFreeCameraActive()
 								? TEXT("LOOK")
-								: TEXT("VERTICAL ANGLE"));
+								: TEXT("ZOOM"));
 						})
 						.Font(UiFont(9, true))
 						.ColorAndOpacity(FLinearColor(0.78f, 0.84f, 0.89f, 1.0f))

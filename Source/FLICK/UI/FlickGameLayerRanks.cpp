@@ -3,7 +3,7 @@
 
 TSharedRef<SWidget> SFlickGameLayer::BuildRankedProfilePanel()
 {
-	TSharedRef<SUniformGridPanel> Playlists = SNew(SUniformGridPanel).SlotPadding(FMargin(5));
+	TSharedRef<SUniformGridPanel> Playlists = SNew(SUniformGridPanel).SlotPadding(FMargin(4));
 	for (int32 Playlist = 0; Playlist < 4; ++Playlist)
 	{
 		const EFlickMatchVariant Variant = Playlist == 3 ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic;
@@ -21,7 +21,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRankedProfilePanel()
 		  [SNew(STextBlock).Text(FText::FromString(Playlist == 3 ? TEXT("BOB 1V1")
 			: FString::Printf(TEXT("KNOCKOUT %dV%d"), TeamSize, TeamSize))).Font(UiFont(10, true)).ColorAndOpacity(Muted)]
 		  + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 6)
-		  [SNew(SFlickRankBadge).Progress_Lambda(Progress).Size(60)]
+		  [SNew(SFlickRankBadge).Progress_Lambda(Progress).Size(52)]
 		  + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 		  [SNew(STextBlock).Text_Lambda([Progress]() { return FText::FromString(FlickRankRules::GetRankLabel(Progress())); })
 			.Font(UiFont(13, true)).ColorAndOpacity(Paper)]
@@ -36,7 +36,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRankedProfilePanel()
 		 ]];
 	}
 
-	TSharedRef<SUniformGridPanel> Ladder = SNew(SUniformGridPanel).SlotPadding(FMargin(5));
+	TSharedRef<SUniformGridPanel> Ladder = SNew(SUniformGridPanel).SlotPadding(FMargin(4));
 	for (int32 Tier = 0; Tier < 8; ++Tier)
 	{
 		TSharedRef<SHorizontalBox> Symbols = SNew(SHorizontalBox);
@@ -46,7 +46,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRankedProfilePanel()
 			Symbols->AddSlot().FillWidth(1)
 			[SNew(SVerticalBox)
 			 + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
-			 [SNew(SFlickRankBadge).Progress(Rank).Size(52)]
+			 [SNew(SFlickRankBadge).Progress(Rank).Size(44)]
 			 + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 3)
 			 [SNew(STextBlock).Text(FText::FromString(FlickRankRules::GetDivisionName(FlickRankRules::GetDivision(Rank))))
 			  .Font(UiFont(9, true)).ColorAndOpacity(Paper)]
@@ -59,25 +59,29 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRankedProfilePanel()
 		[SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(Hairline)
 		 .CutSize(8).BorderWidth(1).Padding(FMargin(9, 8))
 		 [SNew(SVerticalBox)
-		  + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 6)
+		  + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 4)
 		  [SNew(STextBlock).Text(FText::FromString(FlickRankRules::GetTierName(static_cast<EFlickRankTier>(Tier + 1))))
 		   .Font(UiFont(11, true)).ColorAndOpacity(Paper)]
 		  + SVerticalBox::Slot().AutoHeight()[Symbols]
 		 ]];
 	}
-	return SNew(SScrollBox) + SScrollBox::Slot()
-	[SNew(SVerticalBox)
+	// Fit the complete ladder in its reserved profile body. The bounded width
+	// gives wrapped copy a stable desired height; smaller viewports scale down
+	// as a unit rather than clipping the footer or reintroducing a scroll bar.
+	return SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
+	[SNew(SBox).WidthOverride(1184)
+	[SNew(SVerticalBox).Tag(TEXT("RankedProfileContents"))
 	 + SVerticalBox::Slot().AutoHeight().Padding(5, 0, 5, 7)
 	 [SNew(STextBlock).Text(FText::FromString(TEXT("YOUR COMPETITIVE RANKS"))).Font(UiFont(17, true)).ColorAndOpacity(Paper)]
 	 + SVerticalBox::Slot().AutoHeight()[Playlists]
-	 + SVerticalBox::Slot().AutoHeight().Padding(5, 9)
+	 + SVerticalBox::Slot().AutoHeight().Padding(5, 6)
 	 [SNew(STextBlock).Text(FText::FromString(TEXT("Five placements per playlist. Win to climb; tougher opponents award more MMR. Personal stats never affect rating.")))
 	  .AutoWrapText(true).Font(UiFont(10)).ColorAndOpacity(Muted)]
 	 + SVerticalBox::Slot().AutoHeight().Padding(5, 7)
 	 [SNew(STextBlock).Text(FText::FromString(TEXT("THE RANK LADDER  //  MMR RANGES"))).Font(UiFont(12, true)).ColorAndOpacity(Brand)]
 	 + SVerticalBox::Slot().AutoHeight()[Ladder]
-	 + SVerticalBox::Slot().AutoHeight().Padding(5, 8)
-	 [SNew(STextBlock).Text(FText::FromString(TEXT("Ratings are separate for each playlist. Zenith is a single rank at 2400+ MMR. Global leaderboards require the live service.")))
+	 + SVerticalBox::Slot().AutoHeight().Padding(5, 6)
+	 [SNew(STextBlock).Tag(TEXT("RankedProfileFooter")).Text(FText::FromString(TEXT("Ratings are separate for each playlist. Zenith is a single rank at 2400+ MMR. Global leaderboards require the live service.")))
 	  .AutoWrapText(true).Font(UiFont(9)).ColorAndOpacity(Muted)]
-	];
+	]];
 }

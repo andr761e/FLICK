@@ -1,0 +1,12 @@
+{
+  "description": "Shared visual-only finish for runtime pucks and model-rendered UI portraits. No geometry or physics data.",
+  "roles": {
+    "Housing": {"metallic": 0.82, "roughness": 0.27, "anisotropy": 0.22, "color_scale": 0.68, "detail": 0.65, "coat_center": 1.0},
+    "Crown": {"metallic": 0.98, "roughness": 0.19, "anisotropy": 0.38, "color_scale": 0.88, "detail": 0.8},
+    "Core": {"metallic": 0.0, "roughness": 0.44, "specular": 0.02, "anisotropy": 0.08, "color_scale": 0.58, "detail": 0.45},
+    "Edges": {"metallic": 0.96, "roughness": 0.20, "anisotropy": 0.28, "color_scale": 0.9, "detail": 0.6},
+    "Gasket": {"metallic": 0.12, "roughness": 0.42, "anisotropy": 0.0, "color_scale": 0.65, "detail": 0.3},
+    "Diffuser": {"metallic": 0.0, "roughness": 0.34, "specular": 0.04, "anisotropy": 0.0, "color_scale": 1.0, "detail": 0.0},
+    "Emblem": {"metallic": 0.0, "roughness": 0.34, "specular": 0.04, "anisotropy": 0.0, "color_scale": 1.0, "detail": 0.0}
+  }
+}

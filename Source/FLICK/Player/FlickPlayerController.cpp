@@ -192,8 +192,10 @@ void AFlickPlayerController::RefreshControlBindings()
 	InputComponent->BindKey(Key(TEXT("FreeCamera")), IE_Pressed, this, &AFlickPlayerController::HandleFreeCameraTogglePressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Remove")), IE_Pressed, this, &AFlickPlayerController::HandleTrainingRemovePressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("TopView")), IE_Pressed, this, &AFlickPlayerController::HandleTopDownViewPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(Key(TEXT("CameraUp")), IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationUpPressed).bExecuteWhenPaused = true;
-	InputComponent->BindKey(Key(TEXT("CameraDown")), IE_Pressed, this, &AFlickPlayerController::HandleCameraElevationDownPressed).bExecuteWhenPaused = true;
+	InputComponent->BindKey(Key(TEXT("PreviousPuckType")), IE_Pressed, this, &AFlickPlayerController::HandlePreviousPuckTypePressed);
+	InputComponent->BindKey(Key(TEXT("NextPuckType")), IE_Pressed, this, &AFlickPlayerController::HandleNextPuckTypePressed);
+	InputComponent->BindKey(Key(TEXT("CameraZoomIn")), IE_Pressed, this, &AFlickPlayerController::HandleCameraZoomInPressed);
+	InputComponent->BindKey(Key(TEXT("CameraZoomOut")), IE_Pressed, this, &AFlickPlayerController::HandleCameraZoomOutPressed);
 	InputComponent->BindKey(Key(TEXT("CameraReset")), IE_Pressed, this, &AFlickPlayerController::HandleCameraResetPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Scoreboard")), IE_Pressed, this, &AFlickPlayerController::HandleScoreboardPressed).bExecuteWhenPaused = true;
 	InputComponent->BindKey(Key(TEXT("Scoreboard")), IE_Released, this, &AFlickPlayerController::HandleScoreboardReleased).bExecuteWhenPaused = true;
@@ -654,7 +656,7 @@ void AFlickPlayerController::HandlePrimaryReleased()
 	ClearAiming();
 }
 
-void AFlickPlayerController::HandleCameraElevationUpPressed()
+void AFlickPlayerController::HandleNextPuckTypePressed()
 {
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode();
 		FlickGameMode
@@ -664,10 +666,9 @@ void AFlickPlayerController::HandleCameraElevationUpPressed()
 		FlickGameMode->CycleTrainingPlacementArchetype(1);
 		return;
 	}
-	AdjustLocalCameraElevation(1);
 }
 
-void AFlickPlayerController::HandleCameraElevationDownPressed()
+void AFlickPlayerController::HandlePreviousPuckTypePressed()
 {
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode();
 		FlickGameMode
@@ -677,8 +678,10 @@ void AFlickPlayerController::HandleCameraElevationDownPressed()
 		FlickGameMode->CycleTrainingPlacementArchetype(-1);
 		return;
 	}
-	AdjustLocalCameraElevation(-1);
 }
+
+void AFlickPlayerController::HandleCameraZoomInPressed() { AdjustLocalCameraZoom(1); }
+void AFlickPlayerController::HandleCameraZoomOutPressed() { AdjustLocalCameraZoom(-1); }
 
 void AFlickPlayerController::HandleCameraResetPressed()
 {
@@ -1597,12 +1600,12 @@ EFlickTeam AFlickPlayerController::GetPrivateSpectatorTargetTeam() const
 
 void AFlickPlayerController::HandleSpectatorPreviousPressed()
 {
-	if (IsPrivateMatchSpectator() && !ShouldShowPrivateTeamMenu() && !IsScoreboardVisible()) CyclePrivateSpectatorPlayer(-1);
+	if (IsPrivateMatchSpectator() && !IsFreeCameraActive() && !ShouldShowPrivateTeamMenu() && !IsScoreboardVisible()) CyclePrivateSpectatorPlayer(-1);
 }
 
 void AFlickPlayerController::HandleSpectatorNextPressed()
 {
-	if (IsPrivateMatchSpectator() && !ShouldShowPrivateTeamMenu() && !IsScoreboardVisible()) CyclePrivateSpectatorPlayer(1);
+	if (IsPrivateMatchSpectator() && !IsFreeCameraActive() && !ShouldShowPrivateTeamMenu() && !IsScoreboardVisible()) CyclePrivateSpectatorPlayer(1);
 }
 
 void AFlickPlayerController::TogglePrivateSpectatorFreeCamera()
@@ -1790,20 +1793,25 @@ void AFlickPlayerController::UpdateLocalCameraOrbit(const float DeltaSeconds)
 	const float Direction =
 		(IsInputKeyDown(FlickControlBindings::GetKey(TEXT("OrbitLeft"))) ? 1.0f : 0.0f)
 		- (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("OrbitRight"))) ? 1.0f : 0.0f);
+	const float Elevation =
+		(IsInputKeyDown(FlickControlBindings::GetKey(TEXT("CameraUp"))) ? 1.f : 0.f)
+		- (IsInputKeyDown(FlickControlBindings::GetKey(TEXT("CameraDown"))) ? 1.f : 0.f);
 
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
-		CameraPawn && !FMath::IsNearlyZero(Direction))
+		CameraPawn && (!FMath::IsNearlyZero(Direction) || !FMath::IsNearlyZero(Elevation)))
 	{
 		const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>();
 		CameraPawn->RotateGameplayOrbit(
 			Direction,
 			DeltaSeconds,
 			Instance ? Instance->GetGameplayCameraSensitivity() : 0.35f);
+		CameraPawn->MoveGameplayElevation(Elevation, DeltaSeconds,
+			Instance ? Instance->GetGameplayCameraSensitivity() : .35f);
 		ClearHoveredPiece();
 	}
 }
 
-void AFlickPlayerController::AdjustLocalCameraElevation(const int32 Direction)
+void AFlickPlayerController::AdjustLocalCameraZoom(const int32 Direction)
 {
 	if (Direction == 0 || !IsGameplayActive() || IsFollowingPrivatePlayer())
 	{
@@ -1813,10 +1821,7 @@ void AFlickPlayerController::AdjustLocalCameraElevation(const int32 Direction)
 	if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		ClearHoveredPiece();
-		const UFlickGameInstance* Instance = GetGameInstance<UFlickGameInstance>();
-		CameraPawn->AdjustGameplayElevationFine(
-			Direction,
-			Instance ? Instance->GetGameplayCameraSensitivity() : 0.35f);
+		CameraPawn->AdjustGameplayZoom(Direction);
 	}
 }
 

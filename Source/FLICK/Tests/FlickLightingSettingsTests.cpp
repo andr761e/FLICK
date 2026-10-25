@@ -12,6 +12,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickLightingSettingsTest, "FLICK.Settings.Lig
 bool FFlickLightingSettingsTest::RunTest(const FString& Parameters)
 {
 	using namespace FlickLightingSettings;
+	TestEqual(TEXT("Ambient minimum retains soft base illumination"), AmbientIntensityScale(0.f), 1.f);
+	TestEqual(TEXT("Ambient maximum preserves the approved finish"), AmbientIntensityScale(3.f), 3.f);
+	for (float Value = 0.f; Value < 3.f; Value += .1f)
+		TestTrue(TEXT("Ambient changes smoothly through its entire range"),
+			AmbientIntensityScale(Value + .1f) - AmbientIntensityScale(Value) <= .067f);
 	const FString TestIni = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation"),
 		TEXT("LightingSettings-") + FGuid::NewGuid().ToString() + TEXT(".ini"));
 	ON_SCOPE_EXIT { GConfig->UnloadFile(TestIni); IFileManager::Get().Delete(*TestIni); };

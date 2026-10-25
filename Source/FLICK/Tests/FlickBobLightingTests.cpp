@@ -128,7 +128,7 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 			FMath::IsNearlyEqual(Warm->Intensity, Bob.BobWarmRailLightLumens * Area * AccentPreference, .02f));
 		TestTrue(TEXT("BOB cyan side power follows the accent preference"),
 			FMath::IsNearlyEqual(Cool->Intensity, Bob.BobCoolRailLightLumens * Area * AccentPreference, .02f));
-		TestEqual(TEXT("BOB sky follows the ambient preference"), Rig.SkyLightActor->GetLightComponent()->Intensity, Bob.BobSkyIntensity * Ambient);
+		TestEqual(TEXT("BOB sky follows the gentle ambient preference"), Rig.SkyLightActor->GetLightComponent()->Intensity, Bob.BobSkyIntensity * AmbientIntensityScale(Ambient));
 		TestEqual(TEXT("BOB overhead light follows the direct preference"), Rig.DirectionalLightActor->GetLightComponent()->Intensity, Bob.BobDirectionalIntensity * Direct);
 		TestEqual(TEXT("BOB key reflections follow the saved reflection control"), Key->SpecularScale, Highlights);
 		TestEqual(TEXT("BOB rim reflections follow the saved reflection control"), Rim->SpecularScale, Highlights);
@@ -137,7 +137,16 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("BOB fill remains diffuse-only"), Fill->SpecularScale, 0.f);
 	};
 
-	CheckCounts(3, 2);
+	CheckCounts(3, 4);
+	if (TestNotNull(TEXT("One shared puck reflection fixture"), Rig.PuckFinishLight.Get()))
+	{
+		URectLightComponent* PuckLight = Rig.PuckFinishLight->RectLightComponent;
+		TestTrue(TEXT("Puck fixture never illuminates ordinary arena meshes"),
+			!PuckLight->LightingChannels.bChannel0 && PuckLight->LightingChannels.bChannel1);
+		TestEqual(TEXT("Puck studio supplies fixed neutral illumination"), PuckLight->DiffuseScale, 1.f);
+		TestFalse(TEXT("Puck fixture adds no shadow pass"), PuckLight->CastShadows);
+		TestEqual(TEXT("Puck fixture adds no indirect illumination"), PuckLight->IndirectLightingIntensity, 0.f);
+	}
 	CheckPose(1.f, 250.f);
 	CheckPower(1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, .35f);
 	TestTrue(TEXT("BOB key uses lumens"), Key->IntensityUnits == ELightUnits::Lumens);
@@ -162,7 +171,7 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 		&& Rig.ArenaFillLight == Original.ArenaFillLight && Rig.Player1AccentLight == Original.Player1AccentLight
 		&& Rig.Player2AccentLight == Original.Player2AccentLight && Rig.SkyLightActor == Original.SkyLightActor
 		&& Rig.DirectionalLightActor == Original.DirectionalLightActor);
-	CheckCounts(3, 2);
+	CheckCounts(3, 4);
 	SetValue(EScene::Gameplay, EControl::Ambient, 1.5f);
 	SetValue(EScene::Gameplay, EControl::Fill, 1.8f);
 	SetValue(EScene::Gameplay, EControl::Key, .6f);
@@ -200,7 +209,7 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Knockout key retains its original intensity"), Key->Intensity,
 		Knockout.TestPuckKeyLightIntensity * Knockout.OneVsOneGameplaySoftboxMultiplier);
 	TestEqual(TEXT("Knockout fill retains its original intensity"), Fill->Intensity, Knockout.OneVsOneFillLightIntensity);
-	CheckCounts(15, 6);
+	CheckCounts(15, 9);
 	Bob.ArenaRadius = 620.f;
 	Bob.ArenaSurfaceZ = 250.f;
 	Configure(World, Rig, Bob);
@@ -212,7 +221,7 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 	for (const auto& Actor : Rig.StadiumWarmLights)
 		if (TestNotNull(TEXT("Knockout stadium lights remain reusable"), Actor.Get()))
 			TestEqual(TEXT("Knockout stadium lights never leak into BOB"), Actor->RectLightComponent->Intensity, 0.f);
-	CheckCounts(15, 6);
+	CheckCounts(15, 9);
 
 	AFlickCameraPawn* Camera = World->SpawnActor<AFlickCameraPawn>();
 	if (TestNotNull(TEXT("BOB view camera"), Camera))

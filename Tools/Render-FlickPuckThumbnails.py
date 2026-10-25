@@ -12,9 +12,11 @@ import bpy
 from mathutils import Vector
 
 root = Path(__file__).resolve().parent.parent
+finish_roles = json.loads((root / "AssetDevelopment/Pucks/finish.json").read_text())["roles"]
 parser = argparse.ArgumentParser()
 parser.add_argument("--only")
 parser.add_argument("--skin", type=int)
+parser.add_argument("--output", type=Path, help="Isolated authoring QA output; does not replace production portraits")
 views = parser.add_mutually_exclusive_group()
 views.add_argument("--presentation", action="store_true", help="High-quality lineup product stages; leaves existing transparent thumbnails unchanged")
 views.add_argument("--locker", action="store_true", help="Square near-top-down finish cards for the locker")
@@ -33,6 +35,8 @@ elif args.hero:
     output = output / "Hero"
 elif args.profile_cutout:
     output = output / "ProfileCutout"
+if args.output:
+    output = args.output.resolve()
 output.mkdir(parents=True, exist_ok=True)
 bpy.ops.object.select_all(action="SELECT")
 bpy.ops.object.delete(use_global=False)
@@ -66,10 +70,11 @@ if product_stage:
 scene.world.use_nodes = True
 scene.world.node_tree.nodes["Background"].inputs[0].default_value = (.06, .08, .11, 1)
 scene.world.node_tree.nodes["Background"].inputs[1].default_value = .35
-scene.view_settings.view_transform = "AgX"
+scene.view_settings.view_transform = "Standard"
+scene.view_settings.exposure = -.9
 if product_stage:
     scene.view_settings.view_transform = "Standard"
-    scene.view_settings.exposure = -0.6
+    scene.view_settings.exposure = -0.9
     scene.world.node_tree.nodes["Background"].inputs[0].default_value = (.012, .023, .035, 1)
     scene.world.node_tree.nodes["Background"].inputs[1].default_value = .22
 for position, power, size, color in [((-2, -2, 3), 180, 1.8, (.83, .92, 1)),
@@ -91,6 +96,11 @@ if product_stage:
     camera.data.ortho_scale = 1.55
     for light in [item for item in scene.objects if item.type == "LIGHT"]:
         light.data.energy *= .32
+        # Narrow softbox reflections reveal the metal instead of filling its
+        # entire crown with one flat grey reflection. Offline fixtures only.
+        light.data.shape = "RECTANGLE"
+        light.data.size = .42
+        light.data.size_y = 1.8
     # A real brushed-metal receiver supplies contact, emissive spill and
     # reflections in the offline render. It is never imported into the game.
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, -.001))
@@ -114,7 +124,7 @@ if product_stage:
     links.new(bump.outputs["Normal"], shader.inputs["Normal"])
     floor.data.materials.append(material)
 if args.locker:
-    camera.location = (0, -.6, 2.6)
+    camera.location = (0, -.95, 2.6)
     camera.rotation_euler = (Vector((0, 0, .06)) - camera.location).to_track_quat("-Z", "Y").to_euler()
     camera.data.ortho_scale = 1.5
 if args.hero:
@@ -176,6 +186,22 @@ for name in names:
     if len(meshes) != 1:
         raise RuntimeError(name + ": expected one optimized mesh")
     obj = meshes[0]
+    rest_transform = obj.matrix_world.copy()
+    # Match the runtime center coating without changing/exporting the FBX.
+    # The Standard center happens to share its material with the sidewall.
+    for index, mat in enumerate(list(obj.data.materials)):
+        if "graphite" not in mat.name.lower() or not finish_roles["Housing"].get("coat_center", 0):
+            continue
+        center_faces = [p for p in obj.data.polygons if p.material_index == index
+                        and (rest_transform @ p.center).z > 0
+                        and (rest_transform @ p.center).xy.length < .245 and p.normal.z > .8]
+        if center_faces:
+            coating = mat.copy()
+            coating.name = mat.name + "_FaceCoating"
+            coating_index = len(obj.data.materials)
+            obj.data.materials.append(coating)
+            for polygon in center_faces:
+                polygon.material_index = coating_index
     bounds = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
     center = Vector(((min(p.x for p in bounds) + max(p.x for p in bounds)) / 2,
                      (min(p.y for p in bounds) + max(p.y for p in bounds)) / 2,
@@ -203,7 +229,7 @@ for name in names:
             shader.inputs["Base Color"].default_value = (*base, 1)
             shader.inputs["Metallic"].default_value = .12 if luminous else .35 if role in ("Core", "Gasket") else .85
             shader.inputs["Roughness"].default_value = .25 if role in ("Crown", "Edges") else .42
-            shader.inputs["Emission Color"].default_value = (*accent, 1)
+            shader.inputs["Emission Color"].default_value = (*(v ** 1.35 for v in accent), 1)
             shader.inputs["Emission Strength"].default_value = 1.5 if luminous else 0
             if product_stage:
                 shader.inputs["Roughness"].default_value = .22 if role in ("Crown", "Edges") else .29
@@ -211,18 +237,38 @@ for name in names:
             if args.hero or args.profile_cutout:
                 shader.inputs["Roughness"].default_value = .18 if role in ("Crown", "Edges") else .31
                 shader.inputs["Emission Strength"].default_value = 2.7 if luminous else 0
-            if args.profile_cutout and not luminous:
-                # Microfinish belongs only to the offline portrait materials.
+            # The same optical hierarchy as the runtime puck parent; lighting
+            # remains specific to the offline camera, never the geometry.
+            finish = dict(finish_roles[role])
+            if "_FaceCoating" in mat.name:
+                for key in ["metallic", "roughness", "specular", "anisotropy"]:
+                    finish[key] = finish_roles["Core"][key]
+                finish["color_scale"] *= .5
+            shader.inputs["Base Color"].default_value = (*(v * finish["color_scale"] for v in base), 1)
+            shader.inputs["Metallic"].default_value = finish["metallic"]
+            shader.inputs["Roughness"].default_value = finish["roughness"]
+            # Blender's level is relative to the dielectric Fresnel response;
+            # keep the same role-specific low-glare face as the runtime shader.
+            shader.inputs["Specular IOR Level"].default_value = finish.get("specular", .5)
+            shader.inputs["Anisotropic"].default_value = finish["anisotropy"]
+            shader.inputs["Emission Strength"].default_value = 2.2 if luminous else 0
+            if not luminous:
+                # Subtle machining, not a noisy painted silver surface.
                 nodes = mat.node_tree.nodes
                 links = mat.node_tree.links
                 grain = nodes.new("ShaderNodeTexNoise")
-                grain.inputs["Scale"].default_value = 350
+                grain.inputs["Scale"].default_value = 230
                 grain.inputs["Detail"].default_value = 2
                 micro = nodes.new("ShaderNodeBump")
-                micro.inputs["Strength"].default_value = .08
-                micro.inputs["Distance"].default_value = .0004
+                micro.inputs["Strength"].default_value = .055 * finish["detail"]
+                micro.inputs["Distance"].default_value = .00025
                 links.new(grain.outputs["Fac"], micro.inputs["Height"])
                 links.new(micro.outputs["Normal"], shader.inputs["Normal"])
+                roughness = nodes.new("ShaderNodeMapRange")
+                roughness.inputs["To Min"].default_value = finish["roughness"] - .016 * finish["detail"]
+                roughness.inputs["To Max"].default_value = finish["roughness"] + .016 * finish["detail"]
+                links.new(grain.outputs["Fac"], roughness.inputs["Value"])
+                links.new(roughness.outputs["Result"], shader.inputs["Roughness"])
         scene.render.filepath = str(output / (name + "_" + str(skin) + ".png"))
         bpy.ops.render.render(write_still=True)
         report.append({"archetype": name, "skin": skin, "source_sha256": source_hash})
