@@ -1283,6 +1283,7 @@ void AFlickGameMode::SetCameraForFrontend()
 			|| FrontendScreen == EFlickFrontendScreen::Profile || FrontendScreen == EFlickFrontendScreen::ModeSelect
 			|| FrontendScreen == EFlickFrontendScreen::ItemShop;
 		CameraPawn->SetMenuOrbitEnabled(bBrowseMenu);
+		CameraPawn->SetHomePuckPresentation(bMenuContext);
 	}
 	// Existing light actors are reused across frontend and gameplay. Retune them
 	// whenever presentation state changes so showcase exposure cannot leak into

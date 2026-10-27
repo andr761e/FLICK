@@ -1,6 +1,7 @@
 #include "Player/FlickCameraPawn.h"
 #include "Arena/FlickArenaLighting.h"
 #include "Core/FlickModeRules.h"
+#include "Core/FlickPuckFinish.h"
 #include "UI/FlickLockerStyle.h"
 #include "Engine/RectLight.h"
 
@@ -77,6 +78,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	}
 	if (bFreeCameraEnabled)
 	{
+		UpdatePuckStudioLighting();
 		Camera->SetRelativeLocation(FVector::ZeroVector);
 		Camera->SetRelativeRotation(FRotator::ZeroRotator);
 		Camera->SetFieldOfView(CurrentFieldOfView);
@@ -90,6 +92,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 		SetActorLocation(FMath::VInterpTo(GetActorLocation(), SpectatorView.Location, DeltaSeconds, SpectatorViewBlendSpeed));
 		SetActorRotation(FMath::RInterpTo(GetActorRotation(), SpectatorView.Rotation, DeltaSeconds, SpectatorViewBlendSpeed));
 		CurrentFieldOfView = FMath::FInterpTo(CurrentFieldOfView, SpectatorView.FieldOfView, DeltaSeconds, SpectatorViewBlendSpeed);
+		UpdatePuckStudioLighting();
 		Camera->SetRelativeLocation(FVector::ZeroVector);
 		Camera->SetRelativeRotation(FRotator::ZeroRotator);
 		Camera->SetFieldOfView(CurrentFieldOfView);
@@ -223,22 +226,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 		FlickArenaLighting::UpdateMenuSoftboxes(MenuKeyLight.Get(), MenuRimLight.Get(),
 			GetActorLocation(), Radius, State ? State->ArenaSurfaceZ : 250.0f, MenuDeckReflectionLight.Get());
 	}
-	if (bTestArenaPresentation || bBobGameplayFraming || (bMenuPresentation && bOneVsOneArenaPresentation))
-	{
-		if (!PuckStudioKeyLight.IsValid() || !PuckStudioFillLight.IsValid())
-		{
-			const auto Rig = FlickArenaLighting::FindRig(GetWorld());
-			PuckStudioKeyLight = Rig.PuckFinishLight;
-			PuckStudioFillLight = Rig.PuckFillLight;
-		}
-		const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
-		const auto Variant = bBobGameplayFraming ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic;
-		float Radius = FlickModeRules::GetArenaRadius(Variant, State ? State->PlayersPerTeam : 1);
-		if (State && State->bPrivateMatchActive && Variant == EFlickMatchVariant::Classic)
-			Radius *= FMath::Clamp(State->PrivateMatchSettings.ArenaScale, .85f, 1.3f);
-		FlickArenaLighting::UpdatePuckStudioLights(PuckStudioKeyLight.Get(), PuckStudioFillLight.Get(),
-			GetActorLocation(), Radius / (bBobGameplayFraming ? 620.f : 650.f), State ? State->ArenaSurfaceZ : 250.f);
-	}
+	UpdatePuckStudioLighting();
 	bGameplayViewTransitioning = !bMenuPresentation
 		&& (!NewLocation.Equals(TargetLocation, 1.0f) || !NewRotation.Equals(TargetRotation, 0.08f));
 	CurrentFieldOfView = FMath::FInterpTo(CurrentFieldOfView, TargetFieldOfView, DeltaSeconds, BlendSpeed);
@@ -260,6 +248,52 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	Camera->SetRelativeLocation(FVector(SideWave, LocationWave, 0.0f));
 	Camera->SetRelativeRotation(FRotator(PitchWave, YawWave, -YawWave * 0.35f));
 	Camera->SetFieldOfView(CurrentFieldOfView + ShakeAmount * 0.7f);
+}
+
+void AFlickCameraPawn::UpdatePuckStudioLighting()
+{
+	if (!(bTestArenaPresentation || bBobGameplayFraming || (bMenuPresentation && bOneVsOneArenaPresentation))) return;
+	if (!PuckStudioKeyLight.IsValid() || !PuckStudioFillLight.IsValid())
+	{
+		const auto Rig = FlickArenaLighting::FindRig(GetWorld());
+		PuckStudioKeyLight = Rig.PuckFinishLight;
+		PuckStudioFillLight = Rig.PuckFillLight;
+	}
+	const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();
+	const auto Variant = bBobGameplayFraming ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic;
+	float Radius = FlickModeRules::GetArenaRadius(Variant, State ? State->PlayersPerTeam : 1);
+	if (State && State->bPrivateMatchActive && Variant == EFlickMatchVariant::Classic)
+		Radius *= FMath::Clamp(State->PrivateMatchSettings.ArenaScale, .85f, 1.3f);
+	FQuat ProductFrame;
+	const bool bUseProductFrame = !bMenuPresentation || (bHomePuckPresentation && LockerPreviewMode == 0);
+	if (bUseProductFrame)
+	{
+		// Retain the locker's authored frame for menus. Gameplay instead aligns
+		// the key with the reflection of the actual viewing ray across the deck.
+		FVector ReferenceLocation;
+		FRotator ReferenceRotation;
+		FlickLockerStyle::PuckView(250.f, 1.f, Camera->AspectRatio, ReferenceLocation, ReferenceRotation);
+		// The puck sits off the locker's optical axis. Its actual viewing ray,
+		// rather than the UI-shifted camera's forward vector, defines the finish.
+		ReferenceRotation = (FVector(0.f, 0.f, 250.f + FlickLockerStyle::PuckFocusHeight) - ReferenceLocation).Rotation();
+		const float ReferenceAzimuth = FMath::RadiansToDegrees(FMath::Atan2(ReferenceLocation.Y, ReferenceLocation.X));
+		// A slight side-key offset gives the silver band some shape at game size.
+		const float HighlightYaw = bMenuPresentation ? 0.f : 12.f;
+		FRotator View = GetActorRotation();
+		if (!bMenuPresentation && !bFreeCameraEnabled)
+		{
+			// The camera's tilt and height are independently framed. Use the ray
+			// toward the puck plane, not the optical axis, for the silver reflection.
+			const FVector Focus = bCinematicReplay ? ReplayFocus + FVector(0, 0, 20.f)
+				: FVector(0, 0, (State ? State->ArenaSurfaceZ : 250.f) + 20.f);
+			View = (Focus - GetActorLocation()).Rotation();
+		}
+		ProductFrame = FlickArenaLighting::MakePuckStudioFrame(View, ReferenceRotation,
+			ReferenceAzimuth, HighlightYaw, !bMenuPresentation);
+	}
+	FlickArenaLighting::UpdatePuckStudioLights(PuckStudioKeyLight.Get(), PuckStudioFillLight.Get(),
+		GetActorLocation(), Radius / (bBobGameplayFraming ? 620.f : 650.f), State ? State->ArenaSurfaceZ : 250.f,
+		bUseProductFrame ? &ProductFrame : nullptr, !bMenuPresentation);
 }
 
 void AFlickCameraPawn::ApplyCameraSettings()
@@ -302,6 +336,13 @@ void AFlickCameraPawn::SetMenuPresentation(const bool bInMenuPresentation)
 void AFlickCameraPawn::SetMenuOrbitEnabled(const bool bEnabled)
 {
 	bMenuOrbitEnabled = bEnabled;
+	ApplyArenaPostProcess();
+}
+
+void AFlickCameraPawn::SetHomePuckPresentation(const bool bEnabled)
+{
+	if (bHomePuckPresentation == bEnabled) return;
+	bHomePuckPresentation = bEnabled;
 	ApplyArenaPostProcess();
 }
 
@@ -439,9 +480,17 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 	}
 	if (bMenuPresentation && LockerPreviewMode > 0)
 	{
-		Camera->PostProcessSettings.AutoExposureBias -= .45f;
-		Camera->PostProcessSettings.BloomIntensity = .32f;
-		Camera->PostProcessSettings.BloomThreshold = 1.35f;
+		Camera->PostProcessSettings.AutoExposureBias += FlickPuckFinish::ReferenceExposureBias;
+		Camera->PostProcessSettings.BloomIntensity = FlickPuckFinish::ReferenceBloomIntensity;
+		Camera->PostProcessSettings.BloomThreshold = FlickPuckFinish::ReferenceBloomThreshold;
+	}
+	if (bTestArenaPresentation && (!bMenuPresentation || (bHomePuckPresentation && LockerPreviewMode == 0)))
+	{
+		// Home, gameplay and replays share the approved locker exposure/bloom.
+		// Locker's existing compensation above is applied exactly once.
+		Camera->PostProcessSettings.AutoExposureBias = FlickPuckFinish::ReferenceExposureBias;
+		Camera->PostProcessSettings.BloomIntensity = FlickPuckFinish::ReferenceBloomIntensity;
+		Camera->PostProcessSettings.BloomThreshold = FlickPuckFinish::ReferenceBloomThreshold;
 	}
 }
 

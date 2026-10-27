@@ -39,6 +39,10 @@ namespace FlickArenaLighting
 		// Fixed product-lighting rig on channel 1, independent of arena sliders.
 		float PuckFinishLightLumens = 1500.0f;
 		float PuckFillLightLumens = 750.0f;
+		// Larger virtual studio keeps near/far board positions in similar light.
+		float PuckGameplayCoverageScale = 4.f;
+		// Reflection-aligned key needs less energy than the off-axis locker key.
+		float PuckGameplayKeySpecularScale = .055f;
 		FVector PuckKeyOffset = FVector(-450.f, 900.f, 1050.f);
 		FVector PuckFillOffset = FVector(600.f, -350.f, 1150.f);
 		FVector DeckKeyOffset = FVector(-520.f, 1100.f, 1150.f);
@@ -82,5 +86,9 @@ namespace FlickArenaLighting
 	void Configure(UWorld* World, FRig& Rig, const FParameters& Parameters);
 	FRig FindRig(UWorld* World);
 	void UpdateMenuSoftboxes(ARectLight* Key, ARectLight* Rim, const FVector& CameraLocation, float ArenaRadius, float ArenaSurfaceZ, ARectLight* SecondKey = nullptr);
-	void UpdatePuckStudioLights(ARectLight* Key, ARectLight* Fill, const FVector& CameraLocation, float ArenaScale, float ArenaSurfaceZ);
+	// Reflect the viewing ray across the puck plane to keep its silver highlight
+	// visible through elevation changes. Menu views retain their authored frame.
+	FQuat MakePuckStudioFrame(const FRotator& View, const FRotator& ReferenceView,
+		float ReferenceAzimuth, float HighlightYaw, bool bReflectElevation);
+	void UpdatePuckStudioLights(ARectLight* Key, ARectLight* Fill, const FVector& CameraLocation, float ArenaScale, float ArenaSurfaceZ, const FQuat* ProductFrame = nullptr, bool bGameplayReflection = false);
 }

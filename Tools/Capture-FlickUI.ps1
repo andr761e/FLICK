@@ -35,6 +35,15 @@ param(
     [int]$PuckSkin = 0,
     [ValidateRange(-1, 5)]
     [int]$MatchPuckSkin = -1,
+    # Capture-only exposure study; does not alter a saved preference.
+    [Nullable[float]]$ExposureBias = $null,
+    [ValidateRange(0, 8)]
+    [int]$ReplayPuckClass = 0,
+    [Nullable[float]]$CameraElevation = $null,
+    [ValidateRange(-16, 16)]
+    [int]$CameraZoomSteps = 0,
+    [ValidateRange(-1, 2)]
+    [int]$PuckVisualState = -1,
     [ValidateRange(1, 3)]
     [int]$PlayersPerTeam = 1,
     [ValidateRange(0, 4)]
@@ -186,6 +195,11 @@ foreach ($screenName in $Screen) {
     }
     $arguments += "-FlickBobStrikerSkin=$PuckSkin"
     $arguments += "-FlickCapturePuckSkin=$MatchPuckSkin"
+    if ($null -ne $ExposureBias) { $arguments += "-FlickCaptureExposure=$ExposureBias" }
+    if ($screenName -eq 'Replay') { $arguments += "-FlickCaptureReplayClass=$ReplayPuckClass" }
+    if ($null -ne $CameraElevation) { $arguments += "-FlickCaptureElevation=$CameraElevation" }
+    $arguments += "-FlickCaptureZoomSteps=$CameraZoomSteps"
+    if ($PuckVisualState -ge 0) { $arguments += "-FlickCapturePuckState=$PuckVisualState" }
     $arguments += "-FlickPlaySelection=$PlaySelection"
     $arguments += @("-FlickLineupSlot=$LineupSlot", "-FlickLineupHover=$LineupHover")
     if ($LineupRadar) { $arguments += '-FlickLineupRadar' }
@@ -233,6 +247,11 @@ foreach ($screenName in $Screen) {
         CameraOrbit = $CameraOrbit
         LightingValues = $LightingValues
         MatchPuckSkin = $MatchPuckSkin
+        ExposureBias = $ExposureBias
+        CameraElevation = $CameraElevation
+        CameraZoomSteps = $CameraZoomSteps
+        PuckVisualState = $PuckVisualState
+        ReplayPuckClass = $(if ($screenName -eq 'Replay') { $ReplayPuckClass } else { $null })
         Screenshot = $outputPath
         Log = $logPath
     }

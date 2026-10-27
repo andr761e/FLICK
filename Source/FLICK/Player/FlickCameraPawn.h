@@ -23,6 +23,7 @@ public:
 	void AddCameraImpulse(float Strength);
 	void SetMenuPresentation(bool bInMenuPresentation);
 	void SetMenuOrbitEnabled(bool bEnabled);
+	void SetHomePuckPresentation(bool bEnabled);
 	void SetLockerPreviewMode(int32 InMode) { LockerPreviewMode = InMode; }
 	void SetBobGameplayFraming(bool bInBobGameplayFraming);
 	void SetTestArenaPresentation(bool bInTestArenaPresentation);
@@ -257,6 +258,7 @@ public:
 
 private:
 	void ApplyArenaPostProcess();
+	void UpdatePuckStudioLighting();
 	FVector GetGameplayTargetLocation() const;
 	FRotator GetGameplayTargetRotation() const;
 
@@ -284,6 +286,7 @@ private:
 	bool bGameplayElevationLocked = false;
 	bool bMenuPresentation = false;
 	bool bMenuOrbitEnabled = false;
+	bool bHomePuckPresentation = false;
 	int32 LockerPreviewMode = 0;
 	TWeakObjectPtr<class ARectLight> MenuKeyLight;
 	TWeakObjectPtr<class ARectLight> MenuRimLight;

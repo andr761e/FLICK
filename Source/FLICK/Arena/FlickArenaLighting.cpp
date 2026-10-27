@@ -18,6 +18,8 @@ namespace FlickArenaLighting
 {
 	namespace
 	{
+		const FName PuckWideStudioTag(TEXT("FLICK.PuckWideStudio"));
+		const FName PuckGameplayStudioTag(TEXT("FLICK.PuckGameplayStudio"));
 		FName RimSpillTag(int32 Index)
 		{
 			static const auto Tags = []
@@ -52,22 +54,59 @@ namespace FlickArenaLighting
 		Move(Rim, Defaults.DeckWarmOffset);
 	}
 
-	void UpdatePuckStudioLights(ARectLight* Key, ARectLight* Fill, const FVector& CameraLocation, float ArenaScale, float ArenaSurfaceZ)
+	FQuat MakePuckStudioFrame(const FRotator& View, const FRotator& ReferenceView,
+		float ReferenceAzimuth, float HighlightYaw, bool bReflectElevation)
 	{
-		if (FVector2D(CameraLocation.X, CameraLocation.Y).IsNearlyZero()) return;
+		const FQuat AuthoredFrame = FRotator(0.f, View.Yaw - ReferenceView.Yaw
+			+ ReferenceAzimuth + 90.f + HighlightYaw, 0.f).Quaternion();
+		if (!bReflectElevation)
+			return FRotator(FMath::Clamp(View.Pitch, -65.f, -10.f), View.Yaw, 0.f).Quaternion()
+				* ReferenceView.Quaternion().Inverse()
+				* FRotator(0.f, ReferenceAzimuth + 90.f + HighlightYaw, 0.f).Quaternion();
+		// Aim the actual key source at the reflection of the viewing ray, rather
+		// than rotating an arbitrary reference vector. This accounts for the
+		// authored key's side offset as well as its height above the puck plane.
+		const FVector ToEye = -FRotator(FMath::Clamp(View.Pitch, -85.f, -5.f), View.Yaw, 0.f).Vector();
+		const FVector ReflectedEye(-ToEye.X, -ToEye.Y, ToEye.Z);
+		const FVector KeyDirection = FRotator(0.f, HighlightYaw, 0.f).RotateVector(ReflectedEye);
+		const FParameters Defaults;
+		const FVector LocalKey(Defaults.PuckKeyOffset.X, Defaults.PuckKeyOffset.Y, Defaults.PuckKeyOffset.Z - 250.f);
+		return FQuat::FindBetweenNormals(AuthoredFrame.RotateVector(LocalKey).GetSafeNormal(), KeyDirection) * AuthoredFrame;
+	}
+
+	void UpdatePuckStudioLights(ARectLight* Key, ARectLight* Fill, const FVector& CameraLocation, float ArenaScale, float ArenaSurfaceZ, const FQuat* ProductFrame, bool bGameplayReflection)
+	{
+		if (!ProductFrame && FVector2D(CameraLocation.X, CameraLocation.Y).IsNearlyZero()) return;
 		const float Azimuth = FMath::RadiansToDegrees(FMath::Atan2(CameraLocation.Y, CameraLocation.X));
 		const FRotator Frame(0.f, Azimuth + 90.f, 0.f);
 		const FParameters Defaults;
-		const auto Move = [&](ARectLight* Actor, const FVector& Offset)
+		const float Coverage = ProductFrame ? Defaults.PuckGameplayCoverageScale : 1.f;
+		const auto Move = [&](ARectLight* Actor, const FVector& Offset, bool bFill)
 		{
 			if (!IsValid(Actor)) return;
-			FVector Position = Frame.RotateVector(Offset * ArenaScale);
-			Position.Z = ArenaSurfaceZ + (Offset.Z - 250.f) * ArenaScale;
+			if (ProductFrame) Actor->Tags.AddUnique(PuckWideStudioTag);
+			else Actor->Tags.Remove(PuckWideStudioTag);
+			if (bGameplayReflection) Actor->Tags.AddUnique(PuckGameplayStudioTag);
+			else Actor->Tags.Remove(PuckGameplayStudioTag);
+			const FVector Local(Offset.X, Offset.Y, Offset.Z - 250.f);
+			const FVector Position = FVector(0, 0, ArenaSurfaceZ)
+				+ (ProductFrame ? ProductFrame->RotateVector(Local) : Frame.RotateVector(Local)) * ArenaScale * Coverage;
 			Actor->SetActorLocation(Position);
 			Actor->SetActorRotation((FVector(0.f, 0.f, ArenaSurfaceZ) - Position).Rotation());
+			if (auto* Light = Actor->RectLightComponent.Get())
+			{
+				// Scale power by area: same centre illumination, much less falloff
+				// variation across the playing surface. Still just two shared lights.
+				Light->SetIntensity((bFill ? Defaults.PuckFillLightLumens : Defaults.PuckFinishLightLumens)
+					* FMath::Square(ArenaScale * Coverage));
+				Light->SetSpecularScale(bFill ? .15f : bGameplayReflection ? Defaults.PuckGameplayKeySpecularScale : .55f);
+				Light->SetSourceWidth((bFill ? 900.f : 1100.f) * ArenaScale * Coverage);
+				Light->SetSourceHeight((bFill ? 600.f : 650.f) * ArenaScale * Coverage);
+				Light->SetAttenuationRadius(2200.f * ArenaScale * Coverage);
+			}
 		};
-		Move(Key, Defaults.PuckKeyOffset);
-		Move(Fill, Defaults.PuckFillOffset);
+		Move(Key, Defaults.PuckKeyOffset, false);
+		Move(Fill, Defaults.PuckFillOffset, true);
 	}
 
 	// Tags identify only this rig; repeated applications never stack extra fixtures.
@@ -495,23 +534,28 @@ namespace FlickArenaLighting
 		if (!IsValid(Rig.PuckFillLight)) Rig.PuckFillLight = FoundStudio.PuckFillLight;
 		const auto ConfigureStudio = [&](TObjectPtr<ARectLight>& Actor, bool bFill)
 		{
+			const bool bCreated = !IsValid(Actor);
 			if (!IsValid(Actor)) Actor = World->SpawnActor<ARectLight>();
 			if (!IsValid(Actor) || !Actor->RectLightComponent) return;
 			URectLightComponent* Light = Actor->RectLightComponent;
 			Light->SetMobility(EComponentMobility::Movable);
 			const FVector Position = ScaleLocation(bFill ? Parameters.PuckFillOffset : Parameters.PuckKeyOffset);
-			Actor->SetActorLocation(Position);
-			Actor->SetActorRotation((FVector(0, 0, ArenaSurfaceZ) - Position).Rotation());
+			if (bCreated)
+			{
+				Actor->SetActorLocation(Position);
+				Actor->SetActorRotation((FVector(0, 0, ArenaSurfaceZ) - Position).Rotation());
+			}
+			const float Coverage = Actor->ActorHasTag(PuckWideStudioTag) ? Parameters.PuckGameplayCoverageScale : 1.f;
 			Light->SetLightingChannels(false, true, false);
 			Light->SetLightColor(bFill ? FLinearColor(.82f, .9f, 1.f) : FLinearColor(1.f, .97f, .94f));
 			Light->SetIntensityUnits(ELightUnits::Lumens);
-			Light->SetIntensity((bFill ? Parameters.PuckFillLightLumens : Parameters.PuckFinishLightLumens) * LocalPowerScale);
+			Light->SetIntensity((bFill ? Parameters.PuckFillLightLumens : Parameters.PuckFinishLightLumens) * LocalPowerScale * FMath::Square(Coverage));
 			Light->SetDiffuseScale(1.f);
 			// Broad silver bands without a white mirror plate over the crown.
-			Light->SetSpecularScale(bFill ? .15f : .55f);
-			Light->SetSourceWidth((bFill ? 900.f : 1100.f) * ArenaScale);
-			Light->SetSourceHeight((bFill ? 600.f : 650.f) * ArenaScale);
-			Light->SetAttenuationRadius(2200.f * ArenaScale);
+			Light->SetSpecularScale(bFill ? .15f : Actor->ActorHasTag(PuckGameplayStudioTag) ? Parameters.PuckGameplayKeySpecularScale : .55f);
+			Light->SetSourceWidth((bFill ? 900.f : 1100.f) * ArenaScale * Coverage);
+			Light->SetSourceHeight((bFill ? 600.f : 650.f) * ArenaScale * Coverage);
+			Light->SetAttenuationRadius(2200.f * ArenaScale * Coverage);
 			Light->SetCastShadows(false);
 			Light->SetIndirectLightingIntensity(0.f);
 			Light->SetVolumetricScatteringIntensity(0.f);

@@ -110,6 +110,49 @@ bool FFlickKnockoutLightingControlsTest::RunTest(const FString& Parameters)
 		Rig.PuckFinishLight->GetActorLocation().Equals(QuarterTurn.RotateVector(InitialKey), .01f));
 	TestTrue(TEXT("Studio fill follows the same camera-relative orientation"),
 		Rig.PuckFillLight->GetActorLocation().Equals(QuarterTurn.RotateVector(InitialFill), .01f));
+	const FVector Focus(0, 0, 250.f);
+	const FQuat ProductFrame = FQuat::Identity;
+	FlickArenaLighting::UpdatePuckStudioLights(Rig.PuckFinishLight, Rig.PuckFillLight, FVector(0, -1600, 1200), 1.f, 250.f, &ProductFrame);
+	const float Coverage = Defaults.PuckGameplayCoverageScale;
+	TestTrue(TEXT("Wide studio preserves light direction while increasing coverage"),
+		(Rig.PuckFinishLight->GetActorLocation() - Focus).Equals((KeyPosition - Focus) * Coverage, .01f));
+	TestEqual(TEXT("Wide studio preserves centre illumination by scaling power with area"),
+		Rig.PuckFinishLight->RectLightComponent->Intensity, Defaults.PuckFinishLightLumens * Coverage * Coverage);
+	const FQuat ElevatedFrame(FVector::ForwardVector, FMath::DegreesToRadians(20.f));
+	FlickArenaLighting::UpdatePuckStudioLights(Rig.PuckFinishLight, Rig.PuckFillLight, FVector(0, -1600, 1200), 1.f, 250.f, &ElevatedFrame);
+	TestTrue(TEXT("Product lighting responds to camera elevation too"),
+		(Rig.PuckFinishLight->GetActorLocation() - Focus).Equals(ElevatedFrame.RotateVector((KeyPosition - Focus) * Coverage), .01f));
+	const FVector ElevatedPosition = Rig.PuckFinishLight->GetActorLocation();
+	FlickArenaLighting::Configure(World, Rig, Defaults);
+	TestTrue(TEXT("Reapplying arena settings never snaps puck studio direction"), Rig.PuckFinishLight->GetActorLocation().Equals(ElevatedPosition, .01f));
+	TestEqual(TEXT("Reapplying arena settings never flashes puck studio power"),
+		Rig.PuckFinishLight->RectLightComponent->Intensity, Defaults.PuckFinishLightLumens * Coverage * Coverage);
+	FlickArenaLighting::UpdatePuckStudioLights(Rig.PuckFinishLight, Rig.PuckFillLight, FVector(0, -1600, 1200), 1.f, 250.f);
+	TestTrue(TEXT("Returning to locker restores its original light position"), Rig.PuckFinishLight->GetActorLocation().Equals(KeyPosition, .01f));
+	TestEqual(TEXT("Returning to locker restores its original light power"), Rig.PuckFinishLight->RectLightComponent->Intensity, Defaults.PuckFinishLightLumens);
+	FlickArenaLighting::UpdatePuckStudioLights(Rig.PuckFinishLight, Rig.PuckFillLight, FVector(0, -1600, 1200), 1.f, 250.f, &ProductFrame, true);
+	TestEqual(TEXT("Aligned gameplay reflection uses the softer key"), Rig.PuckFinishLight->RectLightComponent->SpecularScale, Defaults.PuckGameplayKeySpecularScale);
+	FlickArenaLighting::Configure(World, Rig, Defaults);
+	TestEqual(TEXT("Reapplying settings preserves gameplay reflection strength"), Rig.PuckFinishLight->RectLightComponent->SpecularScale, Defaults.PuckGameplayKeySpecularScale);
+	FlickArenaLighting::UpdatePuckStudioLights(Rig.PuckFinishLight, Rig.PuckFillLight, FVector(0, -1600, 1200), 1.f, 250.f);
+	TestEqual(TEXT("Locker restores its approved specular strength"), Rig.PuckFinishLight->RectLightComponent->SpecularScale, .55f);
+	const FRotator ReferenceView(-30.f, 90.f, 0.f);
+	const FVector ReferenceReflection(Defaults.PuckKeyOffset.X, Defaults.PuckKeyOffset.Y, Defaults.PuckKeyOffset.Z - 250.f);
+	for (float Elevation : {5.f, 15.f, 30.f, 45.f, 65.f, 85.f})
+	{
+		const FRotator View(-Elevation, 90.f, 0.f);
+		const auto Frame = FlickArenaLighting::MakePuckStudioFrame(View, ReferenceView, -90.f, 0.f, true);
+		const FVector ToEye = -View.Vector();
+		const FVector ToLight = Frame.RotateVector(ReferenceReflection).GetSafeNormal();
+		const FVector HalfVector = (ToEye + ToLight).GetSafeNormal();
+		TestTrue(*FString::Printf(TEXT("Silver reflection stays on the top normal at %.0f degrees"), Elevation),
+			FVector::DotProduct(HalfVector, FVector::UpVector) > .999f);
+		TestTrue(TEXT("Fill stays above the puck plane"), Frame.RotateVector(Defaults.PuckFillOffset - Focus).Z > 0.f);
+	}
+	const FRotator MenuView(-20.f, 120.f, 0.f);
+	const FQuat LegacyMenuFrame = MenuView.Quaternion() * ReferenceView.Quaternion().Inverse();
+	TestTrue(TEXT("Approved Home lighting retains its direct view frame"),
+		FlickArenaLighting::MakePuckStudioFrame(MenuView, ReferenceView, -90.f, 0.f, false).Equals(LegacyMenuFrame, .0001f));
 	return true;
 }
 #endif

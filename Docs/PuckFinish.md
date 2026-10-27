@@ -131,3 +131,10 @@ coated dark insert, silver finish and LED emission budgets remain intact.
 
 The dedicated BOB striker face remains separate. Existing static portraits are
 unchanged in this follow-up. See `PuckStudioArena.md` for captures and checks.
+
+## Locker matching follow-up (2026-10-26)
+
+Knockout play/replay now share the locker's exposure and bloom. The studio pair
+has wider gameplay coverage and follows the view orientation, while locker
+retains its original layout. Materials and static portraits are unchanged.
+See `PuckLockerMatch.md` for implementation and comparison details.

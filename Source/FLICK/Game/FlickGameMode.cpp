@@ -1,4 +1,5 @@
 #include "Game/FlickGameMode.h"
+#include "Camera/CameraComponent.h"
 #include "Core/FlickRankRules.h"
 #include "Game/FlickGameModePrivate.h"
 #include "Misc/Paths.h"
@@ -902,6 +903,41 @@ void AFlickGameMode::BeginPlay()
 		CameraPawn->SetGameplayViewIndex(CameraViewPreview, true);
 	}
 	float CaptureOrbit = 0.f;
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCaptureFrame")) && CameraPawn)
+	{
+		FTimerHandle PuckComparisonTimer;
+		GetWorldTimerManager().SetTimer(PuckComparisonTimer, [this]()
+		{
+			float Elevation = 0.f;
+			if (FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureElevation="), Elevation) && FMath::IsFinite(Elevation))
+				CameraPawn->SetGameplayElevation(Elevation);
+			int32 ZoomSteps = 0;
+			if (FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureZoomSteps="), ZoomSteps))
+				for (int32 Step = 0; Step < FMath::Min(FMath::Abs(ZoomSteps), 16); ++Step) CameraPawn->AdjustGameplayZoom(FMath::Sign(ZoomSteps));
+			int32 State = 0;
+			if (FParse::Value(FCommandLine::Get(), TEXT("FlickCapturePuckState="), State))
+				for (AFlickPiece* Piece : Pieces) if (IsValid(Piece))
+				{
+					Piece->SetSelected(State == 1);
+					Piece->SetHovered(State == 2);
+				}
+			int32 ReplayClass = INDEX_NONE;
+			if (FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureReplayClass="), ReplayClass))
+			{
+				for (AFlickPiece* Piece : Pieces)
+					if (IsValid(Piece) && Piece->GetTeam() == EFlickTeam::Player1 && static_cast<int32>(Piece->GetArchetype()) == ReplayClass)
+					{
+						CameraPawn->BeginCinematicReplay(Piece->GetActorLocation(), Piece->GetTeam());
+						CameraPawn->UpdateCinematicReplay(Piece->GetActorLocation(), .5f, 0.f);
+						break;
+					}
+			}
+			float Exposure = 0.f;
+			if (FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureExposure="), Exposure) && FMath::IsFinite(Exposure))
+				if (UCameraComponent* View = CameraPawn->FindComponentByClass<UCameraComponent>())
+					View->PostProcessSettings.AutoExposureBias = FMath::Clamp(Exposure, -2.f, 2.f);
+		}, 1.1f, false);
+	}
 	int32 CapturePuckSkin = INDEX_NONE;
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCaptureFrame"))
 		&& FParse::Value(FCommandLine::Get(), TEXT("FlickCapturePuckSkin="), CapturePuckSkin)
