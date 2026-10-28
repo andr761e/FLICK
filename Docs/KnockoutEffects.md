@@ -5,7 +5,7 @@ the existing physics-driven arena-edge preview. The puck launches, loses support
 at the edge and is eliminated using the existing checks. Changing the selection
 or leaving the locker destroys the previous preview effect.
 
-Basic Burst remains unchanged. Saved indices 1–5 retain Shockwave, Spark Shower,
+Basic Burst now uses a compact team-coloured wave and fine sparks. Saved indices 1–5 retain Shockwave, Spark Shower,
 Cryo Shatter, Solar Nova and Phase Collapse, now with dedicated geometry and motion.
 Fourteen additional selections follow them: Lightning, Toxic Melt, Gold Burst,
 Pixel Break, Heart Pop, Water Splash, Spirit Release, Galaxy Rift, Comic Pow,
@@ -45,3 +45,14 @@ Final test output is in `Saved/Logs/KnockoutEffectTests.log`. Unreal still emits
 pre-existing `LogAutomationTest: Error: Condition failed` startup assertions before
 the selected tests begin; all seven selected tests report `Result={Success}`.
 No packaged build, network session or GPU performance benchmark was run.
+
+## Visual refinement — 2026-10-28
+
+All twenty selections use the bounded renderer, including Basic Burst. Pressure
+waves have fine cores and soft halos, sparks use camera-facing tails and
+ballistic motion, and most openings have a brief geometric lens glint. A shaded
+translucent material gives smoke/mist depth; a masked faceted material gives
+crystals and tumbling confetti solid faces and controlled highlights. These
+share the existing four sections and introduce no scene lights or physics.
+See `EffectsVisualUpgrade.md` and `Deliverables/Effects-Upgrade-2026-10-28` for
+current implementation and verification.

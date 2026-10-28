@@ -3,8 +3,8 @@
 const FlickKnockoutStyle::FStyle& FlickKnockoutStyle::Get(const int32 Index)
 {
 	static const FStyle Styles[Count] = {
-		{EPattern::Basic,{.3f,.4f,.5f},{.6f,.7f,.8f},.9f,155,80,0,1,10,
-			TEXT("The original compact team-coloured burst, without additional cosmetic layers.")},
+		{EPattern::Basic,{.3f,.4f,.5f},{.6f,.7f,.8f},.9f,110,70,18,1,20,
+			TEXT("A compact team-coloured pressure wave with fine impact sparks and a fast, clean fade.")},
 		{EPattern::Shock,{.005f,.6f,1},{.02f,.95f,1},1.25f,170,45,22,1,32,
 			TEXT("Three staggered cyan pressure rings sweep outwards with fine radial ion streaks.")},
 		{EPattern::Sparks,{1,.18f,.002f},{1,.65f,.025f},1.45f,160,120,23,5,52,

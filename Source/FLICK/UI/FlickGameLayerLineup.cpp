@@ -410,10 +410,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildFormationPuck(const EFlickTeam Team, c
 			[
 				SNew(SOverlay)
 				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-				[SNew(SBox).WidthOverride(110).HeightOverride(110)
-					[SNew(SFlickPuckDisc).TeamColor(GetTeamAccent(Team)).Selected(false)
+				[SNew(SBox).WidthOverride(132).HeightOverride(132)
+					[SNew(SFlickPuckThumbnail).View(EFlickPuckThumbnailView::Locker).Zoom(1.25f).EdgeFade(FMargin(18))
 						.Archetype_Lambda([this, SlotIndex]() { return GetDisplayedLoadoutPiece(SlotIndex); })
-						.AccentColor_Lambda([this, Team, SlotIndex]() { return FlickPieceArchetypeRules::GetVisualAccent(GetDisplayedLoadoutPiece(SlotIndex), GetTeamAccent(Team)); })]]
+						.Skin_Lambda([this, SlotIndex]() { return SelectedPuckSkins[static_cast<int32>(GetDisplayedLoadoutPiece(SlotIndex))]; })]]
 				+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(10, 8)
 				[SNew(STextBlock).Text(FText::FromString(FString::Printf(TEXT("%02d"), SlotIndex + 1))).Font(DisplayFont(11))
 					.ColorAndOpacity_Lambda([Selected]() { return Selected() ? Brand : Cyan; })]
@@ -506,8 +506,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutPresetBar(const EFlickTeam Team
 				return GetDisplayedLoadoutPreset() == Preset || (Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus())) ? Brand : Cyan.CopyWithNewOpacity(.65f);
 			})
 			.BackgroundColor_Lambda([this, Preset]() { return FlickLineupStyle::PresetSurface(GetDisplayedLoadoutPreset() == Preset); })
-			[SNew(STextBlock).Text_Lambda([this, Preset]() { return FText::FromString(GetClassDisplayName(Preset)); })
-				.Font(DisplayFont(11)).Justification(ETextJustify::Center).ColorAndOpacity(Paper)]]
+			[SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
+				[SNew(STextBlock).Text_Lambda([this, Preset]() { return FText::FromString(GetClassDisplayName(Preset)); })
+					.Font(DisplayFont(11)).Justification(ETextJustify::Center).ColorAndOpacity(Paper)]]]
 			+ SOverlay::Slot()[SNew(FlickPlaylistWidgets::SSelectionEdge).CutSize(4)
 				.Active_Lambda([this,Preset]() { return GetDisplayedLoadoutPreset()==Preset; })]);
 		Grid->AddSlot(Column++, 0)[Button];
@@ -596,15 +597,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassPuckCard(const int32 PieceSlot)
 			.Padding(2.0f)
 			[
 				SNew(SOverlay)
-				// Full-height product stage: real contact shadow, reflected light and
-				// a level camera. Only its right edge blends into the label area.
+				// Match the locker's near-top-down product display, keeping each
+				// class symbol and equipped finish readable beside the native labels.
 				+ SOverlay::Slot().HAlign(HAlign_Left)
 				[
-					SNew(SBox).WidthOverride(248.0f)
+					SNew(SBox).WidthOverride(220.0f)
 					[
-						SNew(SFlickPuckThumbnail).View(EFlickPuckThumbnailView::Hero)
+						SNew(SFlickPuckThumbnail).View(EFlickPuckThumbnailView::Locker)
 							.Tag(FName(*FString::Printf(TEXT("ClassPuckPortrait%d"), PieceSlot)))
-							.CutSize(6).Zoom(1.18f).FadeRight(42)
+							.CutSize(6).Zoom(1.1f).EdgeFade(FMargin(18,12,36,12))
 							.Archetype_Lambda([this, PieceSlot]() { return GetSelectedClassPiece(PieceSlot); })
 							.Skin_Lambda([this, PieceSlot]()
 							{
@@ -949,7 +950,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildArchetypeChoice(const EFlickTeam Team,
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth()
 				[SNew(SBox).WidthOverride(144)
-					[SNew(SFlickPuckThumbnail).Archetype(Archetype).View(EFlickPuckThumbnailView::Presentation).CutSize(8.5f).FadeRight(28).Zoom(1.14f)
+					[SNew(SFlickPuckThumbnail).Archetype(Archetype).View(EFlickPuckThumbnailView::Locker).CutSize(8.5f).EdgeFade(FMargin(12,8,24,8))
 						.Skin_Lambda([this, Archetype]() { return SelectedPuckSkins[static_cast<int32>(Archetype)]; })]]
 				+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center).Padding(9, 8, 9, 8)
 				[

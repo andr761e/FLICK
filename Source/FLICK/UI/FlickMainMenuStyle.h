@@ -19,6 +19,11 @@ namespace FlickMainMenuStyle
 	constexpr float RadioHeight = 150.0f;
 	constexpr float RadioBottom = 48.0f;
 	constexpr float SelectorBottom = 86.0f;
+	constexpr double RankDisplaySeconds = 5.0;
+	inline int32 GetRankPlaylist(const double VisibleSeconds)
+	{
+		return FMath::FloorToInt(FMath::Fmod(FMath::Max(0.0, VisibleSeconds), RankDisplaySeconds * 4) / RankDisplaySeconds);
+	}
 
 	namespace Navigation
 	{

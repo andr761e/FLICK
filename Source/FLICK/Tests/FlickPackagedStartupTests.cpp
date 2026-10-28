@@ -5,6 +5,8 @@
 #include "Core/FlickPracticeCatalog.h"
 #include "Game/FlickPracticeComponent.h"
 #include "UI/FlickPracticeStyle.h"
+#include "UI/FlickMainMenuStyle.h"
+#include "Ranking/FlickRankingSubsystem.h"
 #include "Core/FlickLog.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -164,7 +166,29 @@ bool FFlickPackagedStartupTest::RunTest(const FString& Parameters)
 		const auto StatusPanel = FindVisibleTag(Layer, TEXT("HomeStatus"));
 		if (TestTrue(TEXT("Combined Home status panel exists"), StatusPanel.IsValid()))
 		{
-			TestTrue(TEXT("One shared panel contains Social and current rank"), ContainsLabel(StatusPanel.ToSharedRef(), TEXT("SOCIAL")) && ContainsLabel(StatusPanel.ToSharedRef(), TEXT("1V1 CURRENT RANK")));
+			TestTrue(TEXT("Shared rank panel contains Social"), ContainsLabel(StatusPanel.ToSharedRef(), TEXT("SOCIAL")));
+			// Startup timing can land in any interval of the rotating rank panel.
+			// Exercise every queue rather than assuming the title is still 1v1.
+			const double OriginalHomeTime = Layer->FooterTickerElapsed;
+			const auto* Ranking = Instance->GetSubsystem<UFlickRankingSubsystem>();
+			TestNotNull(TEXT("Ranking subsystem available at startup"), Ranking);
+			for (int32 Playlist = 0; Playlist < 4; ++Playlist)
+			{
+				Layer->FooterTickerElapsed = Playlist * FlickMainMenuStyle::RankDisplaySeconds + .25;
+				StatusPanel->Invalidate(EInvalidateWidgetReason::Layout);
+				StatusPanel->SlatePrepass(1.0f);
+				const EFlickMatchVariant Variant = Playlist == 3 ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic;
+				const int32 TeamSize = Playlist == 3 ? 1 : Playlist + 1;
+				const FString Title = Playlist == 3 ? TEXT("BOB 1V1 CURRENT RANK")
+					: FString::Printf(TEXT("%dV%d CURRENT RANK"), TeamSize, TeamSize);
+				TestTrue(FString::Printf(TEXT("Shared panel displays %s"), *Title), ContainsLabel(StatusPanel.ToSharedRef(), Title));
+				if (Ranking)
+					TestTrue(TEXT("Rank progress follows the displayed competitive queue"),
+						ContainsLabel(StatusPanel.ToSharedRef(), Ranking->GetDisplayProgressLabel(Variant, TeamSize)));
+			}
+			Layer->FooterTickerElapsed = OriginalHomeTime;
+			StatusPanel->Invalidate(EInvalidateWidgetReason::Layout);
+			StatusPanel->SlatePrepass(1.0f);
 			TestEqual(TEXT("Combined panel retains its design width"), StatusPanel->GetDesiredSize().X, 650.f);
 		}
 		TestTrue(TEXT("Combined header Social accepts input"), ActivateButton(Layer, TEXT("SOCIAL")));

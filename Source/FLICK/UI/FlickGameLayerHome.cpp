@@ -2,6 +2,34 @@
 
 TSharedRef<SWidget> SFlickGameLayer::BuildHomeStatusPanel()
 {
+	// Use the home-only clock so the cycle restarts at 1v1 on returning home.
+	// All three bindings use the same queue: badge, title and placement/MMR.
+	const auto RankQueue = [this]()
+	{
+		const int32 Playlist = FlickMainMenuStyle::GetRankPlaylist(FooterTickerElapsed);
+		return TPair<EFlickMatchVariant, int32>(Playlist == 3 ? EFlickMatchVariant::Bob : EFlickMatchVariant::Classic,
+			Playlist == 3 ? 1 : Playlist + 1);
+	};
+	const auto ChangePulse = [this]()
+	{
+		if (FooterTickerElapsed < FlickMainMenuStyle::RankDisplaySeconds) return 0.f;
+		const float Phase = FMath::Fmod(FooterTickerElapsed, FlickMainMenuStyle::RankDisplaySeconds);
+		return 1.f - FMath::SmoothStep(0.f, .85f, Phase);
+	};
+	auto RankSteps = SNew(SHorizontalBox);
+	for (int32 Playlist = 0; Playlist < 4; ++Playlist)
+	{
+		RankSteps->AddSlot().AutoWidth().Padding(0, 0, 5, 0)
+		[SNew(SBox).WidthOverride(22).HeightOverride(3)
+			.ToolTipText(FText::FromString(Playlist == 3 ? TEXT("BOB 1V1")
+				: FString::Printf(TEXT("KNOCKOUT %dV%d"), Playlist + 1, Playlist + 1)))
+			[SNew(SBorder).BorderImage(WhiteBrush()).Padding(0)
+				.BorderBackgroundColor_Lambda([this, Playlist, ChangePulse]()
+				{
+					return FlickMainMenuStyle::GetRankPlaylist(FooterTickerElapsed) == Playlist
+						? FMath::Lerp(Cyan, Paper, ChangePulse()) : Hairline.CopyWithNewOpacity(.6f);
+				})]];
+	}
 	// One shell, two independently laid-out sections. Social remains a real
 	// button rather than making the non-interactive MMR area clickable.
 	TSharedRef<SButton> Social = SNew(SButton).ButtonStyle(&TransparentButtonStyle)
@@ -39,26 +67,29 @@ TSharedRef<SWidget> SFlickGameLayer::BuildHomeStatusPanel()
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 17, 0)
-				[SNew(SFlickRankBadge).Size(48).Progress_Lambda([this]() {
+				[SNew(SFlickRankBadge).Size(48).Progress_Lambda([this, RankQueue]() {
 					const auto* Ranking = GetRankingSubsystem();
-					return Ranking ? Ranking->GetDisplayProgress(GameMode.IsValid() ? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic,
-						GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1) : FFlickRankProgress();
-				})]
+					const auto Queue = RankQueue();
+					return Ranking ? Ranking->GetDisplayProgress(Queue.Key, Queue.Value) : FFlickRankProgress();
+				}).RenderTransformPivot(FVector2D(.5f, .5f))
+					.RenderTransform_Lambda([ChangePulse]() { return FSlateRenderTransform(FScale2D(1.f + .08f * ChangePulse())); })]
 				+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center).Padding(0, 0, 16, 0)
 				[
 					SNew(SVerticalBox)
+					.RenderTransform_Lambda([ChangePulse]() { return FSlateRenderTransform(FVector2D(8.f * ChangePulse(), 0)); })
 					+ SVerticalBox::Slot().AutoHeight()
-					[SNew(STextBlock).Text_Lambda([this]() {
-						if (!GameMode.IsValid()) return FText::FromString(TEXT("CURRENT RANK"));
-						return FText::FromString(GameMode->GetActiveMatchVariant() == EFlickMatchVariant::Bob ? TEXT("BOB RANK")
-							: FString::Printf(TEXT("%dV%d CURRENT RANK"), GameMode->GetPlayersPerTeam(), GameMode->GetPlayersPerTeam()));
-					}).Font(DisplayFont(12)).ColorAndOpacity(Paper)]
+					[SNew(STextBlock).Text_Lambda([RankQueue]() {
+						const auto Queue = RankQueue();
+						return FText::FromString(Queue.Key == EFlickMatchVariant::Bob ? TEXT("BOB 1V1 CURRENT RANK")
+							: FString::Printf(TEXT("%dV%d CURRENT RANK"), Queue.Value, Queue.Value));
+					}).Font(DisplayFont(12)).ColorAndOpacity_Lambda([ChangePulse]() { return FMath::Lerp(Paper, Cyan, ChangePulse()); })]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0, 3, 0, 0)
-					[SNew(STextBlock).Text_Lambda([this]() {
+					[SNew(STextBlock).Text_Lambda([this, RankQueue]() {
 						const auto* Ranking = GetRankingSubsystem();
-						return FText::FromString(Ranking ? Ranking->GetDisplayProgressLabel(GameMode.IsValid() ? GameMode->GetActiveMatchVariant() : EFlickMatchVariant::Classic,
-							GameMode.IsValid() ? GameMode->GetPlayersPerTeam() : 1) : TEXT("UNAVAILABLE"));
+						const auto Queue = RankQueue();
+						return FText::FromString(Ranking ? Ranking->GetDisplayProgressLabel(Queue.Key, Queue.Value) : TEXT("UNAVAILABLE"));
 					}).Font(DisplayFont(16)).ColorAndOpacity(Brand).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0)[RankSteps]
 				]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 14, 0)
 				[SNew(SBox).WidthOverride(1)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline)]]

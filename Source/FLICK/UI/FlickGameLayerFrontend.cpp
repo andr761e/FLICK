@@ -102,19 +102,19 @@ TSharedRef<SWidget> SFlickGameLayer::BuildStartupOverlay()
 TSharedRef<SWidget> SFlickGameLayer::BuildDisplayPuckSelector()
 {
 	const auto Cycle = [this](int32 Direction) { if (auto* Sessions = GetDisplayedSessionSubsystem()) Sessions->CycleShowcaseArchetype(Direction); return FReply::Handled(); };
-	return SNew(SBox).WidthOverride(350).HeightOverride(42)
+	return SNew(SBox).WidthOverride(280).HeightOverride(42)
 		.RenderTransform_Lambda([this]() { return FSlateRenderTransform(FVector2D(0, IsDisplayedPartyActive() || bPartyTrayPreview ? -70.f : 0.f)); })
 	[
-		SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Cyan.CopyWithNewOpacity(.7f)).UseAccentForOutline(true).BorderWidth(.8f).CutSize(10).Padding(FMargin(20, 4))
+		SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Cyan.CopyWithNewOpacity(.7f)).UseAccentForOutline(true).BorderWidth(.8f).CutSize(10).Padding(FMargin(12, 4))
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("DISPLAY PUCK"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(9, 0, 0, 0)[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(10)).ColorAndOpacity(Cyan)]
-			+ SHorizontalBox::Slot().AutoWidth().Padding(14, 0)[SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(8, 0)).ToolTipText(FText::FromString(TEXT("Previous display puck")))
+			+ SHorizontalBox::Slot().AutoWidth().Padding(8, 0)[SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(8, 0)).ToolTipText(FText::FromString(TEXT("Previous display puck")))
 				.OnClicked_Lambda([Cycle]() { return Cycle(-1); })[SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(16, true)).ColorAndOpacity(Brand)]]
 			+ SHorizontalBox::Slot().FillWidth(1).HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[SNew(STextBlock).Text_Lambda([this]() { const auto* Sessions = GetDisplayedSessionSubsystem(); return FText::FromString(GetPieceArchetypeName(Sessions ? Sessions->GetShowcaseArchetype() : EFlickPieceArchetype::Standard)); }).Font(UiFont(10, true)).ColorAndOpacity(Paper)]
-			+ SHorizontalBox::Slot().AutoWidth().Padding(8, 0, 0, 0)[SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(8, 0)).ToolTipText(FText::FromString(TEXT("Next display puck")))
+			+ SHorizontalBox::Slot().AutoWidth().Padding(4, 0, 0, 0)[SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(8, 0)).ToolTipText(FText::FromString(TEXT("Next display puck")))
 				.OnClicked_Lambda([Cycle]() { return Cycle(1); })[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(16, true)).ColorAndOpacity(Brand)]]
 		]
 	];

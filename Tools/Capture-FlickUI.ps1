@@ -194,6 +194,8 @@ foreach ($screenName in $Screen) {
         $arguments += "-ini:GameUserSettings:[ScalabilityGroups]:sg.${group}Quality=$Quality"
     }
     $arguments += "-FlickBobStrikerSkin=$PuckSkin"
+	# Class and winner previews read the same team-format argument.
+	$arguments += "-FlickClassPlayers=$PlayersPerTeam"
     $arguments += "-FlickCapturePuckSkin=$MatchPuckSkin"
     if ($null -ne $ExposureBias) { $arguments += "-FlickCaptureExposure=$ExposureBias" }
     if ($screenName -eq 'Replay') { $arguments += "-FlickCaptureReplayClass=$ReplayPuckClass" }

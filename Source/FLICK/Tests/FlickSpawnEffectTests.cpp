@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+#include "Tests/FlickCosmeticShaderChecks.h"
 #include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickSpawnStyle.h"
 #include "Feedback/FlickWorldFeedback.h"
@@ -38,19 +39,7 @@ bool FFlickSpawnEffectTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Spawn surfaces are additive, not opaque"),Material->GetBlendMode(),BLEND_Additive);
 		TestTrue(TEXT("Spawn shader needs no per-effect lights"),Material->GetShadingModels().HasShadingModel(MSM_Unlit));
 #if WITH_EDITOR
-		const auto* E = Material->GetExpressionInputForProperty(MP_EmissiveColor);
-		const auto* Inverse = E ? Cast<UMaterialExpressionEyeAdaptationInverse>(E->Expression) : nullptr;
-		const auto* Glow = Inverse ? Cast<UMaterialExpressionMultiply>(Inverse->LightValueInput.Expression) : nullptr;
-		const auto* Saturation = Glow ? Cast<UMaterialExpressionPower>(Glow->A.Expression) : nullptr;
-		TestTrue(TEXT("Real vertex RGB drives saturated, exposure-compensated emission"),
-			Saturation && Cast<UMaterialExpressionVertexColor>(Saturation->Base.Expression));
-		const auto* O = Material->GetExpressionInputForProperty(MP_Opacity);
-		const auto* Fade = O ? Cast<UMaterialExpressionMultiply>(O->Expression) : nullptr;
-		TestTrue(TEXT("Vertex alpha drives transparency"),Fade && Fade->A.OutputIndex == 4);
-		const auto* Mask = Fade ? Cast<UMaterialExpressionCustom>(Fade->B.Expression) : nullptr;
-		bool bConnected = Mask && Mask->Inputs.Num() == 3;
-		if (Mask) for (const FCustomInput& Input : Mask->Inputs) bConnected &= Input.Input.Expression != nullptr;
-		TestTrue(TEXT("Every analytic mask input is connected"),bConnected);
+		FlickCosmeticShaderChecks::Verify(*this,*Material->GetMaterial());
 #endif
 	}
 	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)

@@ -139,7 +139,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 		TargetLocation = Focus + FVector(-300.0f, -680.0f, 480.0f) * ArenaFramingScale
 			* (LockerPreviewMode == 2 ? 1.35f : LockerPreviewMode == 3 ? 1.15f : LockerPreviewMode == 4 ? 1.1f : 1.0f);
 		TargetRotation = UKismetMathLibrary::FindLookAtRotation(TargetLocation, Focus
-			+ (LockerPreviewMode == 2 ? FVector(500.0f, 0.0f, -110.0f)
+			+ (LockerPreviewMode == 2 ? FVector(500.0f, 0.0f, 20.0f)
 				: LockerPreviewMode == 4 ? FVector(240.0f, 0.0f, -20.0f)
 				: LockerPreviewMode == 3 ? FVector(300.0f, 0.0f, -110.0f) : FVector(200.0f, 0.0f, -110.0f)));
 		if (LockerPreviewMode == 1)
@@ -205,10 +205,13 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	const FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaSeconds, BlendSpeed);
 	SetActorLocation(NewLocation);
 	SetActorRotation(NewRotation);
-	if (bMenuPresentation && LockerPreviewMode == 1)
+	if (bMenuPresentation && LockerPreviewMode > 0)
 	{
 		const auto* State = GetWorld()->GetGameState<AFlickGameState>();
-		const FVector PuckFocus(0, 0, (State ? State->ArenaSurfaceZ : 250.f) + 20.f);
+		const float X = LockerPreviewMode == 2 ? FlickModeRules::GetArenaRadius(
+			EFlickMatchVariant::Classic,State ? State->PlayersPerTeam : 1)-20.f : 0.f;
+		const float Height = LockerPreviewMode == 2 || LockerPreviewMode == 4 ? 60.f : 20.f;
+		const FVector PuckFocus(X, 0, (State ? State->ArenaSurfaceZ : 250.f) + Height);
 		Camera->PostProcessSettings.DepthOfFieldFocalDistance = FMath::Max(1.f, FVector::DotProduct(PuckFocus - NewLocation, GetActorForwardVector()));
 	}
 	if (bTestArenaPresentation || (bMenuPresentation && bMenuOrbitEnabled && bOneVsOneArenaPresentation))
@@ -471,7 +474,8 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 	Camera->PostProcessSettings.bOverride_DepthOfFieldFstop = bPremiumMenu;
 	Camera->PostProcessSettings.bOverride_DepthOfFieldSensorWidth = bPremiumMenu && bOneVsOneMenu;
 	Camera->PostProcessSettings.DepthOfFieldSensorWidth = OneVsOneMenuSensorWidth;
-	Camera->PostProcessSettings.DepthOfFieldFstop = bMenuPresentation && LockerPreviewMode == 1 ? 2.4f
+	Camera->PostProcessSettings.DepthOfFieldFstop = bMenuPresentation && LockerPreviewMode > 1 ? 5.6f
+		: bMenuPresentation && LockerPreviewMode == 1 ? 2.4f
 		: bOneVsOneArenaPresentation ? OneVsOneMenuFstop : 3.2f;
 	if (bShowcaseGrade)
 	{

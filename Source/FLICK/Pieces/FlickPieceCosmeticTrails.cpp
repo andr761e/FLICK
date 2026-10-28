@@ -61,7 +61,11 @@ namespace
 void AFlickPiece::UpdateCollectionTrail(const float DeltaSeconds)
 {
 	if (GetNetMode() == NM_DedicatedServer) return;
-	const float Dt = FMath::Max(0.0f, DeltaSeconds);
+	const bool bRecordedReplay = ReplayCosmeticTime >= 0.0f;
+	const float Dt = bRecordedReplay
+		? FMath::Max(0.0f, ReplayCosmeticTime - LastReplayCosmeticTime)
+		: FMath::Max(0.0f, DeltaSeconds);
+	LastReplayCosmeticTime = ReplayCosmeticTime;
 	TrailClock += Dt;
 	const FlickTrailStyle::FStyle& Style = FlickTrailStyle::Get(PuckTrail);
 	if (!CosmeticRibbon)
@@ -85,30 +89,38 @@ void AFlickPiece::UpdateCollectionTrail(const float DeltaSeconds)
 		}
 	}
 	CosmeticRibbon->SetWorldTransform(FTransform::Identity);
-	RibbonMaterials[0]->SetScalarParameterValue(TEXT("MaskShape"), PuckTrail == 2 || PuckTrail == 4 ? 6
-		: PuckTrail == 9 || PuckTrail == 12 ? 7 : 0);
+	RibbonMaterials[0]->SetScalarParameterValue(TEXT("MaskShape"),
+		PuckTrail == 2 || PuckTrail == 4 || PuckTrail == 5 || PuckTrail == 9 || PuckTrail == 12 ? 6 : 0);
 	RibbonMaterials[1]->SetScalarParameterValue(TEXT("MaskShape"), Style.ParticleShape);
 	for (UMaterialInstanceDynamic* Material : RibbonMaterials)
 		// Arena exposure is deliberately low; preserve visible HDR colour without
 		// changing global lighting or introducing expensive per-particle lights.
-		Material->SetScalarParameterValue(TEXT("GlowStrength"), Style.Glow * 5.0f);
+	{
+		Material->SetScalarParameterValue(TEXT("GlowStrength"), Style.Glow);
+		Material->SetScalarParameterValue(TEXT("EffectAge"), TrailClock);
+	}
 	if (TrailPointAges.Num() != TrailPoints.Num()) { TrailPoints.Reset(); TrailPointAges.Reset(); }
 	for (float& Age : TrailPointAges) Age += Dt;
 	const FVector Position = GetActorLocation() - FVector(0, 0, PieceThickness * 0.38f);
 	if (LastTrailPosition.IsZero()) LastTrailPosition = Position;
 	const float Distance = FVector::Dist2D(Position, LastTrailPosition);
-	const bool bTeleported = Distance > TeleportDistance || Dt > 0.2f;
+	const bool bTeleported = Distance > TeleportDistance || Dt > Style.Lifetime;
 	if (bTeleported)
 	{
 		TrailPoints.Reset(); TrailPointAges.Reset(); TrailSampleElapsed = 0;
 		LastTrailPosition = Position; // Never connect two previews or respawn positions.
 	}
 	const bool bArriving = VisualRoot && VisualRoot->GetRelativeLocation().Z > 1.0f;
-	const bool bMoving = !bTeleported && !bEliminated && !bArriving && Dt > SMALL_NUMBER && Distance / Dt > MinimumSpeed;
+	const bool bMoving = !bTeleported && (!bEliminated || bRecordedReplay) && !IsHidden()
+		&& !bArriving && Dt > SMALL_NUMBER && Distance / Dt > MinimumSpeed;
 	if (bMoving)
 	{
 		// Interpolate at fixed intervals even at 30 FPS; do not emit once per frame.
 		float SampleTime = SampleInterval - TrailSampleElapsed;
+		// A brief stall is still continuous motion. Bound work to twelve samples,
+		// retaining the newest interval so the wake reaches the current puck.
+		const int32 Due = FMath::Max(0,FMath::FloorToInt((Dt-SampleTime)/SampleInterval)+1);
+		SampleTime += FMath::Max(0,Due-12)*SampleInterval;
 		for (int32 Samples = 0; SampleTime <= Dt && Samples < 12; ++Samples, SampleTime += SampleInterval)
 		{
 			TrailPoints.Insert(FMath::Lerp(LastTrailPosition, Position, SampleTime / Dt), 0);
@@ -141,6 +153,10 @@ void AFlickPiece::UpdateCollectionTrail(const float DeltaSeconds)
 		{
 			const FVector Tangent = (TrailPoints[FMath::Max(0, I-1)] - TrailPoints[FMath::Min(Count-1, I+1)]).GetSafeNormal2D();
 			const FVector Side(-Tangent.Y, Tangent.X, 0);
+			// A banked ribbon retains its width at low replay angles.
+			FVector FacingSide = FVector::CrossProduct(Tangent, FVector::CrossProduct(CameraRight, CameraUp)).GetSafeNormal();
+			if (FVector::DotProduct(FacingSide, Side) < 0) FacingSide *= -1;
+			const FVector RibbonSide = (Side*.55f + FacingSide*.45f).GetSafeNormal();
 			const float Age = TrailPointAges[I], Life = FMath::Clamp(1 - Age / Style.Lifetime, 0.0f, 1.0f);
 			const float Cap = FMath::Clamp((Count - 1 - I) / 4.0f, 0.0f, 1.0f);
 			const float Birth = TrailClock - Age;
@@ -175,8 +191,9 @@ void AFlickPiece::UpdateCollectionTrail(const float DeltaSeconds)
 			default: break;
 			}
 			Color.A = FMath::Min(0.95f, Opacity * 1.15f) * FMath::Pow(Life, 1.1f) * Cap;
-			const FVector Center = TrailPoints[I] + Side * Offset * FMath::Sqrt(Life) + FVector(0,0,1.5f + Lane*.18f);
-			Ribbons.Pair(Center, Side, Width * FMath::Sqrt(Life) * Cap, Color, Age / Style.Lifetime);
+			const float Lift = Lane == 0 ? 0 : (1-Life)*(2+3*Wave);
+			const FVector Center = TrailPoints[I] + Side * Offset * FMath::Sqrt(Life) + FVector(0,0,3.5f + Lane*.25f + Lift);
+			Ribbons.Pair(Center, RibbonSide, Width * FMath::Sqrt(Life) * Cap, Color, Age / Style.Lifetime);
 			if (I < Count - 1)
 			{
 				const int32 A = Start + I * 2;
@@ -205,10 +222,18 @@ void AFlickPiece::UpdateCollectionTrail(const float DeltaSeconds)
 		Color.A = FMath::Min(0.95f, Opacity * 1.3f) * FMath::Pow(Life, 1.2f) * FMath::Clamp(Age / .06f, 0.0f, 1.0f);
 		const FVector Center = TrailPoints[I] + Side * (N-.5f) * (6 + Spread * (1-Life)) + FVector(0,0,3 + Age * Rise);
 		const float Rotation = PuckTrail == 10 ? 0 : (N2-.5f) * 1.1f + Age * (PuckTrail == 11 ? .5f : 2.5f);
-		const FVector Right = CameraRight * FMath::Cos(Rotation) + CameraUp * FMath::Sin(Rotation);
-		const FVector Up = CameraUp * FMath::Cos(Rotation) - CameraRight * FMath::Sin(Rotation);
+		FVector Right = CameraRight * FMath::Cos(Rotation) + CameraUp * FMath::Sin(Rotation);
+		FVector Up = CameraUp * FMath::Cos(Rotation) - CameraRight * FMath::Sin(Rotation);
+		if (PuckTrail == 2 || PuckTrail == 4 || PuckTrail == 6 || PuckTrail == 8)
+		{
+			const FVector Flight = -Tangent*90 + FVector(0,0,Rise);
+			Right = (CameraRight*FVector::DotProduct(Flight,CameraRight)
+				+CameraUp*FVector::DotProduct(Flight,CameraUp)).GetSafeNormal();
+			Up = FVector::CrossProduct(FVector::CrossProduct(CameraRight,CameraUp),Right).GetSafeNormal();
+		}
 		Size *= FMath::Sqrt(Life);
-		Particles.Quad(Center, Right, Up, Size, Size * (PuckTrail == 2 ? 1.8f : 1.f), Color);
+		const bool bStreak = PuckTrail == 2 || PuckTrail == 4 || PuckTrail == 6 || PuckTrail == 8;
+		Particles.Quad(Center, Right, Up, Size*(bStreak ? 3.f : 1.f), Size*(bStreak ? .4f : 1.f), Color);
 	}
 	Ribbons.Upload(CosmeticRibbon, 0);
 	Particles.Upload(CosmeticRibbon, 1);

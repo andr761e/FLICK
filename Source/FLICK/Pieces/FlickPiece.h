@@ -55,6 +55,8 @@ public:
 	void BeginReplayPresentation();
 	void ApplyReplayPresentation(const FTransform& Transform, bool bVisible);
 	void EndReplayPresentation();
+	// Recorded shot time drives cosmetics independently of playback speed.
+	void SetReplayCosmeticTime(float SourceTime);
 
 	bool IsSelectableBy(EFlickTeam Team) const;
 	bool IsActive() const { return !bEliminated; }
@@ -363,4 +365,11 @@ private:
 	FVector BaseHaloRelativeScale = FVector::OneVector;
 	FTransform PreReplayTransform = FTransform::Identity;
 	bool bReplayPresentationActive = false;
+	UPROPERTY(ReplicatedUsing = OnRep_ReplayCosmeticTime)
+	float ReplayCosmeticTime = -1.0f;
+	UPROPERTY(ReplicatedUsing = OnRep_ReplayCosmeticTime)
+	bool bReplayCosmeticVisible = true;
+	UFUNCTION()
+	void OnRep_ReplayCosmeticTime();
+	float LastReplayCosmeticTime = -1.0f;
 };

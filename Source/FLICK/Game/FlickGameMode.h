@@ -94,6 +94,27 @@ struct FFlickReplayShotSetup
 	float Power = 0.0f;
 };
 
+// Only events that actually happened in the recorded shot are replayed.
+struct FFlickReplayEffectEvent
+{
+	float Time = 0.0f;
+	FVector Location = FVector::ZeroVector;
+	FVector Direction = FVector::ZeroVector;
+	FLinearColor Color = FLinearColor::White;
+	EFlickFeedbackKind Kind = static_cast<EFlickFeedbackKind>(0);
+	float Strength = 0.0f;
+	int32 Style = 0;
+	TWeakObjectPtr<AFlickWorldFeedback> Playback;
+	TWeakObjectPtr<AFlickWorldFeedback> LiveFeedback;
+};
+
+struct FFlickBotLoadout
+{
+	int32 Skin = 0;
+	TArray<int32> Effects;
+	EFlickLineupPreset Lineup = EFlickLineupPreset::Balanced;
+};
+
 USTRUCT(BlueprintType)
 struct FFlickBotDifficultySettings
 {
@@ -611,6 +632,9 @@ public:
 	float FrontendArenaFillLightMultiplier = 1.18f;
 
 private:
+	friend class FFlickReplayCosmeticsTest;
+	friend class FFlickReplayCosmeticReviewTest;
+	friend class FFlickBotLoadoutsTest;
 	friend class FFlickOneVsOneLightingTest;
 	friend class FFlickBobGameplayTest;
 	friend class FFlickBobResolutionReliabilityTest;
@@ -659,6 +683,9 @@ private:
 	void EnsureActivePlayerClasses(int32 PlayersPerTeam);
 	void RandomizeOtherLocalPlayerClasses(int32 PlayersPerTeam);
 	EFlickLineupPreset PickRandomPlayerClass() const;
+	void ResetBotLoadouts();
+	bool IsBotLoadoutSeat(EFlickTeam Team, int32 Slot) const;
+	const FFlickBotLoadout& GetBotLoadout(EFlickTeam Team, int32 Slot) const;
 	void ApplyPendingPlayerClasses();
 	TArray<AFlickPlayerState*> GetPrivateMatchParticipants() const;
 	void AutoAssignPrivateMatchSlots();
@@ -853,9 +880,11 @@ private:
 	TMap<int32, float> ResolutionFirstImpactTimes;
 	TMap<int32, float> ResolutionFirstOpponentImpactTimes;
 	TMap<int32, float> ResolutionEliminationTimes;
-	TSet<int32> ReplayPresentedEliminationPieceIds;
 	TArray<FFlickRoundReplayFrame> RoundReplayFrames;
 	TArray<FFlickReplayShotSetup> ReplayShotSetups;
+	mutable TArray<FFlickReplayEffectEvent> ReplayEffectEvents;
+	mutable TMap<int32, FFlickBotLoadout> BotLoadouts;
+	int32 BotThemeOffset = 0;
 	float LastReplayCaptureTime = -100.0f;
 	float CinematicReplayElapsed = 0.0f;
 	float CinematicReplaySourceStart = 0.0f;

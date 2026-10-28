@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+#include "Tests/FlickCosmeticShaderChecks.h"
 #include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickTrailStyle.h"
 #include "Engine/Engine.h"
@@ -24,17 +25,7 @@ bool FFlickPuckTrailTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Trails use transparency, not opaque arena strips"), Material->GetBlendMode(), BLEND_Additive);
 		TestTrue(TEXT("Trail shader is unlit"), Material->GetShadingModels().HasShadingModel(MSM_Unlit));
 #if WITH_EDITOR
-		const FExpressionInput* Emissive = Material->GetMaterial()->GetExpressionInputForProperty(MP_EmissiveColor);
-		const UMaterialExpressionMultiply* Glow = Emissive ? Cast<UMaterialExpressionMultiply>(Emissive->Expression) : nullptr;
-		TestTrue(TEXT("Vertex palette actually drives emission (RGB output is unnamed)"),
-			Glow && Cast<UMaterialExpressionVertexColor>(Glow->A.Expression) != nullptr);
-		const FExpressionInput* Opacity = Material->GetMaterial()->GetExpressionInputForProperty(MP_Opacity);
-		const UMaterialExpressionMultiply* Fade = Opacity ? Cast<UMaterialExpressionMultiply>(Opacity->Expression) : nullptr;
-		const UMaterialExpressionCustom* Mask = Fade ? Cast<UMaterialExpressionCustom>(Fade->B.Expression) : nullptr;
-		bool bConnectedMask = Mask && Mask->Inputs.Num() == 3;
-		if (Mask) for (const FCustomInput& Input : Mask->Inputs) bConnectedMask &= Input.Input.Expression != nullptr;
-		TestTrue(TEXT("Analytic masks have UV, shape and animation inputs connected"), bConnectedMask);
-		TestTrue(TEXT("Lifetime uses vertex alpha, not vertex RGB"), Fade && Fade->A.OutputIndex == 4);
+		FlickCosmeticShaderChecks::Verify(*this,*Material->GetMaterial());
 #endif
 	}
 	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
@@ -83,6 +74,10 @@ bool FFlickPuckTrailTest::RunTest(const FString& Parameters)
 					TestTrue(Case + TEXT("finite vertices and UVs"), bFinite);
 					TestTrue(Case + TEXT("real per-point fade and transparent tail cap"), MaximumAlpha > 0 && MaximumAlpha < 255 && MinimumAlpha == 0);
 				}
+				Piece->SetActorLocation(Piece->GetActorLocation()+FVector(75,0,0));
+				Piece->Tick(.25f);
+				TestTrue(Case + TEXT("brief frame hitch keeps a continuous moving wake"),Mesh->IsVisible());
+				TestTrue(Case + TEXT("hitch sampling retains the same geometry budget"),Mesh->GetProcMeshSection(0)->ProcVertexBuffer.Num() <= 672);
 				for (int32 Frame = 0; Frame < FPS * 1.1f; ++Frame) Piece->Tick(1.0f / FPS);
 				TestFalse(Case + TEXT("stationary trail finishes fading"), Mesh->IsVisible());
 				Piece->SetActorLocation(FVector(5000,100,20)); Piece->Tick(1.0f / FPS);

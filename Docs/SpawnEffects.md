@@ -82,3 +82,13 @@ Condition failed` assertions before the selected project tests execute. Check ea
 selected test's actual `Result={Success}` entry rather than treating those startup
 assertions as a project-test result. Packaged builds and live multiplayer have not
 been exercised for this update.
+
+## Visual refinement — 2026-10-28
+
+Arrivals now use shaded analytic masks, fine cores with softer light falloff,
+short depth fades, smoother seals and assembly details. Shafts have a soft
+light curtain, Galaxy a nebula layer, and hot arrivals tapered sparks. Cryo's
+solid facets share the new masked crystal/foil surface with knockouts. Age
+drives shader animation as well as geometry. The shared material builder
+rebuilds the existing assets; Basic Drop stays clean. See `EffectsVisualUpgrade.md`
+for implementation and `Deliverables/Effects-Upgrade-2026-10-28` for verification.

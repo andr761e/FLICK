@@ -14,6 +14,8 @@ void AFlickGameMode::BeginResolutionTracking(
 	}
 	RoundReplayFrames.Reset();
 	ReplayShotSetups.Reset();
+	for (const auto& Event : ReplayEffectEvents) if (Event.Playback.IsValid()) Event.Playback->Destroy();
+	ReplayEffectEvents.Reset();
 	LastReplayCaptureTime = -100.0f;
 	bReplayPlayedForResolution = false;
 	ResolutionElapsed = 0.0f;
@@ -42,7 +44,6 @@ void AFlickGameMode::BeginResolutionTracking(
 	ResolutionFirstImpactTimes.Reset();
 	ResolutionFirstOpponentImpactTimes.Reset();
 	ResolutionEliminationTimes.Reset();
-	ReplayPresentedEliminationPieceIds.Reset();
 	ReplayPrimaryFocusPieceId = INDEX_NONE;
 	ReplayKnockoutFocusPieceId = INDEX_NONE;
 	ReplayFocusSwitchSourceTime = TNumericLimits<float>::Max();
@@ -220,7 +221,6 @@ void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 	bCinematicReplayActive = true;
 	bReplayPlayedForResolution = true;
 	bReplayLaunchCuePlayed = false;
-	ReplayPresentedEliminationPieceIds.Reset();
 	const EFlickTeam WinningTeam = Outcome == EFlickMatchOutcome::Player1Wins
 		? EFlickTeam::Player1 : EFlickTeam::Player2;
 	const EFlickTeam LosingTeam = GetOpposingTeam(WinningTeam);
@@ -303,6 +303,8 @@ void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 			Piece->BeginReplayPresentation();
 		}
 	}
+	for (const auto& Event : ReplayEffectEvents)
+		if (Event.LiveFeedback.IsValid()) Event.LiveFeedback->Destroy();
 	TestArenaActor->BeginReplayPresentation();
 	ApplyCinematicReplayTime(CinematicReplaySourceStart);
 
@@ -463,6 +465,7 @@ void AFlickGameMode::ApplyCinematicReplayTime(const float SourceTime)
 		{
 			bVisible = SourceTime < *EliminationTime;
 		}
+		Piece->SetReplayCosmeticTime(SourceTime);
 		Piece->ApplyReplayPresentation(BlendedTransform, bVisible);
 		if (Piece->GetPieceId() == FocusPieceId)
 		{
@@ -476,52 +479,22 @@ void AFlickGameMode::ApplyCinematicReplayTime(const float SourceTime)
 		}
 	}
 
-	// Live elimination feedback is transient and has expired by the time the
-	// replay starts. Recreate it exactly once when replay time crosses each
-	// recorded ring-out, without re-running elimination gameplay or scoring.
-	for (const TPair<int32, float>& Elimination : ResolutionEliminationTimes)
+	// Reuse the original cosmetic event, not a fresh gameplay elimination.
+	for (FFlickReplayEffectEvent& Event : ReplayEffectEvents)
 	{
-		if (SourceTime < Elimination.Value
-			|| ReplayPresentedEliminationPieceIds.Contains(Elimination.Key))
+		if (SourceTime < Event.Time) continue;
+		if (!Event.Playback.IsValid() && AreImpactEffectsEnabled())
 		{
-			continue;
-		}
-
-		AFlickPiece* EliminatedPiece = nullptr;
-		for (AFlickPiece* Piece : Pieces)
-		{
-			if (Piece && IsValid(Piece) && Piece->GetPieceId() == Elimination.Key)
+			AFlickWorldFeedback* Feedback = GetWorld()->SpawnActor<AFlickWorldFeedback>(
+				AFlickWorldFeedback::StaticClass(), Event.Location, FRotator::ZeroRotator);
+			if (Feedback)
 			{
-				EliminatedPiece = Piece;
-				break;
+				Feedback->InitializeFeedback(Event.Kind, Event.Color, Event.Strength,
+					Event.Direction, Event.Style, PuckArrivalDuration);
+				Event.Playback = Feedback;
 			}
 		}
-		if (!EliminatedPiece)
-		{
-			continue;
-		}
-
-		const FVector ArenaLocation = ArenaActor ? ArenaActor->GetActorLocation() : FVector::ZeroVector;
-		const float ActiveArenaRadius = ArenaActor ? ArenaActor->GetRadius() : ArenaRadius;
-		FVector EdgeDirection(
-			EliminatedPiece->GetActorLocation().X - ArenaLocation.X,
-			EliminatedPiece->GetActorLocation().Y - ArenaLocation.Y,
-			0.0f);
-		if (!EdgeDirection.Normalize())
-		{
-			EdgeDirection = FVector::ForwardVector;
-		}
-		const FVector FeedbackLocation = ArenaLocation
-			+ EdgeDirection * (ActiveArenaRadius - 20.0f)
-			+ FVector(0.0f, 0.0f, ArenaSurfaceZ + 22.0f - ArenaLocation.Z);
-		SpawnWorldFeedback(
-			FeedbackLocation,
-			GetTeamColor(EliminatedPiece->GetTeam()),
-			EFlickFeedbackKind::Elimination,
-			1.0f,
-			EdgeDirection,
-			EliminatedPiece->GetPuckEffect(2));
-		ReplayPresentedEliminationPieceIds.Add(Elimination.Key);
+		if (Event.Playback.IsValid()) Event.Playback->SetReplayAge(SourceTime - Event.Time);
 	}
 	if (!bFoundFocusPiece && VisiblePieceCount > 0)
 	{
@@ -592,7 +565,8 @@ void AFlickGameMode::FinishCinematicRoundReplay(const bool bCompleteRound)
 	PendingReplayOutcome = EFlickMatchOutcome::Continue;
 	RoundReplayFrames.Reset();
 	ReplayShotSetups.Reset();
-	ReplayPresentedEliminationPieceIds.Reset();
+	for (const auto& Event : ReplayEffectEvents) if (Event.Playback.IsValid()) Event.Playback->Destroy();
+	ReplayEffectEvents.Reset();
 	bReplayLaunchCuePlayed = false;
 	ReplayPrimaryFocusPieceId = INDEX_NONE;
 	ReplayKnockoutFocusPieceId = INDEX_NONE;
@@ -1746,6 +1720,22 @@ void AFlickGameMode::SpawnWorldFeedback(
 	const FVector& BiasDirection,
 	const int32 Style) const
 {
+	int32 RecordedEventIndex = INDEX_NONE;
+	const AFlickGameState* EffectState = GetFlickGameState();
+	if (!bCinematicReplayActive && bTestArenaMode && !RoundReplayFrames.IsEmpty()
+		&& EffectState && EffectState->MatchPhase == EFlickMatchPhase::ResolvingPhysics
+		&& (FeedbackKind == EFlickFeedbackKind::Elimination || FeedbackKind == EFlickFeedbackKind::Spawn))
+	{
+		FFlickReplayEffectEvent& Event = ReplayEffectEvents.AddDefaulted_GetRef();
+		Event.Time = ResolutionElapsed;
+		Event.Location = Location;
+		Event.Color = Color;
+		Event.Kind = FeedbackKind;
+		Event.Strength = Strength;
+		Event.Direction = BiasDirection;
+		Event.Style = Style;
+		RecordedEventIndex = ReplayEffectEvents.Num() - 1;
+	}
 	if (!GetWorld() || !AreImpactEffectsEnabled())
 	{
 		return;
@@ -1768,6 +1758,8 @@ void AFlickGameMode::SpawnWorldFeedback(
 			LockerSpawnFeedback = Feedback;
 		}
 		Feedback->InitializeFeedback(FeedbackKind, Color, Strength, BiasDirection, Style, PuckArrivalDuration);
+		if (ReplayEffectEvents.IsValidIndex(RecordedEventIndex))
+			ReplayEffectEvents[RecordedEventIndex].LiveFeedback = Feedback;
 	}
 }
 
@@ -1844,6 +1836,12 @@ AFlickPiece* AFlickGameMode::SpawnPiece(
 				break;
 			}
 		}
+	}
+	if (IsBotLoadoutSeat(Team, OwningPlayerSlot))
+	{
+		const FFlickBotLoadout& Loadout = GetBotLoadout(Team, OwningPlayerSlot);
+		Skin = Loadout.Skin;
+		Effects = Loadout.Effects;
 	}
 	Piece->SetPuckSkin(Skin);
 	Piece->SetPuckEffects(Effects);

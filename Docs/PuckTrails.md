@@ -41,8 +41,8 @@ DefaultGame.ini. Regenerate a missing asset with:
 & "$env:FLICK_UNREAL_ENGINE_ROOT\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" .\FLICK.uproject -unattended -nop4 -ExecutePythonScript="Tools/Build-FlickTrailMaterial.py"
 ```
 
-The script reuses an existing graph and validates/repairs its vertex-colour wire;
-it does not delete or replace the graph.
+The script rebuilds the graph at its existing asset path from the shared
+`FlickCosmeticMaterial.py` authoring code and `Shaders/FlickCosmeticMasks.hlsl`.
 Automated coverage: `FLICK.Cosmetics.PuckTrails` exercises every non-None trail at
 30/60/120 FPS, transparent vertex fades, bounded geometry, cleanup and teleport
 handling. Locker swatches share the same palettes as live trails.
@@ -59,3 +59,11 @@ handling. Locker swatches share the same palettes as live trails.
   failed` startup errors before the selected tests begin. Those are not new trail
   test failures. Full test log: `Saved/Logs/PuckTrailTests.log`.
 - A packaged build and live multiplayer session were not run.
+
+## Visual refinement — 2026-10-28
+
+All twelve trails now share shaded, exposure-compensated masks, fine cores,
+soft intersections and animated flow. Ribbons bank toward low cameras and hot
+particles align their streaks with motion. Brief hitches retain the newest
+bounded samples; teleports still clear history. See `EffectsVisualUpgrade.md`
+and `Deliverables/Effects-Upgrade-2026-10-28` for current evidence and checks.

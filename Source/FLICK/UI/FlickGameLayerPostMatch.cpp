@@ -1,5 +1,6 @@
 #include "UI/FlickGameLayerPrivate.h"
 #include "Player/FlickPostMatchPresentationComponent.h"
+#include "Fonts/FontMeasure.h"
 
 
 
@@ -153,51 +154,64 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
   {
    const auto Canvas = WinnerCanvas.Pin();
    const FVector2D CanvasSize = Canvas.IsValid() ? Canvas->GetCachedGeometry().GetLocalSize() : LayerLocalSize;
-   FVector2D Screen(CanvasSize.X * .5f, CanvasSize.Y * .65f);
+   const auto* State = GetScoreboardGameState();
+   const int32 Count = State ? FMath::Clamp(State->PlayersPerTeam, 1, 3) : 1;
+   // Follow the pucks horizontally, but keep a stable bottom row with enough
+   // spacing for every card even while the camera pulls back.
+   float CenterX = CanvasSize.X * .5f;
+   float Spacing = 269.f;
    int32 Width = 0, Height = 0;
    if (PlayerController.IsValid() && Presentation())
    {
     PlayerController->GetViewportSize(Width, Height);
-    if (Width > 0 && Height > 0 && PlayerController->ProjectWorldLocationToScreen(
-     Presentation()->GetWinnerPosition(Slot) + FVector(0, -100, -20), Screen))
+    FVector2D First, Last;
+    if (Width > 0 && Height > 0
+     && PlayerController->ProjectWorldLocationToScreen(Presentation()->GetWinnerPosition(0), First)
+     && PlayerController->ProjectWorldLocationToScreen(Presentation()->GetWinnerPosition(Count - 1), Last))
     {
-     // Use the puck's center for horizontal alignment; the point in front of
-     // it supplies only the label height (perspective otherwise splays labels).
-     FVector2D PuckCenter;
-     if (PlayerController->ProjectWorldLocationToScreen(Presentation()->GetWinnerPosition(Slot), PuckCenter))
-      Screen.X = PuckCenter.X;
      const FVector2D FullSize(Width, Height);
-     // Canvas units are after FLICK's DPI scaler. LayerLocalSize is before it;
-     // mixing the two caused labels to drift away from their pucks.
      const FVector2D FrameSize = FlickPresentationFrame::GetContainedSize(FullSize);
-     Screen = (Screen - (FullSize - FrameSize) * .5f)
-      * FVector2D(CanvasSize.X / FrameSize.X, CanvasSize.Y / FrameSize.Y);
+     const float Scale = CanvasSize.X / FrameSize.X;
+     CenterX = ((First.X + Last.X) * .5f - (FullSize.X - FrameSize.X) * .5f) * Scale;
+     if (Count > 1) Spacing = FMath::Max(269.f, static_cast<float>(FMath::Abs(Last.X - First.X) * Scale / (Count - 1)));
     }
    }
-   return FMargin(Screen.X, Screen.Y, 0, 0);
+   if (Count > 1) Spacing = FMath::Min(Spacing, FMath::Max(269.f, static_cast<float>((CanvasSize.X - 293.f) / (Count - 1))));
+   const float HalfRow = (245.f + (Count - 1) * Spacing) * .5f;
+   CenterX = FMath::Clamp(CenterX, HalfRow + 24.f, FMath::Max(HalfRow + 24.f, static_cast<float>(CanvasSize.X) - HalfRow - 24.f));
+   const float X = CenterX + (Slot - (Count - 1) * .5f) * Spacing;
+   return FMargin(X, FMath::Max(160.f, static_cast<float>(CanvasSize.Y) - 252.f), 0, 0);
   })
-  [SNew(SBox).WidthOverride(245).HeightOverride(108).Visibility_Lambda([this, Slot, Presentation]()
+  [SNew(SBox).WidthOverride(245).HeightOverride(128).Visibility_Lambda([this, Slot, Presentation]()
   {
    const auto* State = GetScoreboardGameState();
    const auto* View = Presentation();
    return View && View->GetWinnerStatsOpacity() > 0.0f && State && State->WinnerTeam != EFlickTeam::None && Slot < State->PlayersPerTeam
     ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
   })
+   [SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(10)
+    .BackgroundColor(Ink.CopyWithNewOpacity(.97f)).AccentColor(Cyan.CopyWithNewOpacity(.65f)).UseAccentForOutline(true)
+    .Padding(FMargin(12, 10))
    [SNew(SVerticalBox)
     + SVerticalBox::Slot().AutoHeight()
     [SNew(SBox).HeightOverride(28)
-     [SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
      [CenteredLine(TAttribute<FText>::CreateLambda([this, Slot]()
       {
        const auto* State = GetScoreboardGameState();
        FString Name = State ? GetScoreboardPlayerName(State->WinnerTeam, Slot).ToString() : FString();
        Name.ReplaceInline(TEXT("\r"), TEXT(" "));
        Name.ReplaceInline(TEXT("\n"), TEXT(" "));
-       // Keep unusually long display names readable rather than shrinking
-       // them to tiny text. The full name remains on the summary scoreboard.
-       if (Name.Len() > 28) Name = Name.Left(25) + TEXT("...");
+       // Elide by rendered width, keeping a readable font size. Character
+       // limits alone do not account for wide names or Unicode glyphs.
+       const auto Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+       const FSlateFontInfo Font = UiFont(18, true);
+       if (Measure->Measure(Name, Font).X > 213.f)
+       {
+        while (Name.Len() > 1 && Measure->Measure(Name + TEXT("..."), Font).X > 213.f) Name.LeftChopInline(1);
+        Name += TEXT("...");
+       }
        return FText::FromString(Name);
-      }), 18, Paper)]]]
+      }), 18, Paper)]]
     + SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0)
     [SNew(SBox).HeightOverride(19)
      [CenteredLine(TAttribute<FText>::CreateLambda([this, Slot]()
@@ -228,7 +242,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
       && State->DecisiveShotTurn > 0 && State->DecisiveShotTeam == State->WinnerTeam
       && State->DecisiveShotPlayerSlot == Slot ? TEXT("DECISIVE SHOT") : TEXT(""));
     }), 11, Brand)]]
-   ]];
+   ]]];
  }
  const auto DecisiveMoment = [this]()
  {
@@ -239,6 +253,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
   FString PlayerName = GetScoreboardPlayerName(State->DecisiveShotTeam, State->DecisiveShotPlayerSlot).ToString();
   PlayerName.ReplaceInline(TEXT("\r"), TEXT(" "));
   PlayerName.ReplaceInline(TEXT("\n"), TEXT(" "));
+  if (PlayerName.Len() > 28) PlayerName = PlayerName.Left(25) + TEXT("...");
   return FText::FromString(FString::Printf(TEXT("%s  /  %s  /  ROUND %d, SHOT %d"),
    State->bDecisiveShotSelfKnockout ? TEXT("DECISIVE SELF-KNOCKOUT") : TEXT("DECISIVE SHOT"),
    *PlayerName,
@@ -248,21 +263,21 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
  + SOverlay::Slot()
  [SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0, 0, 0, .18f))
   .Visibility_Lambda([ShowDetails]() { return ShowDetails() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })]
- + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(24, 32)
+ + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(24, 24)
+ [SNew(SBox).WidthOverride(700)
+  [SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(14)
+   .BackgroundColor(Ink.CopyWithNewOpacity(.97f)).AccentColor(Cyan.CopyWithNewOpacity(.65f)).UseAccentForOutline(true)
+   .Padding(FMargin(20, 12))
  [SNew(SVerticalBox)
   + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
   [Text(TAttribute<FText>::CreateLambda([this]()
    { const auto* State = GetScoreboardGameState(); return FText::FromString(!State || State->WinnerTeam == EFlickTeam::None ? TEXT("MATCH DRAW")
      : State->WinnerTeam == EFlickTeam::Player1 ? TEXT("BLUE WINS") : TEXT("ORANGE WINS")); }), 36, Paper)]
   + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 8)
-  [SNew(SBox).HeightOverride(20).WidthOverride_Lambda([WinnerCanvas]()
-   {
-    const auto Canvas = WinnerCanvas.Pin();
-    return Canvas.IsValid() ? FMath::Clamp(static_cast<float>(Canvas->GetCachedGeometry().GetLocalSize().X) - 80.0f, 1.0f, 1100.0f) : 1100.0f;
-   })
+  [SNew(SBox).HeightOverride(22).WidthOverride(660)
    [SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
     [CenteredLine(TAttribute<FText>::CreateLambda(DecisiveMoment), 11, Brand)]]]
- ]
+ ]]]
  + SOverlay::Slot()
  [SNew(SBorder).BorderImage(FAppStyle::GetBrush("NoBrush")).Padding(0)
   .Visibility(EVisibility::HitTestInvisible)

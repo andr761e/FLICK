@@ -126,17 +126,26 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLockerPage(const TSharedRef<SWidget>& 
 				+ SOverlay::Slot().VAlign(VAlign_Bottom).Padding(0, 0, 0, 8)
 				[
 					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+					+ SVerticalBox::Slot().AutoHeight()
+					[SNew(SBox).HeightOverride(20).VAlign(VAlign_Center)
+						[SNew(STextBlock).Tag(TEXT("LockerPreviewCategoryName")).Text_Lambda([this]() {
+							return FText::FromString(FlickCosmeticCatalog::GetCategoryName(SelectedLockerCategory));
+						}).Font(DisplayFont(10)).ColorAndOpacity(Cyan).Justification(ETextJustify::Center)]]
+					+ SVerticalBox::Slot().AutoHeight()
+					[SNew(SBox).HeightOverride(36)
+					[SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly).HAlign(HAlign_Center).VAlign(VAlign_Center)
 					[SNew(STextBlock).Tag(TEXT("LockerPreviewName")).Text_Lambda([this]() {
-						const FString CategoryName = FlickCosmeticCatalog::IsPuckCategory(SelectedLockerCategory)
-							? GetPieceArchetypeName(FlickCosmeticCatalog::GetPuckArchetype(SelectedLockerCategory)) : FlickCosmeticCatalog::GetCategoryName(SelectedLockerCategory);
-						return FText::FromString(CategoryName + TEXT("  //  ") + FlickCosmeticCatalog::GetItems(SelectedLockerCategory)[GetSelectedCosmeticIndex(SelectedLockerCategory)]);
-					}).Font(DisplayFont(21)).ColorAndOpacity(Paper).AutoWrapText(true).Justification(ETextJustify::Center)]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 5, 0, 14)
-					[SNew(STextBlock).Text(FText::FromString(TEXT("EQUIPPED"))).Font(DisplayFont(10)).ColorAndOpacity(Brand)]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+						return FText::FromString(FlickCosmeticCatalog::GetItems(SelectedLockerCategory)[GetSelectedCosmeticIndex(SelectedLockerCategory)]);
+					}).Font(DisplayFont(22)).ColorAndOpacity(Paper).AutoWrapText(false).Justification(ETextJustify::Center)]]]
+					+ SVerticalBox::Slot().AutoHeight()
+					[SNew(SBox).HeightOverride(28).VAlign(VAlign_Top).Padding(0, 4, 0, 0)
+						[SNew(STextBlock).Text(FText::FromString(TEXT("EQUIPPED"))).Font(DisplayFont(10)).ColorAndOpacity(Brand).Justification(ETextJustify::Center)]]
+					+ SVerticalBox::Slot().AutoHeight()
+					[SNew(SBox).HeightOverride(44).HAlign(HAlign_Center).VAlign(VAlign_Center)
+					[SNew(SOverlay)
+					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 					[
-						SNew(SHorizontalBox).Visibility_Lambda([IsPuck]() { return IsPuck() ? EVisibility::Visible : EVisibility::Collapsed; })
+						SNew(SHorizontalBox).Visibility_Lambda([IsPuck]() { return IsPuck() ? EVisibility::Visible : EVisibility::Hidden; })
 						+ SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Tag(TEXT("LockerRotatePrevious")).ButtonStyle(&TransparentButtonStyle).ContentPadding(10).OnClicked_Lambda([Rotate]() { Rotate(-20); return FReply::Handled(); })
 							[SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(16)).ColorAndOpacity(Paper)]]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -149,6 +158,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLockerPage(const TSharedRef<SWidget>& 
 						+ SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Tag(TEXT("LockerRotateNext")).ButtonStyle(&TransparentButtonStyle).ContentPadding(10).OnClicked_Lambda([Rotate]() { Rotate(20); return FReply::Handled(); })
 							[SNew(STextBlock).Text(FText::FromString(TEXT(">"))).Font(UiFont(16)).ColorAndOpacity(Paper)]]
 					]
+					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+					[SNew(STextBlock).Text(FText::FromString(TEXT("AUTOMATIC PREVIEW"))).Font(DisplayFont(9)).ColorAndOpacity(Muted)
+						.Visibility_Lambda([this]() { return SelectedLockerCategory >= FlickCosmeticCatalog::TrailCategory
+							? EVisibility::HitTestInvisible : EVisibility::Collapsed; })]]]
 				]
 			]
 		]

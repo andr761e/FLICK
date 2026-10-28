@@ -1,4 +1,5 @@
 #include "Feedback/FlickWorldFeedback.h"
+#include "Feedback/FlickCosmeticGeometry.h"
 #include "Core/FlickSpawnStyle.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -54,13 +55,13 @@ namespace
 			const FVector& X = FVector::ForwardVector, const FVector& Y = FVector::RightVector)
 		{
 			const int32 A = Vertices.Num();
-			for (int32 I = 0; I <= 48; ++I)
+			for (int32 I = 0; I <= 64; ++I)
 			{
-				const float T = I/48.f, Angle = Phase + T*Span;
+				const float T = I/64.f, Angle = Phase + T*Span;
 				const FVector D = X*FMath::Cos(Angle) + Y*FMath::Sin(Angle);
 				Pair(D*R + FVector(0,0,Z), D, W, C, T);
 			}
-			Join(A,49);
+			Join(A,65);
 		}
 		void Crystal(const FVector& Base, float Angle, float Width, float Height, const FLinearColor& C)
 		{
@@ -118,16 +119,23 @@ void AFlickWorldFeedback::InitializeSpawnEffect()
 		SpawnGeometry->RegisterComponent();
 		for (int32 Section = 0; Section < 4; ++Section)
 		{
-			UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(Source, this);
+			UMaterialInterface* Layer = Source;
+			if (Section == 3 && Look.Pattern == ESpawnPattern::Ice)
+				if (auto* Facet = LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Cosmetics/Knockouts/M_PuckFacet.M_PuckFacet"))) Layer = Facet;
+			UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(Layer, this);
 			SpawnMaterials.Add(Material); SpawnGeometry->SetMaterial(Section, Material);
 		}
 	}
 	for (int32 Section = 0; Section < SpawnMaterials.Num(); ++Section)
 	{
 		// The spawn shader compensates exposure, so use restrained scene-linear energy.
-		SpawnMaterials[Section]->SetScalarParameterValue(TEXT("GlowStrength"), Look.Glow);
+		SpawnMaterials[Section]->SetScalarParameterValue(TEXT("GlowStrength"),Section == 3 && Look.Pattern == ESpawnPattern::Ice ? 1.35f
+			: Look.Glow*.28f*(Section == 0 ? .72f : Section == 2 ? 1.15f : 1.f));
 		SpawnMaterials[Section]->SetScalarParameterValue(TEXT("MaskShape"), Section == 2 ? Look.ParticleShape
-			: Section == 3 ? (Look.Pattern == ESpawnPattern::Fire || Look.Pattern == ESpawnPattern::Spirit ? 7 : 3)
+			: Section == 3 ? (Look.Pattern == ESpawnPattern::Fire || Look.Pattern == ESpawnPattern::Spirit ? 7
+				: Look.Pattern == ESpawnPattern::Galaxy ? 8
+				: Look.Pattern == ESpawnPattern::Beam || Look.Pattern == ESpawnPattern::Pulse
+					|| Look.Pattern == ESpawnPattern::Prism || Look.Pattern == ESpawnPattern::Gold ? 10 : 3)
 			: Section == 1 && (Look.Pattern == ESpawnPattern::Fire || Look.Pattern == ESpawnPattern::Spirit) ? 6 : 0);
 	}
 	UpdateSpawnEffect();
@@ -146,6 +154,8 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 	const float Pulse = FMath::Exp(-FMath::Square((Age-Landing)/.13f));
 	const float Strength = FMath::Lerp(.7f,1.f,FMath::Clamp(Appearance.Strength,0.f,1.f));
 	const float R = Look.Radius, H = Look.Height;
+	for (UMaterialInstanceDynamic* Material : SpawnMaterials)
+		Material->SetScalarParameterValue(TEXT("EffectAge"),Age);
 	const auto Color = [&](float T, float Opacity)
 	{
 		const FLinearColor C = Pattern == ESpawnPattern::Prism ? FlickSpawnStyle::Spectrum(T)
@@ -164,6 +174,7 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 	}
 	FSpawnBatch Rings, Ribbons, Motes, Facets;
 	// Ground seals stay outside the puck footprint. No oversized white core flash.
+	Rings.Ring(R,9.f,1.2f,0,Color(.2f,.12f));
 	Rings.Ring(R,2.5f,1,Age*.65f,Color(.15f,.6f));
 	Rings.Ring(R+12+Progress*8,1.4f,1.5f,-Age*.8f,Color(.8f,.28f),PI*1.65f);
 	Rings.Ring(R+12+Smooth(Landing,Duration,Age)*34,4.5f,2,0,Color(.5f,Pulse*.85f));
@@ -173,9 +184,27 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 		const FVector D(FMath::Cos(A),FMath::Sin(A),0);
 		Rings.Quad(D*(R+8)+FVector(0,0,2),D,FVector(-D.Y,D.X,0),3.5f,.7f,Color(I/12.f,.35f));
 	}
+	// Short, staggered arcs make a machined assembly seal rather than three
+	// identical neon hoops. Their landing release follows the real arrival time.
+	for (int32 I = 0; I < 16; ++I)
+	{
+		const float A = I*PI/8 - Age*.22f;
+		const float Radius = R*.88f + Pulse*5;
+		const FVector D(FMath::Cos(A),FMath::Sin(A),0), Tangent(-D.Y,D.X,0);
+		Rings.Quad(D*Radius+FVector(0,0,2),Tangent,D,3.4f,.6f,Color(I/16.f,.28f+.4f*Pulse));
+	}
 	const bool bBeam = Pattern == ESpawnPattern::Pulse || Pattern == ESpawnPattern::Beam || Pattern == ESpawnPattern::Prism || Pattern == ESpawnPattern::Gold;
 	if (bBeam)
 	{
+		const float Curtain = (1-Smooth(.72f,1.f,Progress))*.16f;
+		if (Pattern == ESpawnPattern::Prism)
+		{
+			for (int32 Band = 0; Band < 7; ++Band)
+				Facets.Quad(Right*((Band-3)*R*.22f)+FVector(0,0,H*.5f+3),Right,FVector::UpVector,
+					R*.19f,H*.48f,Color(Band/7.f,Curtain));
+		}
+		else Facets.Quad(FVector(0,0,H*.5f+3),Right,FVector::UpVector,
+			R*.95f,H*.48f,Color(.2f,Curtain));
 		const int32 Shafts = Pattern == ESpawnPattern::Prism ? 7 : Pattern == ESpawnPattern::Beam ? 10 : 6;
 		for (int32 I = 0; I < Shafts; ++I)
 		{
@@ -237,6 +266,13 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 			const float A = I*2*PI/10, Scale = Smooth(0,.4f,Progress)*(1-Smooth(Landing+.08f,Duration,Age));
 			Facets.Crystal(FVector(FMath::Cos(A)*R,FMath::Sin(A)*R,2),A,7*Scale,
 				H*(.35f+.6f*SpawnSeed(I))*Scale,Color(SpawnSeed(I+11),.65f));
+			const FVector Base(FMath::Cos(A)*R,FMath::Sin(A)*R,2);
+			const FVector Tip = Base+FVector(FMath::Cos(A),FMath::Sin(A),5)*H*(.07f+.12f*SpawnSeed(I))*Scale;
+			const int32 Start = Ribbons.Vertices.Num();
+			Ribbons.Pair(Base,Right,.45f,Color(.8f,0),0);
+			Ribbons.Pair(FMath::Lerp(Base,Tip,.4f),Right,.65f,Color(.85f,.75f),.4f);
+			Ribbons.Pair(Tip,Right,.4f,Color(1.f,0),1);
+			Ribbons.Join(Start,3);
 		}
 	}
 	if (Pattern == ESpawnPattern::Lightning)
@@ -264,6 +300,12 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 	}
 	if (Pattern == ESpawnPattern::Galaxy)
 	{
+		for (int32 Cloud = 0; Cloud < 4; ++Cloud)
+		{
+			const float A = Cloud*PI*.5f+Age*.4f;
+			Facets.Quad(FVector(FMath::Cos(A)*R*.25f,FMath::Sin(A)*R*.25f,H*.65f),Right,Up,
+				R*.78f,R*.48f,Color(Cloud*.15f,.22f*(1-Smooth(.8f,1.f,Progress))));
+		}
 		Motes.Quad(FVector(0,0,H*.65f),Right,Up,11,11,Color(.4f,.85f));
 		const FVector X(1,0,0), Y(0,.75f,.66f);
 		for (int32 Arm = 0; Arm < 3; ++Arm)
@@ -295,6 +337,18 @@ void AFlickWorldFeedback::UpdateSpawnEffect()
 		const float Size = Pattern == ESpawnPattern::Hearts ? 5+S*4 : Pattern == ESpawnPattern::Pixel ? 2+S*4 : 1.5f+S*2;
 		Motes.Quad(FVector(FMath::Cos(A)*Radius,FMath::Sin(A)*Radius,Z),Right,Up,Size,Size,
 			Color(I/float(Look.Particles),Opacity));
+		if ((Pattern == ESpawnPattern::Sparks || Pattern == ESpawnPattern::Gold
+			|| Pattern == ESpawnPattern::Fire || Pattern == ESpawnPattern::Lightning) && I%2 == 0)
+		{
+			const FVector Head(FMath::Cos(A)*Radius,FMath::Sin(A)*Radius,Z);
+			const FVector Tail = FVector(-FMath::Sin(A),FMath::Cos(A),.6f)*(7+S*13);
+			const FVector StreakSide = FlickCosmeticGeometry::FacingSide(Tail,Right,Up);
+			const int32 Start = Ribbons.Vertices.Num();
+			Ribbons.Pair(Head-Tail,StreakSide,.35f,Color(.1f,0),0);
+			Ribbons.Pair(Head-Tail*.3f,StreakSide,.65f,Color(.35f,Opacity*.6f),.7f);
+			Ribbons.Pair(Head,StreakSide,.45f,Color(.85f,Opacity),1);
+			Ribbons.Join(Start,3);
+		}
 	}
 	Rings.Upload(*SpawnGeometry,0); Ribbons.Upload(*SpawnGeometry,1);
 	Motes.Upload(*SpawnGeometry,2); Facets.Upload(*SpawnGeometry,3);

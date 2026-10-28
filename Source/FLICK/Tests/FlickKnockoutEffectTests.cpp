@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+#include "Tests/FlickCosmeticShaderChecks.h"
 #include "Core/FlickCosmeticCatalog.h"
 #include "Core/FlickKnockoutStyle.h"
 #include "Feedback/FlickWorldFeedback.h"
@@ -40,26 +41,29 @@ bool FFlickKnockoutEffectTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Knockout surfaces are not opaque"),Material->GetBlendMode(),BLEND_Additive);
 		TestTrue(TEXT("No scene lights are needed"),Material->GetShadingModels().HasShadingModel(MSM_Unlit));
 #if WITH_EDITOR
-		const auto* E = Material->GetExpressionInputForProperty(MP_EmissiveColor);
-		const auto* Inverse = E ? Cast<UMaterialExpressionEyeAdaptationInverse>(E->Expression) : nullptr;
-		const auto* Glow = Inverse ? Cast<UMaterialExpressionMultiply>(Inverse->LightValueInput.Expression) : nullptr;
-		const auto* Power = Glow ? Cast<UMaterialExpressionPower>(Glow->A.Expression) : nullptr;
-		TestTrue(TEXT("Saturated real RGB is exposure compensated"),Power && Cast<UMaterialExpressionVertexColor>(Power->Base.Expression));
-		const auto* O = Material->GetExpressionInputForProperty(MP_Opacity);
-		const auto* Fade = O ? Cast<UMaterialExpressionMultiply>(O->Expression) : nullptr;
-		TestTrue(TEXT("Vertex alpha controls transparency"),Fade && Fade->A.OutputIndex == 4);
-		const auto* Mask = Fade ? Cast<UMaterialExpressionCustom>(Fade->B.Expression) : nullptr;
-		bool bConnected = Mask && Mask->Inputs.Num() == 3;
-		if (Mask) for (const FCustomInput& Input : Mask->Inputs) bConnected &= Input.Input.Expression != nullptr;
-		TestTrue(TEXT("Every mask input is wired"),bConnected);
+		FlickCosmeticShaderChecks::Verify(*this,*Material->GetMaterial());
 #endif
+	}
+	UMaterial* Atmosphere = LoadObject<UMaterial>(nullptr,TEXT("/Game/Cosmetics/Knockouts/M_PuckAtmosphere.M_PuckAtmosphere"));
+	if (TestNotNull(TEXT("Shared atmosphere shader exists in the cooked cosmetics directory"),Atmosphere))
+	{
+		TestEqual(TEXT("Smoke absorbs light rather than adding a neon cloud"),Atmosphere->GetBlendMode(),BLEND_Translucent);
+#if WITH_EDITOR
+		FlickCosmeticShaderChecks::Verify(*this,*Atmosphere);
+#endif
+	}
+	UMaterial* Facets = LoadObject<UMaterial>(nullptr,TEXT("/Game/Cosmetics/Knockouts/M_PuckFacet.M_PuckFacet"));
+	if (TestNotNull(TEXT("Shared crystal and foil surface is cooked with cosmetics"),Facets))
+	{
+		TestEqual(TEXT("Solid facets write depth and dissolve on expiry"),Facets->GetBlendMode(),BLEND_Masked);
+		TestTrue(TEXT("Facet studio shading needs no scene lights"),Facets->GetShadingModels().HasShadingModel(MSM_Unlit));
 	}
 	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
 		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false);
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game,false,NAME_None,nullptr,true,ERHIFeatureLevel::Num,&Settings);
 	if (!TestNotNull(TEXT("Knockout test world"),World)) return false;
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-	for (int32 I = 1; I < FlickKnockoutStyle::Count; ++I)
+	for (int32 I = 0; I < FlickKnockoutStyle::Count; ++I)
 	{
 		TArray<FVector> Reference;
 		for (int32 FPS : {30,60,120})
@@ -127,7 +131,7 @@ bool FFlickKnockoutEffectTest::RunTest(const FString& Parameters)
 	{
 		AFlickWorldFeedback* Basic = World->SpawnActor<AFlickWorldFeedback>();
 		Basic->InitializeFeedback(EFlickFeedbackKind::Elimination,FLinearColor::White,1,FVector::ZeroVector,I);
-		TestEqual(TEXT("Basic and invalid selections retain the legacy burst"),TInlineComponentArray<UProceduralMeshComponent*>(Basic).Num(),0);
+		TestEqual(TEXT("Basic and invalid selections use the clean team burst"),TInlineComponentArray<UProceduralMeshComponent*>(Basic).Num(),1);
 		Basic->Destroy();
 	}
 	World->DestroyWorld(false); GEngine->DestroyWorldContext(World);

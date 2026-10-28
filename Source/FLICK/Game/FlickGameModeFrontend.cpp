@@ -92,6 +92,8 @@ EFlickLineupPreset AFlickGameMode::GetPlayerClass(
 	const int32 PlayerSlot,
 	const bool bUseDraft) const
 {
+	if (!bUseDraft && bPlayerClassesActiveForMatch && IsBotLoadoutSeat(Team, PlayerSlot))
+		return GetBotLoadout(Team, PlayerSlot).Lineup;
 	const TArray<EFlickLineupPreset>* Classes = nullptr;
 	if (bUseDraft)
 	{
@@ -155,6 +157,43 @@ EFlickLineupPreset AFlickGameMode::PickRandomPlayerClass() const
 		EFlickLineupPreset::Control
 	};
 	return PlayableClasses[FMath::RandHelper(UE_ARRAY_COUNT(PlayableClasses))];
+}
+
+void AFlickGameMode::ResetBotLoadouts()
+{
+	BotLoadouts.Reset();
+	BotThemeOffset = FMath::RandHelper(20);
+}
+
+bool AFlickGameMode::IsBotLoadoutSeat(const EFlickTeam Team, const int32 Slot) const
+{
+	if (Team == EFlickTeam::None || Slot < 0 || Slot >= FlickTeamRules::MaximumPlayersPerTeam || bTutorialMode
+		|| IsPracticeMode()) return false;
+	return IsTrainingBotMatch() ? Team == EFlickTeam::Player2 && Slot == 0
+		: bPrivateMatchActive && !GetPrivateSlotOwner(Team, Slot);
+}
+
+const FFlickBotLoadout& AFlickGameMode::GetBotLoadout(const EFlickTeam Team, const int32 Slot) const
+{
+	const int32 Key = EncodePrivatePlayerSlot(Team, Slot);
+	if (const FFlickBotLoadout* Existing = BotLoadouts.Find(Key)) return *Existing;
+	// Skin, trail, arrival, knockout. Each row is a coordinated visual theme.
+	static constexpr int32 Themes[][4] = {
+		{0,1,1,1}, {1,2,2,2}, {2,12,13,12}, {3,5,5,5},
+		{4,11,10,10}, {5,8,9,8}, {0,3,3,3}, {1,4,4,4},
+		{2,6,7,6}, {3,9,12,13}, {4,10,11,9}, {5,7,8,18},
+		{0,1,1,0}, {2,12,13,7}, {0,3,3,11}, {5,8,9,14},
+		{3,7,8,15}, {0,10,11,16}, {3,5,5,17}, {3,5,5,19}
+	};
+	const int32 Index = (BotThemeOffset + BotLoadouts.Num()) % UE_ARRAY_COUNT(Themes);
+	FFlickBotLoadout Loadout;
+	Loadout.Skin = Themes[Index][0];
+	Loadout.Effects = {Themes[Index][1], Themes[Index][2], Themes[Index][3]};
+	// Weight only bot assignments; local human class selection keeps its rules.
+	Loadout.Lineup = GetBotDifficulty() == EFlickBotDifficulty::Easy
+		? (FMath::RandHelper(3) < 2 ? EFlickLineupPreset::Balanced : EFlickLineupPreset::Control)
+		: PickRandomPlayerClass();
+	return BotLoadouts.Add(Key, MoveTemp(Loadout));
 }
 
 void AFlickGameMode::RandomizeOtherLocalPlayerClasses(const int32 PlayersPerTeam)
@@ -493,6 +532,11 @@ EFlickPieceArchetype AFlickGameMode::GetPlayerClassPiece(
 	const int32 PlayerSlot,
 	const int32 PieceSlot) const
 {
+	if (bPlayerClassesActiveForMatch && IsBotLoadoutSeat(Team, PlayerSlot))
+	{
+		const auto& Preset = FlickPieceArchetypeRules::GetPreset(GetBotLoadout(Team, PlayerSlot).Lineup);
+		return Preset.IsValidIndex(PieceSlot) ? Preset[PieceSlot] : EFlickPieceArchetype::Standard;
+	}
 	if (!bPlayerClassesActiveForMatch)
 	{
 		return GetLoadoutPiece(Team, PieceSlot);
@@ -692,6 +736,7 @@ void AFlickGameMode::StartSelectedMatch()
 
 void AFlickGameMode::BeginSelectedMatch()
 {
+	ResetBotLoadouts();
 	PendingRematchId.Reset();
 	if (bNetworkMatchStarted && !CoordinatorMatchId.IsEmpty())
 	{
@@ -1098,6 +1143,7 @@ void AFlickGameMode::BeginTrainingActivity(const bool bAgainstBot)
 	bTrainingMode = true;
 	bTrainingEditMode = false;
 	bTrainingBotMatch = bAgainstBot;
+	ResetBotLoadouts();
 	bClassSelectionStartsTrainingBotMatch = false;
 	ResetTrainingBotThinking();
 	ResetShotClock();

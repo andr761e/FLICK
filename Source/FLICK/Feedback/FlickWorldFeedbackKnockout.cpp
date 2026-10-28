@@ -1,4 +1,5 @@
 #include "Feedback/FlickWorldFeedback.h"
+#include "Feedback/FlickCosmeticGeometry.h"
 #include "Core/FlickKnockoutStyle.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -44,13 +45,13 @@ namespace
 		void Ring(float R, float W, float Z, float Phase, FLinearColor C, float Span = 2*PI)
 		{
 			const int32 Start = Vertices.Num();
-			for (int32 I = 0; I <= 48; ++I)
+			for (int32 I = 0; I <= 64; ++I)
 			{
-				const float T = I/48.f, A = Phase+T*Span;
+				const float T = I/64.f, A = Phase+T*Span;
 				const FVector D(FMath::Cos(A),FMath::Sin(A),0);
 				Pair(D*R+FVector(0,0,Z),D,W,C,T);
 			}
-			Join(Start,49);
+			Join(Start,65);
 		}
 		void Shard(const FVector& P, const FVector& Axis, const FVector& Side, float W, float H, FLinearColor C)
 		{
@@ -104,17 +105,35 @@ void AFlickWorldFeedback::InitializeKnockoutEffect()
 		KnockoutGeometry->RegisterComponent();
 		for (int32 Section = 0; Section < 4; ++Section)
 		{
-			UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(Source,this);
+			UMaterialInterface* LayerSource = Source;
+			if (Section == 3 && (Look.Pattern == EPattern::Ice || Look.Pattern == EPattern::Hologram
+				|| Look.Pattern == EPattern::Prism || Look.Pattern == EPattern::Confetti))
+			{
+				if (auto* Facet = LoadObject<UMaterialInterface>(nullptr,
+					TEXT("/Game/Cosmetics/Knockouts/M_PuckFacet.M_PuckFacet"))) LayerSource = Facet;
+			}
+			else if (Section == 3 && (Look.Pattern == EPattern::Toxic || Look.Pattern == EPattern::Smoke
+				|| Look.Pattern == EPattern::Spirit))
+			{
+				if (auto* Atmosphere = LoadObject<UMaterialInterface>(nullptr,
+					TEXT("/Game/Cosmetics/Knockouts/M_PuckAtmosphere.M_PuckAtmosphere"))) LayerSource = Atmosphere;
+			}
+			UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(LayerSource,this);
 			KnockoutMaterials.Add(Material); KnockoutGeometry->SetMaterial(Section,Material);
 		}
 	}
 	const bool bOrganic = Look.Pattern == EPattern::Toxic || Look.Pattern == EPattern::Spirit || Look.Pattern == EPattern::Smoke;
 	for (int32 I = 0; I < KnockoutMaterials.Num(); ++I)
 	{
-		KnockoutMaterials[I]->SetScalarParameterValue(TEXT("GlowStrength"),Look.Glow);
+		KnockoutMaterials[I]->SetScalarParameterValue(TEXT("GlowStrength"),
+			I == 3 && (Look.Pattern == EPattern::Ice || Look.Pattern == EPattern::Hologram
+				|| Look.Pattern == EPattern::Prism || Look.Pattern == EPattern::Confetti) ? 1.35f
+			: I == 3 && bOrganic ? .8f
+			: Look.Glow*.27f*(I == 0 ? .72f : I == 2 ? 1.15f : 1.f));
 		KnockoutMaterials[I]->SetScalarParameterValue(TEXT("MaskShape"),I == 2 ? Look.ParticleMask
 			: I == 3 ? (bOrganic || Look.Pattern == EPattern::Galaxy ? 8 : Look.Pattern == EPattern::Fire ? 7 : 3)
-			: I == 1 && (bOrganic || Look.Pattern == EPattern::Galaxy || Look.Pattern == EPattern::Vortex) ? 6 : 0);
+			: I == 1 && (bOrganic || Look.Pattern == EPattern::Galaxy || Look.Pattern == EPattern::Vortex
+				|| Look.Pattern == EPattern::Water) ? 6 : 0);
 	}
 	UpdateKnockoutEffect();
 }
@@ -134,7 +153,8 @@ void AFlickWorldFeedback::UpdateKnockoutEffect()
 	const bool bSpectrum = Pattern == EPattern::Prism || Pattern == EPattern::Confetti;
 	const auto Color = [&](float T, float Opacity)
 	{
-		const FLinearColor C = bSpectrum ? FlickKnockoutStyle::Spectrum(T)
+		const FLinearColor C = Pattern == EPattern::Basic ? Appearance.Color
+			: bSpectrum ? FlickKnockoutStyle::Spectrum(T)
 			: FMath::Lerp(Look.Primary,Look.Secondary,FMath::Clamp(T,0.f,1.f));
 		return C.CopyWithNewOpacity(FMath::Clamp(Opacity*Envelope*Strength,0.f,1.f));
 	};
@@ -149,6 +169,22 @@ void AFlickWorldFeedback::UpdateKnockoutEffect()
 	for (UMaterialInstanceDynamic* Material : KnockoutMaterials)
 		Material->SetScalarParameterValue(TEXT("EffectAge"),Age);
 	FKnockoutBatch Rings, Ribbons, Motes, Details;
+	// A brief anamorphic glint gives the opening impact a crisp focal point.
+	// It is geometry, not a light or a whole-screen exposure flash.
+	if (Pattern != EPattern::Smoke)
+	{
+		const float Flash = FMath::Exp(-Age*18.f)*FMath::SmoothStep(0.f,.025f,Age);
+		for (int32 Axis = 0; Axis < 2; ++Axis)
+		{
+			const FVector Direction = Axis ? Up : Right, Side = Axis ? Right : Up;
+			const float Length = R*(Axis ? .32f : .8f)*Burst;
+			const int32 Start = Ribbons.Vertices.Num();
+			Ribbons.Pair(-Direction*Length,Side,.7f,Color(.65f,0),0);
+			Ribbons.Pair(FVector(0,0,8),Side,Axis ? .7f : 1.3f,Color(.85f,Flash),.5f);
+			Ribbons.Pair(Direction*Length,Side,.7f,Color(.65f,0),1);
+			Ribbons.Join(Start,3);
+		}
+	}
 	// Staged travelling waves, not a persistent spawn seal or an opaque sphere.
 	for (int32 I = 0; I < 3; ++I)
 	{
@@ -165,6 +201,7 @@ void AFlickWorldFeedback::UpdateKnockoutEffect()
 		const float Opacity = FMath::Exp(-Local*2.3f)*(Local > 0 ? (bPressure ? .65f : .4f) : 0);
 		Rings.Ring(Radius,I == 0 ? (bPressure ? 5 : 3) : 1.4f,I*2,Age*(I%2 ? -1 : 1),Color(I/2.f,Opacity),
 			Pattern == EPattern::Arcane ? PI*1.75f : 2*PI);
+		if (I == 0) Rings.Ring(Radius,11.f,1,0,Color(.25f,Opacity*.22f));
 	}
 	const bool bVortex = Pattern == EPattern::Vortex || Pattern == EPattern::Galaxy;
 	const bool bOrganic = Pattern == EPattern::Toxic || Pattern == EPattern::Spirit || Pattern == EPattern::Smoke;
@@ -270,7 +307,9 @@ void AFlickWorldFeedback::UpdateKnockoutEffect()
 		const FVector D(FMath::Cos(A),FMath::Sin(A),0), Side(-D.Y,D.X,0);
 		const float Local = FMath::Max(0.f,Age-T*.12f), Travel = 1-FMath::Exp(-Local*3.7f);
 		float Distance = R*(.35f+.65f*S)*Travel;
-		float Z = H*(.3f+.7f*T)*FMath::Sin(FMath::Min(Local/Duration,1.f)*PI)-Local*15;
+		// Ballistic fragments open quickly, then fall instead of hovering on a
+		// perfect spherical sine wave. Motion remains an analytic function of age.
+		float Z = H*(.65f+.7f*T)*Local*2.f - Local*Local*H*.95f;
 		if (Pattern == EPattern::Shock) Z *= .2f;
 		if (bOrganic || Pattern == EPattern::Hearts) Z = Local*H*.7f;
 		if (bVortex)
@@ -309,14 +348,19 @@ void AFlickWorldFeedback::UpdateKnockoutEffect()
 				Ribbons.Join(Start,3);
 			}
 		if (Pattern == EPattern::Confetti)
-			Details.Quad(P,SpinRight,SpinUp,2+S*2,4+T*4,Color(I/float(Look.Particles),Opacity));
-		if (Pattern == EPattern::Sparks || Pattern == EPattern::Gold || Pattern == EPattern::Shock || Pattern == EPattern::Prism)
+		{
+			const FVector TiltUp = SpinUp*FMath::Cos(Rotate*.7f)
+				+FVector::CrossProduct(Right,Up)*FMath::Sin(Rotate*.7f);
+			Details.Quad(P,SpinRight,TiltUp,2+S*2,4+T*4,Color(I/float(Look.Particles),Opacity));
+		}
+		if (Pattern == EPattern::Basic || Pattern == EPattern::Sparks || Pattern == EPattern::Gold || Pattern == EPattern::Shock || Pattern == EPattern::Prism)
 		{
 			const FVector Tail = D*(9+T*24)*Fade+Up*(Z*.12f);
+			const FVector StreakSide = FlickCosmeticGeometry::FacingSide(Tail,Right,Up);
 			const int32 Start = Ribbons.Vertices.Num();
-			Ribbons.Pair(P-Tail,Right,.7f,Color(T,0),0);
-			Ribbons.Pair(P-Tail*.65f,Right,.9f,Color(T,Opacity*.45f),.35f);
-			Ribbons.Pair(P,Right,.6f,Color(T,Opacity),1); Ribbons.Join(Start,3);
+			Ribbons.Pair(P-Tail,StreakSide,.7f,Color(T,0),0);
+			Ribbons.Pair(P-Tail*.65f,StreakSide,.9f,Color(T,Opacity*.45f),.35f);
+			Ribbons.Pair(P,StreakSide,.6f,Color(T,Opacity),1); Ribbons.Join(Start,3);
 		}
 		if (Pattern == EPattern::Comic && I < 16)
 		{

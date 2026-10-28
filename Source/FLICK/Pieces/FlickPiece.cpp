@@ -286,6 +286,8 @@ void AFlickPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AFlickPiece, PuckSpawnEffect);
 	DOREPLIFETIME(AFlickPiece, PuckKnockoutEffect);
 	DOREPLIFETIME(AFlickPiece, bEliminated);
+	DOREPLIFETIME(AFlickPiece, ReplayCosmeticTime);
+	DOREPLIFETIME(AFlickPiece, bReplayCosmeticVisible);
 	DOREPLIFETIME(AFlickPiece, bBobStriker);
 	DOREPLIFETIME(AFlickPiece, bHighDetailVisualsEnabled);
 	DOREPLIFETIME(AFlickPiece, bPregamePreview);
@@ -322,6 +324,16 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	UpdateArrivalVisuals();
 	UpdateCosmeticTrail(DeltaSeconds);
+	if (ReplayCosmeticTime >= 0.0f && HasTestArenaVisuals())
+	{
+		// Gameplay elimination remains authoritative, but the recorded visible
+		// puck needs its detailed mesh, fill and contact shadow on every viewer.
+		const bool bVisible = !IsHidden();
+		WorkshopMesh->SetVisibility(bVisible);
+		PieceMesh->SetCastShadow(bVisible);
+		AccentLight->SetVisibility(bVisible);
+		AccentLight->SetIntensity(bVisible ? (bUsingHighDetailPuck ? 8.0f : 11.0f) : 0.0f);
+	}
 
 	VisualTime += DeltaSeconds;
 	const bool bWasFlashing = HitFlashRemaining > 0.0f;
@@ -607,6 +619,10 @@ void AFlickPiece::BeginReplayPresentation()
 	}
 
 	PreReplayTransform = GetActorTransform();
+	TrailPoints.Reset();
+	TrailPointAges.Reset();
+	LastTrailPosition = FVector::ZeroVector;
+	TrailSampleElapsed = 0.0f;
 	bReplayPresentationActive = true;
 	PieceMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
 	PieceMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
@@ -623,11 +639,13 @@ void AFlickPiece::ApplyReplayPresentation(const FTransform& Transform, const boo
 	}
 
 	SetActorTransform(Transform, false, nullptr, ETeleportType::TeleportPhysics);
+	bReplayCosmeticVisible = bVisible;
 	SetActorHiddenInGame(!bVisible);
 }
 
 void AFlickPiece::EndReplayPresentation()
 {
+	SetReplayCosmeticTime(-1.0f);
 	if (!bReplayPresentationActive || !PieceMesh)
 	{
 		return;
@@ -648,6 +666,31 @@ void AFlickPiece::EndReplayPresentation()
 	PieceMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
 	PieceMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 	PieceMesh->PutRigidBodyToSleep();
+}
+
+void AFlickPiece::SetReplayCosmeticTime(const float SourceTime)
+{
+	const bool bChangedMode = (SourceTime >= 0.0f) != (ReplayCosmeticTime >= 0.0f);
+	ReplayCosmeticTime = SourceTime;
+	if (bChangedMode) OnRep_ReplayCosmeticTime();
+}
+
+void AFlickPiece::OnRep_ReplayCosmeticTime()
+{
+	if (ReplayCosmeticTime >= 0.0f) SetActorHiddenInGame(!bReplayCosmeticVisible);
+	else if (bEliminated) ApplyEliminatedState();
+	// Do not join the end of the live shot to its rewound starting position.
+	if (ReplayCosmeticTime < 0.0f || LastReplayCosmeticTime < 0.0f
+		|| ReplayCosmeticTime < LastReplayCosmeticTime)
+	{
+		TrailPoints.Reset();
+		TrailPointAges.Reset();
+		LastTrailPosition = FVector::ZeroVector;
+		TrailSampleElapsed = 0.0f;
+		LastReplayCosmeticTime = ReplayCosmeticTime;
+		if (CosmeticRibbon) CosmeticRibbon->SetVisibility(false);
+		if (HasTestArenaVisuals()) UpdateTestArenaVisuals();
+	}
 }
 
 void AFlickPiece::Eliminate()
@@ -728,6 +771,12 @@ void AFlickPiece::OnRep_PuckSkin()
 
 void AFlickPiece::OnRep_Eliminated()
 {
+	if (ReplayCosmeticTime >= 0.0f)
+	{
+		ApplyEliminatedState();
+		SetActorHiddenInGame(!bReplayCosmeticVisible);
+		return;
+	}
 	if (bEliminated)
 	{
 		ApplyEliminatedState();
@@ -1415,8 +1464,9 @@ void AFlickPiece::EnableTestArenaVisuals()
 void AFlickPiece::UpdateTestArenaVisuals()
 {
 	if (!HasTestArenaVisuals()) return;
+	const bool bPresented = !bEliminated || ReplayCosmeticTime >= 0.0f;
 	PieceMesh->SetVisibility(false);
-	PieceMesh->SetCastShadow(!bEliminated);
+	PieceMesh->SetCastShadow(bPresented);
 	for (USceneComponent* Child : VisualRoot->GetAttachChildren())
 	{
 		if (Child != WorkshopMesh && Child != SelectionHalo && Child != AccentLight
@@ -1425,8 +1475,8 @@ void AFlickPiece::UpdateTestArenaVisuals()
 			Child->SetVisibility(false);
 		}
 	}
-	AccentLight->SetVisibility(!bEliminated);
-	WorkshopMesh->SetVisibility(!bEliminated);
+	AccentLight->SetVisibility(bPresented);
+	WorkshopMesh->SetVisibility(bPresented);
 	if (!WorkshopTeamMaterials.IsEmpty())
 	{
 		const FLinearColor Color = FlickCosmeticCatalog::GetPuckSkinColor(PuckSkin);
@@ -1455,7 +1505,7 @@ void AFlickPiece::UpdateTestArenaVisuals()
 	const float IdleLight = bUsingHighDetailPuck ? 8.0f : 11.0f;
 	const float HighlightLight = bUsingHighDetailPuck ? 14.0f : 18.0f;
 	AccentLight->SetIntensity(
-		bEliminated ? 0.0f : (bSelected || bHovered ? HighlightLight : IdleLight));
+		bPresented ? (bSelected || bHovered ? HighlightLight : IdleLight) : 0.0f);
 }
 
 bool AFlickPiece::UsesLocalOwnershipRing() const

@@ -40,6 +40,7 @@ public:
 	AFlickWorldFeedback();
 
 	virtual void Tick(float DeltaSeconds) override;
+	void SetReplayAge(float SourceAge);
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void InitializeFeedback(
 		EFlickFeedbackKind InKind,
@@ -50,6 +51,7 @@ public:
 		float InArrivalDuration = 1.2f);
 
 private:
+	friend class FFlickReplayCosmeticsTest;
 	UFUNCTION()
 	void OnRep_Appearance();
 	void ApplyFeedbackAppearance();
@@ -91,6 +93,10 @@ private:
 	int32 Style = 0;
 	FVector BiasDirection = FVector::ZeroVector;
 	float Age = 0.0f;
+	UPROPERTY(ReplicatedUsing = OnRep_ReplayAge)
+	float ReplayAge = -1.0f;
+	UFUNCTION()
+	void OnRep_ReplayAge();
 	float Duration = 0.4f;
 	float MaxDistance = 70.0f;
 	float BaseShardScale = 0.08f;

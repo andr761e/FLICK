@@ -62,6 +62,7 @@ void AFlickWorldFeedback::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AFlickWorldFeedback, Appearance);
+	DOREPLIFETIME(AFlickWorldFeedback, ReplayAge);
 }
 
 void AFlickWorldFeedback::InitializeFeedback(
@@ -110,7 +111,7 @@ void AFlickWorldFeedback::ApplyFeedbackAppearance()
 	}
 	if (SpawnGeometry) SpawnGeometry->SetVisibility(false);
 	BiasDirection = FVector(InBiasDirection.X, InBiasDirection.Y, 0.0f).GetSafeNormal();
-	if (Kind == EFlickFeedbackKind::Elimination && Style > 0)
+	if (Kind == EFlickFeedbackKind::Elimination)
 	{
 		InitializeKnockoutEffect();
 		return;
@@ -231,13 +232,14 @@ void AFlickWorldFeedback::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	Age += DeltaSeconds;
+	Age = ReplayAge >= 0.0f ? ReplayAge : Age + DeltaSeconds;
+	if (ReplayAge >= 0.0f) SetLifeSpan(0.0f);
 	if (Kind == EFlickFeedbackKind::Spawn)
 	{
 		UpdateSpawnEffect();
 		return;
 	}
-	if (Kind == EFlickFeedbackKind::Elimination && Style > 0)
+	if (Kind == EFlickFeedbackKind::Elimination)
 	{
 		UpdateKnockoutEffect();
 		return;
@@ -284,6 +286,21 @@ void AFlickWorldFeedback::Tick(const float DeltaSeconds)
 		const float Scale = BaseShardScale * ScaleAlpha * (Index % 2 == 0 ? 1.0f : 0.72f);
 		Shard->SetRelativeRotation(Direction.Rotation());
 		Shard->SetRelativeScale3D(FVector(Scale * 2.8f, Scale * 0.5f, Scale * 0.5f));
+	}
+}
+
+void AFlickWorldFeedback::SetReplayAge(const float SourceAge)
+{
+	ReplayAge = FMath::Max(0.0f, SourceAge);
+	OnRep_ReplayAge();
+}
+
+void AFlickWorldFeedback::OnRep_ReplayAge()
+{
+	if (ReplayAge >= 0.0f)
+	{
+		SetLifeSpan(0.0f);
+		Tick(0.0f);
 	}
 }
 

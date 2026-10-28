@@ -9,6 +9,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickMainMenuStyleTest, "FLICK.UI.MainMenuPres
 bool FFlickMainMenuStyleTest::RunTest(const FString& Parameters)
 {
 	using namespace FlickMainMenuStyle;
+	TestEqual(TEXT("Home starts at Knockout 1v1"), GetRankPlaylist(0), 0);
+	TestEqual(TEXT("Rank stays readable for the whole interval"), GetRankPlaylist(4.99), 0);
+	TestEqual(TEXT("Second interval shows Knockout 2v2"), GetRankPlaylist(5), 1);
+	TestEqual(TEXT("Third interval shows Knockout 3v3"), GetRankPlaylist(10), 2);
+	TestEqual(TEXT("Fourth interval shows BOB 1v1"), GetRankPlaylist(15), 3);
+	TestEqual(TEXT("Cycle returns to Knockout 1v1"), GetRankPlaylist(20), 0);
+	TestEqual(TEXT("Long-running menu keeps cycling"), GetRankPlaylist(1005), 1);
 	for (const FVector2D Viewport : {FVector2D(1280, 720), FVector2D(1920, 1080), FVector2D(3440, 1440),
 		FVector2D(1280, 960), FVector2D(1080, 1920), FVector2D(5120, 1440)})
 	{

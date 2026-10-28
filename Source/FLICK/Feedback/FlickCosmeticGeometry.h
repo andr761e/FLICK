@@ -6,6 +6,11 @@
 // Presentation-only geometry. Never enables collision or participates in physics.
 namespace FlickCosmeticGeometry
 {
+	inline FVector FacingSide(const FVector& Tangent, const FVector& Right, const FVector& Up)
+	{
+		const FVector Side = FVector::CrossProduct(Tangent,FVector::CrossProduct(Right,Up)).GetSafeNormal();
+		return Side.IsNearlyZero() ? Right : Side;
+	}
 	inline void BuildRing(UProceduralMeshComponent& Mesh, const int32 Section, const int32 Sides = 96)
 	{
 		TArray<FVector> Vertices, Normals;
