@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'TrainingMenu', 'FreePlayMenu', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket', 'BobStriker')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'TrainingMenu', 'FreePlayMenu', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchBobRanked', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket', 'BobStriker')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -75,8 +75,13 @@ param(
     [ValidateRange(1, 30)]
     [float]$CaptureDelaySeconds = 2,
     # Sequence of live samples for temporal shimmer checks; retained in UserDir.
-    [ValidateRange(1, 32)]
+    [ValidateRange(1, 600)]
     [int]$CaptureFrames = 1,
+    # Fixed simulation time for recordings; no dependency on screenshot encoding speed.
+    [ValidateRange(0, 60)]
+    [int]$CaptureFPS = 0,
+    [ValidateSet('Up', 'Down')]
+    [string]$RankDirection = 'Up',
     [switch]$HideControlOverview,
     # Opt in for audio-system checks; ordinary visual captures stay silent.
     [switch]$EnableAudio,
@@ -86,6 +91,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($CaptureFrames -gt 32 -and $CaptureFPS -eq 0) { throw 'Recordings longer than 32 frames require -CaptureFPS.' }
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $projectRoot 'FLICK.uproject'
 $editorPath = Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
@@ -102,6 +108,7 @@ $previewFlags = @{
     PostMatchPrivate = @('-FlickPostMatchPreview', '-FlickPostMatchPrivate')
     PostMatchBob = @('-FlickPostMatchPreview', '-FlickPostMatchBob')
     PostMatchRanked = @('-FlickPostMatchPreview', '-FlickPostMatchRanked')
+    PostMatchBobRanked = @('-FlickPostMatchPreview', '-FlickPostMatchRanked', '-FlickPostMatchBob')
     Invite = @('-FlickPartyInvitePreview')
     Party = @('-FlickPartyTrayPreview')
     Challenges = @('-FlickChallengesPreview')
@@ -165,7 +172,7 @@ foreach ($screenName in $Screen) {
         '-ddc=InstalledNoZenLocalFallback',
         '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame', "-FlickCaptureDelaySeconds=$CaptureDelaySeconds",
-        "-FlickCaptureFrames=$CaptureFrames",
+        "-FlickCaptureFrames=$CaptureFrames", "-FlickCaptureFPS=$CaptureFPS", $(if ($RankDirection -eq 'Down') { '-FlickRankPreviewDown' } else { '-FlickRankPreviewUp' }),
         "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickLockerItem=$LockerItem", "-FlickProfilePage=$ProfilePage", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
         "-FlickCaptureOrbit=$($CameraOrbit.ToString([System.Globalization.CultureInfo]::InvariantCulture))",
         "-ini:GameUserSettings:[FLICK.GameplaySettings]:GameplayCameraDistance=$($CameraDistance.ToString([System.Globalization.CultureInfo]::InvariantCulture))",
@@ -245,6 +252,9 @@ foreach ($screenName in $Screen) {
         Width = $Width
         Height = $Height
         Quality = $Quality
+        CaptureFrames = $CaptureFrames
+        CaptureFPS = $CaptureFPS
+        RankDirection = $RankDirection
         CameraView = $CameraView
         CameraOrbit = $CameraOrbit
         LightingValues = $LightingValues

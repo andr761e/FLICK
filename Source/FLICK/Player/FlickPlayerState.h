@@ -34,9 +34,10 @@ public:
 	bool IsPartyLeader() const { return bPartyLeader; }
 	int32 GetPartySlot() const { return PartySlot; }
 	const FString& GetPartyId() const { return PartyId; }
-	void SetRankedIdentity(bool bVerified, int32 InAuthoritativeRating);
+	void SetRankedIdentity(bool bVerified, int32 InAuthoritativeRating, int32 InMatchesPlayed = 0);
 	bool IsRankedIdentityVerified() const { return bRankedIdentityVerified; }
 	int32 GetAuthoritativeRankedRating() const { return AuthoritativeRankedRating; }
+	int32 GetRankedMatchesPlayed() const { return RankedMatchesPlayed; }
 	void SetVerifiedOnlineAccountId(const FString& AccountId);
 	const FString& GetVerifiedOnlineAccountId() const { return VerifiedOnlineAccountId; }
 	void SetPrivateControlledSlots(const TArray<int32>& InControlledSlots);
@@ -94,6 +95,9 @@ private:
 
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Ranked")
 	int32 AuthoritativeRankedRating = 1000;
+
+	UPROPERTY(Replicated)
+	int32 RankedMatchesPlayed = 0;
 
 	UPROPERTY(Replicated, VisibleAnywhere, Category = "FLICK|Online")
 	FString VerifiedOnlineAccountId;

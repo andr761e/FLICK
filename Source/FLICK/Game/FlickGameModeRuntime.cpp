@@ -133,6 +133,12 @@ void AFlickGameMode::CloseSettings()
 void AFlickGameMode::ReturnToMainMenu()
 {
 	Practice->Stop();
+	if (bNetworkMatchRequested && bMatchmakingRequested && !bNetworkMatchStarted && !bMatchmakingLobbyLocked)
+	{
+		FrontendScreen = EFlickFrontendScreen::MainMenu;
+		SetCameraForFrontend();
+		return;
+	}
 	if (bNetworkMatchRequested)
 	{
 		AFlickGameState* State = GetFlickGameState();
@@ -783,6 +789,8 @@ void AFlickGameMode::TryStartNetworkMatch()
 	if (bMatchmakingRequested && !bMatchmakingLobbyLocked)
 	{
 		bMatchmakingLobbyLocked = true;
+		FrontendScreen = EFlickFrontendScreen::NetworkLobby;
+		SetCameraForFrontend();
 		MatchFoundConfirmationElapsed = 0.0f;
 		if (UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem())
 		{

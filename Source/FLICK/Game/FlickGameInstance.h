@@ -89,6 +89,12 @@ public:
 	virtual void Init() override;
 	void NotifyFrontendReady();
 	void PrepareTravelPresentation(const FString& StatusText);
+	// A one-shot intent, consumed by the frontend after leaving the completed server.
+	bool bPostMatchQueuePending = false;
+	bool bBrowseMatchmakingFromResults = false;
+	EFlickMatchVariant PostMatchQueueVariant = EFlickMatchVariant::Classic;
+	int32 PostMatchQueueTeamSize = 1;
+	bool bPostMatchQueueRanked = false;
 	bool ShouldShowStartupPresentation() const { return !bStartupPresentationComplete; }
 	void CompleteStartupPresentation() { bStartupPresentationComplete = true; }
 

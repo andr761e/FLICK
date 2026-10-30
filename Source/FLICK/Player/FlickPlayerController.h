@@ -59,6 +59,7 @@ public:
 	bool OwnsPieceLocally(const AFlickPiece* Piece) const;
 	void RequestRestartMatch();
 	void RequestRematch(bool bChangeLineup = false);
+	void PlayAgain();
 	void RequestNextRound();
 	void ToggleLobbyReady();
 	void RequestStartNetworkMatch();

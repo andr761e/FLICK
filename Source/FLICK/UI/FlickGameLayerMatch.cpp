@@ -490,7 +490,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 		];
 	}
 
-	return SNew(SBox).HeightOverride(44.0f)
+	return SNew(SBox).HeightOverride_Lambda([this]() { const auto* State = GetScoreboardGameState(); return State && State->bRankedMatch ? 58.f : 44.f; })
 		[
 			SNew(SFlickAngularBorder).RefinedSurface(true)
 			.BackgroundColor_Lambda([this, Team, PlayerSlot, Accent]()
@@ -552,12 +552,31 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 						]
 					]
 				]
-				+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+				+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(0, 0, 10, 0)
 				[
-					SNew(STextBlock)
-					.Text_Lambda([this, Team, PlayerSlot]() { return GetScoreboardPlayerName(Team, PlayerSlot); })
-					.Font(UiFont(14, true))
-					.ColorAndOpacity(FLinearColor::White)
+				 SNew(SVerticalBox)
+				 + SVerticalBox::Slot().AutoHeight()
+				 [SNew(STextBlock).Text_Lambda([this, Team, PlayerSlot]() { return GetScoreboardPlayerName(Team, PlayerSlot); })
+				  .Font(UiFont(14, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+				 + SVerticalBox::Slot().AutoHeight().Padding(0, 2, 0, 0)
+				 [SNew(SHorizontalBox).Visibility_Lambda([this]() { const auto* State = GetScoreboardGameState(); return State && State->bRankedMatch ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				  + SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)
+				  [SNew(STextBlock).Font(UiFont(9, true)).ColorAndOpacity(Cyan).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+				   .Text_Lambda([this, Team, PlayerSlot]() {
+					const auto* Player = FindScoreboardPlayerState(Team, PlayerSlot);
+					if (!Player || !Player->IsRankedIdentityVerified()) return FText::FromString(TEXT("RANK PENDING"));
+					FFlickRankProgress Progress;
+					Progress.Rating = Player->GetAuthoritativeRankedRating();
+					Progress.MatchesPlayed = Player->GetRankedMatchesPlayed();
+					return FText::FromString(FlickRankRules::GetRankLabel(Progress));
+				   })]
+				  + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6, 0, 0, 0)
+				  [SNew(STextBlock).Font(UiFont(9, true)).ColorAndOpacity(Muted)
+				   .Text_Lambda([this, Team, PlayerSlot]() {
+					const auto* Player = FindScoreboardPlayerState(Team, PlayerSlot);
+					return FText::FromString(Player && Player->IsRankedIdentityVerified() ? FString::Printf(TEXT("%d MMR"), Player->GetAuthoritativeRankedRating()) : TEXT("-- MMR"));
+				   })]
+				 ]
 				]
 				+ SHorizontalBox::Slot().AutoWidth()[MakeStatCell(0, FlickScoreboardLayout::Score)]
 				+ SHorizontalBox::Slot().AutoWidth()[MakeStatCell(1, FlickScoreboardLayout::Knockouts)]

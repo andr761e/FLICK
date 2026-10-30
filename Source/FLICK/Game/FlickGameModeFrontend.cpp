@@ -6,6 +6,7 @@ using namespace FlickGameModePrivate;
 
 void AFlickGameMode::SelectMatchVariant(const EFlickMatchVariant Variant)
 {
+	if (bNetworkMatchRequested && bMatchmakingRequested && Variant != SelectedMatchVariant) return;
 	const EFlickMatchVariant NormalizedVariant = NormalizeMatchVariant(Variant);
 	const bool bLobbyModeChanged = IsNetworkLobby() && SelectedMatchVariant != NormalizedVariant;
 	SelectedMatchVariant = NormalizedVariant;

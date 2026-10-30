@@ -84,6 +84,7 @@ void AFlickGameMode::CycleMatchmakingPlayersPerTeam(const int32 Direction)
 
 void AFlickGameMode::SetMatchmakingPlayersPerTeam(const int32 PlayersPerTeam)
 {
+	if (bNetworkMatchRequested && bMatchmakingRequested) return;
 	MatchmakingPlayersPerTeam = FlickTeamRules::ClampPlayersPerTeam(PlayersPerTeam);
 }
 
@@ -1480,7 +1481,7 @@ void AFlickGameMode::SubmitRankedAuthentication(
 				return;
 			}
 			GameMode->PlayerRankedRatings.Add(Controller, Result.Progress.Rating);
-			RankedPlayerState->SetRankedIdentity(true, Result.Progress.Rating);
+			RankedPlayerState->SetRankedIdentity(true, Result.Progress.Rating, Result.Progress.MatchesPlayed);
 			if (AFlickPlayerController* FlickController = Cast<AFlickPlayerController>(Controller))
 			{
 				FlickController->ApplyTrustedRankedProgressFromServer(
@@ -1651,6 +1652,8 @@ void AFlickGameMode::ResetLobbyReadiness()
 
 void AFlickGameMode::CancelNetworkLobby()
 {
+	if (auto* Instance = GetFlickGameInstance(); Instance && !Instance->bPostMatchQueuePending)
+		Instance->bBrowseMatchmakingFromResults = false;
 	if (!bNetworkMatchRequested || !GetWorld())
 	{
 		return;
@@ -2013,7 +2016,7 @@ void AFlickGameMode::DispatchRankedMatchResults()
 					if (Controller && PlayerState
 						&& GetPlayerOnlineId(PlayerState) == PlayerUpdate.AccountId)
 					{
-						PlayerState->SetRankedIdentity(true, PlayerUpdate.RatingUpdate.NewRating);
+						PlayerState->SetRankedIdentity(true, PlayerUpdate.RatingUpdate.NewRating, PlayerUpdate.RatingUpdate.MatchesPlayed);
 						Controller->ApplyTrustedRankedUpdateFromServer(PlayerUpdate.RatingUpdate);
 						break;
 					}

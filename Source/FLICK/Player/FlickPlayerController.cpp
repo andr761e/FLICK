@@ -27,6 +27,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
+#include "Online/FlickPartySubsystem.h"
 #include "Core/FlickPlaylistRules.h"
 #include "Online/FlickSessionSubsystem.h"
 #include "OnlineSubsystem.h"
@@ -1348,6 +1349,29 @@ void AFlickPlayerController::RequestRematch(const bool bChangeLineup)
  else ServerRequestRematch(bChangeLineup);
 }
 
+void AFlickPlayerController::PlayAgain()
+{
+	const AFlickGameState* State = GetFlickGameState();
+	UFlickGameInstance* Instance = Cast<UFlickGameInstance>(GetGameInstance());
+	if (!State || !State->bSeriesComplete || !Instance || Instance->bPostMatchQueuePending) return;
+	// Private rooms and offline games keep their host/local restart behavior.
+	if (State->bPrivateMatchActive || (!State->bMatchmakingLobby && !State->bRankedMatch && GetNetMode() == NM_Standalone))
+	{
+		RequestRematch(false);
+		return;
+	}
+	const UFlickPartySubsystem* Party = Instance->GetSubsystem<UFlickPartySubsystem>();
+	if (Party && Party->IsActive() && !Party->IsLocalLeader()) return;
+	Instance->PostMatchQueueVariant = State->ActiveMatchVariant;
+	Instance->PostMatchQueueTeamSize = State->ActiveMatchVariant == EFlickMatchVariant::Bob ? 1 : State->PlayersPerTeam;
+	Instance->bPostMatchQueueRanked = State->bRankedMatch;
+	Instance->bPostMatchQueuePending = true;
+	Instance->bBrowseMatchmakingFromResults = true;
+	// Leave first: never submit a new ticket from a completed match server.
+	if (AFlickGameMode* Mode = GetFlickGameMode(); Mode && !Mode->IsNetworkSession()) Mode->ReturnToMainMenu();
+	else LeaveNetworkSession();
+}
+
 void AFlickPlayerController::ServerRequestRematch_Implementation(const bool bChangeLineup)
 {
  if (AFlickGameMode* Mode = GetFlickGameMode()) Mode->RequestRematch(this, bChangeLineup);
@@ -1626,6 +1650,9 @@ void AFlickPlayerController::TogglePrivateSpectatorFreeCamera()
 
 void AFlickPlayerController::LeaveNetworkSession()
 {
+	if (const auto* State = GetFlickGameState(); State && State->bSeriesComplete)
+		if (auto* Coordinator = GetGameInstance()->GetSubsystem<UFlickMatchmakingCoordinatorSubsystem>())
+			Coordinator->ClearReconnectReservation();
 	ClearAiming();
 	if (AFlickGameMode* FlickGameMode = GetFlickGameMode())
 	{

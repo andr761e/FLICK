@@ -1119,6 +1119,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildNetworkLobby()
 				.Padding(FMargin(34.0f, 14.0f))
 				[
 					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 12, 0)
+					[SNew(SBox).WidthOverride(180).Visibility_Lambda([this]() {
+					 return GameMode.IsValid() && GameMode->IsMatchmakingSession()
+					  && (GameMode->GetLobbyPlayerCount(EFlickTeam::Player1) < GameMode->GetPlayersPerTeam() || GameMode->GetLobbyPlayerCount(EFlickTeam::Player2) < GameMode->GetPlayersPerTeam())
+					  ? EVisibility::Visible : EVisibility::Collapsed;
+					})[MakeMenuButton(TEXT("MAIN MENU"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->ReturnToMainMenu(); return FReply::Handled(); }), false, false)]]
 					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(180.0f)[MakeMenuButton(GameMode.IsValid() && GameMode->IsMatchmakingSession() ? TEXT("CANCEL QUEUE") : TEXT("CANCEL LOBBY"), FOnClicked::CreateLambda([this]() { if (GameMode.IsValid()) GameMode->CancelNetworkLobby(); return FReply::Handled(); }), false, true)]]
 					+ SHorizontalBox::Slot().AutoWidth().Padding(12.0f, 0.0f, 0.0f, 0.0f)
 					[

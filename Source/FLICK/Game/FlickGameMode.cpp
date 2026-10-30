@@ -3,6 +3,7 @@
 #include "Core/FlickRankRules.h"
 #include "Game/FlickGameModePrivate.h"
 #include "Misc/Paths.h"
+#include "Misc/App.h"
 
 using namespace FlickGameModePrivate;
 
@@ -205,6 +206,11 @@ void AFlickGameMode::BeginPlay()
 			RankedQueueRating,
 			bRankedRequested ? FlickRankRules::GetSearchRangeForAttempt(0) : 0);
 	}
+	if (const auto* Instance = GetFlickGameInstance(); Instance && Instance->bBrowseMatchmakingFromResults && bMatchmakingRequested)
+	{
+		FrontendScreen = EFlickFrontendScreen::MainMenu;
+		SetCameraForFrontend();
+	}
 	// Initialize the cosmetic showcase before the first rendered frame, not on
 	// the first world tick. The menu must never present the startup match roster.
 	UpdateMainMenuPresentation();
@@ -270,17 +276,21 @@ void AFlickGameMode::BeginPlay()
 			State->bRankedMatch = FParse::Param(FCommandLine::Get(), TEXT("FlickPostMatchRanked"));
 			State->bMatchmakingLobby = !State->bPrivateMatchActive;
 			State->SetRoundAdvanceTimerState(false);
-			for (int32 Round = 0; Round < State->RoundsToWin; ++Round) State->CompleteRound(EFlickMatchOutcome::Player1Wins);
+			const bool bRankDownPreview = State->bRankedMatch && FParse::Param(FCommandLine::Get(), TEXT("FlickRankPreviewDown"));
+			const EFlickMatchOutcome PreviewOutcome = bRankDownPreview ? EFlickMatchOutcome::Player2Wins : EFlickMatchOutcome::Player1Wins;
+			const EFlickTeam PreviewWinner = bRankDownPreview ? EFlickTeam::Player2 : EFlickTeam::Player1;
+			const EFlickTeam PreviewLoser = bRankDownPreview ? EFlickTeam::Player1 : EFlickTeam::Player2;
+			for (int32 Round = 0; Round < State->RoundsToWin; ++Round) State->CompleteRound(PreviewOutcome);
 			for (int32 Slot = 0; Slot < State->PlayersPerTeam; ++Slot)
 			{
-				for (int32 KO = 0; KO < 4 - Slot; ++KO) State->RecordPlayerKnockout(EFlickTeam::Player1, Slot);
-				State->RecordPlayerSwitchActivation(EFlickTeam::Player1, Slot);
-				State->RecordPlayerSelfKnockout(EFlickTeam::Player2, Slot);
+				for (int32 KO = 0; KO < 4 - Slot; ++KO) State->RecordPlayerKnockout(PreviewWinner, Slot);
+				State->RecordPlayerSwitchActivation(PreviewWinner, Slot);
+				State->RecordPlayerSelfKnockout(PreviewLoser, Slot);
 			}
-			State->DecisiveShotTeam = EFlickTeam::Player1;
+			State->DecisiveShotTeam = PreviewWinner;
 			State->DecisiveShotPlayerSlot = 0;
 			State->DecisiveShotTurn = 7;
-			State->FinalizeAuthoritativeMatch(EFlickMatchOutcome::Player1Wins);
+			State->FinalizeAuthoritativeMatch(PreviewOutcome);
 			// Exercise the accepted-result UI only in an isolated capture profile.
 			// Ordinary preview launches must never overwrite the developer's MMR.
 			FString CaptureUserDir;
@@ -295,11 +305,30 @@ void AFlickGameMode::BeginPlay()
 					Update.MatchId = State->MatchId;
 					Update.Variant = State->ActiveMatchVariant;
 					Update.PlayersPerTeam = State->PlayersPerTeam;
-					Update.OldRating = 1488;
-					Update.NewRating = 1504;
+					const bool bDown = FParse::Param(FCommandLine::Get(), TEXT("FlickRankPreviewDown"));
+					Update.OldRating = bDown ? 1504 : 1488;
+					Update.NewRating = bDown ? 1488 : 1504;
 					Update.MatchesPlayed = 21;
 					Update.bAccepted = true;
 					Ranking->ApplyTrustedUpdate(Update);
+					// Local-only sample identities for the scoreboard recording. Never live data.
+					for (EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+					for (int32 Slot = 0; Slot < State->PlayersPerTeam; ++Slot)
+					{
+						AFlickPlayerState* Sample = nullptr;
+						for (APlayerState* Existing : State->PlayerArray)
+							if (auto* Player = Cast<AFlickPlayerState>(Existing); Player && Player->GetTeam() == Team && Player->GetTeamPlayerSlot() == Slot) Sample = Player;
+						if (!Sample)
+						{
+							Sample = GetWorld()->SpawnActor<AFlickPlayerState>();
+							Sample->SetTeam(Team);
+							Sample->SetTeamPlayerSlot(Slot);
+							Sample->SetPlayerName(FString::Printf(TEXT("%s PLAYER %d"), Team == EFlickTeam::Player1 ? TEXT("BLUE") : TEXT("ORANGE"), Slot + 1));
+							State->PlayerArray.AddUnique(Sample);
+						}
+						if (Team == EFlickTeam::Player1 && Slot == 0) Sample->SetPlayerName(TEXT("LOCAL PLAYER"));
+						Sample->SetRankedIdentity(true, Team == EFlickTeam::Player1 && Slot == 0 ? Update.NewRating : 1440 + Slot * 70, 21);
+					}
 				}
 			}
 		}
@@ -863,7 +892,18 @@ void AFlickGameMode::BeginPlay()
 		FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureDelaySeconds="), CaptureDelaySeconds);
 		int32 CaptureFrames = 1;
 		FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureFrames="), CaptureFrames);
-		const auto FramesLeft = MakeShared<int32>(FMath::Clamp(CaptureFrames, 1, 32));
+		int32 CaptureFPS = 0;
+		FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureFPS="), CaptureFPS);
+		FString SequenceUserDir;
+		const bool bIsolatedSequence = CaptureFPS > 0 && FParse::Value(FCommandLine::Get(), TEXT("UserDir="), SequenceUserDir)
+			&& FPaths::IsUnderDirectory(FPaths::ConvertRelativePathToFull(SequenceUserDir), FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Saved/UICaptures")));
+		const float CaptureInterval = bIsolatedSequence ? 1.f / FMath::Clamp(CaptureFPS, 1, 60) : .125f;
+		if (bIsolatedSequence)
+		{
+			FApp::SetUseFixedTimeStep(true);
+			FApp::SetFixedDeltaTime(CaptureInterval);
+		}
+		const auto FramesLeft = MakeShared<int32>(FMath::Clamp(CaptureFrames, 1, bIsolatedSequence ? 600 : 32));
 		const TWeakObjectPtr<AFlickGameMode> WeakThis(this);
 		const auto CaptureTimer = MakeShared<FTimerHandle>();
 		FTimerManagerTimerParameters CaptureParameters;
@@ -894,7 +934,7 @@ void AFlickGameMode::BeginPlay()
 					ValidGameMode->QuitGame();
 				}
 			}, 1.0f, false);
-		}, .125f, CaptureParameters);
+		}, CaptureInterval, CaptureParameters);
 	}
 
 	int32 CameraViewPreview = 0;
@@ -1501,11 +1541,35 @@ void AFlickGameMode::Logout(AController* Exiting)
 void AFlickGameMode::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (UFlickGameInstance* Instance = GetFlickGameInstance(); Instance && Instance->bPostMatchQueuePending
+		&& FrontendScreen == EFlickFrontendScreen::MainMenu && !bNetworkMatchStarted
+		&& GetNetMode() != NM_Client && GetNetMode() != NM_DedicatedServer)
+	{
+		const UFlickSessionSubsystem* Sessions = GetFlickSessionSubsystem();
+		const EFlickSessionState SessionState = Sessions ? Sessions->GetState() : EFlickSessionState::Idle;
+		// Party restoration/session teardown is asynchronous; wait until it is ready.
+		if (SessionState == EFlickSessionState::Idle || SessionState == EFlickSessionState::Error
+			|| (Sessions && Sessions->IsPartySession() && SessionState == EFlickSessionState::InSession))
+		{
+			Instance->bPostMatchQueuePending = false;
+			SelectMatchVariant(Instance->PostMatchQueueVariant);
+			SetMatchmakingPlayersPerTeam(Instance->PostMatchQueueTeamSize);
+			SetRankedQueueSelected(Instance->bPostMatchQueueRanked);
+			UE_LOG(LogFlick, Log, TEXT("POST_MATCH_REQUEUE: variant=%d teamSize=%d ranked=%d"),
+				static_cast<int32>(Instance->PostMatchQueueVariant), Instance->PostMatchQueueTeamSize, Instance->bPostMatchQueueRanked);
+			StartSelectedMatchmaking();
+			if (bMatchmakingRequested && !bMatchmakingLobbyLocked)
+			{
+				FrontendScreen = EFlickFrontendScreen::MainMenu;
+				SetCameraForFrontend();
+			}
+		}
+	}
 	UpdateMainMenuPresentation();
 	UpdateLockerPreview(DeltaSeconds);
 
 	AFlickGameState* FlickGameState = GetFlickGameState();
-	if (FrontendScreen == EFlickFrontendScreen::NetworkLobby
+	if (IsNetworkLobby()
 		&& bMatchmakingRequested
 		&& FlickGameState
 		&& !FlickGameState->bMatchmakingTimedOut
@@ -1524,7 +1588,7 @@ void AFlickGameMode::Tick(const float DeltaSeconds)
 				MatchmakingQueueElapsed);
 		}
 	}
-	if (FrontendScreen == EFlickFrontendScreen::NetworkLobby
+	if (IsNetworkLobby()
 		&& bMatchmakingRequested
 		&& bMatchmakingLobbyLocked
 		&& !bNetworkMatchStarted

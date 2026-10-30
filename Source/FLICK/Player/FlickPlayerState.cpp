@@ -29,6 +29,7 @@ void AFlickPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AFlickPlayerState, PartyId);
 	DOREPLIFETIME(AFlickPlayerState, bRankedIdentityVerified);
 	DOREPLIFETIME(AFlickPlayerState, AuthoritativeRankedRating);
+	DOREPLIFETIME(AFlickPlayerState, RankedMatchesPlayed);
 	DOREPLIFETIME(AFlickPlayerState, VerifiedOnlineAccountId);
 	DOREPLIFETIME(AFlickPlayerState, PrivateControlledSlots);
 	DOREPLIFETIME(AFlickPlayerState, bPrivateRoleChosen);
@@ -171,11 +172,13 @@ void AFlickPlayerState::SetPrivateRoleChosen(const bool bInChosen)
 
 void AFlickPlayerState::SetRankedIdentity(
 	const bool bVerified,
-	const int32 InAuthoritativeRating)
+	const int32 InAuthoritativeRating,
+	const int32 InMatchesPlayed)
 {
 	if (HasAuthority())
 	{
 		bRankedIdentityVerified = bVerified;
+		RankedMatchesPlayed = bVerified ? FMath::Max(0, InMatchesPlayed) : 0;
 		AuthoritativeRankedRating = FMath::Clamp(
 			InAuthoritativeRating,
 			0,

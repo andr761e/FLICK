@@ -1,6 +1,7 @@
 #include "UI/FlickGameLayerPrivate.h"
 #include "Player/FlickPostMatchPresentationComponent.h"
 #include "Fonts/FontMeasure.h"
+#include "UI/FlickRankResult.h"
 
 
 
@@ -36,8 +37,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
     const AFlickGameState* State = GetScoreboardGameState();
     if (State && State->bPrivateMatchActive && bPrimary)
      return FText::FromString(GameMode.IsValid() ? TEXT("START REMATCH") : TEXT("WAITING FOR HOST"));
-    if (State && State->bPrivateMatchActive && Label.StartsWith(TEXT("CHANGE"))) return FText::FromString(TEXT("ROLES & LINEUP"));
-    if (bPrimary && State && PlayerController.IsValid() && State->RematchVotes.Contains(PlayerController->PlayerState)) return FText::FromString(TEXT("REMATCH READY"));
     return FText::FromString(Label);
    }).Font(UiFont(14, true)).ColorAndOpacity(bPrimary ? Ink : Paper)]]];
  };
@@ -51,100 +50,58 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
  Menu->AddSlot().AutoHeight().Padding(0, 12, 0, 0)
  [SNew(SBox).IsEnabled_Lambda([this]()
  {
-  const AFlickGameState* State = GetScoreboardGameState();
-  const AFlickPlayerState* Local = PlayerController.IsValid() ? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
-  return State && !State->bRematchStarting && !State->bMatchEndedByForfeit
-   && (State->RematchDeadlineServerTime <= 0.0f || State->GetServerWorldTimeSeconds() < State->RematchDeadlineServerTime) && (!State->bPrivateMatchActive
-   || (GameMode.IsValid() && (!State->bPartyActive || (Local && Local->IsPartyLeader()))));
+  const auto* State = GetScoreboardGameState();
+  if (!State || !PlayerController.IsValid()) return false;
+  const auto* Instance = Cast<UFlickGameInstance>(PlayerController->GetGameInstance());
+  if (Instance && Instance->bPostMatchQueuePending) return false;
+  const auto* Party = Instance ? Instance->GetSubsystem<UFlickPartySubsystem>() : nullptr;
+  if (Party && Party->IsActive() && !Party->IsLocalLeader()) return false;
+  if (!State->bPrivateMatchActive) return true;
+  const auto* Local = PlayerController->GetPlayerState<AFlickPlayerState>();
+  return GameMode.IsValid() && !State->bRematchStarting && !State->bMatchEndedByForfeit
+   && (!State->bPartyActive || (Local && Local->IsPartyLeader()))
+   && (State->RematchDeadlineServerTime <= 0 || State->GetServerWorldTimeSeconds() < State->RematchDeadlineServerTime);
  })
  [Action(TEXT("PLAY AGAIN"), FOnClicked::CreateLambda([this]()
- { if (PlayerController.IsValid()) PlayerController->RequestRematch(false); return FReply::Handled(); }), true)]];
- Menu->AddSlot().AutoHeight().Padding(0, 8, 0, 0)
- [SNew(SBox).Visibility_Lambda([this]()
- {
-  const AFlickGameState* State = GetScoreboardGameState();
-  return State && (State->ActiveMatchVariant == EFlickMatchVariant::Classic || State->bPrivateMatchActive) ? EVisibility::Visible : EVisibility::Collapsed;
- }).IsEnabled_Lambda([this]()
- {
-  const AFlickGameState* State = GetScoreboardGameState();
-  const AFlickPlayerState* Local = PlayerController.IsValid() ? PlayerController->GetPlayerState<AFlickPlayerState>() : nullptr;
-  return State && !State->bRematchStarting && !State->bMatchEndedByForfeit
-   && (State->RematchDeadlineServerTime <= 0.0f || State->GetServerWorldTimeSeconds() < State->RematchDeadlineServerTime)
-   && (!State->bPrivateMatchActive || (GameMode.IsValid() && (!State->bPartyActive || (Local && Local->IsPartyLeader()))));
- })
- [Action(TEXT("CHANGE LINEUP"), FOnClicked::CreateLambda([this]()
- { if (PlayerController.IsValid()) PlayerController->RequestRematch(true); return FReply::Handled(); }), false)]];
- Menu->AddSlot().AutoHeight().Padding(0, 12, 0, 16)
+ { if (PlayerController.IsValid()) PlayerController->PlayAgain(); return FReply::Handled(); }), true)]];
+ Menu->AddSlot().AutoHeight().Padding(0, 12, 0, 18)
  [Text(TAttribute<FText>::CreateLambda([this]()
  {
-  const AFlickGameState* State = GetScoreboardGameState();
+  const auto* State = GetScoreboardGameState();
   if (!State) return FText::GetEmpty();
-  if (State->RematchDeadlineServerTime > 0.0f && State->GetServerWorldTimeSeconds() >= State->RematchDeadlineServerTime) return FText::FromString(TEXT("Rematch window ended. Exit to find a match."));
-  if (!State->RematchStatus.IsEmpty()) return FText::FromString(State->RematchStatus);
-  if (State->bMatchEndedByForfeit) return FText::FromString(TEXT("Match ended by forfeit. Leave to find another match."));
-  if (State->bPrivateMatchActive) return FText::FromString(TEXT("Host starts the next match. Same room, players and settings. Change lineup to revisit roles and classes."));
-  if (State->bMatchmakingLobby || (PlayerController.IsValid() && PlayerController->GetNetMode() != NM_Standalone && !State->bPrivateMatchActive))
-   return FText::FromString(FString::Printf(TEXT("REMATCH READY  %d / %d\nAll players stay on the same teams.%s"), State->RematchVotes.Num(), State->PlayersPerTeam * 2,
-    State->bRematchChangeLineup ? TEXT(" Class selection opens before the next match.") : TEXT("")));
-  return FText::FromString(TEXT("Keep the same teams and lineup, or choose a new class first."));
+  if (State->bPrivateMatchActive) return FText::FromString(TEXT("Host starts the next match with the same room, players and settings."));
+  if (State->bMatchmakingLobby || State->bRankedMatch || (PlayerController.IsValid() && PlayerController->GetNetMode() != NM_Standalone))
+   return FText::FromString(TEXT("Find a new match in this playlist. Browse the main menu while we search. Only the party leader can queue a party."));
+  return FText::FromString(TEXT("Play another match with the same mode and lineup."));
  }), 11, Muted)];
- Menu->AddSlot().AutoHeight().Padding(0, 0, 0, 12)
- [Text(TAttribute<FText>::CreateLambda([this]()
- {
-  const AFlickGameState* State = GetScoreboardGameState();
-  return State && State->RematchDeadlineServerTime > 0.0f
-   ? FText::FromString(FString::Printf(TEXT("REMATCH WINDOW  %ds"), FMath::Max(0, FMath::CeilToInt(State->RematchDeadlineServerTime - State->GetServerWorldTimeSeconds())))) : FText::GetEmpty();
- }), 11, Brand)];
- Menu->AddSlot().AutoHeight().Padding(0, 0, 0, 12)
- [SNew(SBox).HAlign(HAlign_Left).Visibility_Lambda([this]()
+ Menu->AddSlot().AutoHeight().Padding(0, 0, 0, 18)
+ [SNew(SBox).Visibility_Lambda([this]()
  {
   const auto* State = GetScoreboardGameState();
   const auto* Ranking = GetRankingSubsystem();
   return State && State->bRankedMatch && Ranking && Ranking->HasRatingUpdateForMatch(State->MatchId)
    ? EVisibility::Visible : EVisibility::Collapsed;
  })
- [SNew(SHorizontalBox)
-  + SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 10, 0)
-  [SNew(SFlickRankBadge).Size(56).Progress_Lambda([this]()
-  {
-   const auto* Ranking = GetRankingSubsystem();
-   if (!Ranking) return FFlickRankProgress();
-   const auto& Update = Ranking->GetLastRatingUpdate();
-   return Ranking->GetProgress(Update.Variant, Update.PlayersPerTeam);
-  })]
-  + SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)
-  [Text(TAttribute<FText>::CreateLambda([this]()
-  {
-   const auto* Ranking = GetRankingSubsystem();
-   if (!Ranking) return FText::GetEmpty();
-   const auto& Update = Ranking->GetLastRatingUpdate();
-   const int32 OldIndex = Update.OldTier == EFlickRankTier::Unranked ? -1
-    : Update.OldTier == EFlickRankTier::Zenith ? 21 : (static_cast<int32>(Update.OldTier) - 1) * 3 + Update.OldDivision - 1;
-   const int32 NewIndex = FlickRankRules::GetBadgeIndex(Ranking->GetProgress(Update.Variant, Update.PlayersPerTeam));
-   const TCHAR* Change = OldIndex < 0 && NewIndex >= 0 ? TEXT("PLACEMENTS COMPLETE")
-    : NewIndex > OldIndex ? TEXT("RANK UP") : NewIndex < OldIndex ? TEXT("RANK ADJUSTED") : TEXT("COMPETITIVE RESULT");
-   return FText::FromString(FString::Printf(TEXT("%s\n%d  >  %d MMR"), Change, Update.OldRating, Update.NewRating));
-  }), 11, Paper)]
- ]];
- Menu->AddSlot().AutoHeight().Padding(0, 0, 0, 12)
- [Text(TAttribute<FText>::CreateLambda([this]()
+ [SNew(SFlickRankResult).Update_Lambda([this]()
  {
-  const AFlickGameState* State = GetScoreboardGameState();
-  const UFlickRankingSubsystem* Ranking = GetRankingSubsystem();
-  if (!State || !State->bRankedMatch) return FText::GetEmpty();
-  if (!Ranking || !Ranking->HasRatingUpdateForMatch(State->MatchId)) return FText::FromString(TEXT("COMPETITIVE RESULT SYNCING..."));
-  const FFlickRatingUpdate& Update = Ranking->GetLastRatingUpdate();
-  return FText::FromString(FString::Printf(TEXT("RATING  %s%d  /  %s"), Update.RatingDelta >= 0 ? TEXT("+") : TEXT(""), Update.RatingDelta,
-   *FlickRankRules::GetProgressLabel(Ranking->GetProgress(Update.Variant, Update.PlayersPerTeam))));
- }), 11, Brand)];
+  const auto* State = GetScoreboardGameState();
+  const auto* Ranking = GetRankingSubsystem();
+  return State && Ranking && Ranking->HasRatingUpdateForMatch(State->MatchId) ? Ranking->GetLastRatingUpdate() : FFlickRatingUpdate();
+ }).Time_Lambda([this]() { const auto* State = GetScoreboardGameState(); return State ? static_cast<double>(State->GetServerWorldTimeSeconds()) : 0.; })]];
+ Menu->AddSlot().AutoHeight().Padding(0, 0, 0, 12)
+ [SNew(SBox).Visibility_Lambda([this]()
+ {
+  const auto* State = GetScoreboardGameState();
+  const auto* Ranking = GetRankingSubsystem();
+  return State && State->bRankedMatch && (!Ranking || !Ranking->HasRatingUpdateForMatch(State->MatchId)) ? EVisibility::Visible : EVisibility::Collapsed;
+ })[Text(FText::FromString(TEXT("COMPETITIVE RESULT SYNCING...")), 11, Brand)]];
  Menu->AddSlot().AutoHeight()[Action(TEXT("EXIT TO MAIN MENU"), FOnClicked::CreateLambda([this]()
  {
-  if (GameMode.IsValid()) GameMode->ReturnToMainMenu();
+  const auto* State = GetScoreboardGameState();
+  if (GameMode.IsValid() && (!GameMode->IsNetworkSession() || (State && State->bPrivateMatchActive))) GameMode->ReturnToMainMenu();
   else if (PlayerController.IsValid()) PlayerController->LeaveNetworkSession();
   return FReply::Handled();
  }), false)];
-
-
  TSharedRef<SConstraintCanvas> Winners = SNew(SConstraintCanvas);
  const TWeakPtr<SConstraintCanvas> WinnerCanvas = Winners;
  for (int32 Slot = 0; Slot < 3; ++Slot)
@@ -288,9 +245,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
  [SNew(SBox).Visibility_Lambda([ShowDetails]() { return ShowDetails() ? EVisibility::Collapsed : EVisibility::Visible; })
   [Action(TEXT("CONTINUE TO SUMMARY"), FOnClicked::CreateLambda([Presentation]()
    { if (auto* View = Presentation()) View->ContinueToSummary(); return FReply::Handled(); }), false)]]
- + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(32, 105, 32, 32)
- [SNew(SBox).Visibility_Lambda([ShowDetails]() { return ShowDetails() ? EVisibility::Visible : EVisibility::Collapsed; })
-  [SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
+ + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+ .Padding(TAttribute<FMargin>::CreateLambda([this]()
+ { const auto* State = GetScoreboardGameState(); return FMargin(32, State && State->bRankedMatch ? 100.f : 150.f, 32, 32); }))
+ [SNew(SBox).WidthOverride(1680).HeightOverride_Lambda([this]()
+  { const auto* State = GetScoreboardGameState(); return State && State->bRankedMatch ? 700.f : 760.f; }).Visibility_Lambda([ShowDetails]() { return ShowDetails() ? EVisibility::Visible : EVisibility::Collapsed; })
+  [SNew(SScaleBox).Stretch(EStretch::ScaleToFit)
    [SNew(SBox).WidthOverride(1230)
     [SNew(SHorizontalBox)
      + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 30, 0)

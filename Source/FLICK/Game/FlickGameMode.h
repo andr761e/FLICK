@@ -639,6 +639,7 @@ private:
 	friend class FFlickBobGameplayTest;
 	friend class FFlickBobResolutionReliabilityTest;
 	friend class FFlickRematchFlowTest;
+	friend class FFlickPostMatchQueueTest;
 	friend class FFlickTrainingFeedbackTest;
 	friend class FFlickTrainingUndoTest;
 	friend class UFlickPracticeComponent;
