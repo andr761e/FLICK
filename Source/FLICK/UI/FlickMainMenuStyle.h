@@ -19,6 +19,10 @@ namespace FlickMainMenuStyle
 	constexpr float RadioHeight = 150.0f;
 	constexpr float RadioBottom = 48.0f;
 	constexpr float SelectorBottom = 86.0f;
+	inline float GetVerticalInset(FVector2D CanvasSize)
+	{
+		return FMath::Max(0.f, static_cast<float>((CanvasSize.Y - 900.0) * .5));
+	}
 	constexpr double RankDisplaySeconds = 5.0;
 	inline int32 GetRankPlaylist(const double VisibleSeconds)
 	{
@@ -55,20 +59,20 @@ namespace FlickMainMenuStyle
 			{0.0f, Size.Y - Cut}, {0.0f, Cut}};
 	}
 
-	inline float GetDiagonalBottomEdgeX(const FVector2D Size, const float ColumnScale)
+	inline FVector2D GetDiagonalEdges(const FVector2D Size, const float ColumnScale)
 	{
-		return FMath::Min(Size.X, Size.Y * (16.0f / 9.0f)) * 0.355f * ColumnScale;
-	}
-
-	inline float GetDiagonalTopEdgeX(const FVector2D Size, const float ColumnScale)
-	{
-		const float DesignWidth = FMath::Min(Size.X, Size.Y * (16.0f / 9.0f));
-		const float Bottom = GetDiagonalBottomEdgeX(Size, ColumnScale);
-		// A steeper diagonal matches the art direction. On taller supported
-		// frames retain enough glass behind PLAY, including its outer glow.
+		const float DesignHeight = FMath::Min(Size.Y, 900.0);
+		const float DesignWidth = FMath::Min(Size.X, DesignHeight * (16.0f / 9.0f));
+		const float Bottom = DesignWidth * .355f * ColumnScale;
 		const float PlayBottom = NavigationTop + Navigation::PrimaryHeight * ColumnScale;
-		const float Alpha = FMath::Clamp(PlayBottom / FMath::Max(1.0, Size.Y), 0.0f, 0.9f);
+		const float Alpha = FMath::Clamp(PlayBottom / FMath::Max(1.f, DesignHeight), 0.0f, 0.9f);
 		const float MinimumTop = (LeftPadding + Navigation::FirstWidth * ColumnScale + 22.0f - Bottom * Alpha) / (1.0f - Alpha);
-		return FMath::Max(DesignWidth * 0.250f * ColumnScale, MinimumTop);
+		const float Top = FMath::Max(DesignWidth * .250f * ColumnScale, MinimumTop);
+		// Extend the same diagonal above/below the centred composition in 16:10
+		// and 4:3 windows, instead of changing its relationship to the buttons.
+		const float Extension = (Bottom - Top) * GetVerticalInset(Size) / FMath::Max(1.f, DesignHeight);
+		return FVector2D(Top - Extension, Bottom + Extension);
 	}
+	inline float GetDiagonalBottomEdgeX(FVector2D Size, float Scale) { return GetDiagonalEdges(Size, Scale).Y; }
+	inline float GetDiagonalTopEdgeX(FVector2D Size, float Scale) { return GetDiagonalEdges(Size, Scale).X; }
 }

@@ -260,23 +260,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		SNew(SDPIScaler)
 		.DPIScale_Lambda([this]()
 		{
-			// At low resolutions Unreal's UI DPI already shrinks Slate. Use the
-			// available local units there so FLICK does not shrink a second time.
-			// Keep the physical-size rule at ordinary and ultrawide resolutions.
-			FVector2D ViewportSize = LayerLocalSize;
-			if (GEngine && GEngine->GameViewport)
-			{
-				FVector2D PhysicalSize;
-				GEngine->GameViewport->GetViewportSize(PhysicalSize);
-				if (PhysicalSize.Y >= FlickUITheme::ReferenceHeight)
-				{
-					ViewportSize.X = FMath::Min(ViewportSize.X, PhysicalSize.X);
-					ViewportSize.Y = FMath::Min(ViewportSize.Y, PhysicalSize.Y);
-				}
-			}
-			return FMath::Max(0.25f, FMath::Min(
-				ViewportSize.Y / FlickUITheme::ReferenceHeight,
-				ViewportSize.X / FlickUITheme::ReferenceWidth));
+            return FlickPresentationFrame::GetDesignScale(FlickPresentationFrame::GetContainedSize(ViewportLocalSize));
 		})
 		[
 		SNew(SOverlay)
@@ -513,7 +497,7 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		[
 			BuildMainMenuFooter()
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0, 0, FlickMainMenuStyle::RightInset, FlickMainMenuStyle::RadioBottom)
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(0, 0, FlickMainMenuStyle::RightInset, FlickMainMenuStyle::RadioBottom + GetMainMenuVerticalInset()); }))
 		[
 			SNew(SBox).Visibility_Lambda([this]()
 			{

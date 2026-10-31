@@ -17,22 +17,23 @@ bool FFlickMainMenuStyleTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Cycle returns to Knockout 1v1"), GetRankPlaylist(20), 0);
 	TestEqual(TEXT("Long-running menu keeps cycling"), GetRankPlaylist(1005), 1);
 	for (const FVector2D Viewport : {FVector2D(1280, 720), FVector2D(1920, 1080), FVector2D(3440, 1440),
-		FVector2D(1280, 960), FVector2D(1080, 1920), FVector2D(5120, 1440)})
+		FVector2D(1680, 1050), FVector2D(1680, 1028), FVector2D(1280, 960), FVector2D(1080, 1920), FVector2D(5120, 1440)})
 	{
 		const FVector2D Frame = FlickPresentationFrame::GetContainedSize(Viewport);
 		const float CanvasScale = FMath::Min(Frame.X / 1600.0, Frame.Y / 900.0);
 		const FVector2D Canvas = Frame / CanvasScale;
+		const float Inset = GetVerticalInset(Canvas);
 		const float ColumnScale = FMath::Clamp((16.0 / 9.0) / (Frame.X / Frame.Y), 0.78, 1.0);
 		const float Top = GetDiagonalTopEdgeX(Canvas, ColumnScale);
 		const float Bottom = GetDiagonalBottomEdgeX(Canvas, ColumnScale);
 		TestTrue(TEXT("Diagonal slopes forward and stays within the contained frame"), Top > 0.0f && Top < Bottom && Bottom < Canvas.X);
-		float PreviousBottom = NavigationTop;
+		float PreviousBottom = NavigationTop + Inset;
 		for (int32 Row = 0; Row < 6; ++Row)
 		{
 			const FVector2D Size(Navigation::GetRowWidth(Row), Navigation::GetRowHeight(Row));
 			const TArray<FVector2D> Points = GetCardOutline(Size);
 			TestEqual(TEXT("Navigation retains eight clean cut corners"), Points.Num(), 8);
-			const float RowTop = NavigationTop + Navigation::GetRowTop(Row) * ColumnScale;
+			const float RowTop = NavigationTop + Inset + Navigation::GetRowTop(Row) * ColumnScale;
 			TestTrue(TEXT("Cards retain their spacing at all supported display ratios"), RowTop >= PreviousBottom);
 			PreviousBottom = RowTop + Size.Y * ColumnScale;
 			for (int32 Index = 0; Index < Points.Num(); ++Index)
@@ -47,7 +48,7 @@ bool FFlickMainMenuStyleTest::RunTest(const FString& Parameters)
 		}
 		// The bottom-anchored profile stays clear of navigation, including 720p
 		// and compressed ultrawide. The selector now lives under the hero puck.
-		const float ProfileTop = Canvas.Y - 48.0f - 82.0f * ColumnScale;
+		const float ProfileTop = Canvas.Y - 48.0f - Inset - 82.0f * ColumnScale;
 		TestTrue(TEXT("QUIT and the profile retain their breathing room"),
 			ProfileTop - PreviousBottom >= 32.0f * ColumnScale + 12.0f);
 		TestTrue(TEXT("Combined rank/social panel does not reach into the navigation glass"),
@@ -56,6 +57,15 @@ bool FFlickMainMenuStyleTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Radio stays clear of the centred display selector"),
 			Canvas.X - RightInset - RightColumnWidth > Canvas.X * .5f + 175.f);
 		TestTrue(TEXT("Display selector leaves room below the live puck"), Canvas.Y - SelectorBottom - 42.f > 700.f);
+	}
+	TestEqual(TEXT("1080p reference composition has no extra inset"), GetVerticalInset(FVector2D(1600, 900)), 0.f);
+	TestEqual(TEXT("16:10 centres the same composition inside the taller window"), GetVerticalInset(FVector2D(1600, 1000)), 50.f);
+	for (float EngineDPI : {.8f, .97f, 1.f, 1.25f, 1.5f})
+	{
+		const FVector2D Physical(1680, 1050);
+		TestTrue(TEXT("UI scale does not depend on Unreal/Windows DPI"), FMath::IsNearlyEqual(
+			FlickPresentationFrame::GetDesignScale(Physical / EngineDPI) * EngineDPI,
+			FlickPresentationFrame::GetDesignScale(Physical), .0001f));
 	}
 	TestTrue(TEXT("PLAY is the dominant action by height"), Navigation::PrimaryHeight > Navigation::SecondaryHeight);
 	TestEqual(TEXT("Navigation container accommodates the widest card without squeezing the swept edges"),

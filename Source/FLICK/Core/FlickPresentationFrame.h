@@ -9,6 +9,12 @@ namespace FlickPresentationFrame
 	constexpr float MinimumAspect = 4.0f / 3.0f;
 	// Includes common 3440x1440 ultrawide displays while still capping 32:9.
 	constexpr float MaximumAspect = 5.0f / 2.0f;
+	// Input must remain in Slate local units. Mixing physical pixels into this
+	// value applies Unreal/Windows DPI a second time at resolutions below 1080p.
+	inline float GetDesignScale(FVector2D LocalSize)
+	{
+		return FMath::Max(.25f, static_cast<float>(FMath::Min(LocalSize.X / 1600.0, LocalSize.Y / 900.0)));
+	}
 
 	inline FVector2D GetContainedSize(const FVector2D ViewportSize)
 	{

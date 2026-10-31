@@ -146,7 +146,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Top)
-		.Padding(FlickMainMenuStyle::LeftPadding, 50.0f, 0.0f, 0.0f)
+		.Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(FlickMainMenuStyle::LeftPadding, 50.f + GetMainMenuVerticalInset(), 0, 0); }))
 		[
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
 			.Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
@@ -218,7 +218,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Top)
-		.Padding(FlickMainMenuStyle::LeftPadding, FlickMainMenuStyle::NavigationTop, 0.0f, 0.0f)
+		.Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(FlickMainMenuStyle::LeftPadding, FlickMainMenuStyle::NavigationTop + GetMainMenuVerticalInset(), 0, 0); }))
 		[
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
 			[
@@ -302,12 +302,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			]
 			]
 		+ SOverlay::Slot()
-		.HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0, 0, 0, FlickMainMenuStyle::SelectorBottom)
+		.HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(0, 0, 0, FlickMainMenuStyle::SelectorBottom + GetMainMenuVerticalInset()); }))
 		[SNew(SBox).Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::Visible; })[BuildDisplayPuckSelector()]]
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Bottom)
-		.Padding(52.0f, 0.0f, 0.0f, 48.0f)
+		.Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(52, 0, 0, 48.f + GetMainMenuVerticalInset()); }))
 		[
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
 			[
@@ -437,7 +437,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			[BuildChallengePreview()]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)
-		.Padding(0, FlickMainMenuStyle::StatusTop, FlickMainMenuStyle::RightInset, 0)
+		.Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(0, FlickMainMenuStyle::StatusTop + GetMainMenuVerticalInset(), FlickMainMenuStyle::RightInset, 0); }))
 		[BuildHomeStatusPanel()]
 			+ SOverlay::Slot()
 			[

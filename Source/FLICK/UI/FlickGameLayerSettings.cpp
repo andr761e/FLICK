@@ -1,4 +1,5 @@
 #include "UI/FlickGameLayerPrivate.h"
+#include "Game/FlickGameUserSettings.h"
 #include "UI/FlickSettingsStyle.h"
 #include "UI/FlickSettingsWidgets.h"
 
@@ -232,7 +233,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	};
 	const auto ModeLabel = [](const int32 Mode)
 	{
-		return FText::FromString(Mode == 0 ? TEXT("FULLSCREEN") : Mode == 2 ? TEXT("WINDOWED") : TEXT("BORDERLESS"));
+		return FText::FromString(Mode == 2 ? TEXT("WINDOWED") : TEXT("FULLSCREEN (BORDERLESS)"));
 	};
 	const auto LimitLabel = [](const int32 Limit)
 	{
@@ -252,7 +253,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	const TSharedRef<SWidget> ResolutionSelector = SNew(SComboBox<TSharedPtr<FIntPoint>>)
 		.ComboBoxStyle(&DropdownStyle).ItemStyle(&DropdownRowStyle)
 		.OptionsSource(&ResolutionOptions).MaxListHeight(330.0f)
-		.IsEnabled_Lambda([this]() { return PendingWindowMode != 1; })
+		.IsEnabled_Lambda([this]() { return PendingWindowMode == 2; })
 		.OnGenerateWidget_Lambda([ResolutionLabel](TSharedPtr<FIntPoint> Option)
 		{
 			return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::Transparent).Padding(FMargin(8.0f, 5.0f))
@@ -277,7 +278,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 		})
 		.OnSelectionChanged_Lambda([this](TSharedPtr<int32> Option, ESelectInfo::Type)
 		{
-			if (Option.IsValid()) PendingWindowMode = *Option;
+			if (Option.IsValid())
+			{
+				PendingWindowMode = *Option;
+				if (const auto* Settings = GEngine ? Cast<UFlickGameUserSettings>(GEngine->GetGameUserSettings()) : nullptr)
+					PendingResolution = PendingWindowMode == 2 ? Settings->GetRememberedWindowedResolution() : Settings->GetDesktopResolution();
+			}
 		})
 		[SNew(STextBlock).Text_Lambda([this, ModeLabel]() { return ModeLabel(PendingWindowMode); }).Font(UiFont(10, true)).ColorAndOpacity(Paper)];
 	const TSharedRef<SWidget> FrameLimitSelector = SNew(SComboBox<TSharedPtr<int32>>)

@@ -2,5 +2,16 @@
 
 #include "FLICK.h"
 #include "Modules/ModuleManager.h"
+#include "Core/FlickDisplaySettings.h"
 
-IMPLEMENT_PRIMARY_GAME_MODULE( FDefaultGameModuleImpl, FLICK, "FLICK" );
+class FFlickGameModule final : public FDefaultGameModuleImpl
+{
+public:
+	virtual void StartupModule() override
+	{
+		FDefaultGameModuleImpl::StartupModule();
+		FlickDisplaySettings::PrepareStartupConfig();
+	}
+};
+
+IMPLEMENT_PRIMARY_GAME_MODULE(FFlickGameModule, FLICK, "FLICK");

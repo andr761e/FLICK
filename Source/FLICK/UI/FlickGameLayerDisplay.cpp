@@ -1,5 +1,6 @@
 #include "UI/FlickGameLayerPrivate.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Game/FlickGameUserSettings.h"
 
 void SFlickGameLayer::RefreshDisplayOptions()
 {
@@ -33,14 +34,13 @@ void SFlickGameLayer::RefreshDisplayOptions()
 		return PixelsA == PixelsB ? A->X > B->X : PixelsA > PixelsB;
 	});
 
-	WindowModeOptions = {MakeShared<int32>(0), MakeShared<int32>(1), MakeShared<int32>(2)};
+	WindowModeOptions = {MakeShared<int32>(1), MakeShared<int32>(2)};
 	FrameLimitOptions.Reset();
 	for (const int32 Limit : {0, 30, 60, 90, 120, 144, 165, 240})
 	{
 		FrameLimitOptions.Add(MakeShared<int32>(Limit));
 	}
-	PendingWindowMode = Settings->GetFullscreenMode() == EWindowMode::Fullscreen ? 0
-		: Settings->GetFullscreenMode() == EWindowMode::Windowed ? 2 : 1;
+	PendingWindowMode = Settings->GetFullscreenMode() == EWindowMode::Windowed ? 2 : 1;
 	PendingResolution = PendingWindowMode == 1 ? Settings->GetDesktopResolution() : Settings->GetScreenResolution();
 	PendingFrameLimit = FMath::RoundToInt(Settings->GetFrameRateLimit());
 	if (!FrameLimitOptions.ContainsByPredicate([this](const TSharedPtr<int32>& Option)
@@ -57,8 +57,9 @@ void SFlickGameLayer::ApplyPendingDisplaySettings()
 {
 	UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
 	if (!Settings) return;
-	const EWindowMode::Type Mode = PendingWindowMode == 0 ? EWindowMode::Fullscreen
-		: PendingWindowMode == 2 ? EWindowMode::Windowed : EWindowMode::WindowedFullscreen;
+	const EWindowMode::Type Mode = PendingWindowMode == 2 ? EWindowMode::Windowed : EWindowMode::WindowedFullscreen;
+	if (auto* FlickSettings = Cast<UFlickGameUserSettings>(Settings); FlickSettings && Mode == EWindowMode::Windowed)
+		FlickSettings->SetWindowedResolutionIntent(PendingResolution);
 	Settings->SetFullscreenMode(Mode);
 	Settings->SetScreenResolution(Mode == EWindowMode::WindowedFullscreen
 		? Settings->GetDesktopResolution() : PendingResolution);

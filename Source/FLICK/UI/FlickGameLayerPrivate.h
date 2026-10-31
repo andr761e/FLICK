@@ -99,6 +99,14 @@ namespace
 		return FlickMainMenuStyle::GetDiagonalBottomEdgeX(LocalSize, GetMainMenuColumnScale());
 	}
 
+	float GetMainMenuVerticalInset()
+	{
+		FVector2D Size(ReferenceWidth, ReferenceHeight);
+		if (GEngine && GEngine->GameViewport) GEngine->GameViewport->GetViewportSize(Size);
+		Size = FlickPresentationFrame::GetContainedSize(Size);
+		return FlickMainMenuStyle::GetVerticalInset(Size / FlickPresentationFrame::GetDesignScale(Size));
+	}
+
 	float GetDisplayStatValue(const FFlickPieceDisplayStats& Stats, const int32 StatIndex)
 	{
 		switch (StatIndex)
