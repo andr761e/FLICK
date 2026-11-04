@@ -59,6 +59,8 @@ param(
     [int]$LockerItem = -1,
     [ValidateRange(0, 4)]
     [int]$ProfilePage = 0,
+    # Seed only this capture's isolated UserDir, never the player's profile.
+    [switch]$ProfileDataPreview,
     [ValidateRange(0, 9)]
     [int]$SettingsTab = 0,
     [ValidateRange(-1, 5)]
@@ -162,6 +164,31 @@ foreach ($screenName in $Screen) {
     $captureName = '{0}-{1}x{2}' -f $screenName.ToLowerInvariant(), $Width, $Height
     $userDir = Join-Path $captureRoot $captureName
     New-Item -ItemType Directory -Path $userDir -Force | Out-Null
+    if ($ProfileDataPreview) {
+        $profileConfigDir = Join-Path $userDir 'Saved\Config\Windows'
+        New-Item -ItemType Directory -Path $profileConfigDir -Force | Out-Null
+        $profileLines = @(
+            '[/Script/Engine.GameUserSettings]', 'Version=5',
+            '[/Script/FLICK.FlickGameUserSettings]', 'Version=5',
+            '[FLICK.ProfileStats.Casual]', 'MatchesPlayed=75', 'Wins=46', 'Points=18420',
+            'Knockouts=210', 'DoubleKnockouts=18', 'Shots=640', 'Accolade.TeamWipeout=6', 'Accolade.FlawlessRound=12',
+            '[FLICK.ProfileStats.Competitive]', 'MatchesPlayed=53', 'Wins=30', 'Points=12840',
+            'Knockouts=132', 'DoubleKnockouts=11', 'Shots=470', 'Accolade.TeamWipeout=4', 'Accolade.FlawlessRound=8',
+            '[FLICK.ProfileStats]'
+        )
+        $sampleTime = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        for ($sampleIndex = 0; $sampleIndex -lt 8; $sampleIndex++) {
+            $sampleRanked = if ($sampleIndex % 2 -eq 0) { 1 } else { 0 }
+            $sampleWin = if ($sampleIndex -in @(1, 4, 6)) { 0 } else { 1 }
+            $sampleSize = 1 + ($sampleIndex % 3)
+            $samplePoints = @(430, 190, 360, 280, 120, 410, 240, 320)[$sampleIndex]
+            $profileLines += 'EligibleRecentMatches={0}|0|{1}|{2}|{3}|0|{4}|{5}|{6}|{7}' -f ($sampleTime - $sampleIndex * 3600), $sampleSize, $sampleRanked, $sampleWin, $samplePoints, (2 + $sampleIndex % 4), ($sampleIndex % 2), (7 + $sampleIndex)
+        }
+        $profileLines | Set-Content -LiteralPath (Join-Path $profileConfigDir 'GameUserSettings.ini') -Encoding UTF8
+        $editorProfileConfigDir = Join-Path $userDir 'Saved\Config\WindowsEditor'
+        New-Item -ItemType Directory -Path $editorProfileConfigDir -Force | Out-Null
+        $profileLines | Set-Content -LiteralPath (Join-Path $editorProfileConfigDir 'GameUserSettings.ini') -Encoding UTF8
+    }
     $logPath = Join-Path $userDir 'capture.log'
     # Start-Process joins ArgumentList into the native command line. Quote only
     # known path arguments; screen flags are selected from the closed table above.

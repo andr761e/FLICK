@@ -91,7 +91,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 							FlickPracticeCatalog::BestScore(Category,Difficulty),FlickPracticeCatalog::ChallengesPerRun)); })];
 		}
 		Button->SetContent(SNew(SOverlay)
-			+ SOverlay::Slot()[SNew(SFlickAngularBorder).CutSize(13).UseAccentForOutline(true).Padding(1.5f)
+			+ SOverlay::Slot()[SNew(SFlickAngularBorder).HomeSurface(true).CutSize(13).UseAccentForOutline(true).Padding(1.5f)
 				.BackgroundColor(Panel).AccentColor_Lambda([Active]() { return Active() ? Brand : Cyan.CopyWithNewOpacity(.52f); })
 				[SNew(SFlickMenuArtwork).Artwork(Artwork[Category]).CutSize(11.5f).ShadeForText(true).TextShadeStart(.68f).EdgeFade(FMargin(140,0,0,0))]]
 			+ SOverlay::Slot().Padding(28,18,22,16)
@@ -127,7 +127,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 			.OnClicked_Lambda([this,Difficulty]() { SelectedPracticeDifficulty=Difficulty; if (GameMode.IsValid()) GameMode->PlayMenuSound(true); return FReply::Handled(); });
 		const TWeakPtr<SButton> Weak=Button;
 		Button->SetContent(SNew(SOverlay)
-			+ SOverlay::Slot()[SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(10).UseAccentForOutline(true).Padding(FMargin(20,7))
+			+ SOverlay::Slot()[SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).CutSize(10).UseAccentForOutline(true).Padding(FMargin(20,7))
 			.BackgroundColor_Lambda([Selected,Weak]() { const auto B=Weak.Pin(); return Selected() ? Brand
 				: B && (B->IsHovered() || B->HasKeyboardFocus()) ? PanelRaised : Ink.CopyWithNewOpacity(.84f); })
 			.AccentColor_Lambda([Selected,Weak]() { const auto B=Weak.Pin(); return Selected() || (B && B->HasKeyboardFocus()) ? Brand : Hairline; })
@@ -146,7 +146,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 						.Text_Lambda([CategoryForDetails,Difficulty]() { return FText::FromString(DifficultyDescription(CategoryForDetails(),Difficulty)); })
 						.Font(UiFont(9)).ColorAndOpacity_Lambda([Selected]() { return Selected() ? Ink : Muted; }).AutoWrapText(true)]]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12,0,18,0)
-				[SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(5).UseAccentForOutline(true).Padding(FMargin(9,5))
+				[SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).CutSize(5).UseAccentForOutline(true).Padding(FMargin(9,5))
 					.BackgroundColor_Lambda([Selected]() { return Selected() ? Ink.CopyWithNewOpacity(.075f) : Ink; })
 					.AccentColor_Lambda([Selected]() { return Selected() ? Ink.CopyWithNewOpacity(.22f) : Cyan.CopyWithNewOpacity(.28f); })
 				[SNew(STextBlock).Tag(FName(*FString::Printf(TEXT("PracticeDifficultyScore%d"),Difficulty))).Font(DisplayFont(15))
@@ -164,7 +164,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 		.ToolTipText(FText::FromString(TEXT("Five challenges, one attempt per challenge. Your best completed run is saved for this difficulty. 5/5 earns mastery. Restart begins a fresh run.")))
 		.OnClicked_Lambda([this,CategoryForDetails]() { if (GameMode.IsValid()) GameMode->StartPractice(CategoryForDetails(),SelectedPracticeDifficulty); return FReply::Handled(); });
 	const TWeakPtr<SButton> WeakStart=Start;
-	Start->SetContent(SNew(SFlickAngularBorder).CutSize(13).UseAccentForOutline(true).AccentColor(Brand)
+	Start->SetContent(SNew(SFlickAngularBorder).HomeSurface(true).CutSize(13).UseAccentForOutline(true).AccentColor(Brand)
 		.BackgroundColor_Lambda([WeakStart]() { const auto B=WeakStart.Pin(); return B && (B->IsHovered() || B->HasKeyboardFocus()) ? FLinearColor(.85f,1,.14f) : Brand; }).Padding(FMargin(24,0))
 		[SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0,0,24,0)
@@ -202,7 +202,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 							[SNew(STextBlock).Text(FText::FromString(TEXT("Five shots per run. Master every pack with a perfect score."))).Font(UiFont(12)).ColorAndOpacity(Muted)]]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(24,0,0,0)
 						[SNew(SBox).WidthOverride(330).HeightOverride(54)
-							[SNew(SFlickAngularBorder).CutSize(12).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Panel.CopyWithNewOpacity(.94f)).Padding(FMargin(26,0))
+							[SNew(SFlickAngularBorder).HomeSurface(true).CutSize(12).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Panel.CopyWithNewOpacity(.94f)).Padding(FMargin(26,0))
 								[SNew(SHorizontalBox)
 									+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 									[SNew(STextBlock).Text(FText::FromString(TEXT("MASTERY  //"))).Font(DisplayFont(15)).ColorAndOpacity(Muted)]
@@ -215,7 +215,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 					+ SHorizontalBox::Slot().FillWidth(1)[Categories]
 					+ SHorizontalBox::Slot().AutoWidth().Padding(ColumnGap,0,0,0)
 					[SNew(SBox).WidthOverride(DetailWidth)
-						[SNew(SFlickAngularBorder).Tag(TEXT("PracticeDetails")).CutSize(15).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.5f))
+						[SNew(SFlickAngularBorder).HomeSurface(true).Tag(TEXT("PracticeDetails")).CutSize(15).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.5f))
 							.BackgroundColor(Panel.CopyWithNewOpacity(.94f)).Padding(DetailPadding)
 							[SNew(SVerticalBox)
 								+ SVerticalBox::Slot().AutoHeight()
@@ -232,7 +232,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 								+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).HeightOverride(StartHeight)[Start]]]]]]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0,24,0,0)
 				[SNew(SBox).HeightOverride(FooterHeight)
-					[SNew(SFlickAngularBorder).CutSize(12).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Panel.CopyWithNewOpacity(.9f)).Padding(FMargin(12,9))
+					[SNew(SFlickAngularBorder).HomeSurface(true).CutSize(12).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Panel.CopyWithNewOpacity(.9f)).Padding(FMargin(12,9))
 						[SNew(SHorizontalBox)
 							+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(174)[Back]]
 							+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center).HAlign(HAlign_Right).Padding(24,0)
@@ -261,7 +261,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeOverlay()
 		.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->IsPracticeMode() && GameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing
 			? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 		[
-			SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.97f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(14).Padding(20)
+			SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.97f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(14).Padding(20)
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()

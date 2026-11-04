@@ -1589,7 +1589,7 @@ namespace
 				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
 			}
 			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			if (bHomeSurface) DrawHomeSurface(OutDrawElements, AllottedGeometry, LayerId, Points, Fill, Tint);
+			if (bHomeSurface && FlickUITheme::IsMenuSurface(Fill)) DrawHomeSurface(OutDrawElements, AllottedGeometry, LayerId, Points, Fill, Tint);
 			else FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
 				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
 			if (bHomeSurface)
@@ -1724,7 +1724,7 @@ namespace
 				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
 			}
 			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			if (bHomeSurface) DrawHomeSurface(OutDrawElements, AllottedGeometry, SurfaceLayer, Points, BackgroundColor.Get(), Tint);
+			if (bHomeSurface && FlickUITheme::IsMenuSurface(BackgroundColor.Get())) DrawHomeSurface(OutDrawElements, AllottedGeometry, SurfaceLayer, Points, BackgroundColor.Get(), Tint);
 			else FSlateDrawElement::MakeCustomVerts(OutDrawElements, SurfaceLayer,
 				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
 			if (bHomeSurface) DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline, Accent, 1.1f);

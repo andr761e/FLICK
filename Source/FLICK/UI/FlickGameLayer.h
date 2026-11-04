@@ -107,6 +107,8 @@ private:
 	void EquipLockerItem(int32 Category, int32 Index);
 	TSharedRef<SWidget> BuildRankedProfilePanel();
 	TSharedRef<SWidget> BuildProfileStatsPanel();
+	TSharedRef<SWidget> BuildProfileDetailPages();
+	TSharedRef<SWidget> BuildProfileHistoryPanel();
 	TSharedRef<SWidget> BuildStartupOverlay();
 	TSharedRef<SWidget> BuildSocialPanel();
 	TSharedRef<SWidget> BuildSocialFriendRow(int32 FriendIndex);

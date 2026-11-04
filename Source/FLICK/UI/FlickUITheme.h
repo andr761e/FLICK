@@ -21,6 +21,13 @@ namespace FlickUITheme
 	inline const FLinearColor Orange(1.0f, 0.31f, 0.055f, 1.0f);
 	inline const FLinearColor Hairline = FLinearColor::FromSRGBColor(FColor(55, 167, 210, 210));
 	inline const FLinearColor Track = FLinearColor::FromSRGBColor(FColor(28, 63, 85));
+	inline bool IsMenuSurface(const FLinearColor Fill)
+	{
+		for (const FLinearColor Surface : {Panel, PanelRaised, PanelSelected, Ink})
+			if (FMath::IsNearlyEqual(Fill.R, Surface.R) && FMath::IsNearlyEqual(Fill.G, Surface.G)
+				&& FMath::IsNearlyEqual(Fill.B, Surface.B)) return true;
+		return false;
+	}
 
 	// Shared framing, not layout: small controls and large pages retain their
 	// existing sizes. The menu's swept navigation remains home-specific.

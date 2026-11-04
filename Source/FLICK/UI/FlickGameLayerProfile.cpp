@@ -176,7 +176,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileOverview()
 			return FText::FromString(TEXT("Your latest results,\nready to revisit."));
 		};
 		Button->SetContent(SNew(SOverlay)
-			+ SOverlay::Slot()[SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(15).UseAccentForOutline(true).BorderWidth(.8f)
+			+ SOverlay::Slot()[SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).CutSize(15).UseAccentForOutline(true).BorderWidth(.8f)
 				.AccentColor_Lambda([Active]() { return Active() ? Brand : Hairline.CopyWithNewOpacity(.7f); })
 				.BackgroundColor_Lambda([Active]() { return Active() ? FlickProfileStyle::SurfaceHover : FlickProfileStyle::Surface; }).Padding(0)[Art]]
 			+ SOverlay::Slot().Padding(FlickProfileStyle::CardPadding,24)

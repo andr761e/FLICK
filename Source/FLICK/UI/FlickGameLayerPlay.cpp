@@ -99,7 +99,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight().Padding(UiMetrics::CardGap)
 				[
-					SNew(SFlickAngularBorder)
+					SNew(SFlickAngularBorder).HomeSurface(true)
 					.BackgroundColor(Panel.CopyWithNewOpacity(.82f))
 					.AccentColor(Orange.CopyWithNewOpacity(0.66f))
 					.CutSize(8.0f)
@@ -207,7 +207,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeSelect()
 			SNew(SBox).HeightOverride(64).Visibility_Lambda([this]() { return SelectedPlayPlaylist == EFlickPlayPlaylist::Training
 				&& SelectedTrainingActivity == EFlickTrainingActivity::PracticePacks ? EVisibility::Collapsed : EVisibility::Visible; })
 			[
-				SNew(SFlickAngularBorder).CutSize(12).UseAccentForOutline(true).BorderWidth(.8f)
+				SNew(SFlickAngularBorder).HomeSurface(true).CutSize(12).UseAccentForOutline(true).BorderWidth(.8f)
 				.AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Ink.CopyWithNewOpacity(.82f))
 				.Padding(FMargin(18, 6))
 				[
@@ -342,7 +342,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchSetup()
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.65f).Padding(0, 0, 18, 0)
 				[
-					SNew(SFlickAngularBorder).BackgroundColor(Panel.CopyWithNewOpacity(.91f)).AccentColor(Cyan.CopyWithNewOpacity(.6f))
+					SNew(SFlickAngularBorder).HomeSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.91f)).AccentColor(Cyan.CopyWithNewOpacity(.6f))
 						.UseAccentForOutline(true).CutSize(12).Padding(FMargin(26, 20))
 					[
 						SNew(SVerticalBox)
@@ -642,7 +642,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildOnlineBrowser()
 		[
 			SNew(SBox).HeightOverride(116.0f)
 			[
-				SNew(SFlickAngularBorder)
+				SNew(SFlickAngularBorder).HomeSurface(true)
 				.BackgroundColor(FLinearColor(0.002f, 0.008f, 0.016f, 0.95f))
 				.AccentColor(Cyan.CopyWithNewOpacity(0.76f))
 				.CutSize(10.0f)
@@ -702,7 +702,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildOnlineBrowser()
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				SNew(SFlickAngularBorder)
+				SNew(SFlickAngularBorder).HomeSurface(true)
 				.BackgroundColor(FLinearColor(0.006f, 0.018f, 0.03f, 0.97f))
 				.AccentColor(Hairline)
 				.CutSize(12.0f)
@@ -752,7 +752,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildOnlineBrowser()
 		[
 			SNew(SBox).HeightOverride(82.0f)
 			[
-				SNew(SFlickAngularBorder)
+				SNew(SFlickAngularBorder).HomeSurface(true)
 				.BackgroundColor(FLinearColor(0.002f, 0.007f, 0.014f, 0.95f))
 				.AccentColor(Cyan.CopyWithNewOpacity(0.58f))
 				.CutSize(8.0f)
@@ -872,7 +872,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildOnlineSessionRow(const int32 ResultInd
 			return Sessions && Sessions->GetBrowserEntries().IsValidIndex(ResultIndex) ? EVisibility::Visible : EVisibility::Collapsed;
 		})
 		[
-			SNew(SFlickAngularBorder)
+			SNew(SFlickAngularBorder).HomeSurface(true)
 			.BackgroundColor(FLinearColor(0.008f, 0.018f, 0.03f, 0.98f))
 			.AccentColor(Hairline)
 			.CutSize(12.0f)
@@ -943,7 +943,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildNetworkLobby()
 				: EVisibility::Collapsed;
 		})
 		[
-		SNew(SFlickAngularBorder)
+		SNew(SFlickAngularBorder).HomeSurface(true)
 			.BackgroundColor(FLinearColor(0.006f, 0.015f, 0.026f, 0.96f))
 			.AccentColor(Accent)
 			.CutSize(15.0f)
@@ -1111,7 +1111,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildNetworkLobby()
 		[
 			SNew(SBox).HeightOverride(82.0f)
 			[
-				SNew(SFlickAngularBorder)
+				SNew(SFlickAngularBorder).HomeSurface(true)
 				.BackgroundColor(FLinearColor(0.002f, 0.007f, 0.014f, 0.95f))
 				.AccentColor(Cyan.CopyWithNewOpacity(0.58f))
 				.CutSize(8.0f)

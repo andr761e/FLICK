@@ -79,7 +79,7 @@ namespace FlickPlaylistWidgets
 	inline TSharedRef<SWidget> BackContent(const TWeakPtr<SButton>& WeakButton)
 	{
 		using namespace FlickUITheme;
-		return SNew(SFlickAngularBorder).CutSize(11).Padding(FMargin(20, 0)).UseAccentForOutline(true)
+		return SNew(SFlickAngularBorder).HomeSurface(true).CutSize(11).Padding(FMargin(20, 0)).UseAccentForOutline(true)
 			.AccentColor_Lambda([WeakButton]() {
 				const auto Button = WeakButton.Pin();
 				return Button.IsValid() && (Button->IsHovered() || Button->HasKeyboardFocus()) ? Brand : Cyan.CopyWithNewOpacity(.55f);
@@ -132,7 +132,7 @@ namespace FlickPlaylistWidgets
 	inline TSharedRef<SWidget> Footer(const TSharedRef<SWidget>& Content)
 	{
 		return SNew(SBox).HeightOverride(64)
-			[SNew(SFlickAngularBorder).CutSize(12).BorderWidth(.8f).UseAccentForOutline(true)
+			[SNew(SFlickAngularBorder).HomeSurface(true).CutSize(12).BorderWidth(.8f).UseAccentForOutline(true)
 				.AccentColor(FlickUITheme::Cyan.CopyWithNewOpacity(.6f))
 				.BackgroundColor(FlickUITheme::Panel).Padding(FMargin(18, 6))[Content]];
 	}
@@ -140,7 +140,7 @@ namespace FlickPlaylistWidgets
 	inline TSharedRef<SWidget> Card(const EFlickMenuArtwork Artwork, const TAttribute<bool>& Active,
 		const TSharedRef<SWidget>& Content, const float ArtworkWidth = 0)
 	{
-		return SNew(SFlickAngularBorder).CutSize(12).Padding(1.5f).UseAccentForOutline(true)
+		return SNew(SFlickAngularBorder).HomeSurface(true).CutSize(12).Padding(1.5f).UseAccentForOutline(true)
 			.AccentColor(TAttribute<FLinearColor>::CreateLambda([Active]() {
 				return Active.Get() ? FlickUITheme::Brand : FlickUITheme::Cyan.CopyWithNewOpacity(.52f);
 			}))
