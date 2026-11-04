@@ -73,6 +73,13 @@ namespace
 		return nullptr;
 	}
 
+	bool IsReplayCreditVisible(const TSharedRef<SWidget>& Root)
+	{
+		Root->Invalidate(EInvalidateWidgetReason::Prepass);
+		Root->SlatePrepass(1.0f);
+		return FindVisibleTag(Root, TEXT("CinematicReplayOverlay")).IsValid();
+	}
+
 	bool PressButton(const TSharedPtr<SButton>& Button)
 	{
 		if (!Button.IsValid() || !Button->IsEnabled()) return false;
@@ -528,21 +535,38 @@ bool FFlickPackagedStartupTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Bot class screen reopens"), ActivateButton(Layer, TEXT("1V1 VS BOT")));
 		TestTrue(TEXT("Confirm Class accepts input"), ActivateTag(Layer, TEXT("ClassConfirm")));
 		TestTrue(TEXT("Confirmation starts actual bot training"), Mode->IsTrainingBotMatch() && Mode->GetFrontendScreen() == EFlickFrontendScreen::Playing);
+		Layer->bReplayOverlayPreview = true;
+		TestTrue(TEXT("Replay credit is visible during playback"), IsReplayCreditVisible(Layer));
+		{
+			TGuardValue<TWeakObjectPtr<AFlickGameMode>> ClientView(Layer->GameMode, TWeakObjectPtr<AFlickGameMode>());
+			for (const auto Screen : {EFlickFrontendScreen::Paused, EFlickFrontendScreen::Settings})
+			{
+				Controller->SetLocalMatchMenuScreen(Screen);
+				TestFalse(TEXT("Remote-client menus hide replay credit without an authority game mode"), IsReplayCreditVisible(Layer));
+			}
+			Controller->SetLocalMatchMenuScreen(EFlickFrontendScreen::Playing);
+			TestTrue(TEXT("Remote-client replay credit returns after menus close"), IsReplayCreditVisible(Layer));
+		}
 		Mode->TogglePauseMenu();
+		TestFalse(TEXT("Replay credit is hidden under pause"), IsReplayCreditVisible(Layer));
 		Layer->Invalidate(EInvalidateWidgetReason::Prepass);
 		Layer->SlatePrepass(1.0f);
 		TestTrue(TEXT("Centered pause panel exists"), FindVisibleTag(Layer, TEXT("CenteredPausePanel")).IsValid());
 		TestTrue(TEXT("Training pause shows contextual exit"), ContainsLabel(Layer, TEXT("EXIT TRAINING")));
 		TestTrue(TEXT("Pause Settings accepts input"), ActivateTag(Layer, TEXT("PauseSETTINGS")));
 		TestTrue(TEXT("Pause opens actual settings"), Mode->GetFrontendScreen() == EFlickFrontendScreen::Settings);
+		TestFalse(TEXT("Replay credit is hidden under settings"), IsReplayCreditVisible(Layer));
 		TestTrue(TEXT("Settings returns to pause"), ActivateTag(Layer, TEXT("SettingsBack")));
 		TestTrue(TEXT("Pause restored after settings"), Mode->GetFrontendScreen() == EFlickFrontendScreen::Paused);
 		TestTrue(TEXT("Pause Change Class accepts input"), ActivateTag(Layer, TEXT("PauseCHANGECLASS")));
 		TestTrue(TEXT("In-match class selection remains deferred to next round"), Mode->IsChangingClassForNextRound());
+		TestFalse(TEXT("Replay credit is hidden under class selection"), IsReplayCreditVisible(Layer));
 		TestTrue(TEXT("Deferred class confirm accepts input"), ActivateTag(Layer, TEXT("ClassConfirm")));
 		TestTrue(TEXT("Class change returns to pause with queued state"), Mode->GetFrontendScreen() == EFlickFrontendScreen::Paused && Mode->HasPendingClassChanges());
 		TestTrue(TEXT("Pause Resume accepts input"), ActivateTag(Layer, TEXT("PauseRESUME")));
 		TestTrue(TEXT("Resume restores Playing"), Mode->GetFrontendScreen() == EFlickFrontendScreen::Playing);
+		TestTrue(TEXT("Replay credit returns on resume"), IsReplayCreditVisible(Layer));
+		Layer->bReplayOverlayPreview = false;
 		Mode->TogglePauseMenu();
 		TestTrue(TEXT("Training Exit accepts input"), ActivateTag(Layer, TEXT("PauseFORFEIT")));
 		TestTrue(TEXT("Training Exit returns Home"), Mode->GetFrontendScreen() == EFlickFrontendScreen::MainMenu);

@@ -25,21 +25,22 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLightingSettings()
 					[
 						SNew(SBox).HeightOverride(6.0f)
 						[SNew(SProgressBar).Style(&ShotClockBarStyle).FillColorAndOpacity(Brand)
-							.Percent_Lambda([Scene, Control]() { return TOptional<float>(GetValue(Scene(), Control) / GetControl(Control).Maximum); })]
+							.Percent_Lambda([Scene, Control]() { const auto& D = GetControl(Control); return TOptional<float>((GetValue(Scene(), Control) - D.Minimum) / (D.Maximum - D.Minimum)); })]
 					]
 					+ SOverlay::Slot()
 					[
-						SNew(SSlider).Style(&SliderStyle).MinValue(0.0f).MaxValue(Definition.Maximum).StepSize(0.01f)
-						.Value_Lambda([Scene, Control]() { return GetValue(Scene(), Control); })
-						.OnValueChanged_Lambda([Scene, Control, Refresh](float Value) { SetValue(Scene(), Control, Value); Refresh(); })
+						SNew(SSlider).Style(&SliderStyle).MinValue(0.f).MaxValue(2.f).StepSize(.01f)
+						.Value_Lambda([Scene, Control]() { const auto& D = GetControl(Control); return 2.f * (GetValue(Scene(), Control) - D.Minimum) / (D.Maximum - D.Minimum); })
+						.OnValueChanged_Lambda([Scene, Control, Refresh](float Value) { const auto& D = GetControl(Control); SetValue(Scene(), Control, FMath::Lerp(D.Minimum, D.Maximum, Value * .5f)); Refresh(); })
 					]
 				]
 				+ SHorizontalBox::Slot().FillWidth(0.14f).VAlign(VAlign_Center).HAlign(HAlign_Right)
 				[SNew(STextBlock).Text_Lambda([Scene, Control]()
 				{
 					const float Value = GetValue(Scene(), Control);
-					const float Intensity = Control == EControl::Ambient ? AmbientIntensityScale(Value) : Value;
-					return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Intensity * 100.f)));
+					const auto& D = GetControl(Control);
+					const float DisplayValue = 2.f * (Value - D.Minimum) / (D.Maximum - D.Minimum);
+					return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(DisplayValue * 100.f)));
 				}).Font(UiFont(11, true)).ColorAndOpacity(Brand)]
 			]
 		];
@@ -54,7 +55,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLightingSettings()
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 4.0f)
 		[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(bLightingPreview
 			? TEXT("LIVE ARENA // Fill improves visibility without adding glare.")
-			: TEXT("PREVIEW ARENA shows live changes; this backdrop is concept artwork.")); }).Font(UiFont(10)).ColorAndOpacity(Cyan).AutoWrapText(true)]
+			: TEXT("100% is recommended. The 0-200% sliders adjust lighting by up to 25%. PREVIEW ARENA shows live changes.")); }).Font(UiFont(10)).ColorAndOpacity(Cyan).AutoWrapText(true)]
 		+ SVerticalBox::Slot().AutoHeight()[Rows]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
 		[

@@ -1,4 +1,5 @@
 #include "Ranking/FlickRankingSubsystem.h"
+#include "Online/FlickAchievementSubsystem.h"
 
 #include "Core/FlickLog.h"
 #include "Interfaces/OnlineIdentityInterface.h"
@@ -90,6 +91,7 @@ void UFlickRankingSubsystem::ApplyTrustedProgress(
 	if (RankingService)
 	{
 		RankingService->CacheAuthoritativeProgress(Variant, PlayersPerTeam, Progress);
+		if (auto* A = GetGameInstance()->GetSubsystem<UFlickAchievementSubsystem>()) A->RecordPlacements(Variant, PlayersPerTeam, Progress.MatchesPlayed);
 	}
 }
 
@@ -102,6 +104,7 @@ bool UFlickRankingSubsystem::ApplyTrustedUpdate(const FFlickRatingUpdate& Update
 	LastRatingUpdate = Update;
 	FlickRankRules::RefreshRankMetadata(LastRatingUpdate);
 	RankingService->CacheAuthoritativeUpdate(LastRatingUpdate);
+	if (auto* A = GetGameInstance()->GetSubsystem<UFlickAchievementSubsystem>()) A->RecordPlacements(Update.Variant, Update.PlayersPerTeam, Update.MatchesPlayed);
 	UE_LOG(
 		LogFlick,
 		Log,

@@ -17,6 +17,8 @@
 #include "Misc/Paths.h"
 #include "Player/FlickCameraPawn.h"
 #include "UnrealClient.h"
+#include "Engine/RectLight.h"
+#include "Components/LightComponent.h"
 
 namespace
 {
@@ -69,6 +71,31 @@ bool FFlickReplayCosmeticsTest::RunTest(const FString& Parameters)
  AFlickWorldFeedback* LiveBurst = Mode->ReplayEffectEvents[0].LiveFeedback.Get();
  Mode->BeginCinematicRoundReplay(EFlickMatchOutcome::Player1Wins);
  TestTrue(TEXT("Real replay entry succeeds"), Mode->bCinematicReplayActive);
+ // Reproduce a private-match replay paused while browsing both submenus.
+ Mode->bPrivateMatchActive = true;
+ Mode->bPlayerClassesActiveForMatch = true;
+ Mode->FrontendScreen = EFlickFrontendScreen::Playing;
+ Mode->RefreshLightingSettings();
+ const float ReplayKeyIntensity = Mode->TestPuckKeyLight ? Mode->TestPuckKeyLight->GetLightComponent()->Intensity : -1.f;
+ TestNotNull(TEXT("Replay lighting rig"), Mode->TestPuckKeyLight.Get());
+ Mode->TogglePauseMenu();
+ for (int32 Visit = 0; Visit < 2; ++Visit)
+ {
+  Mode->OpenSettings(); Mode->CloseSettings();
+  Mode->OpenClassChange();
+  TestTrue(TEXT("Paused replay permits the deferred class picker"), Mode->IsChangingClassForNextRound());
+  Mode->CancelClassSelection();
+  TestTrue(TEXT("Cancelling a replay class draft preserves the upgraded arena"), Mode->bTestArenaMode);
+  if (Mode->TestPuckKeyLight)
+   TestEqual(TEXT("Cancelling preserves replay lighting intensity"), Mode->TestPuckKeyLight->GetLightComponent()->Intensity, ReplayKeyIntensity);
+  TestTrue(TEXT("Submenus return to pause"), Mode->GetFrontendScreen() == EFlickFrontendScreen::Paused);
+  TestTrue(TEXT("Menu visits preserve the replay"), Mode->bCinematicReplayActive);
+ }
+ Mode->TogglePauseMenu();
+ TestTrue(TEXT("Replay resumes in Playing"), Mode->GetFrontendScreen() == EFlickFrontendScreen::Playing);
+ AFlickPiece* NextPuck = Mode->SpawnPiece(EFlickTeam::Player2, 2, FVector(100, 300, 20), EFlickPieceArchetype::Standard);
+ if (TestNotNull(TEXT("Next-round puck"), NextPuck))
+  TestTrue(TEXT("Pucks spawned after cancelling still use detailed visuals"), NextPuck->HasTestArenaVisuals());
  TestTrue(TEXT("Live burst removed before rewind"), !IsValid(LiveBurst) || LiveBurst->IsActorBeingDestroyed());
  Mode->ApplyCinematicReplayTime(0);
  for (int32 Index = 1; Index <= 30; ++Index)

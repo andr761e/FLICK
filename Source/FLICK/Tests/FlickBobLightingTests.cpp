@@ -6,6 +6,7 @@
 #include "Components/RectLightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Core/FlickLightingSettings.h"
+#include "Core/FlickPuckFinish.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/Engine.h"
 #include "Engine/PointLight.h"
@@ -117,6 +118,11 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 	const auto CheckPower = [&](float Scale, float Ambient, float FillPreference, float KeyPreference,
 		float RimPreference, float AccentPreference, float Direct, float Highlights)
 	{
+		const auto Clamp = [](EControl C, float V) { return FMath::Clamp(V, GetControl(C).Minimum, GetControl(C).Maximum); };
+		Ambient = Clamp(EControl::Ambient, Ambient); FillPreference = Clamp(EControl::Fill, FillPreference);
+		KeyPreference = Clamp(EControl::Key, KeyPreference); RimPreference = Clamp(EControl::Rim, RimPreference);
+		AccentPreference = Clamp(EControl::Accents, AccentPreference); Direct = Clamp(EControl::Direct, Direct);
+		Highlights = Clamp(EControl::Highlights, Highlights);
 		const float Area = FMath::Square(Scale);
 		TestTrue(TEXT("BOB key power follows preferences and source-board area"),
 			FMath::IsNearlyEqual(Key->Intensity, Bob.BobKeyLightLumens * Area * KeyPreference, .02f));
@@ -146,9 +152,12 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Puck studio supplies fixed neutral illumination"), PuckLight->DiffuseScale, 1.f);
 		TestFalse(TEXT("Puck fixture adds no shadow pass"), PuckLight->CastShadows);
 		TestEqual(TEXT("Puck fixture adds no indirect illumination"), PuckLight->IndirectLightingIntensity, 0.f);
+		const FQuat Frame = FQuat::Identity;
+		UpdatePuckStudioLights(Rig.PuckFinishLight, Rig.PuckFillLight, FVector(0, -1800, 1400), 1.f, 250.f, &Frame, true);
+		TestEqual(TEXT("Small BOB coins retain a clear silver reflection"), PuckLight->SpecularScale, Bob.BobPuckKeySpecularScale);
 	}
 	CheckPose(1.f, 250.f);
-	CheckPower(1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, .35f);
+	CheckPower(1.f, 3.f, 3.f, 3.f, 3.f, 1.65f, 2.25f, .48f);
 	TestTrue(TEXT("BOB key uses lumens"), Key->IntensityUnits == ELightUnits::Lumens);
 	TestTrue(TEXT("BOB rim uses lumens"), Rim->IntensityUnits == ELightUnits::Lumens);
 	TestTrue(TEXT("BOB fill uses lumens"), Fill->IntensityUnits == ELightUnits::Lumens);
@@ -197,6 +206,8 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 	// Reusing BOB's lumen-valued fixtures must not alter Knockout's unitless rig.
 	FParameters Knockout;
 	Configure(World, Rig, Knockout);
+	TestEqual(TEXT("BOB highlight calibration cannot leak into Knockout"),
+		Rig.PuckFinishLight->RectLightComponent->SpecularScale, Knockout.PuckGameplayKeySpecularScale);
 	TestTrue(TEXT("Returning to Knockout restores key intensity units"), Key->IntensityUnits == ELightUnits::Unitless);
 	TestTrue(TEXT("Returning to Knockout restores rim intensity units"), Rim->IntensityUnits == ELightUnits::Unitless);
 	TestTrue(TEXT("Returning to Knockout restores fill intensity units"), Fill->IntensityUnits == ELightUnits::Unitless);
@@ -207,14 +218,14 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("BOB rail softness cannot leak into Knockout accents"), Accent->SoftSourceRadius, 0.f);
 	}
 	TestEqual(TEXT("Knockout key retains its original intensity"), Key->Intensity,
-		Knockout.TestPuckKeyLightIntensity * Knockout.OneVsOneGameplaySoftboxMultiplier);
-	TestEqual(TEXT("Knockout fill retains its original intensity"), Fill->Intensity, Knockout.OneVsOneFillLightIntensity);
+		Knockout.TestPuckKeyLightIntensity * Knockout.OneVsOneGameplaySoftboxMultiplier * 3.f);
+	TestEqual(TEXT("Knockout fill retains its original intensity"), Fill->Intensity, Knockout.OneVsOneFillLightIntensity * 3.f);
 	CheckCounts(15, 9);
 	Bob.ArenaRadius = 620.f;
 	Bob.ArenaSurfaceZ = 250.f;
 	Configure(World, Rig, Bob);
 	CheckPose(1.f, 250.f);
-	CheckPower(1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, .35f);
+	CheckPower(1.f, 3.f, 3.f, 3.f, 3.f, 1.65f, 2.25f, .48f);
 	for (const auto& Actor : Rig.RimSpillLights)
 		if (TestNotNull(TEXT("Knockout rim lights remain reusable"), Actor.Get()))
 			TestEqual(TEXT("Knockout rim spill never lights the BOB scene"), Actor->PointLightComponent->Intensity, 0.f);
@@ -238,9 +249,12 @@ bool FFlickBobLightingTest::RunTest(const FString& Parameters)
 			Camera->SetTestArenaPresentation(false);
 			Camera->SetBobGameplayFraming(true);
 			const auto& Post = View->PostProcessSettings;
-			TestEqual(TEXT("BOB bloom is restrained around the existing LEDs"), Post.BloomIntensity, .25f);
-			TestEqual(TEXT("BOB bloom starts above the polished board's ordinary highlights"), Post.BloomThreshold, 1.15f);
-			TestEqual(TEXT("BOB exposure preserves warm ivory and dark walnut contrast"), Post.AutoExposureBias, -.65f);
+			TestEqual(TEXT("BOB shares the approved puck bloom"), Post.BloomIntensity, FlickPuckFinish::ReferenceBloomIntensity);
+			TestEqual(TEXT("BOB shares the approved puck bloom threshold"), Post.BloomThreshold, FlickPuckFinish::ReferenceBloomThreshold);
+			TestEqual(TEXT("BOB shares the approved puck exposure"), Post.AutoExposureBias, FlickPuckFinish::ReferenceExposureBias);
+			TestTrue(TEXT("BOB's pale board cannot darken pucks through eye adaptation"),
+				Post.bOverride_AutoExposureMinBrightness && Post.bOverride_AutoExposureMaxBrightness
+				&& Post.AutoExposureMinBrightness == Post.AutoExposureMaxBrightness);
 			TestEqual(TEXT("BOB does not add artificial grain to material detail"), Post.FilmGrainIntensity, 0.f);
 			TestTrue(TEXT("BOB keeps a neutral gamma"), Post.ColorGamma == FVector4(1.f, 1.f, 1.f, 1.f));
 			TestTrue(TEXT("BOB uses gentle contrast instead of crushing the walnut frame"), Post.ColorContrast == FVector4(1.1f, 1.1f, 1.1f, 1.f));

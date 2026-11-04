@@ -348,7 +348,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 		return SNew(SBox).HeightOverride(1)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(.20f))];
 	};
 	const TSharedRef<SWidget> GameFeel = SNew(SFlickAngularBorder).RefinedSurface(true).Tag(TEXT("SettingsGameplayPanel")).CutSize(13).Padding(FMargin(22,18))
-		.UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).BackgroundColor(Ink.CopyWithNewOpacity(.78f))
+		.UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).BackgroundColor(Panel.CopyWithNewOpacity(.78f))
 		[SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[SNew(SHorizontalBox)
@@ -418,7 +418,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	.Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera || SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })
 	+ SVerticalBox::Slot().FillHeight(1.0f)
 	[
-		SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.78f)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
+		SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.78f)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("02"), TEXT("CAMERA"), TEXT("Adjust camera motion, orbit response, and free-camera control."))]]
@@ -444,7 +444,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	SNew(SVerticalBox)
 	+ SVerticalBox::Slot().FillHeight(1.0f)
 	[
-		SNew(SFlickAngularBorder).RefinedSurface(true).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Sound ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(Ink.CopyWithNewOpacity(.78f)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
+		SNew(SFlickAngularBorder).RefinedSurface(true).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Sound ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(Panel.CopyWithNewOpacity(.78f)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT("02"), TEXT("SOUND"), TEXT("Set the balance of the arena and the interface."))]
@@ -458,7 +458,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	]
 	+ SVerticalBox::Slot().FillHeight(1.0f)
 	[
-		SNew(SFlickAngularBorder).RefinedSurface(true).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::StreamSafe ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(Ink.CopyWithNewOpacity(.78f)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
+		SNew(SFlickAngularBorder).RefinedSurface(true).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::StreamSafe ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(Panel.CopyWithNewOpacity(.78f)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT(""), TEXT("STREAM SAFE"), TEXT("Mute menu and replay music without muting gameplay or interface feedback."))]
@@ -468,7 +468,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	]
 	+ SVerticalBox::Slot().FillHeight(1.0f)
 	[
-		SNew(SFlickAngularBorder).RefinedSurface(true).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Display ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(Ink.CopyWithNewOpacity(.78f)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
+		SNew(SFlickAngularBorder).RefinedSurface(true).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Display ? EVisibility::Visible : EVisibility::Collapsed; }).BackgroundColor(Panel.CopyWithNewOpacity(.78f)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(10.0f).Padding(FMargin(24.0f, 18.0f))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()[SectionHeading(TEXT(""), TEXT("VIDEO"), TEXT("Choose a supported display mode, then apply it. Graphics quality saves immediately."))]
@@ -536,7 +536,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 				[SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(13)).ColorAndOpacity_Lambda([Color]() { return FSlateColor(Color.Get()); })]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6,0,18,0)
 				[SNew(SFlickAngularBorder).RefinedSurface(true).Visibility(bDev ? EVisibility::HitTestInvisible : EVisibility::Collapsed)
-					.UseAccentForOutline(true).AccentColor(Cyan).CutSize(5).Padding(FMargin(5,2)).BackgroundColor(Ink)
+					.UseAccentForOutline(true).AccentColor(Cyan).CutSize(5).Padding(FMargin(5,2)).BackgroundColor(Panel)
 					[SNew(STextBlock).Text(FText::FromString(TEXT("DEV"))).Font(DisplayFont(9)).ColorAndOpacity(Cyan)]]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[SNew(STextBlock).Text(FText::FromString(TEXT("\u203A"))).Font(UiFont(23)).ColorAndOpacity_Lambda([Color]() { return FSlateColor(Color.Get()); })]]);
@@ -558,7 +558,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	const TSharedRef<SWidget> Help = SNew(SBox).HeightOverride(FlickSettingsStyle::HelpHeight)
 		.Visibility_Lambda([IsWide]() { return IsWide() ? EVisibility::Collapsed : EVisibility::Visible; })
 		[SNew(SFlickAngularBorder).RefinedSurface(true).Tag(TEXT("SettingsHelp")).CutSize(13).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.5f))
-			.BackgroundColor(Ink.CopyWithNewOpacity(.82f)).Padding(12)
+			.BackgroundColor(Panel.CopyWithNewOpacity(.82f)).Padding(12)
 			[SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1).Padding(8,4,20,4)
 				[SNew(SVerticalBox)
@@ -615,12 +615,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 					+ SHorizontalBox::Slot().AutoWidth().Padding(0,8,16,0)
 					[SNew(SBox).WidthOverride(FlickSettingsStyle::RailWidth)
 						[SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(14).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f))
-							.BackgroundColor(Ink.CopyWithNewOpacity(.92f)).Padding(FMargin(3,8))
+							.BackgroundColor(Panel.CopyWithNewOpacity(.92f)).Padding(FMargin(3,8))
 							[SNew(SScrollBox).ScrollBarThickness(FVector2D(3,3)) + SScrollBox::Slot()[Navigation]]]]
 					+ SHorizontalBox::Slot().AutoWidth()
 					[SNew(SBox).WidthOverride_Lambda([IsWide]() { return IsWide() ? FlickSettingsStyle::WidePanelWidth : FlickSettingsStyle::PanelWidth; })
 						[SNew(SFlickAngularBorder).RefinedSurface(true).Tag(TEXT("SettingsContentFrame")).CutSize(18).UseAccentForOutline(true)
-							.AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Ink.CopyWithNewOpacity(.80f)).Padding(FMargin(20,20,20,18))
+							.AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Panel.CopyWithNewOpacity(.80f)).Padding(FMargin(20,20,20,18))
 							[SNew(SVerticalBox)
 								+ SVerticalBox::Slot().AutoHeight().Padding(4,0,0,14)
 								[SNew(STextBlock).Text(FText::FromString(TEXT("MAKE IT YOURS."))).Font(DisplayFont(44)).ColorAndOpacity(Paper)]

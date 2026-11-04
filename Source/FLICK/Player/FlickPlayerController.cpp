@@ -1,4 +1,5 @@
 #include "Player/FlickPlayerController.h"
+#include "Online/FlickAchievementSubsystem.h"
 #include "Core/FlickRankRules.h"
 #include "Arena/FlickArenaLighting.h"
 #include "Arena/FlickTestArena.h"
@@ -2303,4 +2304,14 @@ AFlickGameMode* AFlickPlayerController::GetFlickGameMode() const
 AFlickGameState* AFlickPlayerController::GetFlickGameState() const
 {
 	return GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
+}
+
+void AFlickPlayerController::ClientCommitAchievements_Implementation(const FFlickAchievementReport& Report, bool bRankedWin, EFlickMatchVariant Variant, int32 TeamSize)
+{
+    if (!IsLocalController() || !GetGameInstance()) return;
+    if (auto* Achievements = GetGameInstance()->GetSubsystem<UFlickAchievementSubsystem>())
+    {
+        Achievements->AcceptMatch(Report);
+        if (bRankedWin) Achievements->RecordRankedWin(Variant, TeamSize);
+    }
 }

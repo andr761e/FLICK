@@ -30,6 +30,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickOneVsOneLightingTest, "FLICK.Visuals.Knoc
 bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 {
 	using namespace FlickLightingSettings;
+	const auto Preference = [](EControl C) { return GetValue(EScene::Gameplay, C); };
 	const FString TestIni = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation"),
 		TEXT("LightingRig-") + FGuid::NewGuid().ToString() + TEXT(".ini"));
 	const FString PreviousIni = GGameUserSettingsIni;
@@ -66,8 +67,8 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		URectLightComponent* Rim = RimActor->RectLightComponent;
 		USkyLightComponent* Sky = SkyActor->GetLightComponent();
 		TestEqual(TEXT("1v1 gains evenly distributed reflected environment light"), Sky->Intensity,
-			1.05f * Mode->OneVsOneSkyLightMultiplier * AmbientIntensityScale(1.f));
-		TestEqual(TEXT("1v1 gameplay uses a slightly brighter broad fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 1.0f);
+			1.05f * Mode->OneVsOneSkyLightMultiplier * AmbientIntensityScale(Preference(EControl::Ambient)));
+		TestEqual(TEXT("1v1 gameplay uses a slightly brighter broad fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill));
 		TestTrue(TEXT("Fill remains overhead and centred"), FillActor->GetActorLocation().Equals(FVector(0.0f, 0.0f, 1150.0f)));
 		TestTrue(TEXT("Whole board remains comfortably inside fill falloff"),
 			Fill->AttenuationRadius > 1.8f * FVector(650.0f, 0.0f, Mode->ArenaSurfaceZ - 1150.0f).Size());
@@ -90,6 +91,8 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		const auto InitialRimSpillLights = FlickArenaLighting::FindRig(World).RimSpillLights;
 		const auto CheckRimSpill = [&](float Radius, float SurfaceZ, float WarmPreference, float ReflectionPreference)
 		{
+			WarmPreference = FMath::Clamp(WarmPreference, GetControl(EControl::Rim).Minimum, GetControl(EControl::Rim).Maximum);
+			ReflectionPreference = FMath::Clamp(ReflectionPreference, GetControl(EControl::Highlights).Minimum, GetControl(EControl::Highlights).Maximum);
 			const float Scale = Radius / 650.f;
 			const auto Rig = FlickArenaLighting::FindRig(World);
 			for (int32 Index = 0; Index < Rig.RimSpillLights.Num(); ++Index)
@@ -130,10 +133,10 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		Mode->FrontendScreen = EFlickFrontendScreen::MainMenu;
 		Mode->SpawnLightingIfNeeded();
 		TestEqual(TEXT("Menu retains the same neutral ambient coverage"), Sky->Intensity, GameplaySky);
-		TestEqual(TEXT("Menu retains its original broad overhead fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity);
+		TestEqual(TEXT("Menu retains its original broad overhead fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill));
 		TestEqual(TEXT("Menu keeps its own stronger softbox highlights"), Key->Intensity,
-			Mode->TestPuckKeyLightIntensity * Mode->OneVsOneMenuSoftboxMultiplier);
-		TestEqual(TEXT("Menu softboxes default to restrained glare"), Key->SpecularScale, 0.35f);
+			Mode->TestPuckKeyLightIntensity * Mode->OneVsOneMenuSoftboxMultiplier * Preference(EControl::Key));
+		TestEqual(TEXT("Menu softboxes default to restrained glare"), Key->SpecularScale, Preference(EControl::Highlights));
 		TestEqual(TEXT("Gameplay softbox multiplier matches the menu"), Mode->OneVsOneGameplaySoftboxMultiplier, 250.0f);
 		for (const int32 TeamSize : {1, 2, 3})
 		{
@@ -217,12 +220,12 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		Mode->SettingsReturnScreen = EFlickFrontendScreen::MainMenu;
 		Mode->SpawnLightingIfNeeded();
 		TestEqual(TEXT("Opening settings from the menu preserves its preview lights"), Key->Intensity,
-			Mode->TestPuckKeyLightIntensity * Mode->OneVsOneMenuSoftboxMultiplier);
+			Mode->TestPuckKeyLightIntensity * Mode->OneVsOneMenuSoftboxMultiplier * Preference(EControl::Key));
 		Mode->SettingsReturnScreen = EFlickFrontendScreen::Paused;
 		Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("Opening settings from a match preserves gameplay fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 1.0f);
+		TestEqual(TEXT("Opening settings from a match preserves gameplay fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill));
 		TestEqual(TEXT("Opening settings from a match preserves gameplay softboxes"), Key->Intensity,
-			Mode->TestPuckKeyLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier);
+			Mode->TestPuckKeyLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * Preference(EControl::Key));
 		// Each preference changes its own light, and applying twice cannot compound values.
 		SetValue(EScene::Gameplay, EControl::Ambient, 1.5f);
 		SetValue(EScene::Gameplay, EControl::Fill, 2.0f);
@@ -246,19 +249,19 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 				TestFalse(TEXT("Seating spill never adds dynamic shadow passes"), Fixture->RectLightComponent->CastShadows);
 				TestEqual(TEXT("Seating highlights use a wider low-glare source"), Fixture->RectLightComponent->SourceWidth, DefaultRig.StadiumWarmSourceWidth);
 				TestEqual(TEXT("Seating reflection softness remains tuneable"), Fixture->RectLightComponent->SourceHeight, DefaultRig.StadiumWarmSourceHeight);
-				TestEqual(TEXT("Seating glare is bounded separately from its warm illumination"), Fixture->RectLightComponent->SpecularScale, .2f * DefaultRig.StadiumWarmSpecularScale);
+				TestEqual(TEXT("Seating glare is bounded separately from its warm illumination"), Fixture->RectLightComponent->SpecularScale, Preference(EControl::Highlights) * DefaultRig.StadiumWarmSpecularScale);
 				TestTrue(TEXT("Stadium sources sit above the playing plane so the deck can reflect them"),
 					Fixture->GetActorLocation().Z > Mode->ArenaSurfaceZ + 300.f);
 				TestTrue(TEXT("Seating warmth follows the saved warm-light preference"),
-					FMath::IsNearlyEqual(Fixture->RectLightComponent->Intensity, DefaultRig.StadiumWarmLightLumens * .8f, .1f));
+					FMath::IsNearlyEqual(Fixture->RectLightComponent->Intensity, DefaultRig.StadiumWarmLightLumens * Preference(EControl::Rim), .1f));
 			}
-		TestEqual(TEXT("Ambient preference applies live"), Sky->Intensity, 1.05f * Mode->OneVsOneSkyLightMultiplier * AmbientIntensityScale(1.5f));
-		TestEqual(TEXT("Fill preference applies without compounding"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 2.0f);
-		TestEqual(TEXT("Cool softbox preference applies"), Key->Intensity, Mode->TestPuckKeyLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * 0.5f);
-		TestEqual(TEXT("Warm softbox preference applies"), Rim->Intensity, Mode->TestPuckRimLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * 0.8f);
-		TestEqual(TEXT("Team accent preference applies"), Mode->Player1AccentLight->PointLightComponent->Intensity, Mode->MenuAccentLightIntensity * 2.0f);
-		TestEqual(TEXT("Overhead preference applies"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, 1.45f * 0.68f * 0.5f);
-		TestEqual(TEXT("Reflection preference applies without changing diffuse fill"), Key->SpecularScale, 0.2f);
+		TestEqual(TEXT("Ambient preference applies live"), Sky->Intensity, 1.05f * Mode->OneVsOneSkyLightMultiplier * AmbientIntensityScale(Preference(EControl::Ambient)));
+		TestEqual(TEXT("Fill preference applies without compounding"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill));
+		TestEqual(TEXT("Cool softbox preference applies"), Key->Intensity, Mode->TestPuckKeyLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * Preference(EControl::Key));
+		TestEqual(TEXT("Warm softbox preference applies"), Rim->Intensity, Mode->TestPuckRimLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * Preference(EControl::Rim));
+		TestEqual(TEXT("Team accent preference applies"), Mode->Player1AccentLight->PointLightComponent->Intensity, Mode->MenuAccentLightIntensity * Preference(EControl::Accents));
+		TestEqual(TEXT("Overhead preference applies"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, 1.45f * 0.68f * Preference(EControl::Direct));
+		TestEqual(TEXT("Reflection preference applies without changing diffuse fill"), Key->SpecularScale, Preference(EControl::Highlights));
 		SetValue(EScene::Gameplay, EControl::Highlights, 0.f);
 		Mode->SpawnLightingIfNeeded();
 		CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ, .8f, 0.f);
@@ -280,10 +283,10 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 			ClientState->bPartyActive = true;
 			ClientState->SetMatchPhase(EFlickMatchPhase::Aiming);
 			ClientController->RefreshLocalLighting();
-			TestEqual(TEXT("A party in a live match uses gameplay lights, not menu lights"), Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * 2.f);
+			TestEqual(TEXT("A party in a live match uses gameplay lights, not menu lights"), Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * Preference(EControl::Fill));
 			ClientState->SetMatchPhase(EFlickMatchPhase::WaitingToStart);
 			ClientController->RefreshLocalLighting();
-			TestEqual(TEXT("Party frontend retains the shared preset"), Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * 2.f);
+			TestEqual(TEXT("Party frontend retains the shared preset"), Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * Preference(EControl::Fill));
 			TestTrue(TEXT("Local client application reuses existing fixtures"), FlickArenaLighting::FindRig(World).ArenaFillLight == FillActor);
 			for (const int32 TeamSize : {2, 3})
 			{
@@ -292,11 +295,11 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 				ClientController->RefreshLocalLighting();
 				const float Scale = FlickModeRules::GetArenaRadius(EFlickMatchVariant::Classic, TeamSize) / 650.0f;
 				TestTrue(TEXT("Remote-client larger formats use the same saved gameplay preset and area scaling"),
-					FMath::IsNearlyEqual(Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * 2.f * FMath::Square(Scale), 0.1f));
+					FMath::IsNearlyEqual(Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * Preference(EControl::Fill) * FMath::Square(Scale), 0.1f));
 				ClientState->SetMatchPhase(EFlickMatchPhase::WaitingToStart);
 				ClientController->RefreshLocalLighting();
 				TestTrue(TEXT("Remote-client larger formats retain the shared preset"),
-					FMath::IsNearlyEqual(Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * 2.f * FMath::Square(Scale), 0.1f));
+					FMath::IsNearlyEqual(Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * Preference(EControl::Fill) * FMath::Square(Scale), 0.1f));
 			}
 			ClientState->bPrivateMatchActive = true;
 			ClientState->PrivateMatchSettings.ArenaScale = 1.3f;
@@ -304,13 +307,13 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 			ClientController->RefreshLocalLighting();
 			const float PrivateScale = FlickModeRules::GetArenaRadius(EFlickMatchVariant::Classic, 3) * 1.3f / 650.0f;
 			TestTrue(TEXT("Private arena-size adjustments preserve the lighting density"),
-				FMath::IsNearlyEqual(Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * 2.f * FMath::Square(PrivateScale), 0.1f));
+				FMath::IsNearlyEqual(Fill->Intensity, DefaultRig.OneVsOneFillLightIntensity * Preference(EControl::Fill) * FMath::Square(PrivateScale), 0.1f));
 			ClientState->bPrivateMatchActive = false;
 			ClientState->PlayersPerTeam = 1;
 		}
 		Mode->FrontendScreen = EFlickFrontendScreen::MainMenu;
 		Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("Gameplay fill changes carry back into the menu"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 2.0f);
+		TestEqual(TEXT("Gameplay fill changes carry back into the menu"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill));
 
 		for (const int32 TeamSize : {2, 3})
 		{
@@ -319,9 +322,9 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 			const float Scale = Mode->ArenaRadius / 650.0f;
 			Mode->FrontendScreen = EFlickFrontendScreen::Playing;
 			Mode->SpawnLightingIfNeeded();
-			TestEqual(TEXT("Larger formats share the saved neutral ambient response"), Sky->Intensity, 1.05f * Mode->OneVsOneSkyLightMultiplier * AmbientIntensityScale(1.5f));
+			TestEqual(TEXT("Larger formats share the saved neutral ambient response"), Sky->Intensity, 1.05f * Mode->OneVsOneSkyLightMultiplier * AmbientIntensityScale(Preference(EControl::Ambient)));
 			TestTrue(TEXT("Larger formats scale broad fill power with board area"),
-				FMath::IsNearlyEqual(Fill->Intensity, Mode->OneVsOneFillLightIntensity * 2.0f * FMath::Square(Scale), 0.1f));
+				FMath::IsNearlyEqual(Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill) * FMath::Square(Scale), 0.1f));
 			TestEqual(TEXT("Larger formats scale broad fill source radius"), Fill->SourceRadius, 480.0f * Scale);
 			TestEqual(TEXT("Larger formats scale broad fill falloff"), Fill->AttenuationRadius, 2200.0f * Scale);
 			TestEqual(TEXT("Larger formats keep fill diffuse-only"), Fill->SpecularScale, 0.0f);
@@ -330,16 +333,16 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Larger formats share the off-axis key height"),
 				FMath::IsNearlyEqual(KeyActor->GetActorLocation().Z, 250.f + (DefaultRig.DeckKeyOffset.Z - 250.f) * Scale, .01f));
 			TestTrue(TEXT("Larger formats scale saved softbox power with board area"),
-				FMath::IsNearlyEqual(Key->Intensity, Mode->TestPuckKeyLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * 0.5f * FMath::Square(Scale), 0.1f));
+				FMath::IsNearlyEqual(Key->Intensity, Mode->TestPuckKeyLightIntensity * Mode->OneVsOneGameplaySoftboxMultiplier * Preference(EControl::Key) * FMath::Square(Scale), 0.1f));
 			TestEqual(TEXT("Larger formats scale the far-rim softbox range"), Key->AttenuationRadius, 2500.0f * Scale);
-			TestEqual(TEXT("Larger formats share reflection preference"), Key->SpecularScale, 0.2f);
+			TestEqual(TEXT("Larger formats share reflection preference"), Key->SpecularScale, Preference(EControl::Highlights));
 			CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ, .8f, .2f);
 			Mode->FrontendScreen = EFlickFrontendScreen::MainMenu;
 			Mode->SpawnLightingIfNeeded();
-			TestEqual(TEXT("Larger format menus retain shared ambient settings"), Sky->Intensity, 1.05f * Mode->OneVsOneSkyLightMultiplier * AmbientIntensityScale(1.5f));
+			TestEqual(TEXT("Larger format menus retain shared ambient settings"), Sky->Intensity, 1.05f * Mode->OneVsOneSkyLightMultiplier * AmbientIntensityScale(Preference(EControl::Ambient)));
 			TestTrue(TEXT("Larger format menus retain shared fill settings"),
-				FMath::IsNearlyEqual(Fill->Intensity, Mode->OneVsOneFillLightIntensity * 2.0f * FMath::Square(Scale), 0.1f));
-			TestEqual(TEXT("Larger format menus retain shared reflection settings"), Key->SpecularScale, 0.2f);
+				FMath::IsNearlyEqual(Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill) * FMath::Square(Scale), 0.1f));
+			TestEqual(TEXT("Larger format menus retain shared reflection settings"), Key->SpecularScale, Preference(EControl::Highlights));
 			// The same camera-following rig must stay off-axis on the larger board.
 			FlickArenaLighting::UpdateMenuSoftboxes(KeyActor, RimActor, InitialCamera, Mode->ArenaRadius, 250.0f);
 			const FVector LargerKey = KeyActor->GetActorLocation();
@@ -367,13 +370,13 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		Mode->FrontendScreen = EFlickFrontendScreen::Playing;
 		Mode->SpawnLightingIfNeeded();
 		Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("BOB fill uses saved preferences without compounding"), Fill->Intensity, DefaultRig.BobFillLightLumens * 2.0f);
-		TestEqual(TEXT("BOB ambient uses saved preferences"), Sky->Intensity, DefaultRig.BobSkyIntensity * AmbientIntensityScale(1.5f));
-		TestEqual(TEXT("BOB key uses saved preferences"), Key->Intensity, DefaultRig.BobKeyLightLumens * 0.5f);
-		TestEqual(TEXT("BOB rim uses saved preferences"), Rim->Intensity, DefaultRig.BobRimLightLumens * 0.8f);
-		TestEqual(TEXT("BOB accents use saved preferences"), Mode->Player1AccentLight->PointLightComponent->Intensity, DefaultRig.BobWarmRailLightLumens * 2.0f);
-		TestEqual(TEXT("BOB direct light uses saved preferences"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, DefaultRig.BobDirectionalIntensity * 0.5f);
-		TestEqual(TEXT("BOB highlights use saved preferences"), Key->SpecularScale, 0.2f);
+		TestEqual(TEXT("BOB fill uses saved preferences without compounding"), Fill->Intensity, DefaultRig.BobFillLightLumens * Preference(EControl::Fill));
+		TestEqual(TEXT("BOB ambient uses saved preferences"), Sky->Intensity, DefaultRig.BobSkyIntensity * AmbientIntensityScale(Preference(EControl::Ambient)));
+		TestEqual(TEXT("BOB key uses saved preferences"), Key->Intensity, DefaultRig.BobKeyLightLumens * Preference(EControl::Key));
+		TestEqual(TEXT("BOB rim uses saved preferences"), Rim->Intensity, DefaultRig.BobRimLightLumens * Preference(EControl::Rim));
+		TestEqual(TEXT("BOB accents use saved preferences"), Mode->Player1AccentLight->PointLightComponent->Intensity, DefaultRig.BobWarmRailLightLumens * Preference(EControl::Accents));
+		TestEqual(TEXT("BOB direct light uses saved preferences"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, DefaultRig.BobDirectionalIntensity * Preference(EControl::Direct));
+		TestEqual(TEXT("BOB highlights use saved preferences"), Key->SpecularScale, Preference(EControl::Highlights));
 		TestEqual(TEXT("BOB fill does not create reflection glare"), Fill->SpecularScale, 0.0f);
 		for (const auto& Actor : FlickArenaLighting::FindRig(World).RimSpillLights)
 			if (TestNotNull(TEXT("Switching to BOB retains reusable rim sources"), Actor.Get()))
@@ -384,22 +387,22 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 			ClientState->bPartyActive = false;
 			ClientState->SetMatchPhase(EFlickMatchPhase::Aiming);
 			ClientController->RefreshLocalLighting();
-			TestEqual(TEXT("BOB remote-client path applies the local fill preference"), Fill->Intensity, DefaultRig.BobFillLightLumens * 2.0f);
-			TestEqual(TEXT("BOB remote-client path applies the local key preference"), Key->Intensity, DefaultRig.BobKeyLightLumens * 0.5f);
+			TestEqual(TEXT("BOB remote-client path applies the local fill preference"), Fill->Intensity, DefaultRig.BobFillLightLumens * Preference(EControl::Fill));
+			TestEqual(TEXT("BOB remote-client path applies the local key preference"), Key->Intensity, DefaultRig.BobKeyLightLumens * Preference(EControl::Key));
 			ClientState->ActiveMatchVariant = EFlickMatchVariant::Classic;
 		}
 		for (int32 Index = 0; Index < static_cast<int32>(EControl::Count); ++Index)
 			SetValue(EScene::Gameplay, static_cast<EControl>(Index), 0.0f);
 		Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("BOB fill can be disabled"), Fill->Intensity, 0.0f);
-		TestEqual(TEXT("BOB minimum ambient retains gentle base illumination"), Sky->Intensity, DefaultRig.BobSkyIntensity);
-		TestEqual(TEXT("BOB key can be disabled"), Key->Intensity, 0.0f);
-		TestEqual(TEXT("BOB rim can be disabled"), Rim->Intensity, 0.0f);
-		TestEqual(TEXT("BOB accents can be disabled"), Mode->Player1AccentLight->PointLightComponent->Intensity, 0.0f);
-		TestEqual(TEXT("BOB direct light can be disabled"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, 0.0f);
-		TestEqual(TEXT("BOB highlights can be disabled"), Key->SpecularScale, 0.0f);
+		TestEqual(TEXT("BOB fill minimum retains the calibrated finish"), Fill->Intensity, DefaultRig.BobFillLightLumens * Preference(EControl::Fill));
+		TestEqual(TEXT("BOB minimum ambient retains the calibrated finish"), Sky->Intensity, DefaultRig.BobSkyIntensity * AmbientIntensityScale(Preference(EControl::Ambient)));
+		TestEqual(TEXT("BOB key minimum retains the calibrated finish"), Key->Intensity, DefaultRig.BobKeyLightLumens * Preference(EControl::Key));
+		TestEqual(TEXT("BOB rim minimum retains the calibrated finish"), Rim->Intensity, DefaultRig.BobRimLightLumens * Preference(EControl::Rim));
+		TestEqual(TEXT("BOB accents minimum retains the calibrated finish"), Mode->Player1AccentLight->PointLightComponent->Intensity, DefaultRig.BobWarmRailLightLumens * Preference(EControl::Accents));
+		TestEqual(TEXT("BOB direct light minimum retains the calibrated finish"), Mode->DirectionalLightActor->GetLightComponent()->Intensity, DefaultRig.BobDirectionalIntensity * Preference(EControl::Direct));
+		TestEqual(TEXT("BOB highlights minimum retains the calibrated finish"), Key->SpecularScale, Preference(EControl::Highlights));
 		ResetToDefaults(); Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("BOB reset restores the shared gameplay fill default"), Fill->Intensity, DefaultRig.BobFillLightLumens);
+		TestEqual(TEXT("BOB reset restores the shared gameplay fill default"), Fill->Intensity, DefaultRig.BobFillLightLumens * Preference(EControl::Fill));
 		SetValue(EScene::Gameplay, EControl::Fill, 2.0f);
 		Mode->bTestArenaMode = true;
 		Mode->ActiveMatchVariant = EFlickMatchVariant::Classic;
@@ -407,9 +410,9 @@ bool FFlickOneVsOneLightingTest::RunTest(const FString& Parameters)
 		Mode->ArenaRadius = 650.0f;
 		Mode->FrontendScreen = EFlickFrontendScreen::Playing;
 		Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("Returning to 1v1 restores its custom fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 2.0f);
+		TestEqual(TEXT("Returning to 1v1 restores its custom fill"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill));
 		ResetToDefaults(); Mode->SpawnLightingIfNeeded();
-		TestEqual(TEXT("Reset applies live"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * 1.0f);
+		TestEqual(TEXT("Reset applies live"), Fill->Intensity, Mode->OneVsOneFillLightIntensity * Preference(EControl::Fill));
 		CheckRimSpill(Mode->ArenaRadius, Mode->ArenaSurfaceZ,
 			GetValue(EScene::Gameplay, EControl::Rim), GetValue(EScene::Gameplay, EControl::Highlights));
 		const FlickArenaLighting::FRig Found = FlickArenaLighting::FindRig(World);

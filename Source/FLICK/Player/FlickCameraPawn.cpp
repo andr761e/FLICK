@@ -410,13 +410,12 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 		? BobExposureBias
 		: ClassicExposureBias;
 
-	// The test arena's numerous emissive puck and divider accents cause the
-	// histogram exposure to begin attractively bright, then rapidly darken. Keep
-	// that initial EV stable in this arena only. Disabling both overrides again
-	// restores the normal adaptive exposure used by every other mode.
-	Camera->PostProcessSettings.bOverride_AutoExposureMinBrightness = bTestArenaPresentation;
-	Camera->PostProcessSettings.bOverride_AutoExposureMaxBrightness = bTestArenaPresentation;
-	if (bTestArenaPresentation)
+	// Keep the shared puck exposure stable against both emissive Switchyard
+	// surfaces and BOB's pale board. Other scenes retain adaptive exposure.
+	const bool bFixedPuckExposure = bTestArenaPresentation || bBobGameplayFraming;
+	Camera->PostProcessSettings.bOverride_AutoExposureMinBrightness = bFixedPuckExposure;
+	Camera->PostProcessSettings.bOverride_AutoExposureMaxBrightness = bFixedPuckExposure;
+	if (bFixedPuckExposure)
 	{
 		Camera->PostProcessSettings.AutoExposureMinBrightness = TestArenaFixedExposure;
 		Camera->PostProcessSettings.AutoExposureMaxBrightness = TestArenaFixedExposure;
@@ -488,7 +487,8 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 		Camera->PostProcessSettings.BloomIntensity = FlickPuckFinish::ReferenceBloomIntensity;
 		Camera->PostProcessSettings.BloomThreshold = FlickPuckFinish::ReferenceBloomThreshold;
 	}
-	if (bTestArenaPresentation && (!bMenuPresentation || (bHomePuckPresentation && LockerPreviewMode == 0)))
+	if ((bTestArenaPresentation || bBobGameplayFraming)
+		&& (!bMenuPresentation || (bHomePuckPresentation && LockerPreviewMode == 0)))
 	{
 		// Home, gameplay and replays share the approved locker exposure/bloom.
 		// Locker's existing compensation above is applied exactly once.

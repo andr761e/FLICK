@@ -60,7 +60,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLockerPuckCard(const int32 Category, c
 	const auto Active = [Equipped, Weak]() { const auto Pinned = Weak.Pin(); return Equipped() || (Pinned.IsValid() && (Pinned->IsHovered() || Pinned->HasKeyboardFocus())); };
 	static const FSlateRoundedBoxBrush CheckBackground(Brand, 10.f);
 	Button->SetContent(SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(10).Padding(1.5f).UseAccentForOutline(true)
-		.BackgroundColor(Ink).AccentColor_Lambda([Active]() { return Active() ? Brand : Cyan.CopyWithNewOpacity(.45f); })
+		.BackgroundColor(Panel).AccentColor_Lambda([Active]() { return Active() ? Brand : Cyan.CopyWithNewOpacity(.45f); })
 		[SNew(SOverlay)
 			+ SOverlay::Slot()[SNew(SFlickPuckThumbnail).View(EFlickPuckThumbnailView::Locker).CutSize(8.5f).EdgeFade(FMargin(14,34,14,52))
 				.Archetype(FlickCosmeticCatalog::GetPuckArchetype(Category)).Skin(Index)]
@@ -112,7 +112,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLockerPage(const TSharedRef<SWidget>& 
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 28, 0)
 			[SNew(SBox).WidthOverride(FlickLockerStyle::RailWidth)
-				[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.92f)).AccentColor(Cyan.CopyWithNewOpacity(.48f))
+				[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.92f)).AccentColor(Cyan.CopyWithNewOpacity(.48f))
 					.UseAccentForOutline(true).CutSize(14).Padding(FMargin(10, 14))[SNew(SScrollBox) + SScrollBox::Slot()[Categories]]]]
 			+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(FlickLockerStyle::ContentsWidth)[Contents]]
 			+ SHorizontalBox::Slot().FillWidth(1).Padding(16, 0, 0, 0)
@@ -149,7 +149,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLockerPage(const TSharedRef<SWidget>& 
 						+ SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Tag(TEXT("LockerRotatePrevious")).ButtonStyle(&TransparentButtonStyle).ContentPadding(10).OnClicked_Lambda([Rotate]() { Rotate(-20); return FReply::Handled(); })
 							[SNew(STextBlock).Text(FText::FromString(TEXT("<"))).Font(UiFont(16)).ColorAndOpacity(Paper)]]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-						[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.7f)).AccentColor(FLinearColor::Transparent).DrawNeutralOutline(false).CutSize(9).Padding(FMargin(12, 6))
+						[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.7f)).AccentColor(FLinearColor::Transparent).DrawNeutralOutline(false).CutSize(9).Padding(FMargin(12, 6))
 							[SNew(SHorizontalBox)
 								+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 9, 0)
 								[SNew(FlickLockerWidgets::SCategoryGlyph).Category(FlickCosmeticCatalog::CategoryCount).Color(Muted)]
@@ -171,7 +171,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLockerPage(const TSharedRef<SWidget>& 
 			[SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(226)[Back]]
 				+ SHorizontalBox::Slot().FillWidth(1).HAlign(HAlign_Right).VAlign(VAlign_Center)
-				[SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(10).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.42f)).BackgroundColor(Ink.CopyWithNewOpacity(.8f)).Padding(FMargin(22, 12))
+				[SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(10).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.42f)).BackgroundColor(Panel.CopyWithNewOpacity(.8f)).Padding(FMargin(22, 12))
 					[SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 20, 0)[SNew(STextBlock).Text(FText::FromString(TEXT("|"))).Font(DisplayFont(14)).ColorAndOpacity(Brand)]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("SELECT TO EQUIP  //  SAVES AUTOMATICALLY"))).Font(DisplayFont(10)).ColorAndOpacity(Muted)]]]

@@ -13,8 +13,8 @@ SFlickGameLayer::SFlickGameLayer()
 		.SetNormalPadding(FMargin(21.0f, 10.0f))
 		.SetPressedPadding(FMargin(24.0f, 11.0f, 18.0f, 9.0f));
 	PrimaryButtonStyle = FButtonStyle()
-		.SetNormal(FSlateColorBrush(FLinearColor(0.085f, 0.14f, 0.02f, 1.0f)))
-		.SetHovered(FSlateColorBrush(FLinearColor(0.15f, 0.24f, 0.025f, 1.0f)))
+		.SetNormal(FSlateColorBrush(PanelSelected))
+		.SetHovered(FSlateColorBrush(PanelRaised))
 		.SetPressed(FSlateColorBrush(FLinearColor(0.0f, 0.78f, 1.0f, 1.0f)))
 		.SetNormalPadding(FMargin(21.0f, 10.0f))
 		.SetPressedPadding(FMargin(24.0f, 11.0f, 18.0f, 9.0f));
@@ -388,8 +388,16 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot()
 		[
 			SNew(SBox)
+			.Tag(TEXT("CinematicReplayOverlay"))
 			.Visibility_Lambda([this]()
 			{
+				// Replay playback can remain active behind pause/settings/class
+				// menus, on both the host and remote clients. Its HUD must not.
+				if ((GameMode.IsValid() && GameMode->GetFrontendScreen() != EFlickFrontendScreen::Playing)
+					|| (!GameMode.IsValid() && PlayerController.IsValid()
+						&& PlayerController->GetLocalMatchMenuScreen() != EFlickFrontendScreen::Playing)
+					|| GetScreenVisibility(EFlickFrontendScreen::ClassSelect) == EVisibility::Visible)
+					return EVisibility::Collapsed;
 				return ((GameMode.IsValid() && GameMode->IsCinematicReplayActive())
 					|| (PlayerController.IsValid() && PlayerController->IsCinematicReplayPresentationActive()) || bReplayOverlayPreview)
 					? EVisibility::HitTestInvisible
@@ -543,7 +551,7 @@ int32 SFlickGameLayer::GetSelectedCosmeticIndex(const int32 Category) const
 TSharedRef<SWidget> SFlickGameLayer::BuildPartyInvitePrompt()
 {
 	return SNew(SFlickMainMenuPanel)
-		.BackgroundColor(FLinearColor::FromSRGBColor(FColor(11, 22, 25, 250)))
+		.BackgroundColor(FlickUITheme::Panel)
 		.AccentColor(Brand)
 		.CutSize(12.0f)
 		.BorderWidth(1.3f)
@@ -589,7 +597,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyInvitePrompt()
 TSharedRef<SWidget> SFlickGameLayer::BuildMatchmakingStatusBar()
 {
 	return SNew(SFlickAngularBorder)
-		.BackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 244)))
+		.BackgroundColor(FlickUITheme::Panel)
 		.AccentColor(Cyan.CopyWithNewOpacity(0.72f))
 		.UseAccentForOutline(false)
 		.CutSize(9.0f)

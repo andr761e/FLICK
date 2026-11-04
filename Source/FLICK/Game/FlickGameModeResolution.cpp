@@ -1,5 +1,6 @@
 #include "Game/FlickGameModePrivate.h"
 #include "Core/FlickCosmeticCatalog.h"
+#include "Engine/OverlapResult.h"
 
 using namespace FlickGameModePrivate;
 
@@ -19,7 +20,9 @@ void AFlickGameMode::BeginResolutionTracking(
 	LastReplayCaptureTime = -100.0f;
 	bReplayPlayedForResolution = false;
 	ResolutionElapsed = 0.0f;
+	AchievementTracker->BeginResolution();
 	BobPocketPreviousLocations.Reset();
+	BobPocketEnteredPieces.Reset();
 	if (IsBobMode())
 		for (const AFlickPiece* Piece : Pieces)
 			if (IsValid(Piece) && Piece->IsActive())
@@ -134,7 +137,7 @@ void AFlickGameMode::TrackTestArenaControlZones(const float DeltaSeconds)
     for (const AFlickPiece* Piece : Pieces)
      if (Piece && Piece->GetPieceId() == PieceId)
       if (AFlickGameState* State = GetFlickGameState())
-       State->RecordPlayerSwitchActivation(Piece->GetTeam(), Piece->GetOwningPlayerSlot());
+       { State->RecordPlayerSwitchActivation(Piece->GetTeam(), Piece->GetOwningPlayerSlot()); AchievementTracker->SwitchActivated(const_cast<AFlickPiece*>(Piece)); }
    });
 		ResolutionActivatedSwitchMask |= ActivatedSwitches;
 		for (int32 Index = 0; Index < TestArenaActor->GetMechanismCount(); ++Index)
@@ -846,6 +849,7 @@ void AFlickGameMode::UpdateEliminations()
 					FlickGameState->RecordPlayerKnockout(
 						CreditingTeam,
 						FlickGameState->GetLastShootingPlayerSlot(CreditingTeam));
+					AchievementTracker->OpponentKnockedOut(Piece, CreditingTeam, FlickGameState->GetLastShootingPlayerSlot(CreditingTeam));
 				}
 			}
 			PushHudEvent(
@@ -886,14 +890,22 @@ void AFlickGameMode::UpdateBobPockets()
 
 		const FVector Location = Piece->GetActorLocation();
 		const FVector* Previous = BobPocketPreviousLocations.Find(Piece->GetPieceId());
+		const FVector Local = BobArenaActor->GetActorTransform().InverseTransformPosition(Location);
+		// A lip bounce can return to play. A confirmed entry that continues below
+		// the scoring depth remains a pocket even after drifting outside the well.
+		if (Local.Z >= BobArenaActor->SurfaceZ)
+			BobPocketEnteredPieces.Remove(Piece->GetPieceId());
+		if (Previous && BobArenaActor->HasEnteredPocketOnPath(*Previous, Location))
+			BobPocketEnteredPieces.Add(Piece->GetPieceId());
 		const bool bCaptured = BobArenaActor->IsCapturedByPocketOnPath(
-			Previous ? *Previous : Location, Location, Piece->GetPieceRadius());
+			Previous ? *Previous : Location, Location, Piece->GetPieceRadius())
+			|| (BobPocketEnteredPieces.Contains(Piece->GetPieceId())
+				&& Local.Z <= BobArenaActor->SurfaceZ - BobArenaActor->PocketCaptureDepth);
 		BobPocketPreviousLocations.Add(Piece->GetPieceId(), Location);
 		if (!bCaptured)
 		{
 			// An escaped puck is not a scored pocket or striker foul. Restore it
 			// only after it is clearly below the playing bed; never cancel flight.
-			const FVector Local = BobArenaActor->GetActorTransform().InverseTransformPosition(Location);
 			const float OutsideExtent = BobArenaActor->BoardHalfExtent + Piece->GetPieceRadius();
 			const bool bOutside = FMath::Abs(Local.X) > OutsideExtent || FMath::Abs(Local.Y) > OutsideExtent;
 			const bool bOnStadiumFloor = bOutside && Local.Z < BobArenaActor->SurfaceZ - Piece->GetPieceThickness();
@@ -904,11 +916,20 @@ void AFlickGameMode::UpdateBobPockets()
 				const FVector Recovery = FindBobRespawnLocation();
 				ResetBobPieceAt(Piece, Piece->GetTeam(), Recovery, Piece->IsBobStriker());
 				BobPocketPreviousLocations.Add(Piece->GetPieceId(), Recovery);
+				BobPocketEnteredPieces.Remove(Piece->GetPieceId());
 				UE_LOG(LogFlick, Warning, TEXT("BOB recovered escaped puck %d without awarding a pocket"), Piece->GetPieceId());
 			}
 			continue;
 		}
 
+		int32 AchievementPocket = 0;
+		double NearestPocket = TNumericLimits<double>::Max();
+		for (int32 I = 0; I < 4; ++I)
+		{
+			const double Distance = FVector::DistSquared2D(Location, BobArenaActor->GetPocketWorldLocation(I));
+			if (Distance < NearestPocket) { NearestPocket = Distance; AchievementPocket = I; }
+		}
+		AchievementTracker->BobPocket(Piece, AchievementPocket);
 		const FVector PocketLocation(
 			Piece->GetActorLocation().X,
 			Piece->GetActorLocation().Y,
@@ -967,6 +988,7 @@ void AFlickGameMode::UpdateBobPockets()
 			AudioDirector->PlayPocket(PocketLocation);
 		}
 		Piece->Eliminate();
+		BobPocketEnteredPieces.Remove(Piece->GetPieceId());
 		bPocketedAnyPiece = true;
 	}
 
@@ -996,6 +1018,25 @@ void AFlickGameMode::UpdateBobPieceStability()
 		{
 			continue;
 		}
+
+		UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(Piece->GetRootComponent());
+		// A resting coin can legitimately lean on its neighbours in the rack.
+		// Waking it and forcing it flat every frame fights those contacts forever.
+		if (!Body || !Body->IsAnyRigidBodyAwake()) continue;
+		const FVector Up = Piece->GetActorUpVector().GetSafeNormal();
+		const float Alignment = FMath::Abs(Up.Z);
+		if (Alignment >= FMath::Cos(FMath::DegreesToRadians(BobSelfRightingMinimumTilt))) continue;
+		// The bounding sphere encloses every orientation of the cylinder. Only
+		// apply the assist when that rotational clearance is free of other coins;
+		// a coin wedged sideways is just as constrained as one resting on top.
+		const float Clearance = FMath::Sqrt(FMath::Square(Piece->GetPieceRadius())
+			+ FMath::Square(Piece->GetPieceThickness() * .5f)) + .5f;
+		TArray<FOverlapResult> Contacts;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(FlickBobSelfRightingSupport), false, Piece);
+		GetWorld()->OverlapMultiByObjectType(Contacts, Piece->GetActorLocation(), FQuat::Identity,
+			FCollisionObjectQueryParams(ECC_PhysicsBody), FCollisionShape::MakeSphere(Clearance), Query);
+		if (Contacts.ContainsByPredicate([](const FOverlapResult& Contact)
+			{ return Cast<AFlickPiece>(Contact.GetActor()) != nullptr; })) continue;
 
 		Piece->ApplyTabletopSelfRighting(
 			BobSelfRightingTorque,
@@ -1159,6 +1200,7 @@ void AFlickGameMode::FinishPhysicsResolution(const bool bUsedTimeout)
 		SettleClassicPiecesOnTabletop();
 	}
 	UpdateGameStateCounts();
+	AchievementTracker->ResolutionFinished();
 	PresentDramaticResolutionEvent();
 	PresentShotAccolades();
 	ResolveTestArenaControlZones();
@@ -1503,6 +1545,7 @@ void AFlickGameMode::CompleteRoundForOutcome(const EFlickMatchOutcome Outcome)
 	}
 	ResetShotClock();
 	FlickGameState->CompleteRound(Outcome);
+	AchievementTracker->RoundFinished();
 	SetCameraViewForTeam(EFlickTeam::Player1, true);
 	FlickGameState->SetRoundAdvanceTimerState(
 		!FlickGameState->bSeriesComplete,

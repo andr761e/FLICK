@@ -43,6 +43,8 @@ namespace FlickArenaLighting
 		float PuckGameplayCoverageScale = 4.f;
 		// Reflection-aligned key needs less energy than the off-axis locker key.
 		float PuckGameplayKeySpecularScale = .055f;
+		// Smaller BOB coins need a clearer silver highlight at rack-view size.
+		float BobPuckKeySpecularScale = .10f;
 		FVector PuckKeyOffset = FVector(-450.f, 900.f, 1050.f);
 		FVector PuckFillOffset = FVector(600.f, -350.f, 1150.f);
 		FVector DeckKeyOffset = FVector(-520.f, 1100.f, 1150.f);

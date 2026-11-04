@@ -499,7 +499,9 @@ void AFlickGameMode::CancelClassSelection()
 	}
 	bInitialClassSelectionTimerActive = false;
 	bClassSelectionStartsTrainingBotMatch = false;
-	bTestArenaMode = false;
+	// Cancelling an in-match draft must not disable the live arena's lighting
+	// and detailed puck presentation (including while a replay is paused).
+	if (!bClassSelectionForNextRound) bTestArenaMode = false;
 	bLocalRematchClassSelection = false;
 	FrontendScreen = ClassSelectionReturnScreen;
 	SetCameraForFrontend();

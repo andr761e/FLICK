@@ -20,6 +20,7 @@ namespace FlickArenaLighting
 	{
 		const FName PuckWideStudioTag(TEXT("FLICK.PuckWideStudio"));
 		const FName PuckGameplayStudioTag(TEXT("FLICK.PuckGameplayStudio"));
+		const FName BobPuckStudioTag(TEXT("FLICK.BobPuckStudio"));
 		FName RimSpillTag(int32 Index)
 		{
 			static const auto Tags = []
@@ -99,7 +100,9 @@ namespace FlickArenaLighting
 				// variation across the playing surface. Still just two shared lights.
 				Light->SetIntensity((bFill ? Defaults.PuckFillLightLumens : Defaults.PuckFinishLightLumens)
 					* FMath::Square(ArenaScale * Coverage));
-				Light->SetSpecularScale(bFill ? .15f : bGameplayReflection ? Defaults.PuckGameplayKeySpecularScale : .55f);
+				const float KeySpecular = Actor->ActorHasTag(BobPuckStudioTag)
+					? Defaults.BobPuckKeySpecularScale : Defaults.PuckGameplayKeySpecularScale;
+				Light->SetSpecularScale(bFill ? .15f : bGameplayReflection ? KeySpecular : .55f);
 				Light->SetSourceWidth((bFill ? 900.f : 1100.f) * ArenaScale * Coverage);
 				Light->SetSourceHeight((bFill ? 600.f : 650.f) * ArenaScale * Coverage);
 				Light->SetAttenuationRadius(2200.f * ArenaScale * Coverage);
@@ -538,6 +541,8 @@ namespace FlickArenaLighting
 			if (!IsValid(Actor)) Actor = World->SpawnActor<ARectLight>();
 			if (!IsValid(Actor) || !Actor->RectLightComponent) return;
 			URectLightComponent* Light = Actor->RectLightComponent;
+			if (bBobArenaLighting) Actor->Tags.AddUnique(BobPuckStudioTag);
+			else Actor->Tags.Remove(BobPuckStudioTag);
 			Light->SetMobility(EComponentMobility::Movable);
 			const FVector Position = ScaleLocation(bFill ? Parameters.PuckFillOffset : Parameters.PuckKeyOffset);
 			if (bCreated)
@@ -552,7 +557,8 @@ namespace FlickArenaLighting
 			Light->SetIntensity((bFill ? Parameters.PuckFillLightLumens : Parameters.PuckFinishLightLumens) * LocalPowerScale * FMath::Square(Coverage));
 			Light->SetDiffuseScale(1.f);
 			// Broad silver bands without a white mirror plate over the crown.
-			Light->SetSpecularScale(bFill ? .15f : Actor->ActorHasTag(PuckGameplayStudioTag) ? Parameters.PuckGameplayKeySpecularScale : .55f);
+			const float KeySpecular = bBobArenaLighting ? Parameters.BobPuckKeySpecularScale : Parameters.PuckGameplayKeySpecularScale;
+			Light->SetSpecularScale(bFill ? .15f : Actor->ActorHasTag(PuckGameplayStudioTag) ? KeySpecular : .55f);
 			Light->SetSourceWidth((bFill ? 900.f : 1100.f) * ArenaScale * Coverage);
 			Light->SetSourceHeight((bFill ? 600.f : 650.f) * ArenaScale * Coverage);
 			Light->SetAttenuationRadius(2200.f * ArenaScale * Coverage);

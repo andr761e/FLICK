@@ -39,7 +39,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengeRow(const int32 ChallengeInde
 	[
 		SNew(SFlickMainMenuPanel)
 		.Premium(false)
-		.BackgroundColor(FLinearColor::FromSRGBColor(FColor(6, 17, 24, 245)))
+		.HomeSurface(bCompact)
+		.BackgroundColor(FlickUITheme::Panel)
 		.AccentColor_Lambda([this, ChallengeIndex, bCompact]()
 		{
 			const auto& Entry = FlickChallengeCatalog::Challenges[ChallengeIndex];
@@ -68,7 +69,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengeRow(const int32 ChallengeInde
 					const auto& Entry = FlickChallengeCatalog::Challenges[ChallengeIndex];
 					const int32 Progress = FMath::Min(FlickChallengeCatalog::GetProgress(Entry, GetChallengeStats()), Entry.Goal);
 					return FText::FromString(FString::Printf(TEXT("%d / %d"), Progress, Entry.Goal));
-				}).Font(UiFont(bCompact ? 10 : 12, true)).ColorAndOpacity(Brand)]
+				}).Font(UiFont(bCompact ? 10 : 12, true)).ColorAndOpacity(bCompact ? FlickHomeSurface::Gold : Brand)]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, bCompact ? 0.0f : 5.0f, 0.0f, 0.0f)
 			[SNew(STextBlock).Text(FText::FromString(Challenge.Detail)).Font(UiFont(bCompact ? 9 : 11)).ColorAndOpacity(FLinearColor(0.57f, 0.68f, 0.72f)).AutoWrapText(true)]
@@ -111,14 +112,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengePreview()
 			[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(17)).ColorAndOpacity(Paper)]
 		];
 	const TWeakPtr<SButton> WeakViewAll = ViewAllButton;
-	return SNew(SFlickAngularBorder).UseAccentForOutline(true)
-		.BackgroundColor(FLinearColor::FromSRGBColor(FColor(3, 11, 18, 248)))
+	return SNew(SFlickAngularBorder).HomeSurface(true).UseAccentForOutline(true)
+		.BackgroundColor(FlickUITheme::Panel)
 		.AccentColor(Cyan.CopyWithNewOpacity(.65f))
 		.CutSize(14.0f).BorderWidth(.8f).Padding(FMargin(18.0f, 19.0f))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
-			[SNew(STextBlock).Text(FText::FromString(TEXT("CHALLENGES  //  NEAR COMPLETION"))).Font(WordmarkTaglineFont(9)).ColorAndOpacity(FlickMainMenuStyle::Ice)]
+			[SNew(STextBlock).Text(FText::FromString(TEXT("CHALLENGES  //  NEAR COMPLETION"))).Font(WordmarkTaglineFont(9)).ColorAndOpacity(Brand)]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 18.0f)
 			[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR NEXT MILESTONES"))).Font(DisplayFont(22)).ColorAndOpacity(Paper)]
 			+ SVerticalBox::Slot().AutoHeight()
@@ -127,8 +128,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengePreview()
 			[
 				SNew(SBox).HeightOverride(52.0f)
 				[
-					SNew(SFlickMainMenuPanel).Premium(false)
-					.BackgroundColor(FLinearColor::FromSRGBColor(FColor(4, 13, 19, 248)))
+					SNew(SFlickMainMenuPanel).Premium(false).HomeSurface(true)
+					.BackgroundColor(FlickUITheme::Panel)
 					.AccentColor_Lambda([WeakViewAll]()
 					{
 						const TSharedPtr<SButton> Button = WeakViewAll.Pin();
@@ -180,7 +181,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengesPanel()
 		[SNew(STextBlock).Text(FText::FromString(TEXT("NO ACTIVE EVENT  //  NEW EVENT CHALLENGES WILL APPEAR HERE"))).Font(UiFont(12, true)).ColorAndOpacity(Muted)]
 	];
 	return SNew(SOverlay)
-		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.003f, 0.011f, 0.017f, 0.93f))]
+		+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FlickUITheme::Panel)]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
 			SNew(SBox).WidthOverride(1080.0f).HeightOverride(680.0f)

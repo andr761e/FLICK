@@ -9,7 +9,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickUIThemeTest, "FLICK.UI.SharedPresentation
 bool FFlickUIThemeTest::RunTest(const FString& Parameters)
 {
 	using namespace FlickUITheme;
-	TestEqual(TEXT("Home and other screens use the same action lime"), FlickMainMenuStyle::Lime, Brand);
+	TestEqual(TEXT("Home and other screens share the coral action colour"), FlickMainMenuStyle::Lime, Brand);
 	TestEqual(TEXT("Home and other screens use the same highlight cyan"), FlickMainMenuStyle::Ice, Ice);
 	for (const FVector2D Size : {FVector2D(26,26), FVector2D(160,44), FVector2D(520,350), FVector2D(1320,820)})
 	{
@@ -31,16 +31,18 @@ bool FFlickUIThemeTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Shared sheen does not recolour CTA, team, danger or cosmetic colours"), GetSurfaceHighlight(Color), Color);
 	}
 	TestTrue(TEXT("Raised and base panels retain distinct hierarchy"), PanelRaised.GetLuminance() > Panel.GetLuminance());
-	TestTrue(TEXT("Graphite panels receive a subtle directional highlight"), GetSurfaceHighlight(Panel).GetLuminance() > Panel.GetLuminance());
+	TestTrue(TEXT("Blue panels receive a subtle directional highlight"), GetSurfaceHighlight(Panel).GetLuminance() > Panel.GetLuminance());
 	TestEqual(TEXT("Sheen preserves translucent panel opacity"), GetSurfaceHighlight(Panel).A, Panel.A);
 	const auto Contrast = [](const FLinearColor A, const FLinearColor B)
 	{
 		return (FMath::Max(A.GetLuminance(), B.GetLuminance()) + 0.05f)
 			/ (FMath::Min(A.GetLuminance(), B.GetLuminance()) + 0.05f);
 	};
-	TestTrue(TEXT("Body text remains readable against raised graphite panels"), Contrast(Paper, PanelRaised) >= 4.5f);
-	TestTrue(TEXT("Secondary text remains readable against raised graphite panels"), Contrast(Muted, PanelRaised) >= 4.5f);
-	TestTrue(TEXT("Primary actions retain dark-on-lime contrast"), Contrast(Ink, Brand) >= 7.0f);
+	TestTrue(TEXT("Body text remains readable against raised blue panels"), Contrast(Paper, PanelRaised) >= 4.5f);
+	TestTrue(TEXT("Secondary text remains readable against raised blue panels"), Contrast(Muted, PanelRaised) >= 4.5f);
+	TestTrue(TEXT("Primary actions retain dark-on-coral contrast"), Contrast(Ink, Brand) >= 7.0f);
+	TestTrue(TEXT("Small coral labels remain readable on blue panels"), Contrast(Brand, Panel) >= 3.0f);
+	TestEqual(TEXT("Blue cosmetic colours are never treated as a menu surface"), GetSurfaceHighlight(Electric), Electric);
 	return true;
 }
 #endif

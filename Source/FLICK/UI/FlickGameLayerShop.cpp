@@ -60,7 +60,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildShopItemCard(const int32 ItemIndex)
 		.OnClicked_Lambda([this, ItemIndex]() { return OpenShopItem(ItemIndex); });
 	const TWeakPtr<SButton> Weak = Button;
 	const auto Active = [Weak]() { const auto Pinned = Weak.Pin(); return Pinned && (Pinned->IsHovered() || Pinned->HasKeyboardFocus()); };
-	Button->SetContent(SNew(SFlickAngularBorder).BackgroundColor(Ink).UseAccentForOutline(true)
+	Button->SetContent(SNew(SFlickAngularBorder).BackgroundColor(Panel).UseAccentForOutline(true)
 		.AccentColor_Lambda([Active, ItemIndex]() { return Active() ? Brand : FlickShopCatalog::Find(ItemIndex)->Accent.CopyWithNewOpacity(.65f); })
 		.CutSize(9).BorderWidth(1).Padding(1.5f)
 		[SNew(SOverlay)
@@ -160,7 +160,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildItemShop()
 					+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0, 22, 0, 0)
 					[SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 18, 0)
-						[SNew(SFlickAngularBorder).CutSize(10).UseAccentForOutline(true).AccentColor(Muted.CopyWithNewOpacity(.65f)).BackgroundColor(Ink.CopyWithNewOpacity(.85f)).Padding(FMargin(17, 9))
+						[SNew(SFlickAngularBorder).CutSize(10).UseAccentForOutline(true).AccentColor(Muted.CopyWithNewOpacity(.65f)).BackgroundColor(Panel.CopyWithNewOpacity(.85f)).Padding(FMargin(17, 9))
 							[SNew(SHorizontalBox)
 								+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 15, 0)[SNew(FlickShopWidgets::SStatusIcon).Coins(true)]
 								+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -169,7 +169,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildItemShop()
 									+ SVerticalBox::Slot().AutoHeight()
 									[SNew(STextBlock).Tag(TEXT("ShopBalance")).Text_Lambda([this]() { return FText::FromString(ShopPrice(ShopDemo.GetCredits())); }).Font(DisplayFont(21)).ColorAndOpacity(Brand)]]]]
 						+ SHorizontalBox::Slot().AutoWidth()
-						[SNew(SFlickAngularBorder).CutSize(10).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Ink.CopyWithNewOpacity(.85f)).Padding(FMargin(17, 12))
+						[SNew(SFlickAngularBorder).CutSize(10).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Panel.CopyWithNewOpacity(.85f)).Padding(FMargin(17, 12))
 							[SNew(SHorizontalBox)
 								+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 17, 0)[SNew(FlickShopWidgets::SStatusIcon)]
 								+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -184,7 +184,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildItemShop()
 					+ SVerticalBox::Slot().AutoHeight()
 					[SNew(SBox).HeightOverride(FlickShopStyle::HeroHeight)
 						.Visibility_Lambda([this]() { return SelectedShopFilter == EFlickShopFilter::All ? EVisibility::Visible : EVisibility::Collapsed; })
-						[SNew(SFlickAngularBorder).BackgroundColor(Ink).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.65f)).CutSize(14).BorderWidth(1).Padding(1.5f)
+						[SNew(SFlickAngularBorder).BackgroundColor(Panel).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.65f)).CutSize(14).BorderWidth(1).Padding(1.5f)
 							[SNew(SOverlay)
 								+ SOverlay::Slot()[SNew(SFlickMenuArtwork).Artwork(EFlickMenuArtwork::Backdrop).CutSize(12.5f)]
 								+ SOverlay::Slot()[SNew(SFlickShopArtwork).ItemIndex(0).Hero(true).CutSize(12.5f)]
@@ -245,7 +245,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildShopDetails()
 	  [SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0, .003f, .008f, .9f))]]
 	 + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(36)
 	 [SNew(SBox).WidthOverride(1480).HeightOverride(780)
-	  [SNew(SFlickAngularBorder).BackgroundColor(FLinearColor(.006f, .014f, .024f, 1)).AccentColor_Lambda([Item]() { return Item().Accent; }).CutSize(16).BorderWidth(1.5f).Padding(28)
+	  [SNew(SFlickAngularBorder).BackgroundColor(FlickUITheme::Panel).AccentColor_Lambda([Item]() { return Item().Accent; }).CutSize(16).BorderWidth(1.5f).Padding(28)
 	   [SNew(SVerticalBox)
 	    + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 22)
 	    [SNew(SHorizontalBox)

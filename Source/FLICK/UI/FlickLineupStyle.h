@@ -1,12 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UI/FlickUITheme.h"
 
 namespace FlickLineupStyle
 {
 	inline FLinearColor PresetSurface(bool bSelected)
 	{
-		return FLinearColor::FromSRGBColor(bSelected ? FColor(23,35,20,255) : FColor(6,18,25,250));
+		return bSelected ? FlickUITheme::PanelSelected : FlickUITheme::Panel;
 	}
 	constexpr float WorkspaceHeight = 356;
 	constexpr float SlotSize = 138;

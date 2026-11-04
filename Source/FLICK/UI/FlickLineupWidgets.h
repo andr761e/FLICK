@@ -41,6 +41,6 @@ namespace FlickLineupWidgets
 	inline TSharedRef<SWidget> Panel(const TSharedRef<SWidget>& Content, const FMargin Padding = FMargin(18, 14))
 	{
 		return SNew(SFlickAngularBorder).CutSize(14).Padding(Padding).UseAccentForOutline(true)
-			.BackgroundColor(FLinearColor(.003f, .012f, .02f, .94f)).AccentColor(FlickUITheme::Cyan.CopyWithNewOpacity(.48f))[Content];
+			.BackgroundColor(FlickUITheme::Panel).AccentColor(FlickUITheme::Cyan.CopyWithNewOpacity(.48f))[Content];
 	}
 }

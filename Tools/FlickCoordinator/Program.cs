@@ -1290,7 +1290,7 @@ sealed class CoordinatorSettings
             ServerApiKey = Environment.GetEnvironmentVariable("FLICK_BACKEND_SERVER_KEY")
                 ?? "flick-local-development-key",
             SteamWebApiKey = Environment.GetEnvironmentVariable("FLICK_STEAM_WEB_API_KEY") ?? string.Empty,
-            SteamAppId = Environment.GetEnvironmentVariable("FLICK_STEAM_APP_ID") ?? "480",
+            SteamAppId = Environment.GetEnvironmentVariable("FLICK_STEAM_APP_ID") ?? "5548920",
             SteamTicketIdentity = Environment.GetEnvironmentVariable("FLICK_STEAM_TICKET_IDENTITY") ?? "FLICK",
 			SeasonId = Environment.GetEnvironmentVariable("FLICK_COORDINATOR_SEASON_ID") ?? "PRESEASON",
 			RatingsPath = Environment.GetEnvironmentVariable("FLICK_COORDINATOR_RATINGS_PATH")

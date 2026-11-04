@@ -25,6 +25,9 @@ public:
 	bool IsInsidePocket(const FVector& WorldLocation) const;
 	bool IsCapturedByPocket(const FVector& WorldLocation, float PieceRadius) const;
 	bool IsCapturedByPocketOnPath(const FVector& Previous, const FVector& Current, float PieceRadius) const;
+	// Remember entry through the real lip even if momentum carries the falling
+	// puck outside the opening before it reaches the deeper scoring plane.
+	bool HasEnteredPocketOnPath(const FVector& Previous, const FVector& Current) const;
 	bool IsSafeForTabletopSelfRighting(const FVector& WorldLocation, float PieceRadius) const;
 	FVector GetPocketWorldLocation(int32 PocketIndex) const;
 	FVector GetStrikerStart(EFlickTeam Team, float PieceThickness) const;

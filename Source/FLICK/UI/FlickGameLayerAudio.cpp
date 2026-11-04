@@ -53,7 +53,9 @@ namespace
 			const FLinearColor Tint = Style.GetColorAndOpacityTint();
 			const auto Line = [&](TArray<FVector2D> Points, const FLinearColor Color, float Width) {
 				for (auto& Point : Points) Point += Center;
-				FSlateDrawElement::MakeLines(Elements, Layer, Geometry.ToPaintGeometry(), Points, ESlateDrawEffect::None, Color * Tint, true, Width);
+				// Keep the transport glyph above its filled face: Slate can batch
+				// different primitives within one layer in a different order.
+				FSlateDrawElement::MakeLines(Elements, Layer + 2, Geometry.ToPaintGeometry(), Points, ESlateDrawEffect::None, Color * Tint, true, Width);
 			};
 			const auto Triangle = [&](float Direction) {
 				const auto& Transform = Geometry.GetAccumulatedRenderTransform();
@@ -64,9 +66,20 @@ namespace
 			};
 			if (Action == 0)
 			{
+				TArray<FSlateVertex> Disc;
+				TArray<SlateIndex> Indices;
+				Disc.Add(FSlateVertex::Make(Geometry.GetAccumulatedRenderTransform(), FVector2f(Center), FVector2f::ZeroVector, (BrandHover * Tint).ToFColor(true)));
+				for (int32 Step=0; Step<=48; ++Step)
+				{
+					const float Angle=Step*UE_TWO_PI/48;
+					const FVector2D P=Center+FVector2D(FMath::Cos(Angle),FMath::Sin(Angle))*22;
+					Disc.Add(FSlateVertex::Make(Geometry.GetAccumulatedRenderTransform(),FVector2f(P),FVector2f::ZeroVector,(Brand*Tint).ToFColor(true)));
+					if (Step>0) Indices.Append({0,static_cast<SlateIndex>(Step),static_cast<SlateIndex>(Step+1)});
+				}
+				FSlateDrawElement::MakeCustomVerts(Elements,Layer,WhiteBrush()->GetRenderingResource(),Disc,Indices,nullptr,0,0);
 				TArray<FVector2D> Ring;
 				for (int32 Step = 0; Step <= 64; ++Step) { const float Angle = 2 * PI * Step / 64; Ring.Add(FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * 23); }
-				Line(Ring, Focused.Get() ? Brand : Cyan, 1.f);
+				Line(Ring, Paper.CopyWithNewOpacity(Focused.Get() ? 1.f : .85f), 1.3f);
 				if (Playing.Get()) { Line({{-5, -9}, {-5, 9}}, Paper, 4); Line({{5, -9}, {5, 9}}, Paper, 4); }
 				else Triangle(1);
 			}
@@ -76,7 +89,7 @@ namespace
 				const float X = Action > 0 ? 9.f : -9.f;
 				Line({{X, -7}, {X, 7}}, Focused.Get() ? Brand : Paper, 2);
 			}
-			return Layer + 1;
+			return Layer + 2;
 		}
 	private:
 		int32 Action = 0;
@@ -105,10 +118,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMenuRadio()
 		.SetBackgroundImage(FSlateColorBrush(Cyan.CopyWithNewOpacity(.35f)))
 		.SetFillImage(FSlateColorBrush(Cyan)).SetMarqueeImage(FSlateNoResource());
 	return SNew(SBox).WidthOverride(FlickMainMenuStyle::RightColumnWidth).HeightOverride(FlickMainMenuStyle::RadioHeight)
-	[SNew(SFlickAngularBorder).BackgroundColor(Ink.CopyWithNewOpacity(.97f)).AccentColor(Cyan.CopyWithNewOpacity(.7f))
+	[SNew(SFlickAngularBorder).HomeSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.97f)).AccentColor(Cyan.CopyWithNewOpacity(.7f))
 		.UseAccentForOutline(true).BorderWidth(.8f).CutSize(12).Padding(FMargin(22, 10))
 		[SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK RADIO //"))).Font(UiFont(9)).ColorAndOpacity(Cyan)]
+		+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("FLICK RADIO //"))).Font(UiFont(9)).ColorAndOpacity(Brand)]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0, 3, 0, 5)
 		[
 			SNew(SHorizontalBox)

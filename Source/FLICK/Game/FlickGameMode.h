@@ -16,6 +16,7 @@ class AFlickPiece;
 class AFlickPlayerState;
 class AFlickTestArena;
 class UFlickPracticeComponent;
+class UFlickAchievementTracker;
 class UPrimitiveComponent;
 class AFlickWorldFeedback;
 class ADirectionalLight;
@@ -211,6 +212,7 @@ public:
 	bool IsTutorialMode() const { return bTrainingMode && bTutorialMode; }
 	bool IsPracticeMode() const;
 	UFlickPracticeComponent* GetPractice() const { return Practice; }
+	UFlickAchievementTracker* GetAchievementTracker() const { return AchievementTracker; }
 	bool IsFreePlayTraining() const { return bTrainingMode && !bTrainingBotMatch && !bTutorialMode; }
 	bool CanUndoTrainingShot() const;
 	bool UndoTrainingShot();
@@ -643,6 +645,8 @@ private:
 	friend class FFlickTrainingFeedbackTest;
 	friend class FFlickTrainingUndoTest;
 	friend class UFlickPracticeComponent;
+	friend class UFlickAchievementTracker;
+	friend class FFlickAchievementGameplayTest;
 	friend class FFlickPracticeTest;
 	friend class FFlickFrontendRecoveryTest;
 	friend class FFlickPackagedStartupTest;
@@ -925,6 +929,7 @@ private:
 	bool bTutorialMode = false;
 	UPROPERTY(VisibleAnywhere, Category="FLICK|Practice")
 	TObjectPtr<UFlickPracticeComponent> Practice;
+	UPROPERTY() TObjectPtr<UFlickAchievementTracker> AchievementTracker;
 	bool bTutorialCompleted = false;
 	bool bTutorialAdvancePending = false;
 	static constexpr int32 TutorialStageTotal = 4;
@@ -971,6 +976,7 @@ private:
 	float SettledElapsed = 0.0f;
 	// Sweep the pocket capture plane between rendered frames, not just endpoints.
 	TMap<int32, FVector> BobPocketPreviousLocations;
+	TSet<int32> BobPocketEnteredPieces;
 	float LastImpactFeedbackTime = -100.0f;
 	float LastStrongImpactEventTime = -100.0f;
 	bool bNetworkMatchRequested = false;

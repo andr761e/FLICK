@@ -134,7 +134,7 @@ namespace FlickPlaylistWidgets
 		return SNew(SBox).HeightOverride(64)
 			[SNew(SFlickAngularBorder).CutSize(12).BorderWidth(.8f).UseAccentForOutline(true)
 				.AccentColor(FlickUITheme::Cyan.CopyWithNewOpacity(.6f))
-				.BackgroundColor(FLinearColor(.002f, .01f, .017f, .82f)).Padding(FMargin(18, 6))[Content]];
+				.BackgroundColor(FlickUITheme::Panel).Padding(FMargin(18, 6))[Content]];
 	}
 
 	inline TSharedRef<SWidget> Card(const EFlickMenuArtwork Artwork, const TAttribute<bool>& Active,

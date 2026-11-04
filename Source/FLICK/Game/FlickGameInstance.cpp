@@ -1,4 +1,5 @@
 #include "Game/FlickGameInstance.h"
+#include "Online/FlickAchievementSubsystem.h"
 
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Core/FlickVisualSettings.h"
@@ -624,8 +625,11 @@ void UFlickGameInstance::SetClassLoadoutPiece(
 		static_cast<int32>(Archetype),
 		static_cast<int32>(EFlickPieceArchetype::Standard),
 		static_cast<int32>(EFlickPieceArchetype::Toppler));
+	const auto Before = *Loadout;
 	SetUniqueLoadoutPiece(*Loadout, SlotIndex, static_cast<EFlickPieceArchetype>(SafeValue));
 	SaveFrontendSettings();
+	if (Before != *Loadout)
+		if (auto* A = GetSubsystem<UFlickAchievementSubsystem>()) A->RecordCustomLineup();
 }
 
 void UFlickGameInstance::SetAimGuideEnabled(const bool bEnabled)

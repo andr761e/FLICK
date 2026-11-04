@@ -1,4 +1,5 @@
 #include "Game/FlickGameModePrivate.h"
+#include "Online/FlickAchievementSubsystem.h"
 
 using namespace FlickGameModePrivate;
 
@@ -605,6 +606,9 @@ bool AFlickGameMode::ExecuteValidatedLaunch(
 	Piece->SetSelected(false);
 	Piece->SetHovered(false);
 	Piece->Launch(Direction, NormalizedPower, MaxLaunchSpeed);
+	AchievementTracker->ShotLaunched(Piece);
+	if (IsPracticeMode() && GetGameInstance())
+		if (auto* A = GetGameInstance()->GetSubsystem<UFlickAchievementSubsystem>()) A->RecordPracticeShot();
 	if (AudioDirector)
 	{
 		AudioDirector->PlayLaunch(Piece->GetArchetype(), NormalizedPower, LaunchLocation);
@@ -794,6 +798,7 @@ void AFlickGameMode::ReleaseKickoffShots()
 		Piece->SetSelected(false);
 		Piece->SetHovered(false);
 		Piece->Launch(Shot.Direction, Shot.Power, MaxLaunchSpeed);
+		AchievementTracker->ShotLaunched(Piece);
 		if (AudioDirector)
 		{
 			AudioDirector->PlayLaunch(Piece->GetArchetype(), Shot.Power, LaunchLocation);

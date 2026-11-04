@@ -22,7 +22,7 @@ namespace
 		const TWeakPtr<SButton> WeakButton = Button;
 		Button->SetContent(SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(7).UseAccentForOutline(true)
 			.BackgroundColor_Lambda([WeakButton, bPrimary]()
-			{ const auto B = WeakButton.Pin(); return bPrimary ? (B && (B->IsHovered() || B->HasKeyboardFocus()) ? FLinearColor(.85f, 1, .14f) : Brand) : Ink; })
+			{ const auto B = WeakButton.Pin(); return bPrimary ? (B && (B->IsHovered() || B->HasKeyboardFocus()) ? BrandHover : Brand) : Ink; })
 			.AccentColor_Lambda([WeakButton, Accent, bPrimary]()
 			{ const auto B = WeakButton.Pin(); return bPrimary || (B && (B->IsHovered() || B->HasKeyboardFocus())) ? Brand : Accent.CopyWithNewOpacity(.6f); })
 			.Padding(FMargin(10, 6))
@@ -105,7 +105,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildDisplayPuckSelector()
 	return SNew(SBox).WidthOverride(280).HeightOverride(42)
 		.RenderTransform_Lambda([this]() { return FSlateRenderTransform(FVector2D(0, IsDisplayedPartyActive() || bPartyTrayPreview ? -70.f : 0.f)); })
 	[
-		SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Cyan.CopyWithNewOpacity(.7f)).UseAccentForOutline(true).BorderWidth(.8f).CutSize(10).Padding(FMargin(12, 4))
+			SNew(SFlickAngularBorder).HomeSurface(true).BackgroundColor(Panel).AccentColor(Cyan.CopyWithNewOpacity(.7f)).UseAccentForOutline(true).BorderWidth(.8f).CutSize(10).Padding(FMargin(12, 4))
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("DISPLAY PUCK"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
@@ -140,7 +140,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		[
 			SAssignNew(MainMenuDiagonalPanel, SFlickDiagonalPanel)
 			.Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
-			.PanelColor(FLinearColor::FromSRGBColor(FColor(4, 10, 14, 252)))
+			.PanelColor(FlickHomeSurface::Midnight)
 			.EdgeColor(FlickMainMenuStyle::Ice.CopyWithNewOpacity(0.68f))
 		]
 		+ SOverlay::Slot()
@@ -395,7 +395,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 			[
 				SNew(SFlickMainMenuPanel)
 				.Premium(true)
-				.BackgroundColor(FLinearColor::FromSRGBColor(FColor(11, 22, 25, 248)))
+				.HomeSurface(true)
+				.BackgroundColor(FlickUITheme::Panel)
 				.AccentColor(Brand)
 				.CutSize(10.0f)
 				.BorderWidth(1.15f)
@@ -494,7 +495,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuFooter()
 			SNew(SOverlay)
 			+ SOverlay::Slot()
 			[
-				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor::FromSRGBColor(FColor(9, 17, 19, 218))).Padding(0.0f)
+				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FlickUITheme::Panel).Padding(0.0f)
 			]
 			+ SOverlay::Slot().VAlign(VAlign_Top)
 			[
@@ -525,9 +526,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 {
 	auto MakeStatCell = [this](const FString& Label, const FString& Detail, const int32 StatIndex, const FLinearColor& Accent) -> TSharedRef<SWidget>
 	{
+		const bool bFeatured = StatIndex == 0 || StatIndex == 2;
+		const FLinearColor Foreground = bFeatured ? Ink : Paper;
 		return SNew(SFlickAngularBorder)
-			.BackgroundColor(PanelRaised)
-			.AccentColor(Hairline)
+			.BackgroundColor(bFeatured ? Brand : PanelRaised)
+			.AccentColor(bFeatured ? BrandHover : Electric)
 			.CutSize(9.0f)
 			.BorderWidth(0.9f)
 			.Padding(FMargin(18.0f, 8.0f))
@@ -538,7 +541,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 					SNew(STextBlock)
 					.Text(FText::FromString(Label))
 					.Font(UiFont(10, true))
-					.ColorAndOpacity(Brand)
+					.ColorAndOpacity(Foreground)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
 				[
@@ -569,14 +572,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 						}
 					})
 					.Font(DisplayFont(30))
-					.ColorAndOpacity(Paper)
+					.ColorAndOpacity(Foreground)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
 				[
 					SNew(STextBlock)
 					.Text(FText::FromString(Detail))
 					.Font(UiFont(10))
-					.ColorAndOpacity(Muted)
+					.ColorAndOpacity(bFeatured ? Ink : Muted)
 				]
 			];
 	};
@@ -680,7 +683,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileIdentityCard(const bool bExpand
 								+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center).Padding(7)
 								[SNew(SBox).WidthOverride(116).HeightOverride(116)
 									[SNew(SOverlay)
-										+ SOverlay::Slot()[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink).CutSize(11)
+										+ SOverlay::Slot()[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Panel).CutSize(11)
 											.AccentColor_Lambda([this]() { return GetAvatarFrameColor(SelectedAvatarBorder); }).Padding(5)
 											[SNew(SFlickPuckThumbnail).View(EFlickPuckThumbnailView::Locker).CutSize(7).Zoom(1.25f)
 												.Archetype_Lambda(Showcase).Skin_Lambda([this,Showcase]() { return SelectedPuckSkins[static_cast<int32>(Showcase())]; })]]
@@ -715,7 +718,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileIdentityCard(const bool bExpand
 						SNew(SBox).WidthOverride(80).HeightOverride(80)
 						[
 							SNew(SOverlay)
-							+ SOverlay::Slot()[SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor_Lambda([this]() { return GetAvatarFrameColor(SelectedAvatarBorder); }).CutSize(12).Padding(10)
+							+ SOverlay::Slot()[SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor_Lambda([this]() { return GetAvatarFrameColor(SelectedAvatarBorder); }).CutSize(12).Padding(10)
 								[SNew(SFlickStatusGlobe).Color(Cyan)]]
 							+ SOverlay::Slot().Padding(9)[SNew(SImage).Image_Lambda([this]() { auto* Sessions = GetDisplayedSessionSubsystem(); return Sessions ? Sessions->GetLocalAvatarBrush() : nullptr; })]
 							+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this]() { return GetCosmeticImageBrush(2, SelectedAvatarBorder); })]
@@ -1237,7 +1240,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartyS
 			})
 			[
 			SNew(SFlickMainMenuPanel)
-			.BackgroundColor(FLinearColor::FromSRGBColor(FColor(17, 31, 34, 248)))
+			.BackgroundColor(FlickUITheme::Panel)
 			.AccentColor_Lambda([this, PartySlot]()
 			{
 				return (bPartyTrayPreview ? PartySlot == 0 : IsDisplayedPartyMemberLeader(PartySlot))
@@ -1372,7 +1375,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 			})
 			[
 				SNew(SFlickAngularBorder).RefinedSurface(true)
-				.BackgroundColor(Ink)
+				.BackgroundColor(Panel)
 				.AccentColor(Hairline)
 				.UseAccentForOutline(true)
 				.CutSize(7.0f)
@@ -1407,7 +1410,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 	};
 
 	return SNew(SFlickAngularBorder).RefinedSurface(true).Tag(TEXT("SocialDrawer"))
-		.BackgroundColor(Ink.CopyWithNewOpacity(.98f))
+		.BackgroundColor(Panel.CopyWithNewOpacity(.98f))
 		.AccentColor(Cyan).UseAccentForOutline(true)
 		.CutSize(18.0f)
 		.BorderWidth(1.0f)
@@ -1460,7 +1463,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					SNew(SBox).WidthOverride(44.0f).HeightOverride(44.0f)
 					[
 						SNew(SFlickAngularBorder).RefinedSurface(true)
-						.BackgroundColor(Ink)
+						.BackgroundColor(Panel)
 						.AccentColor(Hairline)
 						.UseAccentForOutline(true)
 						.CutSize(7.0f)
@@ -1515,7 +1518,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					})
 					[
 						SNew(SFlickAngularBorder).RefinedSurface(true)
-						.BackgroundColor(Ink)
+						.BackgroundColor(Panel)
 						.AccentColor(Hairline)
 						.UseAccentForOutline(true).CutSize(3.0f).BorderWidth(0.75f).Padding(FMargin(9.0f, 4.0f))
 						[
@@ -1572,7 +1575,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 					})
 					[
 						SNew(SFlickAngularBorder).RefinedSurface(true)
-						.BackgroundColor(Ink)
+						.BackgroundColor(Panel)
 						.AccentColor(Hairline)
 						.UseAccentForOutline(true).CutSize(3.0f).BorderWidth(0.7f).Padding(FMargin(10.0f, 4.0f))
 						[
@@ -1631,7 +1634,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialPanel()
 						})
 						[
 							SNew(SFlickAngularBorder).RefinedSurface(true)
-							.BackgroundColor(Ink)
+							.BackgroundColor(Panel)
 							.AccentColor(Hairline.CopyWithNewOpacity(0.42f))
 							.CutSize(10.0f).BorderWidth(0.8f).Padding(FMargin(20.0f, 14.0f))
 							[
@@ -1778,7 +1781,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 		})
 		[
 			SNew(SFlickAngularBorder).RefinedSurface(true)
-			.BackgroundColor(Ink)
+			.BackgroundColor(Panel)
 			.AccentColor(Hairline)
 			.CutSize(5.0f)
 			.BorderWidth(0.9f)
@@ -1808,7 +1811,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPartyMemberRow(const int32 PartySlot)
 					SNew(SBox).WidthOverride(44.0f).HeightOverride(36.0f)
 					[
 						SNew(SFlickAngularBorder).RefinedSurface(true)
-						.BackgroundColor(Ink)
+						.BackgroundColor(Panel)
 						.AccentColor(Hairline)
 						.CutSize(6.0f)
 						.BorderWidth(1.0f)
@@ -2057,7 +2060,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSocialFriendRow(const int32 FriendInde
 						+ SOverlay::Slot()
 						[
 							SNew(SFlickAngularBorder).RefinedSurface(true)
-							.BackgroundColor(Ink)
+							.BackgroundColor(Panel)
 							.AccentColor(Hairline)
 							.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(3.0f))
 							[
@@ -2154,7 +2157,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 		})
 		[
 			SNew(SFlickAngularBorder).RefinedSurface(true)
-			.BackgroundColor(Ink)
+			.BackgroundColor(Panel)
 			.AccentColor(Hairline.CopyWithNewOpacity(0.62f))
 			.UseAccentForOutline(true)
 			.CutSize(6.0f)
@@ -2167,7 +2170,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRecentPlayerRow(const int32 RecentInde
 					SNew(SBox).WidthOverride(38.0f).HeightOverride(38.0f)
 					[
 						SNew(SFlickAngularBorder).RefinedSurface(true)
-						.BackgroundColor(Ink)
+						.BackgroundColor(Panel)
 						.AccentColor(Hairline.CopyWithNewOpacity(0.7f))
 						.CutSize(5.0f).BorderWidth(0.8f).Padding(FMargin(3.0f))
 						[

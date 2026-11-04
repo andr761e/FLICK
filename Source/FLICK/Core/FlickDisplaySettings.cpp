@@ -23,14 +23,14 @@ void FlickDisplaySettings::MigrateConfig(FConfigCacheIni& Config, const FString&
 			if (Entry.Split(TEXT("="), &Key, &Value)) Config.AddToSection(Current, FName(*Key), Value, Filename);
 		}
 	}
-	for (const TCHAR* Section : {Legacy, Current})
+	for (const TCHAR* SavedSettingsSection : {Legacy, Current})
 	{
 		for (const TCHAR* Key : {TEXT("FullscreenMode"), TEXT("LastConfirmedFullscreenMode")})
 		{
 			int32 Mode = 1;
-			if (Config.GetInt(Section, Key, Mode, Filename) && Mode == 0) Config.SetInt(Section, Key, 1, Filename);
+			if (Config.GetInt(SavedSettingsSection, Key, Mode, Filename) && Mode == 0) Config.SetInt(SavedSettingsSection, Key, 1, Filename);
 		}
-		Config.SetInt(Section, TEXT("PreferredFullscreenMode"), 1, Filename);
+		Config.SetInt(SavedSettingsSection, TEXT("PreferredFullscreenMode"), 1, Filename);
 	}
 }
 

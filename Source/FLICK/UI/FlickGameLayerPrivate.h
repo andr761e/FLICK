@@ -4,6 +4,7 @@
 #include "UI/FlickGameLayer.h"
 #include "UI/FlickUITheme.h"
 #include "UI/FlickMainMenuStyle.h"
+#include "UI/FlickHomeSurface.h"
 #include "UI/FlickMenuArtwork.h"
 #include "UI/FlickPuckThumbnail.h"
 
@@ -138,6 +139,38 @@ namespace
 				ESlateDrawEffect::None, Color.CopyWithNewOpacity(Color.A * Alpha[Index] * Strength), true, Widths[Index]);
 	}
 
+	// Subdivide the convex frame to sample soft local highlights. A single
+	// corner-only triangle fan cannot represent a highlight inside a panel.
+	void DrawHomeSurface(FSlateWindowElementList& Elements, const FGeometry& Geometry, int32 Layer,
+		const TArray<FVector2D>& Outline, FLinearColor Fill, FLinearColor Tint, bool bPrimary = false)
+	{
+		const FVector2D Size = Geometry.GetLocalSize();
+		TArray<FSlateVertex> Vertices;
+		TArray<SlateIndex> Indices;
+		constexpr int32 Steps = 5;
+		Vertices.Reserve(Outline.Num() * Steps * Steps * 3);
+		Indices.Reserve(Outline.Num() * Steps * Steps * 3);
+		const auto AddTriangle = [&](FVector2D A, FVector2D B, FVector2D C) {
+			for (const FVector2D P : {A, B, C})
+			{
+				Indices.Add(static_cast<SlateIndex>(Vertices.Num()));
+				const FLinearColor Color = FlickHomeSurface::Shade(P / Size, Fill, bPrimary) * Tint;
+				Vertices.Add(FSlateVertex::Make(Geometry.GetAccumulatedRenderTransform(), FVector2f(P), FVector2f::ZeroVector, Color.ToFColor(true)));
+			}
+		};
+		for (int32 Edge = 0; Edge < Outline.Num(); ++Edge)
+		{
+			const FVector2D A = Size * .5, B = Outline[Edge], C = Outline[(Edge + 1) % Outline.Num()];
+			const auto P = [&](int32 I, int32 J) { return A + (B - A) * (I / float(Steps)) + (C - A) * (J / float(Steps)); };
+			for (int32 I = 0; I < Steps; ++I) for (int32 J = 0; J < Steps - I; ++J)
+			{
+				AddTriangle(P(I,J), P(I+1,J), P(I,J+1));
+				if (I + J < Steps - 1) AddTriangle(P(I+1,J), P(I+1,J+1), P(I,J+1));
+			}
+		}
+		FSlateDrawElement::MakeCustomVerts(Elements, Layer, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
+	}
+
 	FSlateFontInfo UiFont(const int32 Size, const bool bBold = false)
 	{
 		return FCoreStyle::GetDefaultFontStyle(bBold ? "Bold" : "Regular", Size);
@@ -159,7 +192,7 @@ namespace
 	{
 	public:
 		SLATE_BEGIN_ARGS(SFlickDiagonalPanel)
-			: _PanelColor(FLinearColor(0.002f, 0.009f, 0.016f, 0.82f))
+			: _PanelColor(Panel)
 			, _EdgeColor(FLinearColor(0.0f, 0.76f, 1.0f, 0.58f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, PanelColor)
@@ -209,7 +242,7 @@ namespace
 			constexpr float CoverageAlpha[] = {1.0f, 1.0f, 0.90f, 0.5f, 0.10f, 0.0f, 0.0f};
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
 			const FLinearColor LeftPanelColor = PanelColor.Get() * InWidgetStyle.GetColorAndOpacityTint();
-			const FLinearColor EdgeSheen = FLinearColor::FromSRGBColor(FColor(10, 29, 35, 242)) * InWidgetStyle.GetColorAndOpacityTint();
+			const FLinearColor EdgeSheen = FLinearColor::FromSRGBColor(FColor(4, 43, 66, 248)) * InWidgetStyle.GetColorAndOpacityTint();
 
 			TArray<FSlateVertex> Vertices;
 			constexpr int32 Columns = 1 + UE_ARRAY_COUNT(CoverageOffsets);
@@ -354,10 +387,10 @@ namespace
 	{
 	public:
 		SLATE_BEGIN_ARGS(SFlickMainMenuFrame)
-			: _StartColor(FLinearColor(0.006f, 0.018f, 0.03f, 0.9f))
-			, _EndColor(FLinearColor(0.012f, 0.032f, 0.052f, 0.9f))
-			, _HoverStartColor(FLinearColor(0.01f, 0.055f, 0.09f, 0.94f))
-			, _HoverEndColor(FLinearColor(0.015f, 0.11f, 0.17f, 0.94f))
+			: _StartColor(PanelRaised)
+			, _EndColor(Panel)
+			, _HoverStartColor(PanelSheen)
+			, _HoverEndColor(PanelRaised)
 			, _BorderColor(Hairline)
 			, _HoverBorderColor(Cyan)
 			, _Highlighted(false)
@@ -450,7 +483,7 @@ namespace
 			const auto SurfaceColor = [&](const FVector2D Position)
 			{
 				FLinearColor Color = FMath::Lerp(Left, Right, static_cast<float>(Position.X / Size.X));
-				const FLinearColor Sheen = (bPrimary ? FLinearColor(0.95f, 1.0f, 0.32f) : FLinearColor::FromSRGBColor(FColor(26, 47, 53))) * Tint;
+				const FLinearColor Sheen = (bPrimary ? BrandHover : PanelSheen) * Tint;
 				return FMath::Lerp(Color, Sheen, (1.0f - static_cast<float>(Position.Y / Size.Y)) * (bPrimary ? 0.15f : 0.32f)).ToFColor(true);
 			};
 			Vertices.Add(FSlateVertex::Make(
@@ -470,8 +503,17 @@ namespace
 			TArray<SlateIndex> Indices;
 			for (int32 Index = 0; Index < Points.Num(); ++Index)
 				Indices.Append({0, static_cast<SlateIndex>(Index + 1), static_cast<SlateIndex>((Index + 1) % Points.Num() + 1)});
-			FSlateDrawElement::MakeCustomVerts(
+			if (bHomePresentation)
+				DrawHomeSurface(OutDrawElements, AllottedGeometry, LayerId + 1, Points, Left, Tint, bPrimary);
+			else FSlateDrawElement::MakeCustomVerts(
 				OutDrawElements, LayerId + 1, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
+			if (bHomePresentation)
+			{
+				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline, bPrimary ? Brand : Cyan, bPrimary ? 2.8f : .7f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
+					{Points[0] + FVector2D(6, 1), Points[1] - FVector2D(10, -1)}, ESlateDrawEffect::None,
+					(bPrimary ? Paper : Ice).CopyWithNewOpacity(.6f) * Tint, true, 1.f);
+			}
 			if (bPrimary && !bHomePresentation)
 			{
 				TArray<FVector2D> OuterFrame = Outline;
@@ -1490,6 +1532,7 @@ namespace
 				, _DrawNeutralOutline(true)
 				, _UseAccentForOutline(false)
 				, _RefinedSurface(false)
+				, _HomeSurface(false)
 				, _Padding(FMargin(0.0f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, BackgroundColor)
@@ -1499,6 +1542,7 @@ namespace
 				SLATE_ARGUMENT(bool, DrawNeutralOutline)
 				SLATE_ARGUMENT(bool, UseAccentForOutline)
 				SLATE_ARGUMENT(bool, RefinedSurface)
+				SLATE_ARGUMENT(bool, HomeSurface)
 				SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
@@ -1512,6 +1556,7 @@ namespace
 			bDrawNeutralOutline = InArgs._DrawNeutralOutline;
 			bUseAccentForOutline = InArgs._UseAccentForOutline;
 			bRefinedSurface = InArgs._RefinedSurface;
+			bHomeSurface = InArgs._HomeSurface;
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
 		}
 
@@ -1544,8 +1589,16 @@ namespace
 				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
 			}
 			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
+			if (bHomeSurface) DrawHomeSurface(OutDrawElements, AllottedGeometry, LayerId, Points, Fill, Tint);
+			else FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
 				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
+			if (bHomeSurface)
+			{
+				TArray<FVector2D> Rim = Points; Rim.Add(Points[0]);
+				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Rim, Cyan * Tint, .9f);
+				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(),
+					{Points[0] + FVector2D(18,1), Points[1] - FVector2D(24,-1)}, Effect, Ice.CopyWithNewOpacity(.65f) * Tint, true, 1.f);
+			}
 			if (bRefinedSurface && bDrawNeutralOutline && Fill.A > .1f && Size.X > 12 && Size.Y > 12)
 			{
 				auto Inset = FlickUITheme::GetPanelOutline(Size - FVector2D(6,6), FMath::Max(0.f,Cut-2));
@@ -1591,6 +1644,7 @@ namespace
 		bool bDrawNeutralOutline = true;
 		bool bUseAccentForOutline = false;
 		bool bRefinedSurface = false;
+		bool bHomeSurface = false;
 	};
 
 	// Image-capable shared frame. Premium treatment is reserved for feature
@@ -1599,12 +1653,13 @@ namespace
 	{
 	public:
 		SLATE_BEGIN_ARGS(SFlickMainMenuPanel)
-			: _BackgroundColor(FLinearColor(0.012f, 0.026f, 0.032f, 0.94f))
+			: _BackgroundColor(Panel)
 			, _AccentColor(Brand)
 			, _CutSize(12.0f)
 			, _BorderWidth(1.15f)
 			, _ImageBrush(nullptr)
 			, _Premium(false)
+			, _HomeSurface(false)
 			, _Padding(FMargin(0.0f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, BackgroundColor)
@@ -1613,6 +1668,7 @@ namespace
 			SLATE_ARGUMENT(float, BorderWidth)
 			SLATE_ATTRIBUTE(const FSlateBrush*, ImageBrush)
 			SLATE_ARGUMENT(bool, Premium)
+			SLATE_ARGUMENT(bool, HomeSurface)
 			SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
@@ -1625,6 +1681,7 @@ namespace
 			BorderWidth = InArgs._BorderWidth;
 			ImageBrush = InArgs._ImageBrush;
 			bPremium = InArgs._Premium;
+			bHomeSurface = InArgs._HomeSurface;
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
 		}
 
@@ -1656,7 +1713,7 @@ namespace
 			TArray<SlateIndex> Indices;
 			for (const FVector2D& Point : Points)
 			{
-				FLinearColor Sheen = FLinearColor::FromSRGBColor(FColor(24, 45, 52)) * Tint;
+				FLinearColor Sheen = PanelSheen * Tint;
 				Sheen.A = Fill.A;
 				const FLinearColor Surface = bPremium ? FMath::Lerp(Fill, Sheen, (1.0f - static_cast<float>(Point.Y / Size.Y)) * 0.32f)
 					: FMath::Lerp(FlickUITheme::GetSurfaceHighlight(BackgroundColor.Get()) * Tint, Fill, static_cast<float>(Point.Y / Size.Y));
@@ -1667,8 +1724,10 @@ namespace
 				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
 			}
 			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			FSlateDrawElement::MakeCustomVerts(OutDrawElements, SurfaceLayer,
+			if (bHomeSurface) DrawHomeSurface(OutDrawElements, AllottedGeometry, SurfaceLayer, Points, BackgroundColor.Get(), Tint);
+			else FSlateDrawElement::MakeCustomVerts(OutDrawElements, SurfaceLayer,
 				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
+			if (bHomeSurface) DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline, Accent, 1.1f);
 			if (const FSlateBrush* Brush = ImageBrush.Get())
 			{
 				// Draw the artwork inside the same eight-sided geometry as the panel.
@@ -1694,7 +1753,7 @@ namespace
 					FlickMainMenuStyle::Ice.CopyWithNewOpacity(0.52f) * Tint, true, 1.0f);
 			}
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3, AllottedGeometry.ToPaintGeometry(),
-				Outline, Effect, (bPremium ? FLinearColor::FromSRGBColor(FColor(99, 136, 149, 210)) : FLinearColor(0.26f, 0.34f, 0.38f, 0.88f)) * Tint, true, BorderWidth);
+					Outline, Effect, (bHomeSurface ? Cyan.CopyWithNewOpacity(.8f) : bPremium ? FLinearColor::FromSRGBColor(FColor(99, 136, 149, 210)) : FLinearColor(0.26f, 0.34f, 0.38f, 0.88f)) * Tint, true, BorderWidth);
 
 			const float Bracket = FMath::Min(34.0f, Size.X * 0.12f);
 			const TArray<FVector2D> TopBracket = {{0.0f, Cut}, {Cut, 0.0f}, {Bracket, 0.0f}};
@@ -1717,6 +1776,7 @@ namespace
 		TAttribute<FLinearColor> AccentColor;
 		TAttribute<const FSlateBrush*> ImageBrush;
 		bool bPremium = false;
+		bool bHomeSurface = false;
 		float CutSize = 12.0f;
 		float BorderWidth = 1.15f;
 	};

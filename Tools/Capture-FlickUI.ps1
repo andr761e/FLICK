@@ -191,11 +191,18 @@ foreach ($screenName in $Screen) {
             throw "Unknown lighting control: $($setting.Key)"
         }
         $value = [float]$setting.Value
-        $maximum = if ($setting.Key -eq 'Highlights') { 1.0 } else { 3.0 }
-        if ([float]::IsNaN($value) -or [float]::IsInfinity($value) -or $value -lt 0 -or $value -gt $maximum) {
-            throw "Lighting control $($setting.Key) must be between 0 and $maximum"
+        # Match the bounded approved preset in FlickLightingSettings.cpp.
+        $bounds = switch ($setting.Key) {
+            'Ambient' { @(1.875, 4.125) }
+            'Accents' { @(1.2375, 2.0625) }
+            'Direct' { @(1.6875, 2.8125) }
+            'Highlights' { @(0.36, 0.60) }
+            default { @(2.25, 3.75) }
         }
-        $arguments += "-ini:GameUserSettings:[FLICK.LightingSettings]:Menu.$($setting.Key)=$($value.ToString([System.Globalization.CultureInfo]::InvariantCulture))"
+        if ([float]::IsNaN($value) -or [float]::IsInfinity($value) -or $value -lt $bounds[0] -or $value -gt $bounds[1]) {
+            throw "Lighting control $($setting.Key) must be between $($bounds[0]) and $($bounds[1])"
+        }
+        $arguments += "-ini:GameUserSettings:[FLICK.LightingSettings]:Balanced.Menu.$($setting.Key)=$($value.ToString([System.Globalization.CultureInfo]::InvariantCulture))"
     }
     foreach ($group in @('ViewDistance', 'AntiAliasing', 'Shadow', 'GlobalIllumination', 'Reflection', 'PostProcess', 'Texture', 'Effects', 'Foliage', 'Shading')) {
         $arguments += "-ini:GameUserSettings:[ScalabilityGroups]:sg.${group}Quality=$Quality"

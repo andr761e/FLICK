@@ -298,6 +298,18 @@ bool AFlickBobArena::IsCapturedByPocketOnPath(const FVector& Previous, const FVe
 	return IsCapturedByPocket(GetActorTransform().TransformPosition(Crossing), PieceRadius);
 }
 
+bool AFlickBobArena::HasEnteredPocketOnPath(const FVector& Previous, const FVector& Current) const
+{
+	const FVector From = GetActorTransform().InverseTransformPosition(Previous);
+	const FVector To = GetActorTransform().InverseTransformPosition(Current);
+	// Centre must physically descend below the bed, inside the actual aperture.
+	// Passing over the hole or brushing its rim is not an entry.
+	const float LipPlane = SurfaceZ - FMath::Min(2.f, PocketCaptureDepth);
+	if (From.Z <= LipPlane || To.Z > LipPlane) return false;
+	const float Fraction = (From.Z - LipPlane) / (From.Z - To.Z);
+	return IsInsidePocket(GetActorTransform().TransformPosition(FMath::Lerp(From, To, Fraction)));
+}
+
 bool AFlickBobArena::IsSafeForTabletopSelfRighting(
 	const FVector& WorldLocation,
 	const float PieceRadius) const

@@ -82,7 +82,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeCard(const EFlickMatchVariant Vari
 							+ SHorizontalBox::Slot().AutoWidth()
 							[
 								SNew(SFlickAngularBorder)
-								.BackgroundColor(FLinearColor(0.004f, 0.012f, 0.021f, 0.88f))
+								.BackgroundColor(FlickUITheme::Panel)
 								.AccentColor_Lambda([this, Variant]() { return FSlateColor(GameMode.IsValid() && GameMode->GetSelectedMatchVariant() == Variant ? GetModeAccent(Variant) : Hairline).GetSpecifiedColor(); })
 								.CutSize(5.0f)
 								.BorderWidth(0.8f)
@@ -141,7 +141,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildModeCard(const EFlickMatchVariant Vari
 						[
 							SNew(SBorder)
 							.BorderImage(WhiteBrush())
-							.BorderBackgroundColor(FLinearColor(0.012f, 0.03f, 0.044f, 0.88f))
+							.BorderBackgroundColor(FlickUITheme::Panel)
 							.Padding(FMargin(12.0f, 18.0f))
 							[
 								SNew(STextBlock).Text(FText::FromString(GetMatchVariantSeriesLabel(Variant))).Font(UiFont(9, true)).ColorAndOpacity(FLinearColor::White)
@@ -184,7 +184,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadout()
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(12, 0, 0, 12)
 			[
 				SNew(SBox).WidthOverride(450).HeightOverride(30).HAlign(HAlign_Fill)
-				[SNew(SFlickAngularBorder).BackgroundColor(Ink.CopyWithNewOpacity(.9f)).AccentColor(Cyan.CopyWithNewOpacity(.65f))
+				[SNew(SFlickAngularBorder).BackgroundColor(Panel.CopyWithNewOpacity(.9f)).AccentColor(Cyan.CopyWithNewOpacity(.65f))
 					.UseAccentForOutline(true).CutSize(7).Padding(FMargin(10, 2))
 					[SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().FillWidth(1)[NameEditor]
@@ -305,7 +305,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLineupInspector()
 TSharedRef<SWidget> SFlickGameLayer::BuildLineupRadar()
 {
 	return SNew(SFlickAngularBorder)
-		.BackgroundColor(FLinearColor(0.004f, 0.013f, 0.023f, 0.96f))
+		.BackgroundColor(FlickUITheme::Panel)
 		.AccentColor(Hairline)
 		.CutSize(10.0f)
 		.Padding(FMargin(16.0f, 12.0f))
@@ -435,7 +435,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildLoadoutComparison(const EFlickTeam Tea
 			+ SHorizontalBox::Slot().FillWidth(1)
 			[SNew(STextBlock).Text_Lambda([this, Team]() { return FText::FromString(GetPieceArchetypeName(GetPreviewLoadoutArchetype(Team))); }).Font(DisplayFont(27)).ColorAndOpacity(Paper)]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-			[SNew(SFlickAngularBorder).CutSize(5).Padding(FMargin(15, 3)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.65f)).BackgroundColor(Ink)
+			[SNew(SFlickAngularBorder).CutSize(5).Padding(FMargin(15, 3)).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.65f)).BackgroundColor(Panel)
 				[SNew(STextBlock).Text_Lambda([this, Team]() { return FText::FromString(FlickPieceArchetypeRules::Get(GetPreviewLoadoutArchetype(Team)).ClassLabel); }).Font(DisplayFont(10)).ColorAndOpacity(Cyan)]]
 		]
 		+ SVerticalBox::Slot().AutoHeight()
@@ -572,7 +572,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassPlayerRow(
 		.HeightOverride(78.0f)
 		[
 			SNew(SFlickAngularBorder)
-			.BackgroundColor(Ink.CopyWithNewOpacity(.95f)).RefinedSurface(true)
+			.BackgroundColor(Panel.CopyWithNewOpacity(.95f)).RefinedSurface(true)
 			.AccentColor(Cyan.CopyWithNewOpacity(.7f)).UseAccentForOutline(true)
 			.CutSize(14.0f)
 			.BorderWidth(0.8f)
@@ -586,7 +586,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassPuckCard(const int32 PieceSlot)
 		.HeightOverride(185.0f)
 		[
 			SNew(SFlickAngularBorder).RefinedSurface(true)
-			.BackgroundColor(Ink.CopyWithNewOpacity(.96f))
+			.BackgroundColor(Panel.CopyWithNewOpacity(.96f))
 			.AccentColor_Lambda([this, PieceSlot]()
 			{
 				return FlickPieceArchetypeRules::GetVisualAccent(GetSelectedClassPiece(PieceSlot), GetTeamAccent(GetClassSelectionTeam())).CopyWithNewOpacity(0.72f);
@@ -672,7 +672,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassProfileStatRow(
 				SNew(SBox).WidthOverride(BarWidth).HeightOverride(12.0f)
 				[
 					SNew(SOverlay)
-					+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.002f, 0.007f, 0.012f, 1.0f))]
+					+ SOverlay::Slot()[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FlickUITheme::Panel)]
 					+ SOverlay::Slot().HAlign(HAlign_Left)
 					[
 						SNew(SBox)
@@ -703,7 +703,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassShowcase()
 			+ SHorizontalBox::Slot().FillWidth(0.65f).Padding(0.0f, 0.0f, 14.0f, 0.0f)
 			[
 				SNew(SFlickAngularBorder).RefinedSurface(true)
-				.BackgroundColor(Ink.CopyWithNewOpacity(.96f)).AccentColor(Cyan.CopyWithNewOpacity(.7f))
+				.BackgroundColor(Panel.CopyWithNewOpacity(.96f)).AccentColor(Cyan.CopyWithNewOpacity(.7f))
 				.UseAccentForOutline(true).CutSize(16).Padding(FMargin(16, 13))
 				[
 				SNew(SVerticalBox)
@@ -720,7 +720,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassShowcase()
 			+ SHorizontalBox::Slot().FillWidth(0.35f)
 			[
 				SNew(SFlickAngularBorder).RefinedSurface(true)
-				.BackgroundColor(Ink.CopyWithNewOpacity(.97f))
+				.BackgroundColor(Panel.CopyWithNewOpacity(.97f))
 				.AccentColor(Cyan.CopyWithNewOpacity(.7f)).UseAccentForOutline(true)
 				.CutSize(16.0f)
 				.BorderWidth(0.8f)
@@ -826,7 +826,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildClassSelect()
 							]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
-								SNew(SFlickAngularBorder).BackgroundColor(Ink).AccentColor(Cyan).UseAccentForOutline(true)
+								SNew(SFlickAngularBorder).BackgroundColor(Panel).AccentColor(Cyan).UseAccentForOutline(true)
 								.RefinedSurface(true).CutSize(7).Padding(FMargin(22, 10))
 								[SNew(STextBlock)
 								.Text_Lambda([this]()

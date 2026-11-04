@@ -62,7 +62,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildHomeStatusPanel()
 		SNew(SOverlay)
 		+ SOverlay::Slot()
 		[
-			SNew(SFlickAngularBorder).BackgroundColor(Ink.CopyWithNewOpacity(.97f))
+			SNew(SFlickAngularBorder).HomeSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.97f))
 			.AccentColor(Cyan.CopyWithNewOpacity(.65f)).UseAccentForOutline(true).CutSize(14).BorderWidth(.8f).Padding(FMargin(18, 10))
 			[
 				SNew(SHorizontalBox)
@@ -88,7 +88,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildHomeStatusPanel()
 						const auto* Ranking = GetRankingSubsystem();
 						const auto Queue = RankQueue();
 						return FText::FromString(Ranking ? Ranking->GetDisplayProgressLabel(Queue.Key, Queue.Value) : TEXT("UNAVAILABLE"));
-					}).Font(DisplayFont(16)).ColorAndOpacity(Brand).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+					}).Font(DisplayFont(16)).ColorAndOpacity(FlickHomeSurface::Gold).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0)[RankSteps]
 				]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 14, 0)

@@ -1,4 +1,5 @@
 #include "Pieces/FlickPiece.h"
+#include "Game/FlickAchievementTracker.h"
 #include "Core/FlickPuckPalette.h"
 #include "Core/FlickPuckFinish.h"
 #include "Core/FlickCosmeticCatalog.h"
@@ -886,6 +887,9 @@ void AFlickPiece::HandleMeshHit(
 		const float ClosingSpeed = FMath::Abs(FVector::DotProduct(GetLinearVelocity(), ImpactNormal));
 		const float ImpactVelocityChange = FMath::Max(ImpulseVelocityChange, ClosingSpeed);
 		const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+		if (ImpactVelocityChange > 1.f)
+			if (auto* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AFlickGameMode>() : nullptr)
+				Mode->GetAchievementTracker()->ArenaContact(this, OtherComponent);
 		if (ImpactVelocityChange < 45.0f || Now - LastArenaImpactNotificationTime < 0.09f)
 		{
 			return;

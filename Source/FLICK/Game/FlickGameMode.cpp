@@ -11,6 +11,7 @@ AFlickGameMode::AFlickGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	Practice = CreateDefaultSubobject<UFlickPracticeComponent>(TEXT("Practice"));
+	AchievementTracker = CreateDefaultSubobject<UFlickAchievementTracker>(TEXT("AchievementTracker"));
 
 	TrainingBotEasySettings.ThinkDelay = 1.65f;
 	TrainingBotEasySettings.MinimumPower = 0.34f;

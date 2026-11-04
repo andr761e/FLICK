@@ -92,7 +92,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 		}
 		Button->SetContent(SNew(SOverlay)
 			+ SOverlay::Slot()[SNew(SFlickAngularBorder).CutSize(13).UseAccentForOutline(true).Padding(1.5f)
-				.BackgroundColor(Ink).AccentColor_Lambda([Active]() { return Active() ? Brand : Cyan.CopyWithNewOpacity(.52f); })
+				.BackgroundColor(Panel).AccentColor_Lambda([Active]() { return Active() ? Brand : Cyan.CopyWithNewOpacity(.52f); })
 				[SNew(SFlickMenuArtwork).Artwork(Artwork[Category]).CutSize(11.5f).ShadeForText(true).TextShadeStart(.68f).EdgeFade(FMargin(140,0,0,0))]]
 			+ SOverlay::Slot().Padding(28,18,22,16)
 				[SNew(SVerticalBox)
@@ -202,7 +202,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 							[SNew(STextBlock).Text(FText::FromString(TEXT("Five shots per run. Master every pack with a perfect score."))).Font(UiFont(12)).ColorAndOpacity(Muted)]]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(24,0,0,0)
 						[SNew(SBox).WidthOverride(330).HeightOverride(54)
-							[SNew(SFlickAngularBorder).CutSize(12).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Ink.CopyWithNewOpacity(.94f)).Padding(FMargin(26,0))
+							[SNew(SFlickAngularBorder).CutSize(12).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Panel.CopyWithNewOpacity(.94f)).Padding(FMargin(26,0))
 								[SNew(SHorizontalBox)
 									+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 									[SNew(STextBlock).Text(FText::FromString(TEXT("MASTERY  //"))).Font(DisplayFont(15)).ColorAndOpacity(Muted)]
@@ -216,7 +216,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 					+ SHorizontalBox::Slot().AutoWidth().Padding(ColumnGap,0,0,0)
 					[SNew(SBox).WidthOverride(DetailWidth)
 						[SNew(SFlickAngularBorder).Tag(TEXT("PracticeDetails")).CutSize(15).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.5f))
-							.BackgroundColor(Ink.CopyWithNewOpacity(.94f)).Padding(DetailPadding)
+							.BackgroundColor(Panel.CopyWithNewOpacity(.94f)).Padding(DetailPadding)
 							[SNew(SVerticalBox)
 								+ SVerticalBox::Slot().AutoHeight()
 								[SNew(STextBlock).Tag(TEXT("PracticeFocusTitle")).Text_Lambda([CategoryForDetails]() { return FText::FromString(FlickPracticeCatalog::Name(CategoryForDetails())); }).Font(DisplayFont(30)).ColorAndOpacity(Paper)]
@@ -232,7 +232,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeMenu()
 								+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).HeightOverride(StartHeight)[Start]]]]]]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0,24,0,0)
 				[SNew(SBox).HeightOverride(FooterHeight)
-					[SNew(SFlickAngularBorder).CutSize(12).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Ink.CopyWithNewOpacity(.9f)).Padding(FMargin(12,9))
+					[SNew(SFlickAngularBorder).CutSize(12).UseAccentForOutline(true).AccentColor(Cyan.CopyWithNewOpacity(.6f)).BackgroundColor(Panel.CopyWithNewOpacity(.9f)).Padding(FMargin(12,9))
 						[SNew(SHorizontalBox)
 							+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(174)[Back]]
 							+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center).HAlign(HAlign_Right).Padding(24,0)
@@ -261,7 +261,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPracticeOverlay()
 		.Visibility_Lambda([this]() { return GameMode.IsValid() && GameMode->IsPracticeMode() && GameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing
 			? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 		[
-			SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.97f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(14).Padding(20)
+			SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.97f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(14).Padding(20)
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()

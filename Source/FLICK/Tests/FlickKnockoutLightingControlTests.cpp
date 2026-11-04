@@ -78,11 +78,11 @@ bool FFlickKnockoutLightingControlsTest::RunTest(const FString& Parameters)
 			for (int32 Sample = 0; Sample < Actual.Num(); ++Sample)
 			{
 				const float Response = Control == EControl::Ambient
-					? AmbientIntensityScale(GetControl(Control).GameplayDefault * Multiplier) / AmbientIntensityScale(GetControl(Control).GameplayDefault)
-					: Multiplier;
+					? AmbientIntensityScale(GetValue(EScene::Gameplay, Control)) / AmbientIntensityScale(GetControl(Control).GameplayDefault)
+					: GetValue(EScene::Gameplay, Control) / GetControl(Control).GameplayDefault;
 				const float Expected = Initial[Sample] * (Owners[Sample] == Control ? Response : 1.f);
 				TestTrue(*FString::Printf(TEXT("%s x%.0f changes only its own source group (sample %d)"), GetControl(Control).Key, Multiplier, Sample),
-					FMath::IsNearlyEqual(Actual[Sample], Expected, .01f));
+					FMath::IsNearlyEqual(Actual[Sample], Expected, FMath::Max(.01f, FMath::Abs(Expected) * .000001f)));
 			}
 			TestEqual(TEXT("Repeated slider changes never add lights"), Count(), InitialActors);
 		}

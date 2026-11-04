@@ -41,7 +41,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchTeamPicker()
 			.AccentColor_Lambda([WeakButton, Accent, bPrimary]()
 			{ const auto B = WeakButton.Pin(); return bPrimary || (B && (B->IsHovered() || B->HasKeyboardFocus())) ? Brand : Accent; })
 			.BackgroundColor_Lambda([WeakButton, bPrimary]()
-			{ const auto B = WeakButton.Pin(); return bPrimary ? (B && B->IsHovered() ? FLinearColor(.85f, 1, .14f) : Brand) : Ink; })
+			{ const auto B = WeakButton.Pin(); return bPrimary ? (B && B->IsHovered() ? BrandHover : Brand) : Ink; })
 			.Padding(FMargin(18, 0))
 			[SNew(SBox).HeightOverride(bPrimary ? 52 : 48)
 			 [SNew(SHorizontalBox)
@@ -641,25 +641,27 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMainMenuButton(
 	Button->SetContent(
 		SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 24.0f, 0.0f)
-		[SNew(SFlickMainMenuIcon).Icon(Icon).Color(bPrimary ? Ink : bDanger ? Paper : FlickMainMenuStyle::Lime).Glow(!bPrimary && !bDanger)]
+		[SNew(SFlickMainMenuIcon).Icon(Icon).Color(bPrimary ? Paper : Label == TEXT("ITEM SHOP") ? FlickHomeSurface::Gold : Label == TEXT("SETTINGS") ? Brand : Cyan).Glow(!bPrimary)]
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
-			[SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(bPrimary ? 30 : 21)).ColorAndOpacity(bPrimary ? Ink : FLinearColor(0.98f, 0.99f, 1.0f))]
+			[SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(bPrimary ? 30 : 21)).ColorAndOpacity(Paper)
+				.ShadowOffset(bPrimary ? FVector2D(0,1) : FVector2D::ZeroVector).ShadowColorAndOpacity(Ink.CopyWithNewOpacity(.55f))]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
-			[SNew(STextBlock).Text(FText::FromString(Detail)).Font(UiFont(10)).ColorAndOpacity(bPrimary ? Ink : FLinearColor(0.67f, 0.75f, 0.78f))
+			[SNew(STextBlock).Text(FText::FromString(Detail)).Font(UiFont(10)).ColorAndOpacity(Paper)
+				.ShadowOffset(bPrimary ? FVector2D(0,1) : FVector2D::ZeroVector).ShadowColorAndOpacity(Ink.CopyWithNewOpacity(.6f))
 				.Visibility(Detail.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible)]
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-		[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(21)).ColorAndOpacity(bPrimary ? Ink : Paper)]);
+		[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(21)).ColorAndOpacity(Paper)]);
 	return SNew(SBox).HeightOverride(Height)
 	[
 		SNew(SFlickMainMenuFrame)
-		.StartColor(bPrimary ? FLinearColor::FromSRGBColor(FColor(197, 251, 8)) : FLinearColor::FromSRGBColor(FColor(6, 16, 21, 249)))
-		.EndColor(bPrimary ? FLinearColor::FromSRGBColor(FColor(225, 255, 38)) : FLinearColor::FromSRGBColor(FColor(3, 10, 15, 249)))
-		.HoverStartColor(bPrimary ? FLinearColor::FromSRGBColor(FColor(222, 255, 48)) : FLinearColor::FromSRGBColor(FColor(13, 34, 42, 251)))
-		.HoverEndColor(bPrimary ? FLinearColor::FromSRGBColor(FColor(238, 255, 79)) : FLinearColor::FromSRGBColor(FColor(5, 21, 29, 251)))
+		.StartColor(bPrimary ? Brand : PanelRaised)
+		.EndColor(bPrimary ? Brand : Panel)
+		.HoverStartColor(bPrimary ? BrandHover : PanelSheen)
+		.HoverEndColor(bPrimary ? BrandHover : PanelRaised)
 		.BorderColor(bPrimary ? FlickMainMenuStyle::Lime : FLinearColor::FromSRGBColor(FColor(99, 139, 151, 204)))
 		.HoverBorderColor(bDanger ? Orange : FlickMainMenuStyle::Ice)
 		.Primary(bPrimary)

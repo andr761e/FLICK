@@ -33,6 +33,7 @@ void AFlickGameMode::StartNextRound()
 	DestroyPieces();
 	FlickGameState->SetPuckArrivalState(true, PuckArrivalDuration);
 	SpawnPieces();
+	AchievementTracker->StartRound();
 	ResolutionElapsed = 0.0f;
 	SettledElapsed = 0.0f;
 	LastImpactFeedbackTime = -100.0f;
@@ -730,6 +731,7 @@ void AFlickGameMode::StartMatch(const bool bPreservePregamePieces)
 			PowerExponent,
 			MaxLaunchSpeed);
 		FlickGameState->ResetSeriesState(CurrentRoundsToWin);
+		AchievementTracker->StartMatch();
 		FlickGameState->SetStartingPiecesPerTeam(CurrentStartingPiecesPerTeam);
 		UpdateGameStateCounts();
 		if (bAnimatePucks) SetCameraViewForTeam(EFlickTeam::Player1, true);
@@ -1044,6 +1046,7 @@ void AFlickGameMode::AdvanceCompletedPlayerTurn(
 
 void AFlickGameMode::ActivateNextPlayerForTeam(const EFlickTeam Team)
 {
+	if (AchievementTracker) AchievementTracker->ObserveTurn(Team);
 	if (AFlickGameState* State = GetFlickGameState())
 	{
 		const int32 PlayerSlot = FindEligiblePlayerSlot(Team, GetNextPlayerSlot(Team));

@@ -5,7 +5,7 @@
 namespace
 {
 #if !UE_BUILD_SHIPPING
-	const TCHAR* Section = TEXT("FLICK.Development.RankPreview");
+	const TCHAR* DevelopmentRankSection = TEXT("FLICK.Development.RankPreview");
 	const FString& ConfigFile(const FString& Ini) { return Ini.IsEmpty() ? GGameUserSettingsIni : Ini; }
 	bool IsSupported(const EFlickMatchVariant Variant, const int32 PlayersPerTeam)
 	{
@@ -21,7 +21,7 @@ TOptional<int32> FlickDevelopmentRankSettings::GetRating(
 #if !UE_BUILD_SHIPPING
 	int32 Rating = FlickRankRules::DefaultRating;
 	if (GConfig && IsSupported(Variant, PlayersPerTeam)
-		&& GConfig->GetInt(Section, *FlickRankRules::MakePlaylistKey(Variant, PlayersPerTeam), Rating, ConfigFile(Ini)))
+		&& GConfig->GetInt(DevelopmentRankSection, *FlickRankRules::MakePlaylistKey(Variant, PlayersPerTeam), Rating, ConfigFile(Ini)))
 	{
 		return FMath::Clamp(Rating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating);
 	}
@@ -48,7 +48,7 @@ void FlickDevelopmentRankSettings::SetRating(
 	const EFlickMatchVariant Variant, const int32 PlayersPerTeam, const int32 Rating, const FString& Ini)
 {
 	if (!GConfig || !IsSupported(Variant, PlayersPerTeam)) return;
-	GConfig->SetInt(Section, *FlickRankRules::MakePlaylistKey(Variant, PlayersPerTeam),
+	GConfig->SetInt(DevelopmentRankSection, *FlickRankRules::MakePlaylistKey(Variant, PlayersPerTeam),
 		FMath::Clamp(Rating, FlickRankRules::MinimumRating, FlickRankRules::MaximumRating), ConfigFile(Ini));
 	GConfig->Flush(false, ConfigFile(Ini));
 }
@@ -57,14 +57,14 @@ void FlickDevelopmentRankSettings::ClearRating(
 	const EFlickMatchVariant Variant, const int32 PlayersPerTeam, const FString& Ini)
 {
 	if (!GConfig || !IsSupported(Variant, PlayersPerTeam)) return;
-	GConfig->RemoveKey(Section, *FlickRankRules::MakePlaylistKey(Variant, PlayersPerTeam), ConfigFile(Ini));
+	GConfig->RemoveKey(DevelopmentRankSection, *FlickRankRules::MakePlaylistKey(Variant, PlayersPerTeam), ConfigFile(Ini));
 	GConfig->Flush(false, ConfigFile(Ini));
 }
 
 void FlickDevelopmentRankSettings::ClearAll(const FString& Ini)
 {
 	if (!GConfig) return;
-	GConfig->EmptySection(Section, ConfigFile(Ini));
+	GConfig->EmptySection(DevelopmentRankSection, ConfigFile(Ini));
 	GConfig->Flush(false, ConfigFile(Ini));
 }
 #endif

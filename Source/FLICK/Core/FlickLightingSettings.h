@@ -12,6 +12,7 @@ namespace FlickLightingSettings
 		const TCHAR* Key;
 		const TCHAR* Label;
 		const TCHAR* Description;
+		float Minimum;
 		float Maximum;
 		float MenuDefault;
 		float GameplayDefault;

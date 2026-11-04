@@ -2,6 +2,7 @@
 
 #include "Game/FlickGameMode.h"
 #include "Game/FlickPracticeComponent.h"
+#include "Game/FlickAchievementTracker.h"
 
 #include "Arena/FlickArena.h"
 #include "Arena/FlickBobArena.h"

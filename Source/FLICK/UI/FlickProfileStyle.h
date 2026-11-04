@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UI/FlickUITheme.h"
 
 // Profile overview only, in the shared 1600 x 900 frontend design frame.
 namespace FlickProfileStyle
@@ -12,8 +13,8 @@ namespace FlickProfileStyle
 	constexpr float CardGap = 16;
 	constexpr float CardPadding = 26;
 	constexpr float CardWidth = (ContentWidth - IdentityWidth - IdentityGap - CardGap) / 2;
-	inline const FLinearColor Surface = FLinearColor::FromSRGBColor(FColor(3, 14, 22, 244));
-	inline const FLinearColor SurfaceHover = FLinearColor::FromSRGBColor(FColor(6, 21, 29, 248));
+	inline const FLinearColor Surface = FlickUITheme::Panel;
+	inline const FLinearColor SurfaceHover = FlickUITheme::PanelRaised;
 
 	// Newest records are stored first; charts read left-to-right chronologically.
 	inline TArray<float> NormalizePoints(const TArray<int32>& NewestFirst)

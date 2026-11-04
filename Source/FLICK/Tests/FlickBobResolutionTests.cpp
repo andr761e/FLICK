@@ -9,6 +9,11 @@
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameState.h"
 #include "Pieces/FlickPiece.h"
+#include "EngineUtils.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
+#include "UnrealClient.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickBobResolutionReliabilityTest, "FLICK.BOB.ResolutionReliability",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -51,6 +56,13 @@ bool FFlickBobResolutionReliabilityTest::RunTest(const FString& Parameters)
     // Ensure Chaos broadphase/query data has received the registered bodies.
     for (int32 Step = 0; Step < 8; ++Step) { ++GFrameCounter; World->Tick(LEVELTICK_All, 1.f / 120.f); }
     TestTrue(TEXT("A puck resting on another puck has real support"), Mode->HasRestingSupport(Top));
+    Top->SetActorRotation(FRotator(25, 12, 0), ETeleportType::TeleportPhysics);
+    auto* RestingBody = CastChecked<UPrimitiveComponent>(Top->GetRootComponent());
+    RestingBody->PutAllRigidBodiesToSleep();
+    for (int32 Frame = 0; Frame < 120; ++Frame) Mode->UpdateBobPieceStability();
+    TestFalse(TEXT("BOB self-righting cannot repeatedly wake a settled tilted rack coin"), RestingBody->IsAnyRigidBodyAwake());
+    Top->SetActorRotation(FRotator::ZeroRotator, ETeleportType::TeleportPhysics);
+    RestingBody->PutAllRigidBodiesToSleep();
     TestTrue(TEXT("A resting stack cannot hold the turn in Puck in motion"), Mode->AreActivePiecesSettled());
     State->SetCurrentTeam(EFlickTeam::Player1);
     State->SetMatchPhase(EFlickMatchPhase::ResolvingPhysics);
@@ -96,6 +108,131 @@ bool FFlickBobResolutionReliabilityTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("Crossing above the board cannot score a pocket"),
             Mode->BobArenaActor->IsCapturedByPocketOnPath(From + FVector(0,0,100), To + FVector(0,0,100), Rules.PieceRadius));
     }
+    // Reproduce entering the real hole, then drifting past its footprint before
+    // the old deep-plane check. Both sparse and dense rendered sampling must score.
+    int32 NextId = 20;
+    for (int32 PocketIndex = 0; PocketIndex < 4; ++PocketIndex)
+    for (int32 FPS : {40, 400})
+    {
+        const FVector Pocket = Mode->BobArenaActor->GetPocketWorldLocation(PocketIndex);
+        const FVector From(Pocket.X, Pocket.Y, Mode->BobArenaActor->SurfaceZ + 5.f);
+        const FVector To = From + FVector(160, 0, -55);
+        auto* Coin = Mode->SpawnPiece(EFlickTeam::Player1, NextId++, From, EFlickPieceArchetype::Standard);
+        const int32 Before = State->Player1EliminatedThisShot;
+        Mode->UpdateBobPockets();
+        for (int32 Frame = 1; Frame <= FPS && Coin->IsActive(); ++Frame)
+        {
+            Coin->SetActorLocation(FMath::Lerp(From, To, static_cast<float>(Frame) / FPS), false, nullptr, ETeleportType::TeleportPhysics);
+            Mode->UpdateBobPockets();
+        }
+        TestFalse(TEXT("A coin falling through the lip is scored instead of respawned"), Coin->IsActive());
+        Mode->UpdateBobPockets();
+        TestEqual(TEXT("Pocket scores exactly once at both 40 and 400 FPS"), State->Player1EliminatedThisShot, Before + 1);
+    }
+    const FVector Pocket = Mode->BobArenaActor->GetPocketWorldLocation(0);
+    const FVector Above(Pocket.X, Pocket.Y, Mode->BobArenaActor->SurfaceZ + 5.f);
+    auto* Bounce = Mode->SpawnPiece(EFlickTeam::Player1, NextId++, Above, EFlickPieceArchetype::Standard);
+    Mode->UpdateBobPockets();
+    Bounce->SetActorLocation(Above - FVector(0,0,10), false, nullptr, ETeleportType::TeleportPhysics);
+    Mode->UpdateBobPockets();
+    TestTrue(TEXT("Shallow lip entry does not score until the capture depth"), Bounce->IsActive());
+    Bounce->SetActorLocation(Above, false, nullptr, ETeleportType::TeleportPhysics);
+    Mode->UpdateBobPockets();
+    TestTrue(TEXT("Returning above the bed clears pending pocket entry"), !Mode->BobPocketEnteredPieces.Contains(Bounce->GetPieceId()));
+    TestFalse(TEXT("Flying horizontally over a hole is not entry"), Mode->BobArenaActor->HasEnteredPocketOnPath(Above, Above + FVector(160,0,0)));
+    TestFalse(TEXT("Rising through the lip is not entry"), Mode->BobArenaActor->HasEnteredPocketOnPath(Above - FVector(0,0,10), Above));
+    return true;
+}
+
+namespace
+{
+    struct FBobRackReviewState
+    {
+        TWeakObjectPtr<UWorld> World;
+        TWeakObjectPtr<AFlickPiece> Striker;
+        FVector StartPosition = FVector::ZeroVector;
+        float StartTime = 0;
+    };
+
+    class FBobRackMotionReview final : public IAutomationLatentCommand
+    {
+    public:
+        FBobRackMotionReview(FAutomationTestBase* InTest, TSharedRef<FBobRackReviewState> InState)
+            : Test(InTest), State(InState) {}
+        bool Update() override
+        {
+            UWorld* World = State->World.Get();
+            if (!World) { Test->AddError(TEXT("Rack review has no live world")); return true; }
+            const float Elapsed = World->GetTimeSeconds() - State->StartTime;
+            if (Elapsed > 2.f)
+            {
+                for (TActorIterator<AFlickPiece> It(World); It; ++It)
+                {
+                    if (!It->IsActive() || It->GetLinearVelocity().Size() > 10.f) continue;
+                    FVector Angular = It->GetAngularVelocityDegrees(); Angular.Z = 0;
+                    const int32 Id = It->GetPieceId();
+                    const FVector Previous = PreviousAngular.FindRef(Id);
+                    if (Angular.Size() > 5.f && Previous.Size() > 5.f
+                        && FVector::DotProduct(Angular.GetSafeNormal(), Previous.GetSafeNormal()) < -.5f)
+                        ++Reversals.FindOrAdd(Id);
+                    PreviousAngular.Add(Id, Angular);
+                }
+            }
+            if (Shot < 3 && Elapsed >= (Shot == 0 ? 1.f : Shot == 1 ? 4.f : 7.5f))
+            {
+                FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()
+                    / FString::Printf(TEXT("BOBRackReview/shot-%d.png"), Shot++), true, false);
+            }
+            if (Elapsed < 8.f) return false;
+            int32 MaximumReversals = 0;
+            for (const auto& Pair : Reversals) MaximumReversals = FMath::Max(MaximumReversals, Pair.Value);
+            Test->AddInfo(FString::Printf(TEXT("BOB rack break: worst repeated rocking reversals=%d"), MaximumReversals));
+            Test->TestTrue(TEXT("A settled rack coin does not oscillate perpetually"), MaximumReversals <= 16);
+            Test->TestTrue(TEXT("The break still produces genuine physical motion"), State->Striker.IsValid()
+                && FVector::Dist2D(State->Striker->GetActorLocation(), State->StartPosition) > 150.f);
+            return true;
+        }
+    private:
+        FAutomationTestBase* Test;
+        TSharedRef<FBobRackReviewState> State;
+        TMap<int32, FVector> PreviousAngular;
+        TMap<int32, int32> Reversals;
+        int32 Shot = 0;
+    };
+}
+
+// Opt-in: exercises a real break with the production fixed-step physics and rig.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickBobRackReviewTest, "FLICK.BOB.RackMotionReview",
+    EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FFlickBobRackReviewTest::RunTest(const FString&)
+{
+    if (!FParse::Param(FCommandLine::Get(), TEXT("FlickBobRackReview"))) return true;
+    const auto Review = MakeShared<FBobRackReviewState>();
+    ADD_LATENT_AUTOMATION_COMMAND(FDelayedFunctionLatentCommand([this, Review]()
+    {
+        for (const FWorldContext& Context : GEngine->GetWorldContexts())
+        {
+            UWorld* World = Context.World();
+            if (Context.WorldType != EWorldType::Game || !World) continue;
+            auto* Mode = World->GetAuthGameMode<AFlickGameMode>();
+            auto* State = World->GetGameState<AFlickGameState>();
+            if (!Mode || !State) continue;
+            // Reproduce the trailer's blue opening break even if the unattended
+            // shot clock advanced while the renderer was warming up.
+            State->SetCurrentTeam(EFlickTeam::Player1);
+            for (TActorIterator<AFlickPiece> It(World); It; ++It)
+            {
+                if (!It->IsBobStriker() || It->GetTeam() != State->CurrentTeam) continue;
+                Review->World = World; Review->Striker = *It;
+                Review->StartPosition = It->GetActorLocation(); Review->StartTime = World->GetTimeSeconds();
+                FVector Direction = -Review->StartPosition; Direction.Z = 0;
+                TestTrue(TEXT("Real BOB break launches"), Mode->TryLaunchPiece(*It, Direction.GetSafeNormal(), .82f));
+                return;
+            }
+        }
+        AddError(TEXT("Start the rack review with -FlickBobPreview and an isolated UserDir"));
+    }, 4.f));
+    ADD_LATENT_AUTOMATION_COMMAND(FBobRackMotionReview(this, Review));
     return true;
 }
 #endif

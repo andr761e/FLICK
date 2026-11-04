@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Core/FlickRankRules.h"
 #include "Core/FlickTypes.h"
+#include "Core/FlickAchievementProgress.h"
 #include "GameFramework/PlayerController.h"
 #include "Utility/FlickLaunchMath.h"
 #include "FlickPlayerController.generated.h"
@@ -32,6 +33,8 @@ public:
 	virtual void PlayerTick(float DeltaTime) override;
 	UFlickMenuRadioComponent* GetMenuRadio() const { return MenuRadio; }
 	void RefreshLocalLighting();
+	UFUNCTION(Client, Reliable)
+	void ClientCommitAchievements(const FFlickAchievementReport& Report, bool bRankedWin, EFlickMatchVariant Variant, int32 TeamSize);
 
 	void ClearAiming();
 	bool IsAimingShot() const { return bAimingShot; }
