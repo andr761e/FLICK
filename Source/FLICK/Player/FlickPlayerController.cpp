@@ -423,7 +423,19 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 			}
 			FVector Direction = -Piece->GetActorLocation();
 			Direction.Z = 0.0f;
-			SubmitLaunch(Piece, Direction.GetSafeNormal(), 0.28f);
+			float AutoShotPower = 0.28f;
+#if !UE_BUILD_SHIPPING
+			// Capture/test input still uses the normal selection and launch path.
+			float RequestedPower = AutoShotPower;
+			if (FParse::Value(FCommandLine::Get(), TEXT("FlickNetworkAutoShotPower="), RequestedPower)
+				&& FMath::IsFinite(RequestedPower))
+			{
+				AutoShotPower = FMath::Clamp(RequestedPower, 0.0f, 1.0f);
+			}
+			if (FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkAutoShotOutward")))
+				Direction *= -1.f;
+#endif
+			SubmitLaunch(Piece, Direction.GetSafeNormal(), AutoShotPower);
 			bNetworkAutoShotSubmitted = true;
 			UE_LOG(
 				LogFlick,

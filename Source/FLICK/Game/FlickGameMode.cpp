@@ -853,8 +853,10 @@ void AFlickGameMode::BeginPlay()
 		FTimerHandle KickoffTimer;
 		GetWorldTimerManager().SetTimer(KickoffTimer, [this]()
 		{
-			const int32 RequiredShots = FlickTeamRules::GetSimultaneousKickoffShotCount(CurrentPlayersPerTeam);
-			for (int32 ShotIndex = 0; ShotIndex < RequiredShots; ++ShotIndex)
+			// Kickoff planning is simultaneous: it no longer advances a global
+			// CurrentTeam/slot after each commitment. Submit each participant once.
+			for (const EFlickTeam Team : {EFlickTeam::Player1, EFlickTeam::Player2})
+			for (int32 PlayerSlot = 0; PlayerSlot < CurrentPlayersPerTeam; ++PlayerSlot)
 			{
 				const AFlickGameState* FlickGameState = GetFlickGameState();
 				if (!FlickGameState || FlickGameState->MatchPhase != EFlickMatchPhase::KickoffPlanning)
@@ -865,8 +867,8 @@ void AFlickGameMode::BeginPlay()
 				for (AFlickPiece* Piece : Pieces)
 				{
 					if (Piece && Piece->IsActive()
-						&& Piece->GetTeam() == FlickGameState->CurrentTeam
-						&& Piece->GetOwningPlayerSlot() == FlickGameState->CurrentTeamPlayerSlot)
+						&& Piece->GetTeam() == Team
+						&& Piece->GetOwningPlayerSlot() == PlayerSlot)
 					{
 						PlanningPiece = Piece;
 						break;
@@ -878,9 +880,11 @@ void AFlickGameMode::BeginPlay()
 				}
 				FVector Direction = -PlanningPiece->GetActorLocation();
 				Direction.Z = 0.0f;
-				TryLaunchPiece(PlanningPiece, Direction.GetSafeNormal(), 0.72f);
+				LockKickoffShot(PlanningPiece, Direction.GetSafeNormal(), 0.72f, true);
 			}
-		}, 0.6f, false);
+			// Allow the normal arrival presentation to finish before committing
+			// preview input; an early attempt is correctly rejected by gameplay.
+		}, 2.5f, false);
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickAutoStart")))
 	{

@@ -37,7 +37,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchTeamPicker()
 		TSharedRef<SButton> Button = SNew(SButton).ButtonStyle(&TransparentButtonStyle)
 			.ContentPadding(0).OnClicked(Click);
 		const TWeakPtr<SButton> WeakButton = Button;
-		Button->SetContent(SNew(SFlickAngularBorder).RefinedSurface(true).UseAccentForOutline(true).CutSize(9)
+		Button->SetContent(SNew(SFlickAngularBorder).HomeSurface(true).PrimarySurface(bPrimary).RefinedSurface(true).UseAccentForOutline(true).CutSize(9)
 			.AccentColor_Lambda([WeakButton, Accent, bPrimary]()
 			{ const auto B = WeakButton.Pin(); return bPrimary || (B && (B->IsHovered() || B->HasKeyboardFocus())) ? Brand : Accent; })
 			.BackgroundColor_Lambda([WeakButton, bPrimary]()
@@ -94,7 +94,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateMatchTeamPicker()
 			SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
 			[SNew(SBox).WidthOverride(540.0f)
 			[
-				SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.97f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(18.0f).BorderWidth(1.0f).Padding(FMargin(32.0f, 26.0f))
+				SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.97f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(18.0f).BorderWidth(1.0f).Padding(FMargin(32.0f, 26.0f))
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 18)[FrontendBrandHeader(TEXT("PRIVATE MATCH  //  YOUR ROLE"))]
@@ -151,7 +151,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateSpectatorCard()
 	const auto CycleButton = [this](const FString& Label, const int32 Direction) -> TSharedRef<SWidget>
 	{
 		return SNew(SBox).WidthOverride(42).HeightOverride(40)
-		[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink).AccentColor(Cyan).CutSize(5).Padding(0)
+		[SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).BackgroundColor(Ink).AccentColor(Cyan).CutSize(5).Padding(0)
 		 [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0).HAlign(HAlign_Center).VAlign(VAlign_Center)
 		  .OnClicked_Lambda([this, Direction]()
 		{
@@ -165,7 +165,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPrivateSpectatorCard()
 			return ShouldShowGameplayControls() && PlayerController.IsValid() && PlayerController->IsPrivateMatchSpectator()
 				? EVisibility::Visible : EVisibility::Collapsed;
 		})
-		[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.95f)).AccentColor(Cyan).CutSize(9).Padding(FMargin(12, 9))
+		[SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.95f)).AccentColor(Cyan).CutSize(9).Padding(FMargin(12, 9))
 		 [SNew(SVerticalBox)
 		  + SVerticalBox::Slot().AutoHeight()
 		  [SNew(SHorizontalBox)
@@ -232,7 +232,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 
 		const TWeakPtr<SButton> WeakButton = Button;
 		Button->SetContent(
-			SNew(SFlickAngularBorder).RefinedSurface(true)
+			SNew(SFlickAngularBorder).HomeSurface(true).PrimarySurface(bPrimary).RefinedSurface(true)
 			.BackgroundColor_Lambda([WeakButton, bDanger, bPrimary]()
 			{
 				const TSharedPtr<SButton> PinnedButton = WeakButton.Pin();
@@ -244,8 +244,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 						? FLinearColor(0.15f, 0.041f, 0.022f, 1.0f)
 						: Ink.CopyWithNewOpacity(.98f);
 				}
-				if (bPrimary) return bActive ? FLinearColor(.85f, 1.0f, .14f) : Brand;
-				return bActive ? FLinearColor(.018f, .045f, .052f, 1) : Ink.CopyWithNewOpacity(.98f);
+				if (bPrimary) return bActive ? BrandHover : Brand;
+				return bActive ? PanelRaised : Ink.CopyWithNewOpacity(.98f);
 			})
 			.AccentColor_Lambda([WeakButton, bDanger, bPrimary]()
 			{
@@ -309,7 +309,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 			[
 			SNew(SBox).WidthOverride(540.0f).Tag(TEXT("CenteredPausePanel"))
 			[
-				SNew(SFlickAngularBorder).RefinedSurface(true)
+				SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true)
 				.BackgroundColor(Ink.CopyWithNewOpacity(0.97f))
 				.AccentColor(Cyan).UseAccentForOutline(true)
 				.CutSize(18.0f)
@@ -405,7 +405,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPauseOverlay()
 					[
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth()
-						[SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink).AccentColor(Hairline).UseAccentForOutline(true).CutSize(3).Padding(FMargin(8, 4))
+						[SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).BackgroundColor(Ink).AccentColor(Hairline).UseAccentForOutline(true).CutSize(3).Padding(FMargin(8, 4))
 							[SNew(STextBlock).Text(FText::FromString(TEXT("ESC"))).Font(UiFont(9, true)).ColorAndOpacity(Paper)]]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(16, 0)
 						[SNew(STextBlock).Text(FText::FromString(TEXT("//"))).Font(UiFont(10, true)).ColorAndOpacity(Cyan)]
@@ -454,13 +454,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 		});
 	const TWeakPtr<SButton> WeakNextActionButton = NextActionButton;
 	NextActionButton->SetContent(
-		SNew(SFlickAngularBorder).RefinedSurface(true)
+		SNew(SFlickAngularBorder).HomeSurface(true).PrimarySurface(true).RefinedSurface(true)
 		.BackgroundColor_Lambda([WeakNextActionButton]()
 		{
 			const TSharedPtr<SButton> PinnedButton = WeakNextActionButton.Pin();
 			return PinnedButton.IsValid()
 				&& (PinnedButton->IsHovered() || PinnedButton->HasKeyboardFocus())
-				? FLinearColor(.85f, 1.0f, .14f) : Brand;
+				? BrandHover : Brand;
 		})
 		.AccentColor(Brand)
 		.CutSize(10.0f)
@@ -538,7 +538,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 	];
 	ResultLayout->AddSlot().AutoHeight()
 	[
-		SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink).AccentColor(Cyan).CutSize(10.0f).Padding(FMargin(18.0f, 16.0f))
+		SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).BackgroundColor(Ink).AccentColor(Cyan).CutSize(10.0f).Padding(FMargin(18.0f, 16.0f))
 		[
 			SNew(STextBlock)
 			.Text_Lambda([this]() { return GetRoundScoreText(); })
@@ -597,7 +597,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildRoundOverOverlay()
 			SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)
 			[SNew(SBox).WidthOverride(640.0f)
 			[
-				SNew(SFlickAngularBorder).RefinedSurface(true)
+				SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true)
 				.BackgroundColor(Ink.CopyWithNewOpacity(0.985f))
 				.AccentColor(Cyan).UseAccentForOutline(true)
 				.CutSize(18.0f)
@@ -733,7 +733,7 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMenuButton(
 	return SNew(SBox)
 		.HeightOverride(Height)
 		[
-			SNew(SFlickAngularBorder).RefinedSurface(true)
+			SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true)
 			.BackgroundColor_Lambda([WeakButton, bPrimary, bDanger]()
 			{
 				const TSharedPtr<SButton> PinnedButton = WeakButton.Pin();

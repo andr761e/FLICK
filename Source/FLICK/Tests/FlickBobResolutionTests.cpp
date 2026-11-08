@@ -187,6 +187,8 @@ namespace
             int32 MaximumReversals = 0;
             for (const auto& Pair : Reversals) MaximumReversals = FMath::Max(MaximumReversals, Pair.Value);
             Test->AddInfo(FString::Printf(TEXT("BOB rack break: worst repeated rocking reversals=%d"), MaximumReversals));
+            for (const auto& Pair : Reversals)
+                if (Pair.Value > 16) Test->AddInfo(FString::Printf(TEXT("Rocking puck %d: %d reversals"), Pair.Key, Pair.Value));
             Test->TestTrue(TEXT("A settled rack coin does not oscillate perpetually"), MaximumReversals <= 16);
             Test->TestTrue(TEXT("The break still produces genuine physical motion"), State->Striker.IsValid()
                 && FVector::Dist2D(State->Striker->GetActorLocation(), State->StartPosition) > 150.f);
@@ -220,13 +222,17 @@ bool FFlickBobRackReviewTest::RunTest(const FString&)
             // Reproduce the trailer's blue opening break even if the unattended
             // shot clock advanced while the renderer was warming up.
             State->SetCurrentTeam(EFlickTeam::Player1);
+            if (FParse::Param(FCommandLine::Get(), TEXT("FlickBobReviewNoAssist")))
+                Mode->BobSelfRightingMaxLinearSpeed = -1.f;
             for (TActorIterator<AFlickPiece> It(World); It; ++It)
             {
                 if (!It->IsBobStriker() || It->GetTeam() != State->CurrentTeam) continue;
                 Review->World = World; Review->Striker = *It;
                 Review->StartPosition = It->GetActorLocation(); Review->StartTime = World->GetTimeSeconds();
                 FVector Direction = -Review->StartPosition; Direction.Z = 0;
-                TestTrue(TEXT("Real BOB break launches"), Mode->TryLaunchPiece(*It, Direction.GetSafeNormal(), .82f));
+                float Power = .82f;
+                FParse::Value(FCommandLine::Get(), TEXT("FlickBobReviewPower="), Power);
+                TestTrue(TEXT("Real BOB break launches"), Mode->TryLaunchPiece(*It, Direction.GetSafeNormal(), FMath::Clamp(Power, .1f, 1.f)));
                 return;
             }
         }

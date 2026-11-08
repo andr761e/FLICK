@@ -524,6 +524,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Physics|BOB", meta = (ClampMin = "0.0", ClampMax = "90.0"))
 	float BobSelfRightingMinimumTilt = 18.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Physics|BOB", meta = (ClampMin = "0.0", Units = "cm"))
+	float BobSelfRightingNeighbourClearance = 6.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Physics|BOB", meta = (ClampMin = "0.0"))
 	float BobSelfRightingMaxLinearSpeed = 240.0f;
 

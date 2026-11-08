@@ -278,7 +278,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardOverlay(const bool bEmbedded
 				[
 				SNew(SBox).WidthOverride(900.0f)
 				[
-				SNew(SFlickAngularBorder).RefinedSurface(true)
+				SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true)
 				.BackgroundColor(Ink.CopyWithNewOpacity(0.97f))
 				.AccentColor(Cyan.CopyWithNewOpacity(0.65f))
 				.CutSize(11.0f)
@@ -367,7 +367,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardTeamSection(const EFlickTeam
 		[
 			SNew(SBox).HeightOverride(67.0f)
 			[
-				SNew(SFlickAngularBorder).RefinedSurface(true)
+				SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true)
 				.BackgroundColor(FMath::Lerp(Ink, Accent, 0.018f))
 				.AccentColor(Accent.CopyWithNewOpacity(0.48f))
 				.CutSize(5.0f)
@@ -492,7 +492,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 
 	return SNew(SBox).HeightOverride_Lambda([this]() { const auto* State = GetScoreboardGameState(); return State && State->bRankedMatch ? 58.f : 44.f; })
 		[
-			SNew(SFlickAngularBorder).RefinedSurface(true)
+			SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true)
 			.BackgroundColor_Lambda([this, Team, PlayerSlot, Accent]()
 			{
 				const AFlickGameState* State = GetScoreboardGameState();
@@ -529,7 +529,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildScoreboardPlayerRow(
 				[
 					SNew(SBox).WidthOverride(32.0f).HeightOverride(32.0f)
 					[
-						SNew(SFlickAngularBorder).RefinedSurface(true)
+						SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true)
 						.BackgroundColor(Ink)
 						.AccentColor(Accent.CopyWithNewOpacity(0.65f))
 						.CutSize(4.0f).BorderWidth(0.8f).Padding(FMargin(1.0f))

@@ -27,7 +27,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
  const auto Action = [this](const FString& Label, FOnClicked Click, bool bPrimary) -> TSharedRef<SWidget>
  {
   return SNew(SBox).HeightOverride(52)
-  [SNew(SFlickMainMenuFrame).Primary(bPrimary)
+  [SNew(SFlickMainMenuFrame).HomePresentation(true).Primary(bPrimary)
    .StartColor(bPrimary ? Brand : Ink).EndColor(bPrimary ? Brand : Ink)
    .BorderColor(bPrimary ? Brand : Cyan.CopyWithNewOpacity(.55f)).HoverBorderColor(Brand).Padding(2)
    [SNew(SButton).ButtonStyle(&TransparentButtonStyle)
@@ -146,7 +146,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
    return View && View->GetWinnerStatsOpacity() > 0.0f && State && State->WinnerTeam != EFlickTeam::None && Slot < State->PlayersPerTeam
     ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
   })
-   [SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(10)
+   [SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).CutSize(10)
     .BackgroundColor(Ink.CopyWithNewOpacity(.97f)).AccentColor(Cyan.CopyWithNewOpacity(.65f)).UseAccentForOutline(true)
     .Padding(FMargin(12, 10))
    [SNew(SVerticalBox)
@@ -222,7 +222,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
   .Visibility_Lambda([ShowDetails]() { return ShowDetails() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })]
  + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(24, 24)
  [SNew(SBox).WidthOverride(700)
-  [SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(14)
+  [SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).CutSize(14)
    .BackgroundColor(Ink.CopyWithNewOpacity(.97f)).AccentColor(Cyan.CopyWithNewOpacity(.65f)).UseAccentForOutline(true)
    .Padding(FMargin(20, 12))
  [SNew(SVerticalBox)
@@ -255,7 +255,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
     [SNew(SHorizontalBox)
      + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 30, 0)
      [SNew(SBox).WidthOverride(300)
-      [SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.94f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(18).Padding(20)[Menu]]]
+      [SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).BackgroundColor(Ink.CopyWithNewOpacity(.94f)).AccentColor(Cyan).UseAccentForOutline(true).CutSize(18).Padding(20)[Menu]]]
      + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[BuildScoreboardOverlay(true)]
     ]
    ]

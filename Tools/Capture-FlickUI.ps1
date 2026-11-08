@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Captures an actual Unreal viewport, including Slate UI, using the current editor build.
 .EXAMPLE
@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'TrainingMenu', 'FreePlayMenu', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchBobRanked', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket', 'BobStriker')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'TeamSelection', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'TrainingMenu', 'FreePlayMenu', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchBobRanked', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket', 'BobStriker')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -129,6 +129,7 @@ $previewFlags = @{
     Customize = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
     CustomizePuck = @('-FlickProfilePreview', '-FlickProfileCustomizePreview')
     PrivateMatch = @('-FlickPrivateMatchPreview')
+    TeamSelection = @('-FlickPrivateSpectatorPreview', '-FlickPrivateRolePreview')
     Spectator = @('-FlickPrivateSpectatorPreview')
     Settings = @('-FlickSettingsPreview')
     Video = @('-FlickSettingsPreview')

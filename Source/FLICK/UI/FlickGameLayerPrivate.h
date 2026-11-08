@@ -1533,6 +1533,7 @@ namespace
 				, _UseAccentForOutline(false)
 				, _RefinedSurface(false)
 				, _HomeSurface(false)
+				, _PrimarySurface(false)
 				, _Padding(FMargin(0.0f))
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, BackgroundColor)
@@ -1543,6 +1544,7 @@ namespace
 				SLATE_ARGUMENT(bool, UseAccentForOutline)
 				SLATE_ARGUMENT(bool, RefinedSurface)
 				SLATE_ARGUMENT(bool, HomeSurface)
+				SLATE_ARGUMENT(bool, PrimarySurface)
 				SLATE_ARGUMENT(FMargin, Padding)
 			SLATE_DEFAULT_SLOT(FArguments, Content)
 		SLATE_END_ARGS()
@@ -1557,6 +1559,7 @@ namespace
 			bUseAccentForOutline = InArgs._UseAccentForOutline;
 			bRefinedSurface = InArgs._RefinedSurface;
 			bHomeSurface = InArgs._HomeSurface;
+			bPrimarySurface = InArgs._PrimarySurface;
 			ChildSlot.Padding(InArgs._Padding)[InArgs._Content.Widget];
 		}
 
@@ -1589,7 +1592,7 @@ namespace
 				Indices.Append({0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1)});
 			}
 			const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-			if (bHomeSurface && FlickUITheme::IsMenuSurface(Fill)) DrawHomeSurface(OutDrawElements, AllottedGeometry, LayerId, Points, Fill, Tint);
+			if (bHomeSurface && (bPrimarySurface || FlickUITheme::IsMenuSurface(Fill))) DrawHomeSurface(OutDrawElements, AllottedGeometry, LayerId, Points, Fill, Tint, bPrimarySurface);
 			else FSlateDrawElement::MakeCustomVerts(OutDrawElements, LayerId,
 				WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0, Effect);
 			if (bHomeSurface)
@@ -1645,6 +1648,7 @@ namespace
 		bool bUseAccentForOutline = false;
 		bool bRefinedSurface = false;
 		bool bHomeSurface = false;
+		bool bPrimarySurface = false;
 	};
 
 	// Image-capable shared frame. Premium treatment is reserved for feature

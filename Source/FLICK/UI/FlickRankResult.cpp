@@ -158,7 +158,7 @@ void SFlickRankResult::Construct(const FArguments& Args)
     [SNew(SFlickRankBadge).Size(110).Progress_Lambda([this, bNew]() { return FlickRankTransition::Progress(Active, bNew); })]];
  };
  ChildSlot
- [SNew(SFlickAngularBorder).RefinedSurface(true).CutSize(10).Padding(10)
+ [SNew(SFlickAngularBorder).HomeSurface(true).RefinedSurface(true).CutSize(10).Padding(10)
   .BackgroundColor(Ink).AccentColor_Lambda([this]() { return Accent().CopyWithNewOpacity(.45f + .55f * FlickRankTransition::Pulse(Elapsed)); })
   [SNew(SVerticalBox)
    + SVerticalBox::Slot().AutoHeight()

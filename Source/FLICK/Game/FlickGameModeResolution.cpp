@@ -1026,17 +1026,22 @@ void AFlickGameMode::UpdateBobPieceStability()
 		const FVector Up = Piece->GetActorUpVector().GetSafeNormal();
 		const float Alignment = FMath::Abs(Up.Z);
 		if (Alignment >= FMath::Cos(FMath::DegreesToRadians(BobSelfRightingMinimumTilt))) continue;
-		// The bounding sphere encloses every orientation of the cylinder. Only
-		// apply the assist when that rotational clearance is free of other coins;
-		// a coin wedged sideways is just as constrained as one resting on top.
+		// Reserve the full rotational envelope of BOTH coins, plus a small gap.
+		// A narrow-phase overlap can alternate at each contact during rocking;
+		// switching the assist on in those gaps keeps feeding energy into the rack.
+		// Use the same published poses as the tilt check, rather than mixing an
+		// interpolated pose with the async physics scene's query pose.
 		const float Clearance = FMath::Sqrt(FMath::Square(Piece->GetPieceRadius())
-			+ FMath::Square(Piece->GetPieceThickness() * .5f)) + .5f;
-		TArray<FOverlapResult> Contacts;
-		FCollisionQueryParams Query(SCENE_QUERY_STAT(FlickBobSelfRightingSupport), false, Piece);
-		GetWorld()->OverlapMultiByObjectType(Contacts, Piece->GetActorLocation(), FQuat::Identity,
-			FCollisionObjectQueryParams(ECC_PhysicsBody), FCollisionShape::MakeSphere(Clearance), Query);
-		if (Contacts.ContainsByPredicate([](const FOverlapResult& Contact)
-			{ return Cast<AFlickPiece>(Contact.GetActor()) != nullptr; })) continue;
+			+ FMath::Square(Piece->GetPieceThickness() * .5f));
+		const bool bNeighbourConstrainsRotation = Pieces.ContainsByPredicate([&](const AFlickPiece* Other)
+		{
+			if (!IsValid(Other) || Other == Piece || !Other->IsActive()) return false;
+			const float OtherClearance = FMath::Sqrt(FMath::Square(Other->GetPieceRadius())
+				+ FMath::Square(Other->GetPieceThickness() * .5f));
+			return FVector::DistSquared(Piece->GetActorLocation(), Other->GetActorLocation())
+				<= FMath::Square(Clearance + OtherClearance + FMath::Max(0.f, BobSelfRightingNeighbourClearance));
+		});
+		if (bNeighbourConstrainsRotation) continue;
 
 		Piece->ApplyTabletopSelfRighting(
 			BobSelfRightingTorque,
