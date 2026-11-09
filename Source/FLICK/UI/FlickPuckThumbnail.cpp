@@ -2,6 +2,7 @@
 #include "Rendering/DrawElements.h"
 #include "UI/FlickUITheme.h"
 #include "UI/FlickArtworkGeometry.h"
+#include "Core/FlickCosmeticCatalog.h"
 
 void SFlickPuckThumbnail::Construct(const FArguments& Args)
 {
@@ -20,8 +21,9 @@ void SFlickPuckThumbnail::Construct(const FArguments& Args)
 void SFlickPuckThumbnail::Tick(const FGeometry&, double, float)
 {
 	const int32 Type = FMath::Clamp(static_cast<int32>(Archetype.Get()), 0, 8);
-	const int32 Finish = FMath::Clamp(Skin.Get(), 0, 5);
-	const int32 Key = Type * 6 + Finish;
+	const int32 Finish = FMath::Clamp(Skin.Get(), 0,
+		FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart + Type).Num() - 1);
+	const int32 Key = Type * 100 + Finish;
 	if (LoadedKey != Key)
 	{
 		static const TCHAR* Names[] = {TEXT("Standard"), TEXT("Heavy"), TEXT("Striker"), TEXT("Grippy"),

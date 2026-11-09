@@ -48,6 +48,11 @@ FString FlickCosmeticCatalog::GetConfigKey(const int32 Category)
 	}
 }
 
+bool FlickCosmeticCatalog::IsRetroArcade(const EFlickPieceArchetype Archetype, const int32 Skin)
+{
+	return static_cast<int32>(Archetype) >= 0 && static_cast<int32>(Archetype) < FlickPieceArchetypeRules::ArchetypeCount && Skin == RetroArcadeSkin;
+}
+
 const TArray<FString>& FlickCosmeticCatalog::GetItems(const int32 Category)
 {
 	static const TArray<FString> Banners = {TEXT("CARBON"), TEXT("ARENA"), TEXT("GLACIER"),
@@ -66,7 +71,7 @@ const TArray<FString>& FlickCosmeticCatalog::GetItems(const int32 Category)
 		TEXT("GOLD"), TEXT("ICE"), TEXT("PURPLE CRYSTAL"), TEXT("ROBOTIC"),
 		TEXT("CRYO CIRCUIT"), TEXT("SOLAR FORGE"), TEXT("PHASE RIFT")};
 	static const TArray<FString> PuckSkins = {TEXT("CLASSIC BLUE"), TEXT("CLASSIC ORANGE"),
-		TEXT("EMERALD"), TEXT("AMETHYST"), TEXT("CRIMSON"), TEXT("AMBER")};
+		TEXT("EMERALD"), TEXT("AMETHYST"), TEXT("CRIMSON"), TEXT("AMBER"), TEXT("RETRO ARCADE")};
 	static const TArray<FString> Trails = {TEXT("NONE"), TEXT("ION WAKE"), TEXT("EMBER WAKE"),
 		TEXT("CRYO RIBBON"), TEXT("SOLAR CINDERS"), TEXT("PHASE STREAM"),
 		TEXT("LIGHTNING"), TEXT("PRISM"), TEXT("GOLD RUSH"), TEXT("GALAXY"),
@@ -127,6 +132,7 @@ FLinearColor FlickCosmeticCatalog::GetPuckSkinColor(const int32 Skin)
 	case 3: return FLinearColor(.48f, .035f, 1.f);
 	case 4: return FLinearColor(1.f, .012f, .020f);
 	case 5: return FLinearColor(1.f, .48f, .012f);
+	case RetroArcadeSkin: return FLinearColor(.002f, .87f, 1.f);
 	default: return FLinearColor(0.0f, .55f, 1.0f);
 	}
 }
@@ -154,6 +160,8 @@ int32 FlickCosmeticCatalog::GetCollection(const int32 Category, const int32 Item
 
 FString FlickCosmeticCatalog::GetDescription(const int32 Category, const int32 Item)
 {
+	if (IsPuckCategory(Category) && Item == RetroArcadeSkin)
+		return TEXT("Retro Arcade // Solid neon crown panels, pixel-patterned black titanium and a signature cyan class emblem.");
 	if (Category == TrailCategory && GetItems(Category).IsValidIndex(Item)) return FlickTrailStyle::Get(Item).Description;
 	if (Category == SpawnCategory && GetItems(Category).IsValidIndex(Item)) return FlickSpawnStyle::Get(Item).Description;
 	if (Category == KnockoutCategory && GetItems(Category).IsValidIndex(Item)) return FlickKnockoutStyle::Get(Item).Description;

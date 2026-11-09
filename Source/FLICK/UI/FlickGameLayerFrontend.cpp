@@ -738,7 +738,11 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 		const int32 Columns = Category <= 1 ? 2 : 3;
 		const float RowStep = Category <= 1 ? 156.0f : Category == 2 ? 174.0f
 			: FlickCosmeticCatalog::IsPuckCategory(Category) ? FlickLockerStyle::CardHeight + FlickLockerStyle::CardGap : 136.0f;
-		ItemScroller->SetScrollOffset(FlickCosmeticCatalog::IsPuckCategory(Category) ? 0.f : (GetSelectedCosmeticIndex(Category) / Columns) * RowStep);
+		// Keep the original six finish cards at the top. Added sets remain reachable
+		// and an equipped item below the initial two rows scrolls into view.
+		ItemScroller->SetScrollOffset(FlickCosmeticCatalog::IsPuckCategory(Category)
+			? FMath::Max(0, GetSelectedCosmeticIndex(Category) / Columns - 1) * RowStep
+			: (GetSelectedCosmeticIndex(Category) / Columns) * RowStep);
 		LockerContents->AddSlot()
 		[
 			SNew(SBox).Visibility_Lambda([this, Category]() { return SelectedLockerCategory == Category ? EVisibility::Visible : EVisibility::Collapsed; })

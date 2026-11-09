@@ -12,9 +12,7 @@ Opdater pucks + lav alle P1, P2 og P3 versioner
 .\update-flick-pucks.cmd
 
 Til OH;
-- Starting pucks in BOB need to be more distinct from the standard pucks
 -  
 
 Til André;
-Tjek at dette virker:
 - 

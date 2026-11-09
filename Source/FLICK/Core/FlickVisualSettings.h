@@ -22,4 +22,11 @@ namespace FlickVisualSettings
 	// 0 colour rings, 1 solid ally/dashed enemy, 2 patterns plus relationship labels.
 	FLICK_API int32 GetPuckIndicatorStyle();
 	FLICK_API void SetPuckIndicatorStyle(int32 Style);
+	// Stable palette indices; the first six preserve existing saved preferences.
+	constexpr int32 OpponentRingColorCount = 18;
+	FLICK_API int32 GetOpponentRingColor();
+	FLICK_API void SetOpponentRingColor(int32 Color);
+	FLICK_API FLinearColor GetOpponentRingPaletteColor(int32 Color);
+	FLICK_API FText GetOpponentRingColorName(int32 Color);
+	FLICK_API FLinearColor GetOpponentRingTint();
 }

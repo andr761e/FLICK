@@ -105,6 +105,7 @@ AFlickPiece::AFlickPiece()
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> EmissiveMaterial(TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> OwnershipMaterial(TEXT("/Game/Cosmetics/Pucks/BOB/M_PuckOwnershipRing.M_PuckOwnershipRing"));
 	if (BasicMaterial.Succeeded())
 	{
 		PieceMesh->SetMaterial(0, BasicMaterial.Object);
@@ -131,6 +132,7 @@ AFlickPiece::AFlickPiece()
 		Underglow->SetMaterial(0, EmissiveMaterial.Object);
 		SelectionHalo->SetMaterial(0, EmissiveMaterial.Object);
 	}
+	if (OwnershipMaterial.Succeeded()) SelectionHalo->SetMaterial(0, OwnershipMaterial.Object);
 
 	for (UStaticMeshComponent* VisualMesh : {
 		TopDisc.Get(), OuterTrim.Get(), SideBand.Get(), Underglow.Get(), SelectionHalo.Get(), CenterPip.Get(),
@@ -164,6 +166,7 @@ AFlickPiece::AFlickPiece()
 		Dash->SetupAttachment(VisualRoot);
 		Dash->SetStaticMesh(CubeMesh.Object);
 		if (EmissiveMaterial.Succeeded()) Dash->SetMaterial(0, EmissiveMaterial.Object);
+		if (OwnershipMaterial.Succeeded()) Dash->SetMaterial(0, OwnershipMaterial.Object);
 		Dash->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Dash->SetGenerateOverlapEvents(false);
 		Dash->SetCanEverAffectNavigation(false);
@@ -346,7 +349,9 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 	const bool bAccessibilityChanged = bAssist != bLastColorBlindAssist;
 	bLastColorBlindAssist = bAssist;
 	const int32 IndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
-	const bool bIndicatorChanged = IndicatorStyle != LastIndicatorStyle;
+	const int32 OpponentRingColor = FlickVisualSettings::GetOpponentRingColor();
+	const bool bIndicatorChanged = IndicatorStyle != LastIndicatorStyle || OpponentRingColor != LastOpponentRingColor;
+	LastOpponentRingColor = OpponentRingColor;
 	LastIndicatorStyle = IndicatorStyle;
 	const AFlickPlayerController* IndicatorViewer = GetWorld()
 		? Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController()) : nullptr;
@@ -1354,7 +1359,10 @@ void AFlickPiece::EnableTestArenaVisuals()
 		TEXT("Grippy"), TEXT("Slider"), TEXT("Blocker"), TEXT("Compact"), TEXT("Bouncer"), TEXT("Toppler")};
 	const int32 Index = static_cast<int32>(Archetype);
 	if (Index < 0 || Index >= UE_ARRAY_COUNT(Names)) return;
-	const FString HighDetailPath = (bBobStriker || Archetype == EFlickPieceArchetype::Standard)
+	const bool bRetroArcade = FlickCosmeticCatalog::IsRetroArcade(Archetype, PuckSkin);
+	const FString HighDetailPath = bRetroArcade
+		? FString::Printf(TEXT("/Game/Cosmetics/Pucks/RetroArcade/SM_Puck_%s_RetroArcade.SM_Puck_%s_RetroArcade"), Names[Index], Names[Index])
+		: (bBobStriker || Archetype == EFlickPieceArchetype::Standard)
 		? TEXT("/Game/TestArena/Pucks/PrototypeStandard/SM_Puck_Standard_Blue_Prototype.SM_Puck_Standard_Blue_Prototype")
 		: FString::Printf(
 			TEXT("/Game/TestArena/Pucks/HighDetail/SM_Puck_%s_HighDetail.SM_Puck_%s_HighDetail"),
@@ -1379,6 +1387,23 @@ void AFlickPiece::EnableTestArenaVisuals()
 	WorkshopTeamMaterials.Reset();
 	for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
 	{
+		// Retro Arcade is an authored multi-colour assembly. Its ten material roles must
+		// not be recoloured by the six shared palettes or the team LED override.
+		if (bRetroArcade)
+		{
+			// Preserve the arcade LEDs and housing; only the playing face becomes
+			// BOB's pearl target, so the striker cannot be mistaken for a scoring puck.
+			if (bBobStriker && StrikerFace && Mesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString().Contains(TEXT("RetroArcade_Face")))
+			{
+				WorkshopMesh->SetMaterial(Slot, StrikerFace);
+				if (UMaterialInstanceDynamic* Face = WorkshopMesh->CreateDynamicMaterialInstance(Slot))
+				{
+					Face->SetScalarParameterValue(TEXT("FaceRadius"), 25.6f);
+					Face->SetVectorParameterValue(TEXT("AccentColor"), FLinearColor(0.f, .8f, 1.f));
+				}
+			}
+			continue;
+		}
 		const FString SlotName = Mesh->GetStaticMaterials()[Slot].MaterialSlotName.ToString();
 		if (bUsingHighDetailPuck)
 		{
@@ -1554,7 +1579,13 @@ void AFlickPiece::ApplyVisuals()
 		VisualAccent,
 		ArchetypeMix);
 	// Saturated ownership colours stay distinct even beneath a mismatched skin.
-	const FLinearColor HaloColor = Team == EFlickTeam::Player2
+	const AFlickPlayerController* Viewer = GetWorld()
+		? Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController()) : nullptr;
+	const bool bHasLocalTeam = Viewer && Viewer->GetLocalTeam() != EFlickTeam::None;
+	const bool bTeammate = bHasLocalTeam ? Viewer->GetLocalTeam() == Team : Team == EFlickTeam::Player1;
+	const AFlickGameState* IndicatorState = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
+	const bool bBobOpponent = IndicatorState && IndicatorState->ActiveMatchVariant == EFlickMatchVariant::Bob && !bTeammate;
+	const FLinearColor HaloColor = bHasLocalTeam && !bTeammate ? FlickVisualSettings::GetOpponentRingTint() : Team == EFlickTeam::Player2
 		? FLinearColor(1.0f, 0.10f, 0.01f) : Team == EFlickTeam::Player1
 			? FLinearColor(0.0f, 0.38f, 1.0f) : GetTeamColor(Team);
 	FLinearColor PipColor = FMath::Lerp(
@@ -1618,7 +1649,7 @@ void AFlickPiece::ApplyVisuals()
 	SetGlowColor(UnderglowMaterial, FMath::Lerp(TeamColor, FLinearColor::White, bSelected ? 0.12f : 0.0f), bSelected ? 0.1f : 0.018f);
 	// Ownership must be legible even when the chosen skin is the other team's
 	// colour. Keep this wider ownership marker steady and clearly visible.
-	SetGlowColor(HaloMaterial, HaloColor, bSelected ? 1.8f : 1.45f);
+	SetGlowColor(HaloMaterial, HaloColor, .8f);
 	SetAccentPaint(PipMaterial, PipColor, bSelected ? 0.34f : 0.16f);
 	SetAccentPaint(InnerRingMaterial, bBobStriker
 		? FMath::Lerp(TeamColor, FLinearColor::White, 0.16f)
@@ -1662,10 +1693,6 @@ void AFlickPiece::ApplyVisuals()
 	AccentLight->SetLightColor(TeamColor);
 	AccentLight->SetIntensity(0.0f);
 
-	const AFlickPlayerController* Viewer = GetWorld()
-		? Cast<AFlickPlayerController>(GetWorld()->GetFirstPlayerController()) : nullptr;
-	const bool bHasLocalTeam = Viewer && Viewer->GetLocalTeam() != EFlickTeam::None;
-	const bool bTeammate = bHasLocalTeam ? Viewer->GetLocalTeam() == Team : Team == EFlickTeam::Player1;
 	const int32 IndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
 	const bool bShowIndicator = !bEliminated && !bPregamePreview && !bCosmeticPreview && !bLocalOwnershipRing;
 	const bool bDashed = IndicatorStyle > 0 && !bTeammate;
@@ -1675,7 +1702,7 @@ void AFlickPiece::ApplyVisuals()
 		TeamIndicatorMaterial = TeamIndicatorDashes[0]->CreateAndSetMaterialInstanceDynamic(0);
 		for (UStaticMeshComponent* Dash : TeamIndicatorDashes) Dash->SetMaterial(0, TeamIndicatorMaterial);
 	}
-	SetGlowColor(TeamIndicatorMaterial, HaloColor, bSelected ? 1.8f : 1.45f);
+	SetGlowColor(TeamIndicatorMaterial, HaloColor, .8f);
 	const FVector ParentScale = PieceMesh->GetComponentScale();
 	const float XYScale = FMath::Max(static_cast<float>(ParentScale.X), .01f);
 	const float ZScale = FMath::Max(static_cast<float>(ParentScale.Z), .01f);
@@ -1687,7 +1714,7 @@ void AFlickPiece::ApplyVisuals()
 			FMath::Sin(Angle) * PieceRadius * 1.18f / XYScale, (-PieceThickness * .5f + .8f) / ZScale));
 		Dash->SetRelativeRotation(FRotator(0, FMath::RadiansToDegrees(Angle) + 90, 0));
 		Dash->SetRelativeScale3D(FVector(PieceRadius * .32f / (100 * XYScale),
-			PieceRadius * .12f / (100 * XYScale), 1.2f / (100 * ZScale)));
+			PieceRadius * (bBobOpponent ? .20f : .12f) / (100 * XYScale), 1.2f / (100 * ZScale)));
 		Dash->SetVisibility(bShowIndicator && bDashed);
 	}
 	TeamIndicatorLabel->SetRelativeLocation(FVector(0, -PieceRadius * 1.55f / XYScale,
@@ -1697,7 +1724,7 @@ void AFlickPiece::ApplyVisuals()
 	TeamIndicatorLabel->SetText(FText::FromString(bHasLocalTeam ? (bTeammate ? TEXT("ALLY") : TEXT("FOE"))
 		: Team == EFlickTeam::Player1 ? TEXT("BLUE") : TEXT("ORANGE")));
 	TeamIndicatorLabel->SetVisibility(bShowIndicator && IndicatorStyle == 2);
-	const float Width = FlickVisualSettings::IsColorBlindAssistEnabled()
+	const float Width = bBobOpponent ? 1.30f : FlickVisualSettings::IsColorBlindAssistEnabled()
 		? (bTeammate ? 1.12f : 1.25f) : 1.15f;
 	const float Pulse = bSelected
 		? 1.0f + 0.055f * FMath::Sin(VisualTime * 7.0f)

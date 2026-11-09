@@ -173,6 +173,9 @@ if args.profile_cutout:
     camera.rotation_euler = (Vector((0, 0, .07)) - camera.location).to_track_quat("-Z", "Y").to_euler()
     camera.data.ortho_scale = 1.42
     scene.view_settings.exposure = -.7
+sys.path.insert(0,str(root/'Tools'))
+from FlickPuckPortraitViews import apply_view
+apply_view(scene,camera,'Locker' if args.locker else 'Hero' if args.hero else 'ProfileCutout' if args.profile_cutout else 'Presentation' if args.presentation else 'Original')
 scene.camera = camera
 report = []
 

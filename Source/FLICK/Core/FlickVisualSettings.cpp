@@ -22,6 +22,43 @@ namespace FlickVisualSettings
 		GConfig->Flush(false, GGameUserSettingsIni);
 	}
 
+	int32 GetOpponentRingColor()
+	{
+		int32 Color = 0;
+		if (GConfig) GConfig->GetInt(InterfaceSection, TEXT("OpponentRingColor"), Color, GGameUserSettingsIni);
+		return FMath::Clamp(Color, 0, OpponentRingColorCount - 1);
+	}
+
+	void SetOpponentRingColor(int32 Color)
+	{
+		if (!GConfig) return;
+		GConfig->SetInt(InterfaceSection, TEXT("OpponentRingColor"), FMath::Clamp(Color, 0, OpponentRingColorCount - 1), GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+
+	FLinearColor GetOpponentRingPaletteColor(int32 Color)
+	{
+		static const FLinearColor Colors[] = {
+			FLinearColor(1.f, .18f, .015f), FLinearColor(1.f, .8f, .01f),
+			FLinearColor(1.f, .015f, .45f), FLinearColor(.85f, .85f, .85f),
+			FLinearColor(1.f, .015f, .01f), FLinearColor(.01f, .8f, 1.f),
+			FLinearColor(.3f, 1.f, .01f), FLinearColor(.01f, .65f, .04f), FLinearColor(.01f, 1.f, .45f),
+			FLinearColor(.01f, .35f, 1.f), FLinearColor(.04f, .07f, 1.f), FLinearColor(.32f, .02f, 1.f),
+			FLinearColor(.7f, .01f, 1.f), FLinearColor(1.f, .01f, .8f), FLinearColor(1.f, .28f, .18f),
+			FLinearColor(1.f, .55f, .08f), FLinearColor(.4f, .7f, 1.f), FLinearColor(.02f, .025f, .035f)};
+		return Colors[FMath::Clamp(Color, 0, OpponentRingColorCount - 1)];
+	}
+
+	FText GetOpponentRingColorName(int32 Color)
+	{
+		static const TCHAR* Names[] = {TEXT("Orange"), TEXT("Yellow"), TEXT("Pink"), TEXT("White"), TEXT("Red"), TEXT("Cyan"),
+			TEXT("Lime"), TEXT("Green"), TEXT("Mint"), TEXT("Sky blue"), TEXT("Blue"), TEXT("Indigo"),
+			TEXT("Purple"), TEXT("Magenta"), TEXT("Coral"), TEXT("Gold"), TEXT("Ice blue"), TEXT("Graphite")};
+		return FText::FromString(Names[FMath::Clamp(Color, 0, OpponentRingColorCount - 1)]);
+	}
+
+	FLinearColor GetOpponentRingTint() { return GetOpponentRingPaletteColor(GetOpponentRingColor()); }
+
 	bool IsColorBlindAssistEnabled()
 	{
 		bool bEnabled = false;

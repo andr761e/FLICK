@@ -27,6 +27,7 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 	const int32 SavedHoverDetail = FlickVisualSettings::GetPuckHoverDetail();
 	const bool bSavedColorBlindAssist = FlickVisualSettings::IsColorBlindAssistEnabled();
 	const int32 SavedIndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
+	const int32 SavedOpponentColor = FlickVisualSettings::GetOpponentRingColor();
 	FlickVisualSettings::SetPuckIndicatorStyle(0);
 	FlickVisualSettings::SetColorBlindAssistEnabled(false);
 	FlickVisualSettings::SetPuckHoverDetail(3);
@@ -75,6 +76,15 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Teammate retains blue team ring"), TeammateColour.B > TeammateColour.G);
 	}
 	GameState->PlayersPerTeam = 1;
+	FlickVisualSettings::SetOpponentRingColor(3);
+	const FLinearColor WhiteOpponent = RingColour(Other);
+	TestTrue(TEXT("Opponent preference changes a live unselected ring"), FMath::IsNearlyEqual(WhiteOpponent.R, WhiteOpponent.G) && WhiteOpponent.R > .1f);
+	GameState->ActiveMatchVariant = EFlickMatchVariant::Bob;
+	Other->SetHovered(true); Other->Tick(.016f);
+	TestTrue(TEXT("BOB ring is wider for small scoring pucks"), Other->SelectionHalo->GetRelativeScale3D().X >= 1.29f);
+	Other->SetHovered(false);
+	GameState->ActiveMatchVariant = EFlickMatchVariant::Classic;
+	FlickVisualSettings::SetOpponentRingColor(SavedOpponentColor);
 	RingColour(Own);
 	TestFalse(TEXT("1v1 also hides the local ownership ring"), Own->SelectionHalo->IsVisible());
 	FlickVisualSettings::SetColorBlindAssistEnabled(true);
@@ -144,6 +154,7 @@ bool FFlickPuckInspectionTest::RunTest(const FString& Parameters)
 	FlickVisualSettings::SetPuckHoverDetail(SavedHoverDetail);
 	FlickVisualSettings::SetColorBlindAssistEnabled(bSavedColorBlindAssist);
 	FlickVisualSettings::SetPuckIndicatorStyle(SavedIndicatorStyle);
+	FlickVisualSettings::SetOpponentRingColor(SavedOpponentColor);
 	TestTrue(TEXT("Hover appears in the first frame, without a dwell timer"), Widget->Alpha > 0);
 	Widget->Tick(FGeometry(), 0, .04f);
 	TestEqual(TEXT("Short entrance fade completes within 56 ms"), Widget->Alpha, 1.0f);

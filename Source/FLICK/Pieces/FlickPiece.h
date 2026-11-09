@@ -146,6 +146,7 @@ private:
 	bool bLocalOwnershipRing = false;
 	bool bLastColorBlindAssist = false;
 	int32 LastIndicatorStyle = INDEX_NONE;
+	int32 LastOpponentRingColor = INDEX_NONE;
 	EFlickTeam LastIndicatorViewerTeam = EFlickTeam::None;
 	UPROPERTY(VisibleAnywhere, Category = "FLICK|Components")
 	TArray<TObjectPtr<UStaticMeshComponent>> TeamIndicatorDashes;

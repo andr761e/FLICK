@@ -162,7 +162,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileOverview()
 		};
 		const auto Detail = [this,Order,Instance,Progress]() -> FText {
 			const auto* I = Instance();
-			if (Order == 3) return FText::FromString(TEXT("6 finishes each.\nMake every puck yours."));
+			if (Order == 3) return FText::FromString(FString::Printf(TEXT("%d finishes each.\nMake every puck yours."),
+				FlickCosmeticCatalog::GetItems(FlickCosmeticCatalog::PuckCategoryStart).Num()));
 			if (Order == 1) {
 				const auto* Ranking = GetRankingSubsystem();
 				const auto Rank = Progress();

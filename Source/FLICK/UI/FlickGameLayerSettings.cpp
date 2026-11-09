@@ -61,6 +61,26 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 	const TSharedRef<SWidget> IndicatorSelector = MakeHoverSelector(PuckIndicatorOptions,
 		FlickVisualSettings::GetPuckIndicatorStyle, FlickVisualSettings::SetPuckIndicatorStyle,
 		[](int32 Style) { static const TCHAR* Labels[] = {TEXT("COLOUR RINGS"), TEXT("SOLID ALLY / DASHED FOE"), TEXT("PATTERNS + ALLY / FOE LABELS")}; return FText::FromString(Labels[FMath::Clamp(Style, 0, 2)]); });
+	TSharedRef<SUniformGridPanel> OpponentColorGrid = SNew(SUniformGridPanel).SlotPadding(FMargin(3));
+	for (int32 Color = 0; Color < FlickVisualSettings::OpponentRingColorCount; ++Color)
+	{
+		OpponentColorGrid->AddSlot(Color % 6, Color / 6)
+		[SNew(SBox).WidthOverride(30).HeightOverride(30)
+			[SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0)
+				.ToolTipText(FlickVisualSettings::GetOpponentRingColorName(Color))
+				.OnClicked_Lambda([Color]() { FlickVisualSettings::SetOpponentRingColor(Color); return FReply::Handled(); })
+				[SNew(SBorder).BorderImage(WhiteBrush()).Padding(2)
+					.BorderBackgroundColor_Lambda([Color]() { return FlickVisualSettings::GetOpponentRingColor() == Color ? FLinearColor::White : FLinearColor(.015f,.035f,.05f); })
+					[SNew(SBorder).BorderImage(WhiteBrush()).Padding(0)
+						.BorderBackgroundColor(FlickVisualSettings::GetOpponentRingPaletteColor(Color))
+						[SNew(STextBlock).Text_Lambda([Color]() { return FlickVisualSettings::GetOpponentRingColor() == Color ? FText::FromString(TEXT("\u2713")) : FText::GetEmpty(); })
+							.Font(UiFont(14,true)).Justification(ETextJustify::Center).ColorAndOpacity(FLinearColor::Black)]]]]];
+	}
+	const TSharedRef<SWidget> OpponentColorSelector = SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight()[OpponentColorGrid]
+		+ SVerticalBox::Slot().AutoHeight().Padding(3,3)[SNew(STextBlock)
+			.Text_Lambda([]() { return FlickVisualSettings::GetOpponentRingColorName(FlickVisualSettings::GetOpponentRingColor()); })
+			.Font(UiFont(10)).ColorAndOpacity(Paper)];
 	if (CameraShakeOptions.IsEmpty())
 	{
 		for (int32 Level = 0; Level < 4; ++Level) CameraShakeOptions.Add(MakeShared<int32>(Level));
@@ -424,6 +444,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildSettings()
 			+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Camera ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("02"), TEXT("CAMERA"), TEXT("Adjust camera motion, orbit response, and free-camera control."))]]
 			+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[SectionHeading(TEXT("03"), TEXT("INTERFACE"), TEXT("Choose the guides and information shown during play."))]]
 			+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeOptionRow(TEXT("OTHER PUCK INDICATORS"), IndicatorSelector)]]
+			+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("OPPONENT RING COLOUR"))).Font(UiFont(11,true)).ColorAndOpacity(Paper)]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(0,5)[SNew(SBox).WidthOverride(230)[OpponentColorSelector]]]]
 			+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeOptionRow(TEXT("PUCK HOVER TEXT SIZE"), HoverSizeSelector)]]
 			+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeOptionRow(TEXT("PUCK HOVER INFORMATION"), HoverDetailSelector)]]
 			+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([this]() { return SelectedSettingsTab == EFlickSettingsTab::Interface ? EVisibility::Visible : EVisibility::Collapsed; })[MakeToggleRow(TEXT("COLOUR-BLIND ASSISTANCE"), TAttribute<ECheckBoxState>::CreateLambda([Checked]() { return Checked(FlickVisualSettings::IsColorBlindAssistEnabled()); }), FOnCheckStateChanged::CreateLambda([](ECheckBoxState State) { FlickVisualSettings::SetColorBlindAssistEnabled(State == ECheckBoxState::Checked); }))]]

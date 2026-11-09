@@ -1,0 +1,947 @@
+[
+  {
+    "archetype": "Standard",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Standard",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Standard",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Standard",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Standard",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Heavy",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Heavy",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Heavy",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Heavy",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Heavy",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Striker",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Striker",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Striker",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Striker",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Striker",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Grippy",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Grippy",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Grippy",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Grippy",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Grippy",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Slider",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Slider",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Slider",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Slider",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Slider",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Blocker",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Blocker",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Blocker",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Blocker",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Blocker",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Compact",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Compact",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Compact",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Compact",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Compact",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Bouncer",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Bouncer",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Bouncer",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Bouncer",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Bouncer",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Toppler",
+    "skin": 6,
+    "view": "Original",
+    "camera": [
+      1.15,
+      -1.9,
+      1.75
+    ],
+    "target": [
+      0,
+      0,
+      0.05
+    ],
+    "ortho": 1.48,
+    "size": [
+      512,
+      384
+    ],
+    "transparent": true
+  },
+  {
+    "archetype": "Toppler",
+    "skin": 6,
+    "view": "Locker",
+    "camera": [
+      0,
+      -0.95,
+      2.6
+    ],
+    "target": [
+      0,
+      0,
+      0.06
+    ],
+    "ortho": 1.5,
+    "size": [
+      768,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Toppler",
+    "skin": 6,
+    "view": "Presentation",
+    "camera": [
+      1.05,
+      -1.9,
+      1.85
+    ],
+    "target": [
+      0,
+      0,
+      0.065
+    ],
+    "ortho": 1.55,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Toppler",
+    "skin": 6,
+    "view": "Hero",
+    "camera": [
+      0.9,
+      -1.9,
+      1.45
+    ],
+    "target": [
+      0,
+      0,
+      0.08
+    ],
+    "ortho": 1.62,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": false
+  },
+  {
+    "archetype": "Toppler",
+    "skin": 6,
+    "view": "ProfileCutout",
+    "camera": [
+      0.65,
+      -2,
+      1.18
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "ortho": 1.42,
+    "size": [
+      1024,
+      768
+    ],
+    "transparent": true
+  }
+]

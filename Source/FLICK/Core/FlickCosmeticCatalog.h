@@ -8,6 +8,9 @@
 namespace FlickCosmeticCatalog
 {
 	constexpr int32 PuckCategoryStart = 3;
+	// Appended appearance index; historical palette indices never move.
+	constexpr int32 RetroArcadeSkin = 6;
+	FLICK_API bool IsRetroArcade(EFlickPieceArchetype Archetype, int32 Skin);
 	constexpr int32 TrailCategory = PuckCategoryStart + FlickPieceArchetypeRules::ArchetypeCount;
 	constexpr int32 SpawnCategory = TrailCategory + 1;
 	constexpr int32 KnockoutCategory = SpawnCategory + 1;

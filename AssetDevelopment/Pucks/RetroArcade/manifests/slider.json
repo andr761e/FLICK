@@ -1,0 +1,178 @@
+{
+  "archetype": "Slider",
+  "canonical_scale": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "asset": "SM_Puck_Slider_RetroArcade",
+  "dimensions_cm": [
+    90.0,
+    90.28,
+    20.0
+  ],
+  "triangles": 145064,
+  "materials": {
+    "RetroArcade_Housing": {
+      "base": [
+        0.007,
+        0.011,
+        0.019
+      ],
+      "metallic": 0.85,
+      "roughness": 0.23,
+      "emissive": [
+        0,
+        0,
+        0
+      ],
+      "power": 0,
+      "grain": true
+    },
+    "RetroArcade_Gasket": {
+      "base": [
+        0.003,
+        0.005,
+        0.009
+      ],
+      "metallic": 0.28,
+      "roughness": 0.42,
+      "emissive": [
+        0,
+        0,
+        0
+      ],
+      "power": 0,
+      "grain": false
+    },
+    "RetroArcade_Face": {
+      "base": [
+        0.009,
+        0.012,
+        0.022
+      ],
+      "metallic": 0.55,
+      "roughness": 0.34,
+      "emissive": [
+        0,
+        0,
+        0
+      ],
+      "power": 0,
+      "grain": true
+    },
+    "RetroArcade_ControlDeck": {
+      "base": [
+        0.1,
+        0.125,
+        0.16
+      ],
+      "metallic": 0.92,
+      "roughness": 0.26,
+      "emissive": [
+        0,
+        0,
+        0
+      ],
+      "power": 0,
+      "grain": true
+    },
+    "RetroArcade_PolishedEdges": {
+      "base": [
+        0.3,
+        0.36,
+        0.44
+      ],
+      "metallic": 0.95,
+      "roughness": 0.19,
+      "emissive": [
+        0,
+        0,
+        0
+      ],
+      "power": 0,
+      "grain": false
+    },
+    "RetroArcade_Cyan": {
+      "base": [
+        0.001,
+        0.12,
+        0.16
+      ],
+      "metallic": 0.08,
+      "roughness": 0.22,
+      "emissive": [
+        0.001,
+        0.7,
+        1
+      ],
+      "power": 8.5,
+      "grain": false
+    },
+    "RetroArcade_Magenta": {
+      "base": [
+        0.18,
+        0.002,
+        0.13
+      ],
+      "metallic": 0.06,
+      "roughness": 0.23,
+      "emissive": [
+        1,
+        0.001,
+        0.85
+      ],
+      "power": 9.0,
+      "grain": false
+    },
+    "RetroArcade_Yellow": {
+      "base": [
+        0.36,
+        0.29,
+        0.001
+      ],
+      "metallic": 0.08,
+      "roughness": 0.25,
+      "emissive": [
+        1,
+        0.85,
+        0.001
+      ],
+      "power": 7.5,
+      "grain": false
+    },
+    "RetroArcade_CyanPixels": {
+      "base": [
+        0.002,
+        0.09,
+        0.12
+      ],
+      "metallic": 0.05,
+      "roughness": 0.27,
+      "emissive": [
+        0.002,
+        0.64,
+        0.79
+      ],
+      "power": 3.3,
+      "grain": false
+    },
+    "RetroArcade_MagentaPixels": {
+      "base": [
+        0.09,
+        0.001,
+        0.07
+      ],
+      "metallic": 0.05,
+      "roughness": 0.27,
+      "emissive": [
+        0.65,
+        0.002,
+        0.49
+      ],
+      "power": 3.3,
+      "grain": false
+    }
+  },
+  "zero_area_cleanup": true
+}

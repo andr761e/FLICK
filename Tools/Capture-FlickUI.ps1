@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 Captures an actual Unreal viewport, including Slate UI, using the current editor build.
 .EXAMPLE
@@ -12,7 +12,7 @@ settings do not overwrite the developer's normal profile. No Steam connection is
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'TeamSelection', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'Training', 'TrainingMenu', 'FreePlayMenu', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchBobRanked', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket', 'BobStriker')]
+    [ValidateSet('Home', 'Invite', 'Party', 'Challenges', 'Play', 'Format', 'CompetitiveFormat', 'Profile', 'Customize', 'CustomizePuck', 'PrivateMatch', 'TeamSelection', 'Spectator', 'Settings', 'Video', 'Lighting', 'LightingPreview', 'Lineup', 'Class', 'Shop', 'Social', 'Match', 'Replay', 'AimArrow', 'PuckHover', 'PuckDetail', 'Training', 'TrainingMenu', 'FreePlayMenu', 'Practice', 'PracticePacks', 'Pause', 'Result', 'PostMatch', 'PostMatchPrivate', 'PostMatchBob', 'PostMatchBobRanked', 'PostMatchRanked', 'Scoreboard', 'TestArena', 'SwitchRim', 'StadiumSteps', 'TestArenaStates', 'TestArenaSettings', 'Bob', 'BobPocket', 'BobStriker')]
     [string[]]$Screen = @('Home'),
     [ValidateRange(640, 7680)]
     [int]$Width = 1600,
@@ -31,9 +31,9 @@ param(
     [hashtable]$LightingValues = @{},
     [ValidateRange(0, 3)]
     [int]$Quality = 3,
-    [ValidateRange(0, 5)]
+    [ValidateRange(0, 6)]
     [int]$PuckSkin = 0,
-    [ValidateRange(-1, 5)]
+    [ValidateRange(-1, 6)]
     [int]$MatchPuckSkin = -1,
     # Capture-only exposure study; does not alter a saved preference.
     [Nullable[float]]$ExposureBias = $null,
@@ -142,6 +142,7 @@ $previewFlags = @{
     Match = @('-Flick4v4Preview')
     Replay = @('-Flick4v4Preview', '-FlickReplayPreview', '-FlickFpsPreview')
     AimArrow = @('-Flick4v4Preview', '-FlickAimArrowPreview')
+    PuckDetail = @('-Flick4v4Preview', '-FlickPuckDetailPreview')
     PuckHover = @('-Flick4v4Preview', '-FlickPuckHoverPreview')
     Training = @('-FlickTrainingPreview')
     TrainingMenu = @('-FlickModeSelectPreview', '-FlickTrainingMenuPreview')
@@ -236,6 +237,7 @@ foreach ($screenName in $Screen) {
         $arguments += "-ini:GameUserSettings:[ScalabilityGroups]:sg.${group}Quality=$Quality"
     }
     $arguments += "-FlickBobStrikerSkin=$PuckSkin"
+    $arguments += "-FlickCaptureDistance=$($CameraDistance.ToString([System.Globalization.CultureInfo]::InvariantCulture))"
 	# Class and winner previews read the same team-format argument.
 	$arguments += "-FlickClassPlayers=$PlayersPerTeam"
     $arguments += "-FlickCapturePuckSkin=$MatchPuckSkin"

@@ -70,7 +70,7 @@ bool FFlickStarterSkinTest::RunTest(const FString& Parameters)
 	const FString Key = FlickCosmeticCatalog::GetConfigKey(FlickCosmeticCatalog::PuckCategoryStart);
 	int32 Previous = 0;
 	const bool HadPrevious = GConfig->GetInt(TEXT("FLICK.ProfileCosmetics"), *Key, Previous, GGameUserSettingsIni);
-	for (int32 Retired = 6; Retired <= 9; ++Retired)
+	for (int32 Retired = FlickCosmeticCatalog::RetroArcadeSkin + 1; Retired <= 9; ++Retired)
 	{
 		GConfig->SetInt(TEXT("FLICK.ProfileCosmetics"), *Key, Retired, GGameUserSettingsIni);
 		TestEqual(TEXT("Saved retired skins fall back to Classic Blue"), FlickCosmeticCatalog::LoadPuckSkins()[0], 0);
@@ -95,7 +95,7 @@ bool FFlickStarterSkinTest::RunTest(const FString& Parameters)
 	auto* Camera = CameraPawn->FindComponentByClass<UCameraComponent>();
 	auto* Accent = Piece->FindComponentByClass<UPointLightComponent>();
 	CameraPawn->SetTestArenaPresentation(true);
-	TestEqual(TEXT("Original camera film grain"), Camera->PostProcessSettings.FilmGrainIntensity, .07f);
+	TestEqual(TEXT("Approved fixed puck exposure avoids film grain"), Camera->PostProcessSettings.FilmGrainIntensity, 0.f);
 	TestEqual(TEXT("Original bloom kernel"), Camera->PostProcessSettings.Bloom1Size, .20f);
 	const float BloomBeforeSkins = Camera->PostProcessSettings.BloomIntensity;
 	TestEqual(TEXT("Original LED light intensity"), Accent->Intensity, 8.f);
@@ -210,7 +210,7 @@ bool FFlickStarterSkinTest::RunTest(const FString& Parameters)
 	}
 	Skins.Init(1, FlickPieceArchetypeRules::ArchetypeCount);
 	State->SetPuckSkins(Skins);
-	for (int32 Retired = 6; Retired <= 9; ++Retired)
+	for (int32 Retired = FlickCosmeticCatalog::RetroArcadeSkin + 1; Retired <= 9; ++Retired)
 	{
 		Skins[0] = Retired;
 		TestFalse(TEXT("Server rejects retired Standard skins"), State->SetPuckSkins(Skins));

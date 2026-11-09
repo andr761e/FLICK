@@ -1,4 +1,5 @@
 #include "Game/FlickGameMode.h"
+#include "Core/FlickCosmeticCatalog.h"
 #include "Camera/CameraComponent.h"
 #include "Core/FlickRankRules.h"
 #include "Game/FlickGameModePrivate.h"
@@ -986,16 +987,21 @@ void AFlickGameMode::BeginPlay()
 	int32 CapturePuckSkin = INDEX_NONE;
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCaptureFrame"))
 		&& FParse::Value(FCommandLine::Get(), TEXT("FlickCapturePuckSkin="), CapturePuckSkin)
-		&& CapturePuckSkin >= 0 && CapturePuckSkin < 6)
+		&& CapturePuckSkin >= 0 && CapturePuckSkin <= FlickCosmeticCatalog::RetroArcadeSkin)
 	{
-		for (AFlickPiece* Piece : Pieces) if (IsValid(Piece)) Piece->SetPuckSkin(CapturePuckSkin);
-		// Local cosmetic synchronization runs just after BeginPlay. Apply the
-		// isolated QA palette once it has completed, never to the saved profile.
-		FTimerHandle CaptureSkinTimer;
-		GetWorldTimerManager().SetTimer(CaptureSkinTimer, [this, CapturePuckSkin]()
+		const auto ApplyCaptureSkin = [this, CapturePuckSkin]()
 		{
-			for (AFlickPiece* Piece : Pieces) if (IsValid(Piece)) Piece->SetPuckSkin(CapturePuckSkin);
-		}, 1.f, false);
+			for (AFlickPiece* Piece : Pieces)
+			{
+				if (!IsValid(Piece)) continue;
+				const int32 Category = FlickCosmeticCatalog::PuckCategoryStart + static_cast<int32>(Piece->GetArchetype());
+				if (FlickCosmeticCatalog::GetItems(Category).IsValidIndex(CapturePuckSkin)) Piece->SetPuckSkin(CapturePuckSkin);
+			}
+		};
+		ApplyCaptureSkin();
+		// Apply again after local cosmetic synchronization, only in this QA profile.
+		FTimerHandle CaptureSkinTimer;
+		GetWorldTimerManager().SetTimer(CaptureSkinTimer, FTimerDelegate::CreateLambda(ApplyCaptureSkin), 1.f, false);
 	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCaptureFrame")) && CameraPawn
 		&& FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureOrbit="), CaptureOrbit)
@@ -1005,6 +1011,33 @@ void AFlickGameMode::BeginPlay()
 		CaptureOrbit = FMath::Clamp(CaptureOrbit, -180.f, 180.f);
 		CameraPawn->RotateGameplayOrbit(FMath::Sign(CaptureOrbit),
 			FMath::Abs(CaptureOrbit) / (CameraPawn->GameplayOrbitDegreesPerSecond * 1.5f), 1.f);
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickPuckDetailPreview")) && CameraPawn)
+	{
+		// Isolated art QA: frame a real match piece, with its normal mesh,
+		// materials and puck lighting. No studio actor or gameplay changes.
+		FTimerHandle PuckDetailTimer;
+		GetWorldTimerManager().SetTimer(PuckDetailTimer, [this]()
+		{
+			for (AFlickPiece* Piece : Pieces)
+			{
+				if (!IsValid(Piece) || Piece->GetTeam() != EFlickTeam::Player1
+					|| Piece->GetArchetype() != EFlickPieceArchetype::Standard) continue;
+				float Elevation = 32.f, Orbit = 0.f, Distance = .9f;
+				FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureElevation="), Elevation);
+				FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureOrbit="), Orbit);
+				FParse::Value(FCommandLine::Get(), TEXT("FlickCaptureDistance="), Distance);
+				if (!FMath::IsFinite(Elevation) || !FMath::IsFinite(Orbit) || !FMath::IsFinite(Distance)) return;
+				const float Pitch = FMath::DegreesToRadians(FMath::Clamp(Elevation, 15.f, 75.f));
+				const FVector Center = Piece->GetActorLocation();
+				const FVector Offset = FVector(0.f, -FMath::Cos(Pitch), FMath::Sin(Pitch))
+					.RotateAngleAxis(Orbit, FVector::UpVector) * (170.f * FMath::Clamp(Distance, .75f, 1.25f));
+				CameraPawn->SetFreeCameraEnabled(true);
+				CameraPawn->SetActorLocation(Center + Offset);
+				CameraPawn->SetActorRotation((-Offset).Rotation());
+				break;
+			}
+		}, 1.5f, false);
 	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickBobStrikerPreview")) && CameraPawn)
 	{
@@ -1016,7 +1049,7 @@ void AFlickGameMode::BeginPlay()
 			if (!Striker || !CameraPawn) return;
 			int32 Skin = 0;
 			FParse::Value(FCommandLine::Get(), TEXT("FlickBobStrikerSkin="), Skin);
-			Striker->SetPuckSkin(FMath::Clamp(Skin, 0, 5));
+			Striker->SetPuckSkin(FMath::Clamp(Skin, 0, FlickCosmeticCatalog::RetroArcadeSkin));
 			const FVector Center = Striker->GetActorLocation();
 			const FVector Position = Center + FVector(0, -115, 100);
 			CameraPawn->SetFreeCameraEnabled(true);
