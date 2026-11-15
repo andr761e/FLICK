@@ -82,7 +82,7 @@ void UFlickPrivateSpectatorComponent::TickComponent(float DeltaTime, ELevelTick 
 {
 	Super::TickComponent(DeltaTime, TickType, TickFunction);
 	auto* Controller = Cast<AFlickPlayerController>(GetOwner());
-	if (!Controller || !Controller->IsLocalController()) return;
+	if (!Controller || !Controller->IsLocalController() || GetWorld()->IsPlayingReplay()) return;
 	auto* Camera = Cast<AFlickCameraPawn>(Controller->GetPawn());
 	const auto* State = GetWorld()->GetGameState<AFlickGameState>();
 	if (!Camera) return;
@@ -91,9 +91,9 @@ void UFlickPrivateSpectatorComponent::TickComponent(float DeltaTime, ELevelTick 
 		if (bFollowing) StopFollowing();
 		TargetSeat = INDEX_NONE;
 	}
-	// Only actual private-match participants publish, never spectators, replays,
-	// public matchmaking, or post-match presentations. Unreliable traffic is 10 Hz.
-	if (State && State->bPrivateMatchActive && State->IsGameplayActive() && !State->bSeriesComplete
+	// Participants publish validated presentation-only camera views for spectators
+	// and full-match recording. Unreliable traffic remains limited to 10 Hz.
+	if (State && (State->bPrivateMatchActive || GetWorld()->IsRecordingReplay()) && State->IsGameplayActive() && !State->bSeriesComplete
 		&& Controller->GetLocalTeam() != EFlickTeam::None && !Controller->IsCinematicReplayPresentationActive())
 	{
 		PublishElapsed += DeltaTime;

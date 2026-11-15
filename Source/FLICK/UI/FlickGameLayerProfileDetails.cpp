@@ -1,3 +1,5 @@
+#include "UI/FlickCareerWidgets.h"
+#include "Core/FlickPracticeCatalog.h"
 #include "UI/FlickGameLayerPrivate.h"
 #include "UI/FlickPlaylistWidgets.h"
 #include "UI/FlickProfileWidgets.h"
@@ -53,9 +55,9 @@ namespace
 TSharedRef<SWidget> SFlickGameLayer::BuildProfileDetailPages()
 {
     TSharedRef<SHorizontalBox> Tabs = SNew(SHorizontalBox);
-    for (const auto Tab : {EFlickProfileTab::Stats, EFlickProfileTab::MatchHistory, EFlickProfileTab::Leaderboards})
+    for (const auto Tab : {EFlickProfileTab::Stats, EFlickProfileTab::MatchHistory, EFlickProfileTab::Leaderboards, EFlickProfileTab::SavedReplays})
     {
-        const FString Name = Tab == EFlickProfileTab::Stats ? TEXT("STATS") : Tab == EFlickProfileTab::MatchHistory ? TEXT("MATCH HISTORY") : TEXT("COMPETITIVE RANKS");
+        const FString Name = Tab == EFlickProfileTab::Stats ? TEXT("STATS") : Tab == EFlickProfileTab::MatchHistory ? TEXT("MATCH HISTORY") : Tab==EFlickProfileTab::SavedReplays ? TEXT("SAVED REPLAYS") : TEXT("COMPETITIVE RANKS");
         Tabs->AddSlot().AutoWidth().Padding(6,0)
         [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0)
             .OnClicked_Lambda([this,Tab]() { SelectedProfileTab=Tab; if (GameMode.IsValid()) GameMode->PlayMenuSound(true); return FReply::Handled(); })
@@ -98,63 +100,127 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileDetailPages()
 
 TSharedRef<SWidget> SFlickGameLayer::BuildProfileStatsPanel()
 {
-    const auto Instance=[this]() { return PlayerController.IsValid() ? Cast<UFlickGameInstance>(PlayerController->GetGameInstance()) : nullptr; };
-    const auto Stats=[this,Instance]() { return Instance() ? Instance()->GetProfileStatsForView(static_cast<EFlickProfileStatsView>(SelectedProfileStatsView)) : FFlickProfileStats(); };
-    const auto Records=[this,Instance]() { return FilteredRecords(Instance(),SelectedProfileStatsView); };
-    TSharedRef<SHorizontalBox> Filters=SNew(SHorizontalBox);
-    for (int32 View=0; View<3; ++View)
-        Filters->AddSlot().AutoWidth().Padding(0,0,8,0)
-        [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0).OnClicked_Lambda([this,View]() { SelectedProfileStatsView=View; return FReply::Handled(); })
-            [SNew(SFlickAngularBorder).HomeSurface(true).UseAccentForOutline(true).CutSize(7).Padding(FMargin(22,9))
-                .BackgroundColor_Lambda([this,View]() { return SelectedProfileStatsView==View ? PanelSelected : Ink; })
-                .AccentColor_Lambda([this,View]() { return SelectedProfileStatsView==View ? Brand : Hairline; })
-                [SNew(STextBlock).Text(FText::FromString(View==0 ? TEXT("TOTAL") : View==1 ? TEXT("CASUAL") : TEXT("COMPETITIVE"))).Font(DisplayFont(12)).ColorAndOpacity(Paper)]]];
-    TSharedRef<SHorizontalBox> Headlines=SNew(SHorizontalBox);
-    const TCHAR* Names[]={TEXT("MATCHES PLAYED"),TEXT("MATCH WINS"),TEXT("WIN RATE"),TEXT("KNOCKOUTS")};
-    for (int32 I=0; I<4; ++I)
-    {
-        const bool bCoral=I==0 || I==2;
-        Headlines->AddSlot().FillWidth(1).Padding(I ? 8 : 0,0,I==3 ? 0 : 8,0)
-        [SNew(SFlickMainMenuFrame).HomePresentation(true).Primary(bCoral)
-            .StartColor(bCoral ? Brand : Panel).EndColor(bCoral ? Brand : Panel)
-            .BorderColor(bCoral ? BrandHover : Cyan).Padding(FMargin(24,16))
-            [SNew(SVerticalBox)
-                + SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(Names[I])).Font(DisplayFont(13)).ColorAndOpacity(bCoral ? Ink : Muted)]
-                + SVerticalBox::Slot().FillHeight(1).VAlign(VAlign_Center)[SNew(STextBlock).Text_Lambda([Stats,I]() { const auto S=Stats(); return I==2 ? FText::FromString(FString::Printf(TEXT("%d%%"), S.MatchesPlayed>0 ? FMath::RoundToInt(100.f*S.Wins/S.MatchesPlayed) : 0)) : FText::AsNumber(I==0 ? S.MatchesPlayed : I==1 ? S.Wins : S.Knockouts); }).Font(DisplayFont(48)).ColorAndOpacity(bCoral ? Ink : Paper)]
-                + SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(I==2 ? TEXT("COMPLETED SERIES") : I==3 ? TEXT("OPPONENT PUCKS REMOVED") : TEXT("CAREER TOTAL"))).Font(UiFont(9)).ColorAndOpacity(bCoral ? Ink : Muted)]]];
-    }
-    TSharedRef<SHorizontalBox> Bars=SNew(SHorizontalBox);
-    for (int32 Bar=0; Bar<8; ++Bar)
-        Bars->AddSlot().FillWidth(1).Padding(10,0)
-        [SNew(SVerticalBox).Visibility_Lambda([Records,Bar]() { return Records().IsValidIndex(Bar) ? EVisibility::Visible : EVisibility::Hidden; })
-            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[SNew(STextBlock).Text_Lambda([Records,Bar]() { const auto R=Records(); return R.IsValidIndex(Bar) ? FText::AsNumber(R[R.Num()-1-Bar].Points) : FText::GetEmpty(); }).Font(DisplayFont(14)).ColorAndOpacity(Paper)]
-            + SVerticalBox::Slot().FillHeight(1).VAlign(VAlign_Bottom).Padding(0,8,0,6)
-                [SNew(SBox).HeightOverride_Lambda([Records,Bar]() { const auto R=Records(); if (!R.IsValidIndex(Bar)) return 0.f; int32 Peak=1; for (const auto& Match:R) Peak=FMath::Max(Peak,Match.Points); return 160.f*R[R.Num()-1-Bar].Points/Peak; })
-                    [SNew(SDetailBar).Color_Lambda([Records,Bar]() { const auto R=Records(); return R.IsValidIndex(Bar) && Bar==R.Num()-1 ? Brand : Cyan; })]]
-            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[SNew(STextBlock).Text(FText::AsNumber(Bar+1)).Font(DisplayFont(10)).ColorAndOpacity(Muted)]];
-    const auto Chart=DetailSurface(SNew(SVerticalBox)
-        + SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("RECENT FORM  //  MATCH POINTS"))).Font(DisplayFont(22)).ColorAndOpacity(Paper)]
-        + SVerticalBox::Slot().AutoHeight().Padding(0,5,0,15)[SNew(STextBlock).Text(FText::FromString(TEXT("Last eight stored results. Oldest to newest."))).Font(UiFont(11)).ColorAndOpacity(Muted)]
-        + SVerticalBox::Slot().FillHeight(1)[SNew(SOverlay)
-            + SOverlay::Slot()[Bars]
-            + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-                [SNew(SVerticalBox).Visibility_Lambda([Records]() { return Records().IsEmpty() ? EVisibility::Visible : EVisibility::Collapsed; })
-                    + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[SNew(FlickProfileWidgets::SGlyph).Kind(0).Color(Cyan)]
-                    + SVerticalBox::Slot().AutoHeight().Padding(0,16,0,4)[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR NEXT MATCH STARTS THE STORY"))).Font(DisplayFont(18)).ColorAndOpacity(Paper)]
-                    + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("Complete a series to begin tracking your form."))).Font(UiFont(11)).ColorAndOpacity(Muted)]]]
-        + SVerticalBox::Slot().AutoHeight().Padding(0,14,0,0)[DetailRule()]);
-    TSharedRef<SUniformGridPanel> Supporting=SNew(SUniformGridPanel).SlotPadding(FMargin(7));
-    const TCHAR* Labels[]={TEXT("CAREER POINTS"),TEXT("SHOTS TAKEN"),TEXT("DOUBLE KOS"),TEXT("STYLE ACCOLADES"),TEXT("TEAM WIPEOUTS"),TEXT("FLAWLESS ROUNDS")};
-    for (int32 I=0; I<6; ++I)
-        Supporting->AddSlot(I%2,I/2)[DetailSurface(SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(Labels[I])).Font(DisplayFont(11)).ColorAndOpacity(Muted)]
-            + SVerticalBox::Slot().FillHeight(1).VAlign(VAlign_Center)[SNew(STextBlock).Text_Lambda([Stats,I]() { const auto S=Stats(); return FText::AsNumber(I==0 ? S.Points : I==1 ? S.Shots : I==2 ? S.DoubleKnockouts : I==3 ? S.GetTotalAccolades() : S.GetAccoladeCount(I==4 ? EFlickAccolade::TeamWipeout : EFlickAccolade::FlawlessRound)); }).Font(DisplayFont(28)).ColorAndOpacity(I==0 ? BrandHover : Paper)])];
-    return SNew(SVerticalBox)
-        + SVerticalBox::Slot().AutoHeight()[Filters]
-        + SVerticalBox::Slot().AutoHeight().Padding(0,16,0,16)[SNew(SBox).HeightOverride(138)[Headlines]]
-        + SVerticalBox::Slot().FillHeight(1)[SNew(SHorizontalBox)
-            + SHorizontalBox::Slot().FillWidth(1.2f).Padding(0,0,9,0)[Chart]
-            + SHorizontalBox::Slot().FillWidth(1).Padding(0,-7,-7,-7)[Supporting]];
+ struct FRow { FString Name,Value,Help; };
+ struct FCache { int32 Category=-1,View=-1,Count=-1; FString Sync; TArray<FRow> Rows; };
+ auto Cache=MakeShared<FCache>();
+ const auto Career=[this]() { return PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickProgressionSubsystem>():nullptr; };
+ const auto Rows=[this,Career,Cache]() -> const TArray<FRow>&
+ {
+  auto* C=Career(); const int32 Count=C?C->GetEvents().Num():0;
+  if(Cache->Category==CareerCategory && Cache->View==SelectedProfileStatsView && Cache->Count==Count && Cache->Sync==(C?C->GetSyncStatus():FString())) return Cache->Rows;
+  Cache->Category=CareerCategory;Cache->View=SelectedProfileStatsView;Cache->Count=Count;Cache->Sync=C?C->GetSyncStatus():FString();Cache->Rows.Reset();
+  int64 Matches=0,Wins=0,Draws=0,Seconds=0,Shots=0,Points=0,KOs=0,Doubles=0,Self=0,Switches=0,Pockets=0,Fouls=0,Multi=0;
+  int64 Acc[FlickAccoladeCount]={}; int32 Practice=0; int64 PracticeXP=0,ChallengeXP=0;
+  if(C) for(const auto& E:C->GetEvents())
+  {
+   if(E.Kind==1) { Practice+=E.Id.StartsWith(TEXT("Practice-")); PracticeXP+=E.XP(); }
+   if(E.Kind==3) ChallengeXP+=E.XP();
+   if(E.Kind!=0 || (SelectedProfileStatsView>0 && E.Playlist!=SelectedProfileStatsView-1)) continue;
+   if((CareerCategory==1 && E.Format==3) || (CareerCategory==2 && E.Format!=3)) continue;
+   ++Matches; Wins+=E.bWon;Draws+=E.bDraw;Seconds+=E.Seconds;Shots+=E.Shots;Points+=E.Points;KOs+=E.Knockouts;
+   Doubles+=E.DoubleKnockouts;Self+=E.SelfKnockouts;Switches+=E.Switches;Pockets+=E.Pockets;Fouls+=E.Fouls;Multi+=E.MultiPockets;
+   for(int32 I=0;I<FMath::Min(E.Accolades.Num(),FlickAccoladeCount);++I) Acc[I]+=E.Accolades[I];
+  }
+  const FString Since=TEXT("Recorded since the career update. Older matches did not store this breakdown.");
+  if(C && (CareerCategory==0 || CareerCategory==3) && SelectedProfileStatsView!=3)
+  {
+   const auto L=C->GetLegacy(SelectedProfileStatsView); Matches+=L.MatchesPlayed;Wins+=L.Wins;Points+=L.Points;Shots+=L.Shots;KOs+=L.Knockouts;Doubles+=L.DoubleKnockouts;
+   for(int32 I=0;I<FMath::Min(L.AccoladeCounts.Num(),FlickAccoladeCount);++I) Acc[I]+=L.AccoladeCounts[I];
+  }
+  const auto Row=[Cache](const TCHAR* N,int64 V,const FString& H) { Cache->Rows.Add({N,FText::AsNumber(V).ToString(),H}); };
+  const auto StringRow=[Cache](const TCHAR* N,const FString& V,const FString& H) { Cache->Rows.Add({N,V,H}); };
+  if(CareerCategory==0)
+  {
+   Row(TEXT("Matches played"),Matches,TEXT("Completed matches in the selected playlists. Includes preserved historical career totals."));
+   Row(TEXT("Wins"),Wins,TEXT("Completed match wins, independent of your competitive MMR."));
+   StringRow(TEXT("Win rate"),FString::Printf(TEXT("%.1f%%"),Matches?100.*Wins/Matches:0.),TEXT("Wins divided by completed matches. Draws are not wins."));
+   StringRow(TEXT("Active match time"),FString::Printf(TEXT("%lldh %lldm"),Seconds/3600,Seconds/60%60),Since+TEXT(" Excludes menus, replays and spectating; completed matches only."));
+   Row(TEXT("Career points"),Points,TEXT("Lifetime points; this counter continues after Steam achievement goals are reached."));
+   Row(TEXT("Shots taken"),Shots,TEXT("Lifetime shots in the selected completed matches."));
+   StringRow(TEXT("Shots per match"),FString::Printf(TEXT("%.2f"),Matches?double(Shots)/Matches:0.),TEXT("Lifetime shots divided by completed matches in this view."));
+  }
+  else if(CareerCategory==1)
+  {
+   Row(TEXT("Knockout matches"),Matches,Since);Row(TEXT("Knockout wins"),Wins,Since);
+   Row(TEXT("Opponent knockouts"),KOs,Since);Row(TEXT("Double knockouts"),Doubles,Since);
+   Row(TEXT("Self knockouts"),Self,Since);Row(TEXT("Switch activations"),Switches,Since);
+   StringRow(TEXT("Knockouts per match"),FString::Printf(TEXT("%.2f"),Matches?double(KOs)/Matches:0.),Since);
+  }
+  else if(CareerCategory==2)
+  {
+   Row(TEXT("BOB matches"),Matches,Since);Row(TEXT("BOB wins"),Wins,Since);Row(TEXT("Pucks pocketed"),Pockets,Since+TEXT(" Scoring pucks only; striker pockets are fouls."));
+   Row(TEXT("Striker fouls"),Fouls,Since);Row(TEXT("Multi-pocket shots"),Multi,Since+TEXT(" At least two of your scoring pucks pocketed in one shot."));
+   Row(TEXT("BOB shots"),Shots,Since);
+   StringRow(TEXT("Pockets per match"),FString::Printf(TEXT("%.2f"),Matches?double(Pockets)/Matches:0.),Since+TEXT(" Not labelled accuracy: opponents can also pocket your pieces."));
+  }
+  else if(CareerCategory==3)
+   for(int32 I=0;I<FlickAccoladeCount;++I)
+   {
+    static const TCHAR* Help[]={TEXT("Knock out an opponent while activating a switch."),TEXT("Knock out an opponent after banking your shot off a divider."),TEXT("Earn a knockout where a newly raised divider affects play."),TEXT("Knock out an opponent through a chain of puck collisions."),TEXT("Remove at least two opponents in one shot to clear their remaining team."),TEXT("Trade one of your pieces for the final opponent while another ally survives."),TEXT("Earn a long-range knockout."),TEXT("Hit at least three pucks directly while earning a knockout."),TEXT("Earn a knockout, keep your shot puck near the edge and lose none of your own pieces."),TEXT("Earn a knockout with a last-moment shot release."),TEXT("Win a round with all of your team's starting pieces still in play.")};
+    Row(GetFlickAccoladeName(static_cast<EFlickAccolade>(I)),Acc[I],FString(Help[I])+TEXT(" Lifetime awards in the selected playlists; no achievement counter cap."));
+   }
+  else if(CareerCategory==4)
+  {
+   Row(TEXT("Practice difficulties completed"),Practice,TEXT("Distinct completed practice runs. Each pack/difficulty pays its first-completion XP once."));
+   int32 TrueMastered=0; for(int32 Cat=0;Cat<4;++Cat) for(int32 D=0;D<3;++D) TrueMastered+=C && C->GetPracticeBest(Cat,D)==5;
+   Row(TEXT("Mastered difficulties"),TrueMastered,TEXT("A perfect 5/5 earns mastery. Best scores are preserved in the account career record."));
+   Row(TEXT("Practice XP"),PracticeXP,TEXT("150 Foundation / 300 Skilled / 500 Expert. Replays do not award repeat XP."));
+  }
+  else
+  {
+   const auto L=C?C->GetLevel():FlickProgression::FLevel();
+   Row(TEXT("Account level"),L.Number,TEXT("Permanent experience level. Never resets with a season and is separate from rank. No gameplay bonuses."));
+   Row(TEXT("Lifetime XP"),C?C->GetXP():0,TEXT("Match completion, active time, modest performance bonuses and one-time learning/challenge rewards."));
+   Row(TEXT("XP to next level"),L.Required-L.Progress,TEXT("1,000 XP at level 1; +100 per level until the requirement reaches 3,000. Levels continue thereafter."));
+   Row(TEXT("Challenge XP"),ChallengeXP,TEXT("One-time rewards for completed eligible career challenges."));
+   StringRow(TEXT("Account save"),C?C->GetSyncStatus():TEXT("UNAVAILABLE"),TEXT("Account-scoped local saves plus Steam Remote Storage when signed in and Steam Cloud is enabled. Offline awards merge by unique event ID."));
+  }
+  return Cache->Rows;
+ };
+ auto Filters=SNew(SHorizontalBox).Visibility_Lambda([this]() { return CareerCategory<4?EVisibility::Visible:EVisibility::Hidden; });
+ for(int32 V=0;V<4;++V) Filters->AddSlot().AutoWidth().Padding(0,0,8,0)
+ [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0).OnClicked_Lambda([this,V]() { SelectedProfileStatsView=V;CareerSelectedRow=0;return FReply::Handled(); })
+  [SNew(SFlickAngularBorder).HomeSurface(true).CutSize(7).Padding(FMargin(18,8)).UseAccentForOutline(true)
+   .AccentColor_Lambda([this,V]() { return SelectedProfileStatsView==V?Brand:Cyan; }).BackgroundColor(Panel)
+   [SNew(STextBlock).Text(FText::FromString(V==0?TEXT("ALL PLAYLISTS"):V==1?TEXT("CASUAL"):V==2?TEXT("COMPETITIVE"):TEXT("BOTS"))).Font(DisplayFont(11)).ColorAndOpacity(Paper)]]];
+ auto Categories=SNew(SVerticalBox);
+ const TCHAR* Names[]={TEXT("OVERVIEW"),TEXT("KNOCKOUT"),TEXT("BOB"),TEXT("ACCOLADES"),TEXT("PRACTICE"),TEXT("PROGRESSION")};
+ for(int32 Cat=0;Cat<6;++Cat) Categories->AddSlot().AutoHeight().Padding(0,0,0,7)
+ [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0).OnClicked_Lambda([this,Cat]() { CareerCategory=Cat;CareerSelectedRow=0;return FReply::Handled(); })
+  [SNew(SFlickAngularBorder).HomeSurface(true).CutSize(8).Padding(FMargin(14,17)).UseAccentForOutline(true)
+   .AccentColor_Lambda([this,Cat]() { return CareerCategory==Cat?Brand:Cyan.CopyWithNewOpacity(.45f); }).BackgroundColor(Panel)
+   [SNew(STextBlock).Text(FText::FromString(Names[Cat])).Font(DisplayFont(13)).ColorAndOpacity(Paper)]]];
+ const auto CareerSurface=[](TSharedRef<SWidget> Content) -> TSharedRef<SWidget>
+ { return SNew(SFlickAngularBorder).HomeSurface(false).BackgroundColor(FLinearColor(.005f,.027f,.045f,.96f)).AccentColor(Cyan.CopyWithNewOpacity(.35f)).CutSize(12).Padding(22)[Content]; };
+ auto Stats=SNew(SVerticalBox);
+ for(int32 I=0;I<FlickAccoladeCount;++I) Stats->AddSlot().AutoHeight().Padding(0,0,0,4)
+ [SNew(SBox).HeightOverride(35).Visibility_Lambda([Rows,I]() { return Rows().IsValidIndex(I)?EVisibility::Visible:EVisibility::Collapsed; })
+  [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0).OnHovered_Lambda([this,I]() { CareerSelectedRow=I; })
+   .OnClicked_Lambda([this,I]() { CareerSelectedRow=I;return FReply::Handled(); })
+   [SNew(SFlickAngularBorder).HomeSurface(false).CutSize(6).Padding(FMargin(14,6)).UseAccentForOutline(true).BorderWidth(.7f)
+    .AccentColor_Lambda([this,I]() { return CareerSelectedRow==I?Brand:Cyan.CopyWithNewOpacity(.12f); }).BackgroundColor_Lambda([this,I]() { return CareerSelectedRow==I?FLinearColor(.018f,.11f,.16f):FLinearColor(.008f,.045f,.065f,.8f); })
+    [SNew(SHorizontalBox)
+     + SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)[SNew(STextBlock).Text_Lambda([Rows,I]() { return Rows().IsValidIndex(I)?FText::FromString(Rows()[I].Name):FText::GetEmpty(); }).Font(UiFont(11,true)).ColorAndOpacity(Paper)]
+     + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text_Lambda([Rows,I]() { return Rows().IsValidIndex(I)?FText::FromString(Rows()[I].Value):FText::GetEmpty(); }).Font(DisplayFont(16)).ColorAndOpacity(Cyan)]]]]];
+ const auto Selected=[this,Rows]() { const auto& R=Rows();return R.IsValidIndex(CareerSelectedRow)?R[CareerSelectedRow]:FRow(); };
+ return SNew(SVerticalBox)
+  + SVerticalBox::Slot().AutoHeight()[Filters]
+  + SVerticalBox::Slot().FillHeight(1).Padding(0,16,0,0)[SNew(SHorizontalBox)
+   + SHorizontalBox::Slot().AutoWidth().Padding(0,0,16,0)[SNew(SBox).WidthOverride(205)[Categories]]
+   + SHorizontalBox::Slot().FillWidth(1.55f).Padding(0,0,16,0)[CareerSurface(SNew(SVerticalBox)
+    + SVerticalBox::Slot().AutoHeight().Padding(0,0,0,14)[SNew(STextBlock).Text(FText::FromString(TEXT("CAREER STATISTICS"))).Font(DisplayFont(23)).ColorAndOpacity(Paper)]
+    + SVerticalBox::Slot().FillHeight(1)[Stats])]
+   + SHorizontalBox::Slot().FillWidth(1)[CareerSurface(SNew(SVerticalBox)
+    + SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(TEXT("STAT BREAKDOWN"))).Font(UiFont(10,true)).ColorAndOpacity(Muted)]
+    + SVerticalBox::Slot().AutoHeight().Padding(0,20,0,8)[SNew(STextBlock).Text_Lambda([Selected]() { return FText::FromString(Selected().Name); }).Font(DisplayFont(24)).ColorAndOpacity(Paper).AutoWrapText(true)]
+    + SVerticalBox::Slot().AutoHeight().Padding(0,0,0,20)[SNew(STextBlock).Text_Lambda([Selected]() { return FText::FromString(Selected().Value); }).Font(DisplayFont(46)).ColorAndOpacity(Cyan).AutoWrapText(true)]
+    + SVerticalBox::Slot().AutoHeight()[DetailRule()]
+    + SVerticalBox::Slot().AutoHeight().Padding(0,20)[SNew(STextBlock).Text_Lambda([Selected]() { return FText::FromString(Selected().Help); }).Font(UiFont(12)).ColorAndOpacity(Muted).AutoWrapText(true)]
+    + SVerticalBox::Slot().FillHeight(1)[SNew(SSpacer)]
+    + SVerticalBox::Slot().AutoHeight().Padding(0,0,0,12)[SNew(STextBlock).Text_Lambda([this]() { return FText::FromString(CareerCategory>=4?TEXT("ACCOUNT-WIDE PROGRESS"):SelectedProfileStatsView==0?TEXT("ALL PLAYLISTS"):SelectedProfileStatsView==1?TEXT("CASUAL MATCHES"):SelectedProfileStatsView==2?TEXT("COMPETITIVE MATCHES"):TEXT("BOT MATCHES")); }).Font(UiFont(10,true)).ColorAndOpacity(Cyan)]
+    + SVerticalBox::Slot().AutoHeight().Padding(0,0,0,18)[DetailRule()]
+    + SVerticalBox::Slot().AutoHeight()[FlickCareerUI::Progress(Career())]
+   )]];
 }
 
 TSharedRef<SWidget> SFlickGameLayer::BuildProfileHistoryPanel()

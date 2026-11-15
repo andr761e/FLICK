@@ -135,7 +135,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildItemShop()
 	return SNew(SOverlay)
 		+ SOverlay::Slot()[FlickPlaylistWidgets::Background()]
 		+ SOverlay::Slot().Padding(FMargin(FlickShopStyle::Margin, 16, FlickShopStyle::Margin, 20))
-		[SNew(SVerticalBox)
+		[SNew(SVerticalBox).IsEnabled(false)
 			+ SVerticalBox::Slot().AutoHeight()
 			[SNew(SBox).HeightOverride(FlickShopStyle::HeaderHeight)
 				[SNew(SOverlay)
@@ -223,7 +223,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildItemShop()
 			+ SVerticalBox::Slot().AutoHeight().Padding(0, 14, 0, 0)
 			[SNew(SBox).HeightOverride(52)
 				[SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(160)[Back]]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(160)]
 					+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center).Padding(30, 0, 16, 0)
 					[ShopText(TEXT("CONCEPT ITEMS  //  DEMO CREDITS HAVE NO REAL VALUE."), 9, Muted)]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -231,7 +231,25 @@ TSharedRef<SWidget> SFlickGameLayer::BuildItemShop()
 						.OnClicked_Lambda([this]() { ShopDemo.Reset(); ShopStatus.Reset(); return FReply::Handled(); })
 						[ShopText(TEXT("RESET DEMO"), 10, Muted)]]]]]
 		+ SOverlay::Slot()
-		[SNew(SBox).Visibility_Lambda([this]() { return SelectedShopItem != INDEX_NONE ? EVisibility::Visible : EVisibility::Collapsed; })[BuildShopDetails()]];
+		[SNew(SBox).IsEnabled(false).Visibility_Lambda([this]() { return SelectedShopItem != INDEX_NONE ? EVisibility::Visible : EVisibility::Collapsed; })[BuildShopDetails()]]
+		// Modal veil: absorb pointer input before it can reach any shop controls.
+		+ SOverlay::Slot()
+		[SNew(SOverlay)
+			+ SOverlay::Slot()
+			[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(.003f,.012f,.025f,.62f))
+				.OnMouseButtonDown_Lambda([](const FGeometry&, const FPointerEvent&) { return FReply::Handled(); })
+				.OnMouseButtonUp_Lambda([](const FGeometry&, const FPointerEvent&) { return FReply::Handled(); })]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+			[SNew(SBox).WidthOverride(1650).HeightOverride(260)
+				.RenderTransformPivot(FVector2D(.5f,.5f))
+				.RenderTransform(FSlateRenderTransform(FQuat2D(FMath::DegreesToRadians(-12.f))))
+				[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(1.f,.18f,.075f,.85f)).Padding(FMargin(0,3))
+					[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(.005f,.015f,.028f,.88f)).Padding(FMargin(30,12))
+						[SNew(STextBlock).Text(FText::FromString(TEXT("COMING SOON"))).Font(DisplayFont(138))
+							.Justification(ETextJustify::Center).ColorAndOpacity(FLinearColor(1.f,.30f,.17f,.96f))
+							.ShadowOffset(FVector2D(6,8)).ShadowColorAndOpacity(FLinearColor(0,0,0,.85f))]]]]
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(48,0,0,22)
+			[SNew(SBox).WidthOverride(160).HeightOverride(52)[Back]]];
 }
 
 TSharedRef<SWidget> SFlickGameLayer::BuildShopDetails()

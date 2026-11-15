@@ -3,6 +3,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Game/FlickGameState.h"
+#include "Game/FlickGameMode.h"
 #include "Player/FlickPlayerController.h"
 #include "Player/FlickPlayerState.h"
 #include "Player/FlickCameraPawn.h"
@@ -109,6 +110,45 @@ bool FFlickPrivateSpectatorTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Public camera publishing rejected"), Human->SetPrivateCameraView(Camera->CaptureSpectatorView()));
 	Spectator->TickComponent(.1f, LEVELTICK_All, nullptr);
 	TestFalse(TEXT("Leaving private match clears follow"), Spectator->IsFollowing());
+	World->DestroyWorld(false);
+	GEngine->DestroyWorldContext(World);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickPrivateTeamCameraTest, "FLICK.Match.PrivateTeamCameraReset",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFlickPrivateTeamCameraTest::RunTest(const FString& Parameters)
+{
+	const auto Settings = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Settings);
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	auto* Mode = World->SpawnActor<AFlickGameMode>();
+	auto* Controller = World->SpawnActor<AFlickPlayerController>();
+	Controller->SetAsLocalPlayerController();
+	World->AddController(Controller);
+	auto* Player = World->SpawnActor<AFlickPlayerState>();
+	Controller->PlayerState = Player;
+	auto* Camera = World->SpawnActor<AFlickCameraPawn>();
+	Controller->Possess(Camera);
+	Camera->SetMenuPresentation(false);
+	Mode->CameraPawn = Camera;
+	Mode->bPrivateMatchActive = true;
+	for (EFlickTeam Team : {EFlickTeam::Player2, EFlickTeam::Player1})
+	{
+		Player->SetTeam(Team);
+		Camera->ResetRoundView(Team == EFlickTeam::Player2 ? 2 : 0);
+		Camera->Tick(2.f);
+		const auto Expected = Camera->CaptureSpectatorView();
+		Camera->ResetRoundView(Team == EFlickTeam::Player2 ? 0 : 2);
+		Camera->Tick(2.f);
+		// Class confirmation / next-round startup requests Blue, regardless of viewer.
+		Mode->SetCameraViewForTeam(EFlickTeam::Player1, true);
+		Camera->Tick(2.f);
+		const auto Actual = Camera->CaptureSpectatorView();
+		TestTrue(TEXT("Private round reset preserves the selected team's perspective"),
+			FVector(Actual.Location).Equals(Expected.Location, 1.f) && Actual.Rotation.Equals(Expected.Rotation, .1f));
+	}
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
 	return true;

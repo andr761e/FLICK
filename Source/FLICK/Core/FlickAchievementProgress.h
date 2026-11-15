@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/FlickAchievementCatalog.h"
+#include "Core/FlickProgression.h"
 #include "FlickAchievementProgress.generated.h"
 
 namespace FlickAchievements
@@ -19,6 +20,7 @@ struct FFlickAchievementReport
     UPROPERTY() FGuid EventId;
     UPROPERTY() TArray<int32> Values;
     UPROPERTY() int32 ArchetypeMask = 0;
+    UPROPERTY() FFlickCareerEvent Career;
     FFlickAchievementReport() { Values.Init(0, FlickAchievements::Count); }
 };
 

@@ -1,4 +1,9 @@
 #include "Game/FlickGameInstance.h"
+#include "Game/FlickReplaySubsystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
+#include "Game/FlickProgressionSubsystem.h"
 #include "Online/FlickAchievementSubsystem.h"
 
 #include "Core/FlickPieceArchetypeRules.h"
@@ -770,6 +775,7 @@ void UFlickGameInstance::RecordCompletedMatch(
 	{
 		return;
 	}
+	if(auto* Career=GetSubsystem<UFlickProgressionSubsystem>()) Career->GetXP(); // Snapshot legacy before adding new results.
 	FFlickProfileStats& PlaylistStats = bRanked ? CompetitiveProfileStats : CasualProfileStats;
 	PlaylistStats.RecordMatch(Points, Knockouts, DoubleKnockouts, Shots, bWon);
 	PlaylistStats.RecordAccolades(AccoladeCounts);
@@ -846,4 +852,16 @@ void UFlickGameInstance::SaveFrontendSettings() const
 	GConfig->SetFloat(FlickSettingsSection, TEXT("GameplayCameraDistance"), GameplayCameraDistance, GGameUserSettingsIni);
 	GConfig->SetFloat(FlickSettingsSection, TEXT("GameplayCameraFieldOfView"), GameplayCameraFieldOfView, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
+}
+
+void UFlickGameInstance::HandleDemoPlaybackFailure(const UE::Net::TNetResult<EReplayResult>& Result)
+{
+ Super::HandleDemoPlaybackFailure(Result);
+ if (auto* Replays=GetSubsystem<UFlickReplaySubsystem>())
+ {
+  Replays->PlaybackFailed(TEXT("This replay could not be loaded. It may be damaged or recorded with an incompatible game version."));
+  Replays->bReturnToLibrary=true;
+ }
+ if (UWorld* World=GetWorld()) World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this,[this]()
+ { UGameplayStatics::OpenLevel(this,FName(TEXT("/Engine/Maps/Entry"))); }));
 }

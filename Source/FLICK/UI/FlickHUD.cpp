@@ -64,6 +64,7 @@ namespace
 void AFlickHUD::BeginPlay()
 {
 	Super::BeginPlay();
+	if (GetWorld()->IsPlayingReplay()) return;
 	AFlickGameMode* FlickGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AFlickGameMode>() : nullptr;
 	AFlickPlayerController* FlickController = Cast<AFlickPlayerController>(GetOwningPlayerController());
 	if (!GEngine || !GEngine->GameViewport || !FlickController)

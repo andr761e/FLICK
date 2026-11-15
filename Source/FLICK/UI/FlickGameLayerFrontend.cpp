@@ -1,5 +1,7 @@
+#include "UI/FlickCareerWidgets.h"
 // main menu, profile, social, shop
 #include "UI/FlickGameLayerPrivate.h"
+#include "UI/FlickSavedReplays.h"
 #include "Misc/Paths.h"
 #include "UI/FlickCosmeticWidgets.h"
 #include "UI/FlickLockerStyle.h"
@@ -307,7 +309,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Bottom)
-		.Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(52, 0, 0, 48.f + GetMainMenuVerticalInset()); }))
+		.Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(52, 0, 0, 28.f + GetMainMenuVerticalInset()); }))
 		[
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
 			[
@@ -373,6 +375,22 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 				]
 			]
 			]
+            + SVerticalBox::Slot().AutoHeight().Padding(0,12,0,0)
+            [SNew(SBox).WidthOverride(410).HeightOverride(44)
+             [SNew(SFlickAngularBorder).HomeSurface(false).BackgroundColor(FLinearColor(.006f,.025f,.04f,.97f)).AccentColor(Cyan.CopyWithNewOpacity(.42f)).CutSize(8).Padding(FMargin(10,5))
+              [SNew(SHorizontalBox)
+               + SHorizontalBox::Slot().AutoWidth().Padding(0,0,12,0)
+                [SNew(SBox).WidthOverride(46)[SNew(SFlickAngularBorder).HomeSurface(false).BackgroundColor(FLinearColor(.015f,.12f,.17f)).AccentColor(Cyan).CutSize(6).Padding(1)
+                 [SNew(STextBlock).Text_Lambda([this]() { auto* C=PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickProgressionSubsystem>():nullptr;return FText::AsNumber(C?C->GetLevel().Number:1); }).Font(DisplayFont(22)).ColorAndOpacity(Paper).Justification(ETextJustify::Center)]]]
+               + SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)
+                [SNew(SVerticalBox)
+                 + SVerticalBox::Slot().AutoHeight()[SNew(SHorizontalBox)
+                  + SHorizontalBox::Slot().FillWidth(1)[SNew(STextBlock).Text(FText::FromString(TEXT("ACCOUNT LEVEL"))).Font(UiFont(9,true)).ColorAndOpacity(Cyan)]
+                  + SHorizontalBox::Slot().AutoWidth()[SNew(STextBlock).Text_Lambda([this]() { auto* C=PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickProgressionSubsystem>():nullptr;const auto L=C?C->GetLevel():FlickProgression::FLevel();return FText::FromString(FString::Printf(TEXT("%s XP TO NEXT"),*FText::AsNumber(L.Required-L.Progress).ToString())); }).Font(UiFont(8)).ColorAndOpacity(Muted)]]
+                 + SVerticalBox::Slot().AutoHeight().Padding(0,6,0,0)[SNew(SBox).HeightOverride(5)
+                  [SNew(SProgressBar).Percent_Lambda([this]() { auto* C=PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickProgressionSubsystem>():nullptr;return C?C->GetLevel().Fraction():0.f; }).FillColorAndOpacity(Cyan).BorderPadding(FVector2D::ZeroVector)]]
+                ]
+              ]]]
 			]
 		]
 		+ SOverlay::Slot()
@@ -764,7 +782,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfile()
 	return SNew(SOverlay)
         + SOverlay::Slot()[SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Customization ? EVisibility::Visible : EVisibility::Collapsed; })[BuildLockerPage(LockerCategories, LockerContents)]]
         + SOverlay::Slot()[SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::Overview ? EVisibility::Visible : EVisibility::Collapsed; })[BuildProfileOverview()]]
-        + SOverlay::Slot()[SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab != EFlickProfileTab::Overview && SelectedProfileTab != EFlickProfileTab::Customization ? EVisibility::Visible : EVisibility::Collapsed; })[BuildProfileDetailPages()]];
+        + SOverlay::Slot()[SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab == EFlickProfileTab::SavedReplays ? EVisibility::Visible : EVisibility::Collapsed; })
+          [MakeFlickSavedReplays(PlayerController.IsValid()?PlayerController->GetGameInstance():nullptr,FOnClicked::CreateLambda([this]() {SelectedProfileTab=EFlickProfileTab::Overview;return FReply::Handled();}))]]
+        + SOverlay::Slot()[SNew(SBox).Visibility_Lambda([this]() { return SelectedProfileTab != EFlickProfileTab::Overview && SelectedProfileTab != EFlickProfileTab::Customization && SelectedProfileTab != EFlickProfileTab::SavedReplays ? EVisibility::Visible : EVisibility::Collapsed; })[BuildProfileDetailPages()]];
 }
 
 TSharedRef<SWidget> SFlickGameLayer::BuildMainMenuPartyMember(const int32 PartySlot)

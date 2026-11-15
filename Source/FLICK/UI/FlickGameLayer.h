@@ -45,7 +45,8 @@ enum class EFlickProfileTab : uint8
 	Stats,
 	Leaderboards,
 	MatchHistory,
-	Customization
+	Customization,
+	SavedReplays
 };
 
 enum class EFlickSettingsTab : uint8
@@ -341,6 +342,8 @@ private:
 	EFlickProfileTab AnimatedProfileTab = EFlickProfileTab::Overview;
 	float ProfileEntranceElapsed = 0.0f;
 	bool bProfileWasVisible = false;
+	int32 CareerCategory = 0;
+	int32 CareerSelectedRow = 0;
 	int32 SelectedProfileStatsView = 0; // Total, Casual, Competitive.
 	int32 SelectedBannerStyle = 0;
 	int32 SelectedBannerTag = 0;

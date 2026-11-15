@@ -49,11 +49,14 @@ public:
 	void EndCinematicReplay();
 	void SetPostMatchPresentation(bool bEnabled, float Pullback, int32 WinnerCount, float SurfaceZ);
 	void SetFreeCameraEnabled(bool bEnabled);
+	// The theatre controller owns the shared rig across every replay camera mode.
+	void SetReplayLightingLocked(bool bLocked) { bReplayLightingLocked = bLocked; }
 	void AddFreeCameraInput(float Forward, float Right, float Up, const FVector2D& LookDelta, bool bBoost, float DeltaSeconds);
 	void SetFreeCameraSensitivity(float LookSensitivity, float MoveSensitivity);
 	bool IsFreeCameraEnabled() const { return bFreeCameraEnabled; }
 	FFlickSpectatorView CaptureSpectatorView() const;
 	void SetSpectatorView(const FFlickSpectatorView& View);
+	void SnapSpectatorView(const FFlickSpectatorView& View);
 	void ClearSpectatorView() { bSpectatorView = false; }
 	UPROPERTY(EditAnywhere, Category = "FLICK|Spectator", meta = (ClampMin = "1.0", ClampMax = "30.0"))
 	float SpectatorViewBlendSpeed = 14.0f;
@@ -305,6 +308,8 @@ private:
 	int32 PostMatchWinnerCount = 1;
 	float PostMatchSurfaceZ = 250.0f;
 	bool bFreeCameraEnabled = false;
+	bool bReplayLightingLocked = false;
+	float ReplayFreeMaximumRadius = 0.f, ReplayFreeMaximumHeight = 0.f;
 	bool bSpectatorView = false;
 	FFlickSpectatorView SpectatorView;
 	bool bTopDownView = false;

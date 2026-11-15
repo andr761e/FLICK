@@ -1,5 +1,6 @@
 #include "Player/FlickPlayerController.h"
 #include "Online/FlickAchievementSubsystem.h"
+#include "Game/FlickProgressionSubsystem.h"
 #include "Core/FlickRankRules.h"
 #include "Arena/FlickArenaLighting.h"
 #include "Arena/FlickTestArena.h"
@@ -118,6 +119,7 @@ void AFlickPlayerController::EndCinematicReplayFromServer()
 void AFlickPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	if (GetWorld()->IsPlayingReplay()) return;
 
 	ApplyFrontendInputMode();
 	bNetworkAutoShotRequested = FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkAutoShot"));
@@ -233,6 +235,7 @@ void AFlickPlayerController::RefreshLocalLighting()
 
 void AFlickPlayerController::PlayerTick(const float DeltaTime)
 {
+	if (GetWorld()->IsPlayingReplay()) return;
 	Super::PlayerTick(DeltaTime);
 	UpdateLocalTurnAudio();
 	if (IsLocalController() && !bPuckSkinsSubmitted && GetPlayerState<AFlickPlayerState>()) SubmitLocalPuckSkins();
@@ -403,8 +406,7 @@ void AFlickPlayerController::PlayerTick(const float DeltaTime)
 	{
 		const EFlickTeam LocalTeam = GetLocalTeam();
 		if (AFlickCameraPawn* CameraPawn = Cast<AFlickCameraPawn>(GetPawn());
-			CameraPawn && (LocalTeam != EFlickTeam::None
-				|| (NetworkState && NetworkState->bPrivateMatchActive)))
+			CameraPawn && LocalTeam != EFlickTeam::None)
 		{
 			CameraPawn->SetMenuPresentation(false);
 			CameraPawn->SetGameplayViewIndex(LocalTeam == EFlickTeam::Player2 ? 2 : 0, true);
@@ -2238,6 +2240,7 @@ void AFlickPlayerController::ClientSetGameplayCameraTeam_Implementation(
 		const int32 ViewIndex = Team == EFlickTeam::Player2 ? 2 : 0;
 		if (bSnap) Camera->ResetRoundView(ViewIndex);
 		else Camera->SetGameplayViewIndex(ViewIndex, false);
+		bInitializedNetworkCamera = true;
 	}
 }
 
@@ -2321,9 +2324,18 @@ AFlickGameState* AFlickPlayerController::GetFlickGameState() const
 void AFlickPlayerController::ClientCommitAchievements_Implementation(const FFlickAchievementReport& Report, bool bRankedWin, EFlickMatchVariant Variant, int32 TeamSize)
 {
     if (!IsLocalController() || !GetGameInstance()) return;
+    if(auto* Career=GetGameInstance()->GetSubsystem<UFlickProgressionSubsystem>()) Career->AcceptMatch(Report.Career);
     if (auto* Achievements = GetGameInstance()->GetSubsystem<UFlickAchievementSubsystem>())
     {
         Achievements->AcceptMatch(Report);
         if (bRankedWin) Achievements->RecordRankedWin(Variant, TeamSize);
     }
+}
+
+void AFlickPlayerController::ProcessEvent(UFunction* Function,void* Parameters)
+{
+ // Recorded gameplay controllers may be reconstructed by the replay driver.
+ // Their original RPCs must never submit shots, results, rewards or travel.
+ if (GetWorld() && GetWorld()->IsPlayingReplay() && Function && Function->HasAnyFunctionFlags(FUNC_Net)) return;
+ Super::ProcessEvent(Function,Parameters);
 }

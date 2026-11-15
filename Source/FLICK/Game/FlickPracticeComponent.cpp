@@ -2,6 +2,7 @@
 #include "Game/FlickGameModePrivate.h"
 #include "Core/FlickPracticeCatalog.h"
 #include "Online/FlickAchievementSubsystem.h"
+#include "Game/FlickProgressionSubsystem.h"
 #include "Feedback/FlickCosmeticGeometry.h"
 #include "Feedback/FlickCosmeticMaterial.h"
 
@@ -187,6 +188,8 @@ void UFlickPracticeComponent::Update(float DeltaSeconds)
 	bComplete = true; if (Marker) Marker->SetVisibility(false);
 	if (TargetMarker) TargetMarker->SetVisibility(false);
 	FlickPracticeCatalog::RecordScore(Category, Difficulty, Score);
+	if (auto* GI = GetWorld()->GetGameInstance())
+		if (auto* Career = GI->GetSubsystem<UFlickProgressionSubsystem>()) Career->RecordPractice(Category, Difficulty, Score);
 	if (auto* GI = GetWorld()->GetGameInstance())
 		if (auto* Achievements = GI->GetSubsystem<UFlickAchievementSubsystem>()) Achievements->RecordPractice(Category, Difficulty, Score);
 }

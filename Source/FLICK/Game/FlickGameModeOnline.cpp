@@ -972,6 +972,12 @@ void AFlickGameMode::TogglePrivateMatchSlot(
 	RequestingState->SetPrivateControlledSlots({EncodedSlot});
 	RequestingState->SetPrivateRoleChosen(true);
 	RefreshPrivatePrimaryAssignments();
+	// Team selection can happen after the client's initial camera setup.
+	// Send the new perspective explicitly, including for the listen host.
+	if (auto* Controller = Cast<AFlickPlayerController>(RequestingPlayer))
+	{
+		Controller->SetGameplayCameraTeamFromServer(RequestingState->GetTeam(), true);
+	}
 	if (bPrivateMatchActive)
 	{
 		if (AFlickGameState* State = GetFlickGameState(); State && State->bPrivateMatchAssignmentActive)
@@ -1866,6 +1872,7 @@ void AFlickGameMode::FinalizeDisconnectedTeamForfeit(const EFlickTeam ExitingTea
 		return;
 	}
 	State->CompleteMatchByForfeit(ExitingTeam);
+	if(AchievementTracker) AchievementTracker->RoundFinished();
 	DispatchRankedMatchResults();
 	if (UFlickMatchmakingCoordinatorSubsystem* Coordinator = GetFlickMatchmakingCoordinatorSubsystem())
 	{

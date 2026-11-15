@@ -8,8 +8,10 @@ names = ("PlayCasual", "PlayCompetitive", "PlayTraining", "PlayPrivate", "Practi
          "TrainingFreePlayV2", "TrainingBotV2", "TrainingBobV2", "FormatDoublesV2", "FormatTriplesV2", "PlayBackdropV2", "PracticeSwitchV2",
          "SettingsBackdropV2", "SettingsImpactV2", "ProfileBackdropV2", "ProfileRankStageV2", "ProfileCustomizeV2",
          "PracticePrecisionV3", "PracticeKnockoutsV3", "PracticeSwitchV3", "PracticeBobV3",
-         "TrainingPracticeWideV3", "ProfileIdentityBannerV3", "ProfileShowcaseFloorV4", "ProfilePlacementV4", "ProfileFinishTrioV4")
-if unreal.SystemLibrary.parse_param(unreal.SystemLibrary.get_command_line(), "FlickSettingsArtwork"):
+         "TrainingPracticeWideV3", "ProfileIdentityBannerV3", "ProfileShowcaseFloorV4", "ProfilePlacementV4", "ProfileFinishTrioV4", "TrainingBobBotV4")
+if unreal.SystemLibrary.parse_param(unreal.SystemLibrary.get_command_line(), "FlickBobArtwork"):
+    names = ("TrainingBobV2", "PracticeBobV3", "TrainingBobBotV4")
+elif unreal.SystemLibrary.parse_param(unreal.SystemLibrary.get_command_line(), "FlickSettingsArtwork"):
     names = ("SettingsBackdropV2", "SettingsImpactV2")
 elif unreal.SystemLibrary.parse_param(unreal.SystemLibrary.get_command_line(), "FlickProfileArtwork"):
     names = ("ProfileBackdropV2", "ProfileRankStageV2", "ProfileCustomizeV2")

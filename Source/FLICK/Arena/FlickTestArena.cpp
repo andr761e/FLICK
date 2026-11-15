@@ -1431,7 +1431,7 @@ void AFlickTestArena::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	// Physics remains server-authoritative; clients predict only the moving divider's presentation.
-	if (!HasAuthority() && !bReplayPresentationActive)
+	if (!HasAuthority() && !bReplayPresentationActive && !GetWorld()->IsPlayingReplay())
 	{
 		bool bTransformsChanged = false;
 		for (int32 Index = 0; Index < GetMechanismCount(); ++Index)

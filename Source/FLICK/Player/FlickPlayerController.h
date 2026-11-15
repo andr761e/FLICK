@@ -31,6 +31,7 @@ public:
 	virtual void SetupInputComponent() override;
 	void RefreshControlBindings();
 	virtual void PlayerTick(float DeltaTime) override;
+	virtual void ProcessEvent(UFunction* Function, void* Parameters) override;
 	UFlickMenuRadioComponent* GetMenuRadio() const { return MenuRadio; }
 	void RefreshLocalLighting();
 	UFUNCTION(Client, Reliable)

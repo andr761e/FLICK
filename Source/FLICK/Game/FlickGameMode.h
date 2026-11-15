@@ -215,6 +215,9 @@ public:
 	UFlickAchievementTracker* GetAchievementTracker() const { return AchievementTracker; }
 	bool IsFreePlayTraining() const { return bTrainingMode && !bTrainingBotMatch && !bTutorialMode; }
 	bool CanUndoTrainingShot() const;
+	bool CanReplayTrainingShot() const;
+	bool IsTrainingShotReplayActive() const { return bTrainingShotReplay && bCinematicReplayActive; }
+	bool ReplayTrainingShot();
 	bool UndoTrainingShot();
 	bool IsTrainingEditMode() const { return bTrainingMode && bTrainingEditMode; }
 	int32 GetTutorialStageNumber() const { return TutorialStageIndex + 1; }
@@ -637,6 +640,8 @@ public:
 	float FrontendArenaFillLightMultiplier = 1.18f;
 
 private:
+	bool bTrainingShotReplay = false;
+	friend class FFlickPrivateTeamCameraTest;
 	friend class FFlickReplayCosmeticsTest;
 	friend class FFlickReplayCosmeticReviewTest;
 	friend class FFlickBotLoadoutsTest;

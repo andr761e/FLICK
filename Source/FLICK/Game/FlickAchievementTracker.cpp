@@ -3,12 +3,21 @@
 #include "Misc/App.h"
 
 
-UFlickAchievementTracker::UFlickAchievementTracker() { PrimaryComponentTick.bCanEverTick = false; }
+UFlickAchievementTracker::UFlickAchievementTracker() { PrimaryComponentTick.bCanEverTick = true; }
+
+void UFlickAchievementTracker::TickComponent(float Delta, ELevelTick TickType, FActorComponentTickFunction* Function)
+{
+    Super::TickComponent(Delta,TickType,Function);
+    if(!IsLive() || bMatchReported) return;
+    const auto* State=CastChecked<AFlickGameMode>(GetOwner())->GetFlickGameState();
+    if(State && (State->MatchPhase==EFlickMatchPhase::Aiming || State->MatchPhase==EFlickMatchPhase::KickoffPlanning || State->MatchPhase==EFlickMatchPhase::ResolvingPhysics))
+        ActiveSeconds+=FMath::Max(0.f,Delta);
+}
 
 bool UFlickAchievementTracker::IsLive() const
 {
     const auto* Mode = Cast<AFlickGameMode>(GetOwner());
-    return bEnabled && Mode && !Mode->bCinematicReplayActive && Mode->FrontendScreen == EFlickFrontendScreen::Playing;
+    return bEnabled && Mode && !Mode->IsPrivateMatch() && !Mode->bCinematicReplayActive && Mode->FrontendScreen == EFlickFrontendScreen::Playing;
 }
 
 void UFlickAchievementTracker::Add(int32 Player, FlickAchievements::EId Id, int32 Amount)
@@ -24,8 +33,10 @@ void UFlickAchievementTracker::StartMatch()
 {
     auto* Mode = Cast<AFlickGameMode>(GetOwner());
     Players.Reset(); Shots.Reset(); bMatchReported = false; LastCompletedRound = INDEX_NONE;
-    bEnabled = Mode && Mode->HasAuthority() && !Mode->IsTutorialMode() && !Mode->IsFreePlayTraining()
-        && Mode->FrontendScreen == EFlickFrontendScreen::Playing && !FApp::IsUnattended() && !IsRunningCommandlet();
+    ActiveSeconds=0;
+    bEnabled = Mode && Mode->HasAuthority() && !Mode->IsPrivateMatch() && !Mode->IsTutorialMode() && !Mode->IsFreePlayTraining()
+        && Mode->FrontendScreen == EFlickFrontendScreen::Playing
+        && (!FApp::IsUnattended() || Mode->GetNetMode()==NM_DedicatedServer) && !IsRunningCommandlet();
     if (!bEnabled) return;
     const FGuid Event = FGuid::NewGuid();
     for (int32 T = 1; T <= 2; ++T)
@@ -111,7 +122,8 @@ void UFlickAchievementTracker::BobPocket(AFlickPiece* Piece, int32 PocketIndex)
     const int32 K = Key(Piece->GetTeam(), 0);
     auto* P = Players.Find(K); if (!P) return;
     ScoredPieces.Add(Piece->GetPieceId());
-    if (Piece->IsBobStriker()) { P->bStrikerPocketed = true; return; }
+    if (Piece->IsBobStriker()) { P->bStrikerPocketed = true; ++P->Report.Career.Fouls; return; }
+    ++P->Report.Career.Pockets;
     Add(K, FlickAchievements::EId::InThePocket); Add(K, FlickAchievements::EId::PocketCollection);
     if (PocketIndex >= 0 && PocketIndex < 4) P->Corners |= 1 << PocketIndex;
     int32 N = 0; for (uint8 Mask = P->Corners; Mask; Mask &= Mask - 1) ++N;
@@ -148,7 +160,7 @@ void UFlickAchievementTracker::ResolutionFinished()
         }
         else
         {
-            if (S.OwnCoins >= 2) { Add(Pair.Key, FlickAchievements::EId::DoubleDeposit); if (Players[Pair.Key].Shots == 1) Add(Pair.Key, FlickAchievements::EId::Breakthrough); }
+            if (S.OwnCoins >= 2) { ++Players[Pair.Key].Report.Career.MultiPockets; Add(Pair.Key, FlickAchievements::EId::DoubleDeposit); if (Players[Pair.Key].Shots == 1) Add(Pair.Key, FlickAchievements::EId::Breakthrough); }
             if (S.OwnCoins >= 3) Add(Pair.Key, FlickAchievements::EId::ThreePointPlan);
         }
     }
@@ -205,6 +217,15 @@ void UFlickAchievementTracker::RoundFinished()
                 if (auto* P = Players.Find(Key(PS->GetTeam(), PS->GetTeamPlayerSlot())))
                 {
                     if (const auto* Stats = State->FindPlayerMatchStats(PS->GetTeam(), PS->GetTeamPlayerSlot())) Add(Key(PS->GetTeam(), PS->GetTeamPlayerSlot()), FlickAchievements::EId::OnTheBoard, Stats->Score);
+                    auto& E=P->Report.Career;
+                    E.Id=State->MatchId.IsEmpty()?P->Report.EventId.ToString():State->MatchId; E.Seconds=FMath::FloorToInt(ActiveSeconds + .001); E.Shots=P->Shots;
+                    E.bEligible=!Mode->IsPrivateMatch() && (Mode->IsMatchmakingSession() || Mode->IsTrainingBotMatch());
+                    E.Playlist=Mode->IsTrainingBotMatch()?2:State->bRankedMatch?1:0;
+                    E.Format=bBob?3:FMath::Clamp(Mode->CurrentPlayersPerTeam-1,0,2);
+                    E.bWon=!State->bDraw && Winner==PS->GetTeam(); E.bDraw=State->bDraw;
+                    if(const auto* S=State->FindPlayerMatchStats(PS->GetTeam(),PS->GetTeamPlayerSlot()))
+                    { E.Points=S->Score; E.Knockouts=bBob?0:S->Knockouts; E.DoubleKnockouts=bBob?0:S->DoubleKnockouts; E.SelfKnockouts=S->SelfKnockouts; E.Switches=S->SwitchActivations; E.Accolades=S->AccoladeCounts; }
+                    FlickProgression::RewardMatch(E);
                     PC->ClientCommitAchievements(P->Report, State->bRankedMatch && Winner == PS->GetTeam(), State->ActiveMatchVariant, Mode->CurrentPlayersPerTeam);
                 }
 }

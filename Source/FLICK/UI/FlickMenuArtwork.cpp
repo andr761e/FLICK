@@ -14,7 +14,7 @@ const TCHAR* FlickMenuArtwork::AssetName(const EFlickMenuArtwork Artwork)
 		TEXT("SettingsBackdropV2"), TEXT("SettingsImpactV2"),
 		TEXT("ProfileBackdropV2"), TEXT("ProfileRankStageV2"), TEXT("ProfileFinishTrioV4"),
 		TEXT("PracticePrecisionV3"), TEXT("PracticeKnockoutsV3"), TEXT("PracticeSwitchV3"), TEXT("PracticeBobV3"),
-		TEXT("TrainingPracticeWideV3"), TEXT("ProfileIdentityBannerV3"), TEXT("ProfileShowcaseFloorV4"), TEXT("ProfilePlacementV4")
+		TEXT("TrainingPracticeWideV3"), TEXT("ProfileIdentityBannerV3"), TEXT("ProfileShowcaseFloorV4"), TEXT("ProfilePlacementV4"), TEXT("TrainingBobBotV4")
 	};
 	static_assert(UE_ARRAY_COUNT(Names) == static_cast<uint8>(EFlickMenuArtwork::Count));
 	return Names[FMath::Clamp(static_cast<int32>(Artwork), 0, UE_ARRAY_COUNT(Names) - 1)];
@@ -31,7 +31,7 @@ FVector2f FlickMenuArtwork::AuthoredSize(const EFlickMenuArtwork Artwork)
 		|| Artwork == EFlickMenuArtwork::ProfileCustomize || Artwork == EFlickMenuArtwork::ProfilePlacement
 		|| Artwork == EFlickMenuArtwork::PracticePrecision || Artwork == EFlickMenuArtwork::PracticeKnockouts
 		|| Artwork == EFlickMenuArtwork::PracticeSwitch || Artwork == EFlickMenuArtwork::PracticeBob) return FVector2f(1672, 941);
-	return Artwork == EFlickMenuArtwork::Bob || Artwork == EFlickMenuArtwork::Triples
+	return Artwork == EFlickMenuArtwork::Bob || Artwork == EFlickMenuArtwork::BobVsBot || Artwork == EFlickMenuArtwork::Triples
 		? FVector2f(1862, 845) : FVector2f(1860, 845);
 }
 

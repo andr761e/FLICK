@@ -1,10 +1,14 @@
 #include "UI/FlickGameLayerPrivate.h"
+#include "Game/FlickProgressionSubsystem.h"
 #include "UI/FlickPlaylistWidgets.h"
 #include "UI/FlickProfileStyle.h"
 #include "UI/FlickProfileWidgets.h"
 
 namespace
 {
+ FFlickProfileStats CareerStats(const UFlickGameInstance* I)
+ { if(I) if(auto* C=I->GetSubsystem<UFlickProgressionSubsystem>()) return C->GetEligibleStats(); return FFlickProfileStats(); }
+
 	// Native, data-driven card decoration. Empty profiles show an empty chart /
 	// muted timeline, never fictional results baked into an illustration.
 	class SProfileActivity final : public SLeafWidget
@@ -152,7 +156,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileOverview()
 		}
 		const auto Summary = [Order,Instance,Progress]() -> FText {
 			const auto* I = Instance();
-			if (Order == 0) return FText::FromString(FString::Printf(TEXT("%d MATCHES"), I ? I->GetProfileStats().MatchesPlayed : 0));
+			if (Order == 0) return FText::FromString(FString::Printf(TEXT("%d ONLINE MATCHES"), I ? CareerStats(I).MatchesPlayed : 0));
 			if (Order == 2) return FText::FromString(FString::Printf(TEXT("%d RECENT SERIES"), I ? I->GetRecentMatches().Num() : 0));
 			if (Order == 3) return FText::FromString(TEXT("9 PUCK TYPES"));
 			const auto Rank = Progress();
@@ -171,9 +175,9 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileOverview()
 					Ranking && Ranking->GetDisplayProgressLabel(EFlickMatchVariant::Classic,1).StartsWith(TEXT("DEV")) ? TEXT("Development preview")
 					: Rank.MatchesPlayed < FlickRankRules::PlacementMatchCount ? TEXT("Complete your placements.") : TEXT("Keep building your rank.")));
 			}
-			if (!I || (Order == 0 ? I->GetProfileStats().MatchesPlayed == 0 : I->GetRecentMatches().IsEmpty()))
+			if (!I || (Order == 0 ? CareerStats(I).MatchesPlayed == 0 : I->GetRecentMatches().IsEmpty()))
 				return FText::FromString(TEXT("Your next match starts\nyour story."));
-			if (Order == 0) return FText::FromString(FString::Printf(TEXT("%d WINS  //  %d POINTS\nRecent match points shown."), I->GetProfileStats().Wins, I->GetProfileStats().Points));
+			if (Order == 0) return FText::FromString(FString::Printf(TEXT("%d WINS  //  %d POINTS\nLifetime online totals."), CareerStats(I).Wins, CareerStats(I).Points));
 			return FText::FromString(TEXT("Your latest results,\nready to revisit."));
 		};
 		Button->SetContent(SNew(SOverlay)
@@ -253,5 +257,10 @@ TSharedRef<SWidget> SFlickGameLayer::BuildProfileOverview()
 					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(FlickProfileStyle::IdentityWidth)[BuildProfileIdentityCard(true)]]
 					+ SHorizontalBox::Slot().FillWidth(1).Padding(FlickProfileStyle::IdentityGap,0,0,0)[Cards]]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0,26,0,0)
+				[SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0)
+				 .OnClicked_Lambda([this]() {SelectedProfileTab=EFlickProfileTab::SavedReplays;return FReply::Handled();})
+				 [SNew(SFlickAngularBorder).HomeSurface(true).BackgroundColor(Panel).AccentColor(Cyan).UseAccentForOutline(true).CutSize(10).Padding(14)
+				  [SNew(STextBlock).Text(FText::FromString(TEXT("SAVED REPLAYS  //  WATCH YOUR MATCHES FROM EVERY ANGLE"))).Font(DisplayFont(15)).ColorAndOpacity(Paper)]]]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0,12,0,0)
 				[SNew(SBox).WidthOverride(180).HeightOverride(52).HAlign(HAlign_Left)[Back]]]];
 }

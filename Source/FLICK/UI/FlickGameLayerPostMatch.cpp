@@ -1,6 +1,9 @@
+#include "UI/FlickCareerWidgets.h"
+#include "Game/FlickReplaySubsystem.h"
 #include "UI/FlickGameLayerPrivate.h"
 #include "Player/FlickPostMatchPresentationComponent.h"
 #include "Fonts/FontMeasure.h"
+#include "Widgets/Input/SEditableTextBox.h"
 #include "UI/FlickRankResult.h"
 
 
@@ -95,6 +98,25 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
   const auto* Ranking = GetRankingSubsystem();
   return State && State->bRankedMatch && (!Ranking || !Ranking->HasRatingUpdateForMatch(State->MatchId)) ? EVisibility::Visible : EVisibility::Collapsed;
  })[Text(FText::FromString(TEXT("COMPETITIVE RESULT SYNCING...")), 11, Brand)]];
+ const auto Career=[this]() { return PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickProgressionSubsystem>():nullptr; };
+ Menu->AddSlot().AutoHeight().Padding(0,6,0,14)
+ [SNew(SVerticalBox).Visibility_Lambda([this,Career]() { const auto* State=GetScoreboardGameState(); return Career() && State && (State->MatchId.IsEmpty() || Career()->GetLastAward().Id==State->MatchId) && Career()->GetLastAward().XP()>0 ? EVisibility::Visible:EVisibility::Collapsed; })
+  + SVerticalBox::Slot().AutoHeight()[Text(TAttribute<FText>::CreateLambda([Career]() { const auto E=Career()?Career()->GetLastAward():FFlickCareerEvent();
+   return FText::FromString(FString::Printf(TEXT("ACCOUNT XP  +%d\nFINISH +%d  /  TIME +%d\nWIN +%d  /  STYLE +%d\nCHALLENGES +%d"),E.XP(),E.CompletionXP,E.TimeXP,E.WinXP,E.StyleXP,E.BonusXP)); }),10,Paper)]
+  + SVerticalBox::Slot().AutoHeight().Padding(0,8)[FlickCareerUI::Progress(Career(),true,TAttribute<double>::CreateLambda([Presentation]() { const auto* P=Presentation();return P?double(P->GetElapsed()-UFlickPostMatchPresentationComponent::ShowcaseSeconds-UFlickPostMatchPresentationComponent::PullbackSeconds):0.; }))]];
+ Menu->AddSlot().AutoHeight().Padding(0,0,0,5)[Text(FText::FromString(TEXT("REPLAY NAME")),10,Muted)];
+ Menu->AddSlot().AutoHeight().Padding(0,0,0,8)
+ [SNew(SEditableTextBox).Font(UiFont(12)).HintText(FText::FromString(TEXT("Name this match...")))
+  .IsEnabled_Lambda([this]() {const auto* R=PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>():nullptr;return R&&!R->IsCurrentSaved();})
+  .Text_Lambda([this]() {const auto* R=PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>():nullptr;return FText::FromString(R?R->GetSaveName():FString());})
+  .OnTextChanged_Lambda([this](const FText& Name) {if(PlayerController.IsValid()) if(auto* R=PlayerController->GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>()) R->SetSaveName(Name.ToString());})];
+ Menu->AddSlot().AutoHeight().Padding(0,0,0,12)
+ [SNew(SBox).IsEnabled_Lambda([this]() {const auto* R=PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>():nullptr;return R&&R->CanSave()&&!R->GetSaveName().TrimStartAndEnd().IsEmpty();})
+  [SNew(SButton).ButtonStyle(&TransparentButtonStyle).ContentPadding(0)
+   .OnClicked_Lambda([this]() {if(PlayerController.IsValid()) if(auto* R=PlayerController->GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>()) R->SaveCurrent();return FReply::Handled();})
+   [SNew(SFlickMainMenuFrame).HomePresentation(true).StartColor(Ink).EndColor(Ink).BorderColor(Cyan.CopyWithNewOpacity(.55f)).Padding(FMargin(16,12))
+    [SNew(STextBlock).Text_Lambda([this]() {const auto* R=PlayerController.IsValid()?PlayerController->GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>():nullptr;
+     return FText::FromString(R&&R->IsCurrentSaved()?TEXT("SAVED ✓"):R&&R->CanSave()?TEXT("SAVE REPLAY"):R&&R->IsRecordingMatch()?TEXT("FINALIZING REPLAY..."):TEXT("REPLAY UNAVAILABLE"));}).Font(UiFont(14,true)).ColorAndOpacity(Paper)]]]];
  Menu->AddSlot().AutoHeight()[Action(TEXT("EXIT TO MAIN MENU"), FOnClicked::CreateLambda([this]()
  {
   const auto* State = GetScoreboardGameState();

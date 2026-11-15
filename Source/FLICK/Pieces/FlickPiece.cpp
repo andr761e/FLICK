@@ -282,6 +282,10 @@ void AFlickPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AFlickPiece, Team);
+	DOREPLIFETIME_CONDITION(AFlickPiece, SavedReplaySampleTime, COND_ReplayOnly);
+	DOREPLIFETIME_CONDITION(AFlickPiece, SavedReplayPosition, COND_ReplayOnly);
+	DOREPLIFETIME_CONDITION(AFlickPiece, SavedReplayRotation, COND_ReplayOnly);
+	DOREPLIFETIME_CONDITION(AFlickPiece, bHasSavedReplayPose, COND_ReplayOnly);
 	DOREPLIFETIME(AFlickPiece, Archetype);
 	DOREPLIFETIME(AFlickPiece, PieceId);
 	DOREPLIFETIME(AFlickPiece, OwningPlayerSlot);
@@ -326,6 +330,7 @@ void AFlickPiece::BeginPlay()
 void AFlickPiece::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	UpdateSavedReplayPose();
 	UpdateArrivalVisuals();
 	UpdateCosmeticTrail(DeltaSeconds);
 	if (ReplayCosmeticTime >= 0.0f && HasTestArenaVisuals())

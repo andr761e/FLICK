@@ -7,6 +7,7 @@
 #include "Pieces/FlickPiece.h"
 #include "Arena/FlickTestArena.h"
 #include "Components/PrimitiveComponent.h"
+#include "Core/FlickVisualSettings.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickTrainingUndoTest, "FLICK.Training.ShotUndo",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -49,6 +50,30 @@ bool FFlickTrainingUndoTest::RunTest(const FString& Parameters)
 		Mode->CaptureTrainingResetSnapshot();
 		TestTrue(TEXT("Free Play launch succeeds"), Mode->TryLaunchPiece(Own, FVector::ForwardVector, .5f));
 		TestTrue(TEXT("Undo available during motion"), Mode->CanUndoTrainingShot());
+		TestFalse(TEXT("Cannot replay a shot still in motion"), Mode->CanReplayTrainingShot());
+		Mode->ResolutionElapsed = 1.f;
+		Mode->CaptureRoundReplayFrame(true);
+		Mode->ResolveTrainingTurn();
+		const int32 SettledTurn = State->TurnNumber;
+		const FTransform SettledTransform = Own->GetActorTransform();
+		const int32 SavedStyle = FlickVisualSettings::GetTrainingReplayStyle();
+		for (int32 Style = 0; Style < 3; ++Style)
+		{
+		FlickVisualSettings::SetTrainingReplayStyle(Style);
+		TestTrue(TEXT("Settled free-play shot can be replayed"), Mode->ReplayTrainingShot());
+		TestTrue(TEXT("Replay pacing has positive motion duration"), Mode->CinematicReplayMotionDuration > 0.f);
+		const float Pullback = Mode->CinematicReplayPlaybackDuration - Mode->CinematicReplayMotionDuration;
+		if (Style == 1) TestTrue(TEXT("Dramatic style has longer establishing shot"), Pullback > 2.f);
+		if (Style == 2) TestTrue(TEXT("Tactical style gets to the shot quickly"), Pullback < 1.f);
+		TestTrue(TEXT("Training replay is marked for clean presentation"), Mode->IsTrainingShotReplayActive());
+		Mode->FinishCinematicRoundReplay(true);
+		TestFalse(TEXT("Replay presentation ends"), Mode->IsTrainingShotReplayActive());
+		TestTrue(TEXT("Replay restores the settled puck transform"), Own->GetActorTransform().Equals(SettledTransform, .01f));
+		TestEqual(TEXT("Replay never completes a round or advances a turn"), State->TurnNumber, SettledTurn);
+		TestTrue(TEXT("Recording can be watched again"), Mode->CanReplayTrainingShot());
+		TestTrue(TEXT("Undo survives replay"), Mode->CanUndoTrainingShot());
+		}
+		FlickVisualSettings::SetTrainingReplayStyle(SavedStyle);
 		Own->SetActorLocation(FVector(500, 0, 300), false, nullptr, ETeleportType::TeleportPhysics);
 		Target->Eliminate(); Target->Destroy(); Mode->Pieces.Remove(Target);
 		State->RecordPlayerKnockout(EFlickTeam::Player1, 0);

@@ -3,6 +3,8 @@
 #include "Camera/CameraComponent.h"
 #include "Core/FlickRankRules.h"
 #include "Game/FlickGameModePrivate.h"
+#include "Player/FlickReplayController.h"
+#include "Game/FlickReplaySubsystem.h"
 #include "Misc/Paths.h"
 #include "Misc/App.h"
 
@@ -60,6 +62,7 @@ AFlickGameMode::AFlickGameMode()
 
 	GameStateClass = AFlickGameState::StaticClass();
 	PlayerControllerClass = AFlickPlayerController::StaticClass();
+	ReplaySpectatorPlayerControllerClass = AFlickReplayController::StaticClass();
 	PlayerStateClass = AFlickPlayerState::StaticClass();
 	DefaultPawnClass = AFlickCameraPawn::StaticClass();
 	HUDClass = AFlickHUD::StaticClass();
@@ -159,6 +162,7 @@ FString AFlickGameMode::InitNewPlayer(
 void AFlickGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	if (GetWorld()->IsPlayingReplay()) return;
 	bNetworkMatchRequested |= FParse::Param(FCommandLine::Get(), TEXT("FlickNetworkMatch"));
 	bPartyRequested |= FParse::Param(FCommandLine::Get(), TEXT("FlickParty"));
 	bMatchmakingRequested |= FParse::Param(FCommandLine::Get(), TEXT("FlickMatchmaking"));
@@ -236,6 +240,8 @@ void AFlickGameMode::BeginPlay()
 	}
 
 #if !UE_BUILD_SHIPPING
+	// A theatre return must reach the library rather than rerun development launch fixtures.
+	if (const auto* Replays=GetGameInstance()?GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>():nullptr;Replays&&Replays->bReturnToLibrary) return;
 	if (FParse::Param(FCommandLine::Get(), TEXT("FlickCoordinatorAutoQueue"))
 		&& !bCoordinatorAutoQueueConsumed
 		&& !bNetworkMatchRequested)
@@ -814,6 +820,28 @@ void AFlickGameMode::BeginPlay()
 	{
 		SelectMatchVariant(EFlickMatchVariant::Classic);
 		StartTrainingMode();
+		if (FParse::Param(FCommandLine::Get(), TEXT("FlickTrailerReplay")))
+		{
+			DestroyPieces();
+			int32 Scene = 0;
+			FParse::Value(FCommandLine::Get(), TEXT("FlickTrailerScene="), Scene);
+			const float LaneY = Scene == 2 ? -160.f : 0.f;
+			AFlickPiece* Hero = SpawnPiece(EFlickTeam::Player1, 1, FVector(-310, LaneY, ArenaSurfaceZ + 13),
+				Scene == 1 ? EFlickPieceArchetype::Heavy : Scene == 2 ? EFlickPieceArchetype::Striker : EFlickPieceArchetype::Standard);
+			AFlickPiece* Target = SpawnPiece(EFlickTeam::Player2, 2, FVector(80, LaneY, ArenaSurfaceZ + 13),
+				Scene == 1 ? EFlickPieceArchetype::Compact : EFlickPieceArchetype::Standard);
+			Hero->SetPuckSkin(Scene == 1 ? 5 : 0);
+			Target->SetPuckSkin(Scene == 2 ? 3 : 1);
+			if (Scene == 1)
+			{
+				SpawnPiece(EFlickTeam::Player2, 3, FVector(190, 18, ArenaSurfaceZ + 13), EFlickPieceArchetype::Standard)->SetPuckSkin(4);
+				SpawnPiece(EFlickTeam::Player2, 4, FVector(310, -16, ArenaSurfaceZ + 13), EFlickPieceArchetype::Grippy)->SetPuckSkin(3);
+			}
+			float Power = .7f;
+			FParse::Value(FCommandLine::Get(), TEXT("FlickNetworkAutoShotPower="), Power);
+			FTimerHandle Launch;
+			GetWorldTimerManager().SetTimer(Launch, [this, Hero, Power]() { TryLaunchPiece(Hero, FVector::ForwardVector, Power); }, 2.f, false);
+		}
 	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("FlickPausePreview")))
 	{
@@ -1416,6 +1444,14 @@ void AFlickGameMode::PostLogin(APlayerController* NewPlayer)
 
 void AFlickGameMode::Logout(AController* Exiting)
 {
+	// DemoNetDriver destroys this internal spectator when recording finishes.
+	// It never occupied a room seat, so its cleanup must not reset the lobby,
+	// change rematch state, or count as a participant disconnect/forfeit.
+	if (Cast<AFlickReplayController>(Exiting))
+	{
+		Super::Logout(Exiting);
+		return;
+	}
 	AFlickPlayerState* ExitingState = Exiting ? Exiting->GetPlayerState<AFlickPlayerState>() : nullptr;
 	if (AFlickGameState* State = GetFlickGameState(); State && State->bSeriesComplete && ExitingState)
 	{
@@ -1578,6 +1614,7 @@ void AFlickGameMode::Logout(AController* Exiting)
 
 void AFlickGameMode::Tick(const float DeltaSeconds)
 {
+	if (GetWorld()->IsPlayingReplay()) return;
 	Super::Tick(DeltaSeconds);
 	if (UFlickGameInstance* Instance = GetFlickGameInstance(); Instance && Instance->bPostMatchQueuePending
 		&& FrontendScreen == EFlickFrontendScreen::MainMenu && !bNetworkMatchStarted

@@ -1,5 +1,8 @@
 #include "Game/FlickGameModePrivate.h"
+#include "Game/FlickReplaySubsystem.h"
+#include "Engine/DemoNetDriver.h"
 #include "Core/FlickCosmeticCatalog.h"
+#include "Core/FlickVisualSettings.h"
 #include "Engine/OverlapResult.h"
 
 using namespace FlickGameModePrivate;
@@ -85,7 +88,7 @@ float AFlickGameMode::GetCinematicReplayProgress() const
 
 bool AFlickGameMode::IsCinematicReplayPullbackActive() const
 {
-	return bCinematicReplayActive && CinematicReplayElapsed < ReplayPullbackDuration;
+	return bCinematicReplayActive && CinematicReplayElapsed < (CinematicReplayPlaybackDuration - CinematicReplayMotionDuration);
 }
 
 float AFlickGameMode::GetCinematicReplayPullbackAlpha() const
@@ -98,7 +101,7 @@ float AFlickGameMode::GetCinematicReplayPullbackAlpha() const
 	{
 		return 1.0f;
 	}
-	const float BuildDuration = FMath::Max(ReplayPullbackDuration * 0.7f, 0.01f);
+	const float BuildDuration = FMath::Max((CinematicReplayPlaybackDuration - CinematicReplayMotionDuration) * 0.7f, 0.01f);
 	const float Alpha = FMath::Clamp(CinematicReplayElapsed / BuildDuration, 0.0f, 1.0f);
 	return Alpha * Alpha * (3.0f - 2.0f * Alpha);
 }
@@ -166,7 +169,7 @@ void AFlickGameMode::ResolveTestArenaControlZones()
 
 void AFlickGameMode::CaptureRoundReplayFrame(const bool bForce)
 {
-	if (!bTestArenaMode || bCinematicReplayActive || !TestArenaActor || !IsValid(TestArenaActor))
+	if ((!IsFreePlayTraining() && (!bTestArenaMode || !IsValid(TestArenaActor))) || bCinematicReplayActive)
 	{
 		return;
 	}
@@ -184,8 +187,11 @@ void AFlickGameMode::CaptureRoundReplayFrame(const bool bForce)
 
 	FFlickRoundReplayFrame& Frame = RoundReplayFrames.AddDefaulted_GetRef();
 	Frame.Time = FMath::Max(0.0f, ResolutionElapsed);
-	Frame.RaisedDividerMask = TestArenaActor->GetRaisedDividerMask();
-	Frame.DividerLiftFractions = TestArenaActor->GetDividerLiftFractions();
+	if (IsValid(TestArenaActor))
+	{
+		Frame.RaisedDividerMask = TestArenaActor->GetRaisedDividerMask();
+		Frame.DividerLiftFractions = TestArenaActor->GetDividerLiftFractions();
+	}
 	Frame.Pieces.Reserve(Pieces.Num());
 	for (AFlickPiece* Piece : Pieces)
 	{
@@ -203,22 +209,29 @@ void AFlickGameMode::CaptureRoundReplayFrame(const bool bForce)
 
 void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 {
-	if (!bTestArenaMode || bCinematicReplayActive || bReplayPlayedForResolution
-		|| !TestArenaActor || !IsValid(TestArenaActor) || RoundReplayFrames.Num() < 2
+	if ((!bTrainingShotReplay && (!bTestArenaMode || !IsValid(TestArenaActor))) || bCinematicReplayActive || bReplayPlayedForResolution
+		|| RoundReplayFrames.Num() < 2
 		|| (Outcome != EFlickMatchOutcome::Player1Wins && Outcome != EFlickMatchOutcome::Player2Wins))
 	{
 		return;
 	}
 
+	// Do not put a presentation rewind inside the full-match recording.
+	if (auto* Replays=GetGameInstance()?GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>():nullptr;Replays&&Replays->IsRecordingMatch())
+		if(auto* Demo=GetWorld()->GetDemoNetDriver()) Demo->PauseRecording(true);
 	const float FirstTime = RoundReplayFrames[0].Time;
 	const float LastTime = RoundReplayFrames.Last().Time;
 	CinematicReplaySourceStart = FirstTime;
 	CinematicReplaySourceDuration = FMath::Max(LastTime - FirstTime, 0.01f);
+	const int32 TrainingStyle = bTrainingShotReplay ? FlickVisualSettings::GetTrainingReplayStyle() : 0;
+	const float MotionRate = TrainingStyle == 1 ? .42f : TrainingStyle == 2 ? .85f : ReplaySlowMotionRate;
+	const float MaximumDuration = TrainingStyle == 1 ? 12.f : ReplayMaximumPlaybackDuration;
+	const float Pullback = TrainingStyle == 1 ? 2.4f : TrainingStyle == 2 ? .65f : ReplayPullbackDuration;
 	CinematicReplayMotionDuration = FMath::Clamp(
-		CinematicReplaySourceDuration / FMath::Clamp(ReplaySlowMotionRate, 0.25f, 1.0f),
+		CinematicReplaySourceDuration / FMath::Clamp(MotionRate, 0.25f, 1.0f),
 		1.25f,
-		FMath::Max(ReplayMaximumPlaybackDuration, 2.0f));
-	CinematicReplayPlaybackDuration = ReplayPullbackDuration + CinematicReplayMotionDuration;
+		FMath::Max(MaximumDuration, 2.0f));
+	CinematicReplayPlaybackDuration = Pullback + CinematicReplayMotionDuration;
 	CinematicReplayElapsed = 0.0f;
 	PendingReplayOutcome = Outcome;
 	bCinematicReplayActive = true;
@@ -308,7 +321,7 @@ void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 	}
 	for (const auto& Event : ReplayEffectEvents)
 		if (Event.LiveFeedback.IsValid()) Event.LiveFeedback->Destroy();
-	TestArenaActor->BeginReplayPresentation();
+	if (IsValid(TestArenaActor)) TestArenaActor->BeginReplayPresentation();
 	ApplyCinematicReplayTime(CinematicReplaySourceStart);
 
 	FVector InitialFocus = ArenaActor ? ArenaActor->GetActorLocation() : FVector::ZeroVector;
@@ -354,7 +367,7 @@ void AFlickGameMode::BeginCinematicRoundReplay(const EFlickMatchOutcome Outcome)
 	ClearControllerAiming();
 	PushHudEvent(bSelfKnockout ? TEXT("REPLAY  //  SELF-KNOCKOUT") : TEXT("REPLAY  //  ROUND-WINNING SHOT"), FLinearColor::White, CinematicReplayPlaybackDuration);
 	UE_LOG(LogFlick, Log, TEXT("Test arena replay started: %.2f second pullback and %.2f seconds of shot playback"),
-		ReplayPullbackDuration, CinematicReplayMotionDuration);
+		(CinematicReplayPlaybackDuration - CinematicReplayMotionDuration), CinematicReplayMotionDuration);
 	UE_LOG(LogFlick, Log, TEXT("Replay camera narrative: primary=%d knockout=%d switch=%.2f self_ko=%d"),
 		ReplayPrimaryFocusPieceId,
 		ReplayKnockoutFocusPieceId,
@@ -385,7 +398,7 @@ void AFlickGameMode::UpdateCinematicRoundReplay(const float DeltaSeconds)
 			return;
 		}
 	}
-	if (CinematicReplayElapsed < ReplayPullbackDuration)
+	if (CinematicReplayElapsed < (CinematicReplayPlaybackDuration - CinematicReplayMotionDuration))
 	{
 		ApplyCinematicReplayTime(CinematicReplaySourceStart);
 	}
@@ -409,7 +422,7 @@ void AFlickGameMode::UpdateCinematicRoundReplay(const float DeltaSeconds)
 			}
 		}
 		const float MotionProgress = CinematicReplayMotionDuration > KINDA_SMALL_NUMBER
-			? FMath::Clamp((CinematicReplayElapsed - ReplayPullbackDuration) / CinematicReplayMotionDuration, 0.0f, 1.0f)
+			? FMath::Clamp((CinematicReplayElapsed - (CinematicReplayPlaybackDuration - CinematicReplayMotionDuration)) / CinematicReplayMotionDuration, 0.0f, 1.0f)
 			: 1.0f;
 		ApplyCinematicReplayTime(CinematicReplaySourceStart + CinematicReplaySourceDuration * MotionProgress);
 	}
@@ -560,21 +573,39 @@ void AFlickGameMode::FinishCinematicRoundReplay(const bool bCompleteRound)
 	}
 
 	bCinematicReplayActive = false;
+	if (auto* Replays=GetGameInstance()?GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>():nullptr;Replays&&Replays->IsRecordingMatch())
+		if(auto* Demo=GetWorld()->GetDemoNetDriver()) Demo->PauseRecording(false);
 	CinematicReplayElapsed = 0.0f;
 	CinematicReplaySourceStart = 0.0f;
 	CinematicReplaySourceDuration = 0.0f;
 	CinematicReplayMotionDuration = 0.0f;
 	CinematicReplayPlaybackDuration = 0.0f;
 	PendingReplayOutcome = EFlickMatchOutcome::Continue;
-	RoundReplayFrames.Reset();
-	ReplayShotSetups.Reset();
-	for (const auto& Event : ReplayEffectEvents) if (Event.Playback.IsValid()) Event.Playback->Destroy();
-	ReplayEffectEvents.Reset();
+	// A requested training replay returns to the settled board, without awarding
+	// a round or consuming the recording / Undo snapshot.
+	const bool bTrainingReplay = bTrainingShotReplay;
+	bTrainingShotReplay = false;
+	if (!bTrainingReplay)
+	{
+		RoundReplayFrames.Reset();
+		ReplayShotSetups.Reset();
+		for (const auto& Event : ReplayEffectEvents) if (Event.Playback.IsValid()) Event.Playback->Destroy();
+		ReplayEffectEvents.Reset();
+	}
+	else
+	{
+		for (auto& Event : ReplayEffectEvents)
+		{
+			if (Event.Playback.IsValid()) Event.Playback->Destroy();
+			Event.Playback.Reset();
+		}
+		bReplayPlayedForResolution = false;
+	}
 	bReplayLaunchCuePlayed = false;
 	ReplayPrimaryFocusPieceId = INDEX_NONE;
 	ReplayKnockoutFocusPieceId = INDEX_NONE;
 	ReplayFocusSwitchSourceTime = TNumericLimits<float>::Max();
-	if (bCompleteRound)
+	if (bCompleteRound && !bTrainingReplay)
 	{
 		CompleteRoundForOutcome(CompletedOutcome);
 	}
@@ -1339,7 +1370,7 @@ void AFlickGameMode::ResolveTrainingTurn()
 	for (int32 PieceIndex = Pieces.Num() - 1; PieceIndex >= 0; --PieceIndex)
 	{
 		AFlickPiece* Piece = Pieces[PieceIndex];
-		if (Piece && IsValid(Piece) && Piece->IsActive())
+		if (Piece && IsValid(Piece))
 		{
 			continue;
 		}
@@ -1363,6 +1394,13 @@ void AFlickGameMode::ResolveTrainingTurn()
 		AudioDirector->PlayTurn(EFlickTeam::Player1);
 	}
 	UE_LOG(LogFlick, Log, TEXT("Training shot resolved; Player 1 remains active"));
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("FlickTrailerReplay")))
+	{
+		FTimerHandle Replay;
+		GetWorldTimerManager().SetTimer(Replay, [this]() { ReplayTrainingShot(); }, .2f, false);
+	}
+#endif
 }
 
 void AFlickGameMode::CaptureTrainingResetSnapshot()

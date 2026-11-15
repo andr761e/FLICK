@@ -514,7 +514,7 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingActivityCard(
 	const EFlickMenuArtwork Artwork = Activity == EFlickTrainingActivity::Tutorial ? EFlickMenuArtwork::Tutorial
 		: Activity == EFlickTrainingActivity::FreePlay ? EFlickMenuArtwork::FreePlay
 		: Activity == EFlickTrainingActivity::BotMatch ? EFlickMenuArtwork::BotMatch
-		: Activity == EFlickTrainingActivity::BobBotMatch ? EFlickMenuArtwork::Bob : EFlickMenuArtwork::TrainingPracticeWide;
+		: Activity == EFlickTrainingActivity::BobBotMatch ? EFlickMenuArtwork::BobVsBot : EFlickMenuArtwork::TrainingPracticeWide;
 	CardButton->SetContent(FlickPlaylistWidgets::Card(Artwork, TAttribute<bool>::CreateLambda(IsActive),
 		SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Bottom)

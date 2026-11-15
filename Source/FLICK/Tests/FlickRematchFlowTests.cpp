@@ -5,6 +5,8 @@
 #include "Game/FlickGameMode.h"
 #include "Game/FlickGameState.h"
 #include "Player/FlickPlayerController.h"
+#include "Player/FlickReplayController.h"
+#include "Player/FlickPlayerState.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickRematchFlowTest, "FLICK.Match.PostMatchRematchFlow",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -23,6 +25,29 @@ bool FFlickRematchFlowTest::RunTest(const FString& Parameters)
 	AFlickPlayerController* Host = World->SpawnActor<AFlickPlayerController>();
 	Host->SetAsLocalPlayerController();
 	World->AddController(Host);
+	// Ending a recording destroys its internal spectator. It must not be treated
+	// as a room participant disconnecting or dismiss the completed-match summary.
+	for (const bool bPrivateRecording : {false, true})
+	{
+		Mode->bNetworkMatchRequested = true;
+		Mode->bNetworkMatchStarted = true;
+		Mode->bPrivateMatchActive = bPrivateRecording;
+		Mode->FrontendScreen = EFlickFrontendScreen::Playing;
+		State->ResetSeriesState(1);
+		State->CompleteRound(EFlickMatchOutcome::Player2Wins);
+		State->SetNetworkLobbyState(false, EFlickMatchVariant::Classic);
+		auto* Recorder = World->SpawnActor<AFlickReplayController>();
+		Recorder->PlayerState = World->SpawnActor<AFlickPlayerState>();
+		Mode->Logout(Recorder);
+		TestEqual(TEXT("Recorder cleanup keeps the post-match screen"), Mode->FrontendScreen, EFlickFrontendScreen::Playing);
+		TestEqual(TEXT("Recorder cleanup preserves final result phase"), State->MatchPhase, EFlickMatchPhase::RoundOver);
+		TestFalse(TEXT("Recorder cleanup does not reopen the lobby"), State->bNetworkLobbyActive);
+		TestTrue(TEXT("Recorder cleanup keeps the current room match"), Mode->bNetworkMatchStarted);
+		TestTrue(TEXT("Recorder cleanup preserves the finished series"), State->bSeriesComplete);
+		Recorder->Destroy();
+	}
+	Mode->bNetworkMatchRequested = false;
+	Mode->bNetworkMatchStarted = false;
 	for (const bool bPrivate : {false, true})
 	for (const EFlickMatchVariant Variant : {EFlickMatchVariant::Classic, EFlickMatchVariant::Bob})
 	for (int32 Size = 1; Size <= (Variant == EFlickMatchVariant::Bob ? 1 : 3); ++Size)

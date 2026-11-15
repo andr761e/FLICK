@@ -1,5 +1,24 @@
 #include "Game/FlickGameModePrivate.h"
 
+bool AFlickGameMode::CanReplayTrainingShot() const
+{
+	const AFlickGameState* State = GetFlickGameState();
+	return CanUndoTrainingShot() && State->MatchPhase == EFlickMatchPhase::Aiming
+		&& RoundReplayFrames.Num() >= 2 && !ReplayShotSetups.IsEmpty();
+}
+
+bool AFlickGameMode::ReplayTrainingShot()
+{
+	if (!CanReplayTrainingShot()) return false;
+	ClearControllerAiming();
+	bReplayPlayedForResolution = false;
+	bTrainingShotReplay = true;
+	BeginCinematicRoundReplay(ResolutionShootingTeam == EFlickTeam::Player2
+		? EFlickMatchOutcome::Player2Wins : EFlickMatchOutcome::Player1Wins);
+	if (!bCinematicReplayActive) bTrainingShotReplay = false;
+	return bCinematicReplayActive;
+}
+
 bool AFlickGameMode::CanUndoTrainingShot() const
 {
 	const AFlickGameState* State = GetFlickGameState();

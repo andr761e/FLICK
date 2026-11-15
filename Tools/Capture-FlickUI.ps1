@@ -61,6 +61,9 @@ param(
     [int]$ProfilePage = 0,
     # Seed only this capture's isolated UserDir, never the player's profile.
     [switch]$ProfileDataPreview,
+    [switch]$CareerPreview,
+    [ValidateRange(0,5)]
+    [int]$CareerCategory = 0,
     [ValidateRange(0, 9)]
     [int]$SettingsTab = 0,
     [ValidateRange(-1, 5)]
@@ -202,7 +205,8 @@ foreach ($screenName in $Screen) {
         '-nosteam', '-NoScreenMessages', '-ForceRes',
         "-ResX=$Width", "-ResY=$Height", '-FlickSkipIntro', '-FlickCaptureFrame', "-FlickCaptureDelaySeconds=$CaptureDelaySeconds",
         "-FlickCaptureFrames=$CaptureFrames", "-FlickCaptureFPS=$CaptureFPS", $(if ($RankDirection -eq 'Down') { '-FlickRankPreviewDown' } else { '-FlickRankPreviewUp' }),
-        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickLockerItem=$LockerItem", "-FlickProfilePage=$ProfilePage", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
+        "-FlickCameraView=$CameraView", "-FlickPlayersPerTeam=$PlayersPerTeam", "-FlickLockerCategory=$selectedLockerCategory", "-FlickLockerItem=$LockerItem", "-FlickProfilePage=$ProfilePage",
+        "-FlickCareerCategory=$CareerCategory", "-FlickSettingsTab=$selectedSettingsTab", '-FlickTestArenaSeed=1337',
         "-FlickCaptureOrbit=$($CameraOrbit.ToString([System.Globalization.CultureInfo]::InvariantCulture))",
         "-ini:GameUserSettings:[FLICK.GameplaySettings]:GameplayCameraDistance=$($CameraDistance.ToString([System.Globalization.CultureInfo]::InvariantCulture))",
         "-FlickPracticeCategory=$PracticeCategory", "-FlickPracticeDifficulty=$PracticeDifficulty",
@@ -236,6 +240,7 @@ foreach ($screenName in $Screen) {
     foreach ($group in @('ViewDistance', 'AntiAliasing', 'Shadow', 'GlobalIllumination', 'Reflection', 'PostProcess', 'Texture', 'Effects', 'Foliage', 'Shading')) {
         $arguments += "-ini:GameUserSettings:[ScalabilityGroups]:sg.${group}Quality=$Quality"
     }
+    if ($CareerPreview) { $arguments += "-FlickCareerPreview" }
     $arguments += "-FlickBobStrikerSkin=$PuckSkin"
     $arguments += "-FlickCaptureDistance=$($CameraDistance.ToString([System.Globalization.CultureInfo]::InvariantCulture))"
 	# Class and winner previews read the same team-format argument.

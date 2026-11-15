@@ -22,6 +22,9 @@ public:
 	AFlickPiece();
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void OnRep_ReplicatedMovement() override;
+	virtual void PreReplicationForReplay(IRepChangedPropertyTracker& ChangedPropertyTracker) override;
+	FVector GetReplaySourceLocation() const { return bHasSavedReplayPose ? FVector(SavedReplayPosition) : GetReplicatedMovement().Location; }
 
 	void InitializePiece(
 		EFlickTeam InTeam,
@@ -109,6 +112,28 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	void UpdateSavedReplayPose();
+	void QueueSavedReplayPose(float Time, const FVector& Location, const FQuat& Rotation);
+	UFUNCTION()
+	void OnRep_SavedReplayPose();
+	struct FReplayPoseSample
+	{
+		float Time = 0.f;
+		FVector Location = FVector::ZeroVector;
+		FQuat Rotation = FQuat::Identity;
+		FVector Velocity = FVector::ZeroVector;
+	};
+	TArray<FReplayPoseSample, TInlineAllocator<8>> SavedReplayPoses;
+	int32 SavedReplayRevision = INDEX_NONE;
+	// Timestamp of the recorded pose, not the frame on which playback receives it.
+	UPROPERTY(ReplicatedUsing = OnRep_SavedReplayPose)
+	float SavedReplaySampleTime = -1.f;
+	UPROPERTY(Replicated)
+	FVector_NetQuantize100 SavedReplayPosition = FVector::ZeroVector;
+	UPROPERTY(Replicated)
+	FRotator SavedReplayRotation = FRotator::ZeroRotator;
+	UPROPERTY(Replicated)
+	bool bHasSavedReplayPose = false;
 	UPROPERTY(ReplicatedUsing = OnRep_CosmeticPreview)
 	bool bCosmeticPreview = false;
 	UFUNCTION()

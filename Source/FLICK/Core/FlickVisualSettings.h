@@ -5,6 +5,9 @@
 // Per-machine options beyond UGameUserSettings' scalability groups.
 namespace FlickVisualSettings
 {
+	// Free-play replay preference: 0 Classic, 1 Dramatic, 2 Tactical.
+	FLICK_API int32 GetTrainingReplayStyle();
+	FLICK_API void SetTrainingReplayStyle(int32 Style);
 	FLICK_API int32 GetRenderScale();
 	FLICK_API void SetRenderScale(int32 Percent);
 	FLICK_API bool IsHardwareLumenEnabled();

@@ -1,3 +1,4 @@
+#include "Game/FlickProgressionSubsystem.h"
 #include "Game/FlickGameModePrivate.h"
 #include "Core/FlickLineupRules.h"
 #include "Core/FlickCosmeticCatalog.h"
@@ -1459,6 +1460,7 @@ void AFlickGameMode::UpdateTutorial(const float DeltaSeconds)
 	}
 
 	bTutorialCompleted = true;
+	if (auto* Career=GetGameInstance()->GetSubsystem<UFlickProgressionSubsystem>()) Career->RecordTutorial();
 	bTutorialAdvancePending = false;
 	DestroyPieces();
 	if (AFlickGameState* State = GetFlickGameState())

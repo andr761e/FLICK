@@ -1319,9 +1319,10 @@ void AFlickGameMode::SetCameraViewForTeam(const EFlickTeam Team, const bool bSna
 		return;
 	}
 
-	// Network players keep the camera on their own side. Turn ownership must not
+	// Private players (including standalone games against bots) and network
+	// players keep the camera on their own side. Turn ownership must not
 	// move one player's viewpoint to the opponent's end of the table.
-	if (GetNetMode() != NM_Standalone)
+	if (bPrivateMatchActive || GetNetMode() != NM_Standalone)
 	{
 		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 		{

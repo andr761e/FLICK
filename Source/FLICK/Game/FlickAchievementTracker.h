@@ -9,8 +9,8 @@
 class AFlickPiece;
 class UPrimitiveComponent;
 
-// Authority-only observation of existing physics and match events. No tick,
-// force, collision response, or client-predicted outcome is introduced.
+// Authority-only event observation and active-play clock. Never applies forces,
+// changes collision responses, or predicts an outcome.
 UCLASS()
 class FLICK_API UFlickAchievementTracker : public UActorComponent
 {
@@ -28,6 +28,7 @@ public:
     void SwitchActivated(AFlickPiece* Piece);
     void ResolutionFinished();
     void RoundFinished();
+    virtual void TickComponent(float Delta, ELevelTick TickType, FActorComponentTickFunction* Function) override;
 private:
     friend class FFlickAchievementGameplayTest;
     struct FPlayer
@@ -51,6 +52,7 @@ private:
     TSet<int32> BankedCoins, DividerShots;
     TSet<int32> ScoredPieces;
     int32 LastCompletedRound = INDEX_NONE;
+    double ActiveSeconds = 0;
     int32 RoundStartingCount[2] = {};
     bool ComebackEligible[2] = {};
     bool bEnabled = false, bResolutionFinished = true, bMatchReported = false;

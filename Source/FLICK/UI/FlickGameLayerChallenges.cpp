@@ -1,3 +1,4 @@
+#include "Game/FlickProgressionSubsystem.h"
 #include "UI/FlickGameLayerPrivate.h"
 
 FFlickProfileStats SFlickGameLayer::GetChallengeStats() const
@@ -5,7 +6,8 @@ FFlickProfileStats SFlickGameLayer::GetChallengeStats() const
 	const UFlickGameInstance* Instance = PlayerController.IsValid()
 		? Cast<UFlickGameInstance>(PlayerController->GetGameInstance())
 		: GameMode.IsValid() ? Cast<UFlickGameInstance>(GameMode->GetGameInstance()) : nullptr;
-	return Instance ? Instance->GetProfileStats() : FFlickProfileStats();
+	if(Instance) if(auto* Career=Instance->GetSubsystem<UFlickProgressionSubsystem>()) return Career->GetEligibleStats();
+	return FFlickProfileStats();
 }
 
 void SFlickGameLayer::RefreshChallengePreview()

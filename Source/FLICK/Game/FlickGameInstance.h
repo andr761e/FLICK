@@ -87,6 +87,7 @@ class FLICK_API UFlickGameInstance : public UGameInstance
 
 public:
 	virtual void Init() override;
+	virtual void HandleDemoPlaybackFailure(const UE::Net::TNetResult<EReplayResult>& Result) override;
 	void NotifyFrontendReady();
 	void PrepareTravelPresentation(const FString& StatusText);
 	// A one-shot intent, consumed by the frontend after leaving the completed server.

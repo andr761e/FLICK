@@ -12,7 +12,7 @@ enum class EFlickMenuArtwork : uint8
 	Tutorial, FreePlay, BotMatch, Bob, Doubles, Triples, Backdrop, SettingsBackdrop, SettingsImpact,
 	ProfileBackdrop, ProfileRankStage, ProfileCustomize,
 	PracticePrecision, PracticeKnockouts, PracticeSwitch, PracticeBob,
-	TrainingPracticeWide, ProfileIdentityBanner, ProfileShowcaseFloor, ProfilePlacement, Count
+	TrainingPracticeWide, ProfileIdentityBanner, ProfileShowcaseFloor, ProfilePlacement, BobVsBot, Count
 };
 
 namespace FlickMenuArtwork

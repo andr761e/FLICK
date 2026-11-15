@@ -101,6 +101,20 @@ namespace FlickVisualSettings
 		GConfig->Flush(false, GGameUserSettingsIni);
 	}
 
+	int32 GetTrainingReplayStyle()
+	{
+		int32 Style = 1;
+		if (GConfig) GConfig->GetInt(Section, TEXT("TrainingReplayStyle"), Style, GGameUserSettingsIni);
+		return FMath::Clamp(Style, 0, 2);
+	}
+
+	void SetTrainingReplayStyle(int32 Style)
+	{
+		if (!GConfig) return;
+		GConfig->SetInt(Section, TEXT("TrainingReplayStyle"), FMath::Clamp(Style, 0, 2), GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+
 	bool IsFpsVisible()
 	{
 		bool bVisible = false;

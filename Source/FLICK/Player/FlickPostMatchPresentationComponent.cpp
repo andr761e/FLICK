@@ -79,6 +79,7 @@ void UFlickPostMatchPresentationComponent::BuildWinner(const int32 Slot)
 void UFlickPostMatchPresentationComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, TickFunction);
+	if(GetWorld()->IsPlayingReplay()) return;
 	AFlickPlayerController* Controller = Cast<AFlickPlayerController>(GetOwner());
 	if (!Controller || !Controller->IsLocalController()) return;
 	const AFlickGameState* State = GetWorld()->GetGameState<AFlickGameState>();

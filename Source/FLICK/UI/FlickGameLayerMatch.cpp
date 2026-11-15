@@ -865,6 +865,24 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTrainingToolsPanel()
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0, 8, 0, 0)
 				[
+					SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).IsFocusable(false)
+					.IsEnabled_Lambda([this]() { return GameMode.IsValid() && GameMode->CanReplayTrainingShot(); })
+					.OnClicked_Lambda([this]() { if (GameMode.IsValid()) GameMode->ReplayTrainingShot(); return FReply::Handled(); })
+					[SNew(STextBlock).Font(UiFont(10, true)).ColorAndOpacity(Paper).Text(FText::FromString(TEXT("REPLAY LAST SHOT")))]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0)
+				[
+					SNew(SButton).ButtonStyle(&CompactMenuButtonStyle).IsFocusable(false)
+					.ToolTipText(FText::FromString(TEXT("Classic: original match camera. Dramatic: close sweeping camera and slow motion. Tactical: steady elevated camera and faster playback. Saves automatically.")))
+					.OnClicked_Lambda([]() { FlickVisualSettings::SetTrainingReplayStyle((FlickVisualSettings::GetTrainingReplayStyle() + 1) % 3); return FReply::Handled(); })
+					[SNew(STextBlock).Font(UiFont(10, true)).ColorAndOpacity(Cyan).Text_Lambda([]()
+					{
+						const TCHAR* Names[] = { TEXT("CLASSIC"), TEXT("DRAMATIC"), TEXT("TACTICAL") };
+						return FText::FromString(FString::Printf(TEXT("REPLAY STYLE  /  %s  >"), Names[FlickVisualSettings::GetTrainingReplayStyle()]));
+					})]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 8, 0, 0)
+				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().FillWidth(1).Padding(0, 0, 6, 0)
 					[

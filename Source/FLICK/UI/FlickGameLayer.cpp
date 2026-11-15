@@ -1,5 +1,6 @@
 #include "UI/FlickGameLayer.h"
 #include "UI/FlickGameLayerPrivate.h"
+#include "Game/FlickReplaySubsystem.h"
 #include "UI/FlickAimArrowWidget.h"
 #include "UI/FlickPuckHoverWidget.h"
 #include "Online/FlickMatchmakingCoordinatorSubsystem.h"
@@ -138,6 +139,8 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	}
 	bLightingPreview = SelectedSettingsTab == EFlickSettingsTab::Lighting
 		&& FParse::Param(FCommandLine::Get(), TEXT("FlickLightingPreview"));
+	FParse::Value(FCommandLine::Get(),TEXT("FlickCareerCategory="),CareerCategory);
+	CareerCategory=FMath::Clamp(CareerCategory,0,5);
 	int32 ProfilePreviewPage = 0;
 	if (FParse::Value(FCommandLine::Get(), TEXT("FlickProfilePage="), ProfilePreviewPage))
 	{
@@ -229,6 +232,15 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	ChildSlot
 	[
 		SNew(SOverlay)
+		.Visibility_Lambda([this]()
+		{
+#if !UE_BUILD_SHIPPING
+			if (FParse::Param(FCommandLine::Get(), TEXT("FlickTrailerClean"))) return EVisibility::Collapsed;
+#endif
+			return GameMode.IsValid() && GameMode->IsTrainingShotReplayActive()
+				&& GameMode->GetFrontendScreen() == EFlickFrontendScreen::Playing
+				? EVisibility::Collapsed : EVisibility::SelfHitTestInvisible;
+		})
 		+ SOverlay::Slot().VAlign(VAlign_Top)
 		[
 			SNew(SBox).HeightOverride_Lambda([this]() { return (ViewportLocalSize.Y - FlickPresentationFrame::GetContainedSize(ViewportLocalSize).Y) * 0.5f; })
@@ -724,6 +736,11 @@ void SFlickGameLayer::Tick(
 	const float InDeltaTime)
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+	if (PlayerController.IsValid())
+		if (auto* Replays=PlayerController->GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>();Replays&&Replays->bReturnToLibrary&&GameMode.IsValid())
+		{
+			Replays->bReturnToLibrary=false; SelectedProfileTab=EFlickProfileTab::SavedReplays; GameMode->OpenProfile();
+		}
 	const bool bProfileVisible = GetScreenVisibility(EFlickFrontendScreen::Profile) == EVisibility::Visible;
 	if (bProfileVisible)
 	{

@@ -6,6 +6,8 @@
 #include "Pieces/FlickPiece.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Player/FlickPlayerController.h"
+#include "Player/FlickPlayerState.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 
@@ -72,6 +74,26 @@ bool FFlickAchievementGameplayTest::RunTest(const FString&)
     auto* Tracker = Mode->GetAchievementTracker();
     // Deliberately enable just this in-memory fixture. Real unattended runs are excluded.
     Tracker->bEnabled = true;
+    State->MatchPhase=EFlickMatchPhase::Aiming;
+    Tracker->ActiveSeconds=0;
+    for(int32 Frame=0;Frame<40;++Frame) Tracker->TickComponent(.025f,LEVELTICK_All,nullptr);
+    const float LowFPS=Tracker->ActiveSeconds;
+    Tracker->ActiveSeconds=0;
+    for(int32 Frame=0;Frame<400;++Frame) Tracker->TickComponent(.0025f,LEVELTICK_All,nullptr);
+    TestTrue(TEXT("Active XP clock is consistent at 40 and 400 FPS"),FMath::IsNearlyEqual(LowFPS,Tracker->ActiveSeconds,.001f));
+    Mode->bCinematicReplayActive=true;Tracker->TickComponent(10.f,LEVELTICK_All,nullptr);
+    TestTrue(TEXT("Replays add no active XP time"),FMath::IsNearlyEqual(Tracker->ActiveSeconds,1.f,.001f));
+    Mode->bCinematicReplayActive=false;State->MatchPhase=EFlickMatchPhase::RoundOver;Tracker->TickComponent(10.f,LEVELTICK_All,nullptr);
+    TestTrue(TEXT("Result menus add no active XP time"),FMath::IsNearlyEqual(Tracker->ActiveSeconds,1.f,.001f));
+    State->MatchPhase=EFlickMatchPhase::Aiming;
+    Tracker->ActiveSeconds=0;
+    for(int32 F=0;F<24000;++F) Tracker->TickComponent(.025f,LEVELTICK_All,nullptr);
+    const auto LongLowFPS=FMath::FloorToInt(Tracker->ActiveSeconds+.001);
+    Tracker->ActiveSeconds=0;
+    for(int32 F=0;F<240000;++F) Tracker->TickComponent(.0025f,LEVELTICK_All,nullptr);
+    TestEqual(TEXT("Ten-minute active clock agrees at 40 and 400 FPS"),FMath::FloorToInt(Tracker->ActiveSeconds+.001),LongLowFPS);
+    Tracker->ActiveSeconds=0;
+
     Tracker->Players.FindOrAdd(0).Report.EventId = FGuid::NewGuid();
     Tracker->Players.FindOrAdd(1).Report.EventId = FGuid::NewGuid();
     auto* Heavy = Mode->SpawnPiece(EFlickTeam::Player1, 1, FVector(0,0,300), EFlickPieceArchetype::Heavy);
@@ -114,6 +136,22 @@ bool FFlickAchievementGameplayTest::RunTest(const FString&)
     Tracker->BobPocket(Other,2);
     TestEqual(TEXT("A striker pocket is excluded from objective coin counters"), Read(FlickAchievements::EId::PocketCollection), 2);
     TestTrue(TEXT("A striker pocket invalidates a clean BOB win"), Tracker->Players[0].bStrikerPocketed);
+    auto* PC=World->SpawnActor<AFlickPlayerController>();
+    World->AddController(PC);
+    auto* PS=World->SpawnActor<AFlickPlayerState>();PC->PlayerState=PS;PS->SetTeam(EFlickTeam::Player1);PS->SetTeamPlayerSlot(0);
+    Mode->bTrainingMode=true;Mode->bTrainingBotMatch=true;Tracker->ActiveSeconds=300;
+    State->bSeriesComplete=true;State->WinnerTeam=EFlickTeam::Player1;State->bDraw=false;
+    Tracker->RoundFinished();
+    const auto& Career=Tracker->Players[0].Report.Career;
+    TestTrue(TEXT("Completed bot match produces an eligible authority career result"),Career.bEligible);
+    TestEqual(TEXT("BOB career result distinguishes scoring pucks"),Career.Pockets,2);
+    TestEqual(TEXT("BOB career result counts striker fouls separately"),Career.Fouls,1);
+    TestEqual(TEXT("BOB career result records multi-pocket shots"),Career.MultiPockets,1);
+    TestEqual(TEXT("BOB results keep their own format"),Career.Format,3);
+    TestTrue(TEXT("Authority computes nonzero bot XP"),Career.XP()>0 && Career.XP()<=350);
+    const int32 Award=Career.XP();Tracker->RoundFinished();
+    TestEqual(TEXT("Repeated result callback does not increase the award"),Tracker->Players[0].Report.Career.XP(),Award);
+
     return true;
 }
 #endif

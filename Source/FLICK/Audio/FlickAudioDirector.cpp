@@ -2,6 +2,7 @@
 
 #include "Components/AudioComponent.h"
 #include "Game/FlickGameInstance.h"
+#include "Game/FlickReplaySubsystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundWaveProcedural.h"
@@ -292,6 +293,7 @@ void AFlickAudioDirector::MulticastReplayMusic_Implementation(float Duration, EF
 
 void AFlickAudioDirector::PlayReplayMusicLocal(const float Duration, const EFlickTeam WinningTeam)
 {
+	if(GetWorld()->IsPlayingReplay()) if(const auto* Replay=GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>();Replay&&Replay->IsLoadingTheatre()) return;
 	bReplayMusicActive = false;
 	if (IsValid(ReplayMusicComponent)) ReplayMusicComponent->FadeOut(0.32f, 0.0f);
 	const UFlickGameInstance* Settings = Cast<UFlickGameInstance>(GetGameInstance());
@@ -394,6 +396,7 @@ void AFlickAudioDirector::MulticastImportantCue_Implementation(const FFlickAudio
 
 void AFlickAudioDirector::PlayLocalCue(const FFlickAudioCue& Cue)
 {
+	if(GetWorld()->IsPlayingReplay()) if(const auto* Replay=GetGameInstance()->GetSubsystem<UFlickReplaySubsystem>();Replay&&Replay->IsLoadingTheatre()) return;
 	if (GetNetMode() == NM_DedicatedServer) return;
 	const EFlickGeneratedSoundKind Kind = static_cast<EFlickGeneratedSoundKind>(Cue.Kind);
 	const bool bInterfaceSound = Kind == EFlickGeneratedSoundKind::UiNavigate

@@ -2,6 +2,8 @@
 #include "Arena/FlickArenaLighting.h"
 #include "Core/FlickModeRules.h"
 #include "Core/FlickPuckFinish.h"
+#include "Core/FlickVisualSettings.h"
+#include "Game/FlickGameMode.h"
 #include "UI/FlickLockerStyle.h"
 #include "Engine/RectLight.h"
 
@@ -58,6 +60,9 @@ void AFlickCameraPawn::BeginPlay()
 void AFlickCameraPawn::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	// Only the theatre camera may write the local rig during saved playback,
+	// including the first frame after checkpoint actors have been restored.
+	if (GetWorld() && GetWorld()->IsPlayingReplay() && !bReplayLightingLocked) return;
 
 	if (!Camera)
 	{
@@ -176,9 +181,15 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 	float BlendSpeed = PresentationBlendSpeed;
 	if (bCinematicReplay)
 	{
-		const float ArcAngle = ReplayOrbitAngle + FMath::Lerp(-7.0f, 11.0f, ReplayProgress);
-		const float ReplayDistance = FMath::Lerp(720.0f, 1120.0f, ReplayPullbackAlpha) * ArenaFramingScale;
-		const float ReplayHeight = FMath::Lerp(430.0f, 650.0f, ReplayPullbackAlpha) * ArenaFramingScale;
+		const auto* Mode = GetWorld()->GetAuthGameMode<AFlickGameMode>();
+		const int32 Style = Mode && Mode->IsTrainingShotReplayActive() ? FlickVisualSettings::GetTrainingReplayStyle() : 0;
+		const float Sweep = FMath::SmoothStep(0.f, 1.f, ReplayProgress);
+		const float ArcAngle = ReplayOrbitAngle + (Style == 1 ? FMath::Lerp(-22.f, 30.f, Sweep)
+			: Style == 2 ? 0.f : FMath::Lerp(-7.f, 11.f, ReplayProgress));
+		const float ReplayDistance = (Style == 1 ? FMath::Lerp(580.f, 850.f, ReplayPullbackAlpha)
+			: Style == 2 ? 1120.f : FMath::Lerp(720.f, 1120.f, ReplayPullbackAlpha)) * ArenaFramingScale;
+		const float ReplayHeight = (Style == 1 ? FMath::Lerp(320.f, 460.f, ReplayPullbackAlpha)
+			: Style == 2 ? 1050.f : FMath::Lerp(430.f, 650.f, ReplayPullbackAlpha)) * ArenaFramingScale;
 		const FVector CameraOffset = FVector(0.0f, -ReplayDistance, ReplayHeight)
 			.RotateAngleAxis(ArcAngle, FVector::UpVector);
 		TargetLocation = ReplayFocus + CameraOffset;
@@ -186,7 +197,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 			TargetLocation,
 			ReplayFocus + FVector(0.0f, 0.0f, 28.0f));
 		const float EstablishedFieldOfView = FMath::Lerp(33.0f, 39.0f, ReplayPullbackAlpha);
-		TargetFieldOfView = EstablishedFieldOfView - 3.5f * FMath::Sin(ReplayProgress * PI);
+		TargetFieldOfView = Style == 2 ? 42.f : EstablishedFieldOfView - (Style == 1 ? 6.f : 3.5f) * FMath::Sin(ReplayProgress * PI);
 		BlendSpeed = 5.5f;
 	}
 	if (bPostMatchPresentation && !bCinematicReplay)
@@ -255,6 +266,7 @@ void AFlickCameraPawn::Tick(const float DeltaSeconds)
 
 void AFlickCameraPawn::UpdatePuckStudioLighting()
 {
+	if (bReplayLightingLocked) return;
 	if (!(bTestArenaPresentation || bBobGameplayFraming || (bMenuPresentation && bOneVsOneArenaPresentation))) return;
 	if (!PuckStudioKeyLight.IsValid() || !PuckStudioFillLight.IsValid())
 	{
@@ -728,7 +740,20 @@ void AFlickCameraPawn::SetFreeCameraEnabled(const bool bEnabled)
 		return;
 	}
 	bFreeCameraEnabled = bEnabled;
+	if (bReplayLightingLocked) ApplyArenaPostProcess();
 	if (bEnabled) ClearSpectatorView();
+	if (bEnabled && GetWorld() && GetWorld()->IsPlayingReplay())
+	{
+		// The overview and recorded player views can start beyond the normal
+		// gameplay bounds. Preserve their pose when taking over the camera.
+		const auto* State = GetWorld()->GetGameState<AFlickGameState>();
+		FVector Position = GetActorLocation();
+		Position.Z = FMath::Max(Position.Z, (State ? State->ArenaSurfaceZ : 250.f) + 50.f);
+		SetActorLocation(Position);
+		ReplayFreeMaximumRadius = FMath::Max(FreeCameraMaximumRadius * ArenaFramingScale,
+			FVector2D(Position.X, Position.Y).Size() + 100.f);
+		ReplayFreeMaximumHeight = FMath::Max(FreeCameraMaximumHeight * ArenaFramingScale, Position.Z + 100.f);
+	}
 	bAimPresentation = false;
 	ShakeTrauma = 0.0f;
 	if (!bFreeCameraEnabled)
@@ -748,6 +773,15 @@ FFlickSpectatorView AFlickCameraPawn::CaptureSpectatorView() const
 		View.bValid = true;
 	}
 	return View;
+}
+
+void AFlickCameraPawn::SnapSpectatorView(const FFlickSpectatorView& View)
+{
+	if (!View.IsSafe()) return;
+	SetSpectatorView(View);
+	SetActorLocationAndRotation(View.Location,View.Rotation);
+	CurrentFieldOfView=View.FieldOfView;
+	if (Camera) Camera->SetFieldOfView(CurrentFieldOfView);
 }
 
 void AFlickCameraPawn::SetSpectatorView(const FFlickSpectatorView& View)
@@ -790,7 +824,9 @@ void AFlickCameraPawn::AddFreeCameraInput(
 	}
 	const float Speed = FreeCameraMoveSpeed * (bBoost ? FreeCameraBoostMultiplier : 1.0f);
 	FVector NewLocation = GetActorLocation() + Movement * Speed * DeltaSeconds;
-	const float MaximumRadius = FreeCameraMaximumRadius * ArenaFramingScale;
+	const bool bSavedReplay = GetWorld() && GetWorld()->IsPlayingReplay();
+	const auto* State = bSavedReplay ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
+	const float MaximumRadius = bSavedReplay ? ReplayFreeMaximumRadius : FreeCameraMaximumRadius * ArenaFramingScale;
 	FVector2D Planar(NewLocation.X, NewLocation.Y);
 	if (Planar.SizeSquared() > FMath::Square(MaximumRadius))
 	{
@@ -800,8 +836,8 @@ void AFlickCameraPawn::AddFreeCameraInput(
 	}
 	NewLocation.Z = FMath::Clamp(
 		NewLocation.Z,
-		FreeCameraMinimumHeight,
-		FreeCameraMaximumHeight * ArenaFramingScale);
+		bSavedReplay ? (State ? State->ArenaSurfaceZ : 250.f) + 50.f : FreeCameraMinimumHeight,
+		bSavedReplay ? ReplayFreeMaximumHeight : FreeCameraMaximumHeight * ArenaFramingScale);
 	SetActorLocation(NewLocation);
 }
 

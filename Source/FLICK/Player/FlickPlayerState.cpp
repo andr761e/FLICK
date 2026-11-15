@@ -33,14 +33,14 @@ void AFlickPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AFlickPlayerState, VerifiedOnlineAccountId);
 	DOREPLIFETIME(AFlickPlayerState, PrivateControlledSlots);
 	DOREPLIFETIME(AFlickPlayerState, bPrivateRoleChosen);
-	DOREPLIFETIME_CONDITION(AFlickPlayerState, PrivateCameraView, COND_SkipOwner);
+	DOREPLIFETIME(AFlickPlayerState, PrivateCameraView);
 }
 
 bool AFlickPlayerState::SetPrivateCameraView(const FFlickSpectatorView& View)
 {
 	const AFlickGameState* State = GetWorld() ? GetWorld()->GetGameState<AFlickGameState>() : nullptr;
 	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-	if (!HasAuthority() || !State || !State->bPrivateMatchActive || !State->IsGameplayActive()
+	if (!HasAuthority() || !State || (!State->bPrivateMatchActive && !GetWorld()->IsRecordingReplay()) || !State->IsGameplayActive()
 		|| State->bSeriesComplete || Team == EFlickTeam::None || !View.IsSafe()
 		|| (LastPrivateCameraUpdate >= 0.0 && Now - LastPrivateCameraUpdate < 0.045)) return false;
 	PrivateCameraView = View;
