@@ -22,10 +22,17 @@ namespace
 		virtual FVector2D ComputeDesiredSize(float) const override { return {300,30}; }
 		virtual int32 OnPaint(const FPaintArgs&,const FGeometry& G,const FSlateRect&,FSlateWindowElementList& E,int32 L,const FWidgetStyle&,bool) const override
 		{
-			const auto* R=Replay.Get(); if(!R||R->GetDuration()<=0) return L;
+			const auto* R=Replay.Get(); if(!R||R->GetViewDuration()<=0) return L;
+			if(R->IsEditingClip())
+			{
+				const float Start=G.GetLocalSize().X*R->GetClipIn()/R->GetViewDuration();
+				const float Width=G.GetLocalSize().X*(R->GetClipOut()-R->GetClipIn())/R->GetViewDuration();
+				FSlateDrawElement::MakeBox(E,L,G.ToPaintGeometry(FVector2D(Width,18),FSlateLayoutTransform(FVector2D(Start,0))),FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")),ESlateDrawEffect::None,Brand.CopyWithNewOpacity(.25f));
+			}
 			for(const auto& M:R->GetPlaying().Markers)
 			{
-				const float X=G.GetLocalSize().X*FMath::Clamp(M.Time/R->GetDuration(),0.f,1.f);
+				if(M.Time<R->GetViewStart()||M.Time>R->GetViewEnd()) continue;
+				const float X=G.GetLocalSize().X*FMath::Clamp((M.Time-R->GetViewStart())/R->GetViewDuration(),0.f,1.f);
 				const FLinearColor Color=M.Label.StartsWith(TEXT("Round"))?Cyan:M.Label==TEXT("Knockout")||M.Label==TEXT("Pocket")?Brand:Muted.CopyWithNewOpacity(.5f);
 				FSlateDrawElement::MakeLines(E,L,G.ToPaintGeometry(),TArray<FVector2D>{{X,0},{X,9}},ESlateDrawEffect::None,Color,true,2);
 			}
@@ -112,6 +119,7 @@ TSharedRef<SWidget> MakeFlickReplayTheatre(AFlickReplayController* Controller)
 		.OnGetMenuContent_Lambda([C,R,MenuItem]()->TSharedRef<SWidget>
 		{
 			return SNew(SBox).WidthOverride(265)[SNew(SVerticalBox)
+			 +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,5)[MenuItem(TEXT("CREATE CLIP"),[C,R]() {if(C.IsValid()) C->SelectCamera(C->GetCameraMode());if(R.IsValid()) R->BeginClip();})]
 			 +SVerticalBox::Slot().AutoHeight()[MenuItem(TEXT("RESET CAMERA"),[C]() {if(C.IsValid()) C->ResetView();})]
 			 +SVerticalBox::Slot().AutoHeight().Padding(0,2)[MenuItem(TEXT("PREVIOUS SHOT"),[R]() {if(R.IsValid()) R->JumpMarker(-1);})]
 			 +SVerticalBox::Slot().AutoHeight()[MenuItem(TEXT("NEXT SHOT"),[R]() {if(R.IsValid()) R->JumpMarker(1);})]
@@ -139,16 +147,19 @@ TSharedRef<SWidget> MakeFlickReplayTheatre(AFlickReplayController* Controller)
 	      +SVerticalBox::Slot().AutoHeight()[SNew(SHorizontalBox)
 	       +SHorizontalBox::Slot().FillWidth(1).VAlign(VAlign_Center)[SNew(SBox).HeightOverride(18)[SNew(SOverlay)
 	        +SOverlay::Slot()[SNew(SSlider).Style(&TimelineStyle)
-	         .Value_Lambda([R]() {return R.IsValid()&&R->GetDuration()>0?R->GetDisplayTime()/R->GetDuration():0.f;})
+	         .Value_Lambda([R]() {return R.IsValid()&&R->GetViewDuration()>0?R->GetDisplayTime()/R->GetViewDuration():0.f;})
 	         .OnMouseCaptureBegin_Lambda([R]() {if(R.IsValid()) R->BeginScrub();})
 	         .OnMouseCaptureEnd_Lambda([R]() {if(R.IsValid()) R->EndScrub();})
-	         .OnValueChanged_Lambda([R](float V) {if(R.IsValid()) R->PreviewScrub(V*R->GetDuration());})
+	         .OnValueChanged_Lambda([R](float V) {if(R.IsValid()) R->PreviewScrub(R->GetViewStart()+V*R->GetViewDuration());})
 	         .ToolTipText(FText::FromString(TEXT("Drag the timeline, then release to jump. Cyan: rounds. Orange: knockouts / pockets.")))]
 	        +SOverlay::Slot()[SNew(SReplayMarkers).Replay(R).Visibility(EVisibility::HitTestInvisible)]]]
 	       +SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10,0,0,0)
-	       [SNew(STextBlock).Text_Lambda([R]() {return FText::FromString(R.IsValid()?FString::Printf(TEXT("%s / %s%s"),*Clock(R->GetDisplayTime()),*Clock(R->GetDuration()),R->IsSeeking()?TEXT(" ..."):TEXT("")):TEXT("LOADING"));}).Font(UiFont(10,true)).ColorAndOpacity(Paper)]]
+	       [SNew(STextBlock).Text_Lambda([R]() {return FText::FromString(R.IsValid()?FString::Printf(TEXT("%s / %s%s"),*Clock(R->GetDisplayTime()),*Clock(R->GetViewDuration()),R->IsSeeking()?TEXT(" ..."):TEXT("")):TEXT("LOADING"));}).Font(UiFont(10,true)).ColorAndOpacity(Paper)]]
 	      +SVerticalBox::Slot().AutoHeight().Padding(0,4,0,0)[Controls]
-	     ]]]]];
+	     ]]]]]
+	 +SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(12,0,12,90)
+	 [SNew(SBox).MaxDesiredWidth(820).Visibility_Lambda([R,C]() {return R.IsValid()&&R->IsEditingClip()&&C.IsValid()&&C->ShowsControls()?EVisibility::SelfHitTestInvisible:EVisibility::Collapsed;})
+	  [SNew(SScaleBox).Stretch(EStretch::ScaleToFit).StretchDirection(EStretchDirection::DownOnly)[MakeFlickReplayClipEditor(Controller->Replay())]]];
 }
 
 TSharedRef<SWidget> MakeFlickReplayLoading(UFlickReplaySubsystem* Replay)

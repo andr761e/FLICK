@@ -87,6 +87,7 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Deck uses the cooked architectural shader"), Finish->GetMaterial()->GetName(), FString(TEXT("M_ArchitecturalMetal")));
 			CheckParameter(Finish, TEXT("RimCollarFinish"), 0.f);
 			CheckParameter(Finish, TEXT("DeckFinish"), 1.f);
+			CheckParameter(Finish, TEXT("DeckGuides"), 1.f);
 			CheckParameter(Finish, TEXT("DeckRelief"), Arena->DeckFinishRelief);
 			CheckPatternScale(Finish);
 			FLinearColor Color;
@@ -109,22 +110,22 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 		{
 			const auto* Material = Arena->StadiumStructureMesh->GetMaterial(Slot);
 			if (!Material || Material->GetMaterial()->GetName() != TEXT("M_ArchitecturalMetal")) continue;
+			const auto* Source = Arena->StadiumStructureMesh->GetStaticMesh()->GetMaterial(Slot);
+			const FString SourceName = Source ? Source->GetName() : FString();
 			CheckParameter(Material, TEXT("RimCollarFinish"), 0.f);
 			CheckParameter(Material, TEXT("DeckRelief"), 0.f);
+			CheckParameter(Material, TEXT("DeckGuides"), 0.f);
+			CheckParameter(Material, TEXT("ConcourseSeams"), SourceName.Contains(TEXT("Porcelain")) ? 1.f : 0.f);
+			CheckParameter(Material, TEXT("ConcourseSeamGeometry"), SourceName.Contains(TEXT("Graphite_Inset")) ? 1.f : 0.f);
 			CheckPatternScale(Material);
 		}
-		TestTrue(TEXT("Reduced guide set is built"), Arena->ConceptGuides->GetInstanceCount() > 0);
+		TestTrue(TEXT("Traced stadium seams match their rasterized render depth"),
+			Arena->StadiumStructureMesh->EvaluateWorldPositionOffsetInRayTracing());
+		TestEqual(TEXT("Integrated guides never overlap a second mesh edge or Lumen occluder"),
+			Arena->ConceptGuides->GetInstanceCount(), 0);
+		TestFalse(TEXT("Fallback guide meshes stay hidden with the current floor material"), Arena->ConceptGuides->IsVisible());
 		TestEqual(TEXT("Every designed socket has a dark channel"), Arena->ConceptSocketDark->GetInstanceCount(), Arena->GetPossibleLocationCount());
 		TestEqual(TEXT("Every designed socket has four metal frame bars"), Arena->ConceptSocketMetal->GetInstanceCount(), Arena->GetPossibleLocationCount() * 4);
-		FTransform Guide;
-		Arena->ConceptGuides->GetInstanceTransform(0, Guide);
-		FTransform OtherAxis, RingGuide;
-		Arena->ConceptGuides->GetInstanceTransform(1, OtherAxis);
-		Arena->ConceptGuides->GetInstanceTransform(2, RingGuide);
-		TestTrue(TEXT("Cross axes and rings have distinct non-overlapping visual depths"),
-			OtherAxis.GetLocation().Z - Guide.GetLocation().Z > .05f
-			&& Guide.GetLocation().Z - RingGuide.GetLocation().Z > .05f);
-		TestTrue(TEXT("Guides scale with the current arena radius"), FMath::IsNearlyEqual(Guide.GetScale3D().X * 100.f, Radius * 1.88f, .01f));
 		FTransform Rim;
 		Arena->ConceptWarmRim->GetInstanceTransform(0, Rim);
 		TestTrue(TEXT("Warm rim follows the current arena edge"), FMath::IsNearlyEqual(FVector2D(Rim.GetLocation()).Size(), Radius * .998f, .01f));
@@ -182,7 +183,8 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 			CheckPatternScale(Material);
 		}
 		Arena->SetMenuPresentationEnabled(false);
-		TestTrue(TEXT("New arena appearance remains active after leaving menus"), Arena->bConceptApplied && Arena->ConceptGuides->IsVisible());
+		TestTrue(TEXT("New arena appearance remains active after leaving menus"), Arena->bConceptApplied);
+		TestFalse(TEXT("Leaving menus cannot restore duplicate guide geometry"), Arena->ConceptGuides->IsVisible());
 		for (UMaterialInstanceDynamic* Material : Arena->ConceptMaterials)
 			TestFalse(TEXT("Concept MIDs do not have unsupported MID parents"), Material->Parent->IsA<UMaterialInstanceDynamic>());
 		for (int32 Index = 0; Index < Components.Num(); ++Index)

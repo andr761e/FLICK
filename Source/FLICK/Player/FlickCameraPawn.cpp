@@ -3,6 +3,7 @@
 #include "Core/FlickModeRules.h"
 #include "Core/FlickPuckFinish.h"
 #include "Core/FlickVisualSettings.h"
+#include "Core/FlickRenderStability.h"
 #include "Game/FlickGameMode.h"
 #include "UI/FlickLockerStyle.h"
 #include "Engine/RectLight.h"
@@ -463,10 +464,11 @@ void AFlickCameraPawn::ApplyArenaPostProcess()
 	Camera->PostProcessSettings.bOverride_ScreenSpaceReflectionQuality = bOneVsOneMenu;
 	Camera->PostProcessSettings.ScreenSpaceReflectionQuality = 75.f;
 	Camera->PostProcessSettings.bOverride_LumenReflectionQuality = bOneVsOneMenu;
-	// Use Epic's normal reconstruction budget rather than multiplying its five
-	// samples to eight. Temporal filtering and the stable scene-trace path below
-	// remain enabled; reflection tracing layout belongs to scalability settings.
-	Camera->PostProcessSettings.LumenReflectionQuality = 1.0f;
+	// Optional A/B controls; normal quality remains unchanged after comparison.
+	const bool bStableArena=bOneVsOneMenu&&FlickRenderStability::IsEnabled();
+	Camera->PostProcessSettings.LumenReflectionQuality = bStableArena?FlickRenderStability::ReflectionQuality():1.f;
+	Camera->PostProcessSettings.bOverride_LumenFinalGatherQuality=bStableArena&&FlickRenderStability::FinalGatherQuality()>1.f;
+	Camera->PostProcessSettings.LumenFinalGatherQuality=bStableArena?FlickRenderStability::FinalGatherQuality():1.f;
 	// Tiny rim LEDs fluctuate when screen-space hits alternate with Lumen's
 	// scene cache. Use scene traces consistently in Switchyard; retain Lumen
 	// reflections and the player's hardware/software tracing preference.

@@ -37,7 +37,7 @@ void UFlickReplaySubsystem::ShowLoading()
 void UFlickReplaySubsystem::BeginPlayback()
 {
 	bPreloading=false; bWarmingTheatre=true; Status=TEXT("Preparing replay and warming up the arena...");
-	const FString File=Root()/TEXT("Matches")/(Playing.Id+TEXT(".flick.replay"));
+	const FString File=Root()/TEXT("Matches")/(Playing.PayloadId()+TEXT(".flick.replay"));
 	const TArray<FString> Options={TEXT("ReplayStreamerOverride=LocalFileNetworkReplayStreaming")};
 	if(!GetGameInstance()->PlayReplay(File,nullptr,Options))
 		PlaybackFailed(TEXT("This replay could not be opened; it may require a different game version."));
@@ -63,7 +63,7 @@ void UFlickReplaySubsystem::TickLoading()
 	}
 	const auto* State=GetWorld()->GetGameState<AFlickGameState>();
 	int32 Count=0; for(TActorIterator<AFlickPiece> It(GetWorld());It;++It) ++Count;
-	if(!State||!Count||GetTime()<.15f||IsAsyncLoading()) {StableSince=0; WarmFrames=0;return;}
+	if(!State||!Count||(!bWarmPrerolled&&GetTime()<.15f)||IsAsyncLoading()) {StableSince=0; WarmFrames=0;return;}
 	// Paused frames do not exercise motion/impact render pipelines. Run a bounded
 	// hidden playback pass, then restore the initial checkpoint before opening UI.
 	if(!bWarmPrerolled)
@@ -77,7 +77,7 @@ void UFlickReplaySubsystem::TickLoading()
 		}
 		if(FPlatformTime::Seconds()-PrerollStarted>=20||GetTime()>=FMath::Min(10.f,GetDuration()-.05f))
 		{
-			SetSpeed(1);SetPaused(true);Seek(FMath::Min(.2f,GetDuration()*.1f));bWarmRewinding=true;
+			SetSpeed(1);SetPaused(true);Seek(GetViewStart());bWarmRewinding=true;
 		}
 		return;
 	}

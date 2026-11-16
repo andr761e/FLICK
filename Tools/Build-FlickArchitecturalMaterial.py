@@ -42,6 +42,98 @@ surface_z = param("ArenaSurfaceZ", 250.)
 lens_count = param("RimLensCount", 28.)
 vertex_normal = edit.create_material_expression(material, u.MaterialExpressionVertexNormalWS)
 position = edit.create_material_expression(material, u.MaterialExpressionWorldPosition)
+# Painted guides and concourse joints share their host surface's depth. Thin
+# boxes above that surface produced subpixel silhouettes, intersections and
+# independent Lumen occluders. Filter their actual pixel coverage instead.
+markings = edit.create_material_expression(material, u.MaterialExpressionCustom)
+markings.set_editor_property("output_type", u.CustomMaterialOutputType.CMOT_FLOAT2)
+inputs = []
+for key in ("P", "N", "Guides", "Seams", "Width", "Radius", "SurfaceZ"):
+    entry = u.CustomInput()
+    entry.set_editor_property("input_name", key)
+    inputs.append(entry)
+markings.set_editor_property("inputs", inputs)
+markings.set_editor_property("code", r"""
+struct FloorInk {
+ float coverage(float distance) {
+  return saturate(.5-distance/max(fwidth(distance),.001));
+ }
+ float stroke(float coordinate,float halfWidth) {
+  // Integrate the interval over the pixel, including strokes narrower than
+  // one pixel. Differentiate BEFORE abs(): fwidth(abs(x)) collapses when a
+  // quad straddles a thin line, exactly where stable coverage matters most.
+  float pixel=max(fwidth(coordinate),.001);
+  return saturate((min(halfWidth,coordinate+pixel*.5)
+                 -max(-halfWidth,coordinate-pixel*.5))/pixel);
+ }
+};
+FloorInk ink;
+if(Guides<.5 && Seams<.5) return float2(0.,0.);
+float scale=max(Radius/650.,.1), r=length(P.xy);
+float up=saturate((N.z-.8)*5.);
+float cross=max(ink.stroke(P.x,Width*.5*scale),ink.stroke(P.y,Width*.5*scale))
+ *ink.coverage(max(abs(P.x),abs(P.y))-Radius*.94);
+float inner=ink.stroke(r-Radius*.151,.65*scale);
+float rings=max(max(ink.stroke(r-Radius*.36,Width*.5*scale),ink.stroke(r-Radius*.52,Width*.5*scale)),
+                max(ink.stroke(r-Radius*.705,Width*.5*scale),ink.stroke(r-Radius*.855,Width*.5*scale)));
+// Match the existing 3/192-segment break immediately after each cardinal axis.
+// Rotate its centre rather than differentiating a wrapped angle at that axis.
+float2 rotated=float2(.998795456*P.x+.049067674*P.y,
+                     -.049067674*P.x+.998795456*P.y);
+float gap=min(abs(rotated.x),abs(rotated.y))-r*.049067674;
+float guide=max(cross,max(inner,rings*ink.coverage(-gap)));
+guide*=Guides*up;
+
+float angle=atan2(P.y,P.x);
+float radialStep=3.141592654/12.;
+float nearest=angle-radialStep*floor(angle/radialStep+.5);
+float radial=ink.stroke(r*sin(nearest),.6*scale)
+ *ink.coverage(670.*scale-r)*ink.coverage(r-1512.*scale);
+float joints=max(ink.stroke(r-935.9*scale,.9*scale),
+                 max(ink.stroke(r-1225.9*scale,.9*scale),ink.stroke(r-1475.9*scale,.9*scale)));
+float seam=max(radial,joints);
+// Retain the 48 timing ticks that share the authored seam material slot.
+float tickStep=3.141592654/24.;
+float tick=floor(angle/tickStep+.5), localAngle=angle-tick*tickStep;
+float halfLength=frac(tick*.25)<.01?16.:7.;
+float tickCoverage=ink.stroke(r*cos(localAngle)-1055.*scale,1.25*scale)
+ *ink.stroke(r*sin(localAngle),halfLength*scale);
+seam=max(seam,tickCoverage);
+float floorZ=SurfaceZ-50.*scale;
+seam*=Seams*up*(1.-smoothstep(.5*scale,1.5*scale,abs(P.z-floorZ)));
+return float2(guide,seam);
+""")
+for node, slot in ((position, "P"), (vertex_normal, "N"),
+                   (param("DeckGuides", 0.), "Guides"), (param("ConcourseSeams", 0.), "Seams"),
+                   (param("GuideWidth", 1.05), "Width"), (radius, "Radius"), (surface_z, "SurfaceZ")):
+    connect(node, markings, slot)
+
+
+def marked_property(surface, property, paint, seams=None):
+    """Blend the same filtered coverage through every shading channel."""
+    node = edit.create_material_expression(material, u.MaterialExpressionCustom)
+    node.set_editor_property("output_type", u.CustomMaterialOutputType.CMOT_FLOAT3
+                             if property in (u.MaterialProperty.MP_BASE_COLOR,
+                                             u.MaterialProperty.MP_NORMAL,
+                                             u.MaterialProperty.MP_EMISSIVE_COLOR)
+                             else u.CustomMaterialOutputType.CMOT_FLOAT1)
+    entries = []
+    for key in ("Surface", "Ink", "Paint", "Seam"):
+        entry = u.CustomInput()
+        entry.set_editor_property("input_name", key)
+        entries.append(entry)
+    node.set_editor_property("inputs", entries)
+    vector = property in (u.MaterialProperty.MP_BASE_COLOR, u.MaterialProperty.MP_NORMAL,
+                          u.MaterialProperty.MP_EMISSIVE_COLOR)
+    node.set_editor_property("code", "return lerp(lerp(Surface,Paint.rgb,Ink.x),Seam.rgb,Ink.y);"
+                             if vector else "return lerp(lerp(Surface,Paint,Ink.x),Seam,Ink.y);")
+    connect(surface, node, "Surface")
+    connect(markings, node, "Ink")
+    connect(paint, node, "Paint")
+    connect(seams if seams is not None else paint, node, "Seam")
+    assert edit.connect_material_property(node, "", property)
+
+
 pattern = edit.create_material_expression(material, u.MaterialExpressionCustom)
 pattern.set_editor_property("output_type", u.CustomMaterialOutputType.CMOT_FLOAT4)
 inputs = []
@@ -117,18 +209,22 @@ mask.set_editor_property("r", True)
 mask.set_editor_property("g", True)
 mask.set_editor_property("b", True)
 connect(pattern, mask, "")
-assert edit.connect_material_property(mask, "", u.MaterialProperty.MP_BASE_COLOR)
+marked_property(mask, u.MaterialProperty.MP_BASE_COLOR,
+                param("GuideColor", u.LinearColor(.48, .57, .62, 1)),
+                param("SeamColor", u.LinearColor(.003, .006, .009, 1)))
 alpha = edit.create_material_expression(material, u.MaterialExpressionComponentMask)
 alpha.set_editor_property("r", False)
 alpha.set_editor_property("g", False)
 alpha.set_editor_property("b", False)
 alpha.set_editor_property("a", True)
 connect(pattern, alpha, "")
-assert edit.connect_material_property(alpha, "", u.MaterialProperty.MP_ROUGHNESS)
+marked_property(alpha, u.MaterialProperty.MP_ROUGHNESS, param("MarkingRoughness", .8), param("SeamRoughness", .75))
 for key, value, prop in (("Metallic", .8, u.MaterialProperty.MP_METALLIC),
                          ("Specular", .5, u.MaterialProperty.MP_SPECULAR),
                          ("Anisotropy", .2, u.MaterialProperty.MP_ANISOTROPY)):
-    assert edit.connect_material_property(param(key, value), "", prop)
+    marked_property(param(key, value), prop,
+                    param("Marking" + key, {"Metallic": .05, "Specular": .25, "Anisotropy": 0.}[key]),
+                    param("Seam" + key, {"Metallic": .2, "Specular": .1, "Anisotropy": 0.}[key]))
 
 # A real, small surface gradient perturbs reflected light. World-space normals
 # keep the machining direction continuous across separate imported deck plates.
@@ -186,13 +282,36 @@ connect(deck, normal, "Deck")
 connect(relief, normal, "Relief")
 for node, slot in ((collar, "Collar"), (radius, "Radius"), (arena_scale, "ArenaScale"), (surface_z, "SurfaceZ")):
     connect(node, normal, slot)
-assert edit.connect_material_property(normal, "", u.MaterialProperty.MP_NORMAL)
+marked_property(normal, u.MaterialProperty.MP_NORMAL, vertex_normal)
 
 # Preserve the existing material's exact render-order convention, not new WPO.
 offset = edit.create_material_expression(material, u.MaterialExpressionMultiply)
 connect(param("LayerDirection", u.LinearColor(0, 0, 1, 0)), offset, "A")
 connect(param("RenderLayerOffset", 0.), offset, "B")
-assert edit.connect_material_property(offset, "", u.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+# The authored graphite slot also contains benches/walls. Bury ONLY its thin
+# floor details; the filtered joints/ticks now live on the porcelain floor.
+# Use undisplaced world position so selection cannot depend on its own WPO.
+unshifted_position = edit.create_material_expression(material, u.MaterialExpressionWorldPosition)
+unshifted_position.set_editor_property("world_position_shader_offset", u.WorldPositionIncludedOffsets.WPT_EXCLUDE_ALL_SHADER_OFFSETS)
+floor_offset = edit.create_material_expression(material, u.MaterialExpressionCustom)
+floor_offset.set_editor_property("output_type", u.CustomMaterialOutputType.CMOT_FLOAT3)
+entries = []
+for key in ("Offset", "P", "HideSeams", "Radius", "SurfaceZ"):
+    entry = u.CustomInput()
+    entry.set_editor_property("input_name", key)
+    entries.append(entry)
+floor_offset.set_editor_property("inputs", entries)
+floor_offset.set_editor_property("code", r"""
+float scale=max(Radius/650.,.1);
+float z=(P.z-SurfaceZ)/scale+50.;
+float floorDetail=step(.25,z)*step(z,2.1)*step(length(P.xy),1514.*scale);
+return Offset-float3(0.,0.,4.*scale*HideSeams*floorDetail);
+""")
+for node, slot in ((offset, "Offset"), (unshifted_position, "P"),
+                   (param("ConcourseSeamGeometry", 0.), "HideSeams"),
+                   (radius, "Radius"), (surface_z, "SurfaceZ")):
+    connect(node, floor_offset, slot)
+assert edit.connect_material_property(floor_offset, "", u.MaterialProperty.MP_WORLD_POSITION_OFFSET)
 
 emission = edit.create_material_expression(material, u.MaterialExpressionCustom)
 emission.set_editor_property("output_type", u.CustomMaterialOutputType.CMOT_FLOAT3)
@@ -241,7 +360,9 @@ connect(param("IndirectEmissionScale", .15), indirect_emission, "B")
 emission_paths = edit.create_material_expression(material, u.MaterialExpressionRayTracingQualitySwitch)
 connect(emission, emission_paths, "Normal")
 connect(indirect_emission, emission_paths, "RayTraced")
-assert edit.connect_material_property(emission_paths, "", u.MaterialProperty.MP_EMISSIVE_COLOR)
+marked_property(emission_paths, u.MaterialProperty.MP_EMISSIVE_COLOR,
+                param("GuideLift", u.LinearColor(.48*.035, .57*.035, .62*.035, 0)),
+                param("SeamLift", u.LinearColor(0, 0, 0, 0)))
 edit.recompile_material(material)
 assert u.EditorAssetLibrary.save_loaded_asset(material)
 u.log("FLICK_ARCHITECTURAL_MATERIAL_READY " + material.get_path_name())

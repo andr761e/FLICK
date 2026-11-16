@@ -6,3 +6,4 @@ TSharedRef<SWidget> MakeFlickReplayTheatre(AFlickReplayController* Controller);
 
 class UFlickReplaySubsystem;
 TSharedRef<SWidget> MakeFlickReplayLoading(UFlickReplaySubsystem* Replay);
+TSharedRef<SWidget> MakeFlickReplayClipEditor(UFlickReplaySubsystem* Replay);

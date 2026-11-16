@@ -6,6 +6,8 @@
 #include "Core/FlickTypes.h"
 #include "FlickReplaySubsystem.generated.h"
 
+class INetworkReplayStreamer;
+
 struct FFlickReplayMarker
 {
 	float Time = 0;
@@ -17,6 +19,12 @@ struct FFlickReplayMarker
 struct FFlickSavedReplay
 {
 	FString Id, Name, RecordedAt, GameVersion, Mode, Result;
+	// Clips reference a full recording directly, even when made from another clip.
+	FString SourceId, SourceName;
+	float ClipStart = 0, ClipEnd = 0;
+	bool IsClip() const { return !SourceId.IsEmpty(); }
+	const FString& PayloadId() const { return IsClip()?SourceId:Id; }
+	float ViewDuration() const { return IsClip()?ClipEnd-ClipStart:Duration; }
 	EFlickMatchVariant Variant = EFlickMatchVariant::Classic;
 	int32 TeamSize = 1;
 	float Duration = 0;
@@ -50,6 +58,8 @@ public:
 	bool RenameReplay(const FString& Id, const FString& Name);
 	bool SetFavourite(const FString& Id, bool bValue);
 	bool Delete(const FString& Id);
+	// Times are relative to the selected library entry. Returns the new entry ID.
+	FString SaveClip(const FString& Id, const FString& Name, float Start, float End);
 	bool Watch(const FString& Id);
 	bool NeedsSessionExit() const;
 	bool WatchAfterLeaving(const FString& Id);
@@ -60,7 +70,21 @@ public:
 	const FString& GetStatus() const { return Status; }
 	float GetTime() const;
 	float GetDuration() const;
-	float GetDisplayTime() const { if(bScrubbing) return ScrubTime; return PendingSeek>=0?PendingSeek:bSeeking?ActiveSeek:GetTime(); }
+	// Native playback/pose clocks stay in source seconds; the UI is clip-relative.
+	float GetViewStart() const { return Playing.IsClip()?Playing.ClipStart:0.f; }
+	float GetViewEnd() const;
+	float GetViewDuration() const { return FMath::Max(0.f,GetViewEnd()-GetViewStart()); }
+	float GetDisplayTime() const;
+	void BeginClip();
+	void CloseClip();
+	bool IsEditingClip() const { return bEditingClip; }
+	int32 GetClipEditorRevision() const { return ClipEditorRevision; }
+	bool SetClipRange(float Start, float End);
+	float GetClipIn() const { return ClipIn; }
+	float GetClipOut() const { return ClipOut; }
+	void PreviewClip();
+	void PreviewClipBoundary(bool bStart, bool bFinal=false);
+	bool IsPreviewingClip() const { return bPreviewingClip; }
 	void Seek(float Seconds);
 	void BeginScrub();
 	void PreviewScrub(float Seconds);
@@ -91,8 +115,14 @@ private:
 	FString CaptureMatchId, TemporaryFile, Status, PendingWatchId;
 	FFlickSavedReplay Current, Playing;
 	bool bCapturing = false, bCurrentSaved = false, bPlaybackRequested = false;
+	TSharedPtr<INetworkReplayStreamer> FinalizingRecording;
 	bool bPaused = false, bSeeking = false;
 	bool bScrubbing = false, bScrubWasPaused = false;
+	bool bEditingClip = false, bPreviewingClip = false;
+	bool bBoundaryPreview = false;
+	double LastBoundarySeek = 0;
+	float ClipIn = 0, ClipOut = 0;
+	int32 ClipEditorRevision = 0;
 	float ScrubTime = 0;
 	bool bPreloading = false, bWarmingTheatre = false;
 	bool bWarmPrerolled = false, bWarmRewinding = false;

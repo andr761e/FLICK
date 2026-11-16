@@ -136,3 +136,70 @@ Recorded puck poses are applied once per actor frame rather than repeatedly for 
 The first UI build caught a missing Slate bracket; it was corrected, and the game target subsequently compiled successfully. The interpolation regression covers constant velocity, exact endpoints, deceleration, missing velocities and collision tangents staying within recorded bounds. Existing short 1x rendered comparisons were approximately 10 ms at p95 both before and after; no renderer FPS improvement is claimed from those samples. Their five screenshot stalls are deliberate captures. Original low-rate saves remain limited by the motion information they contain.
 
 Final compact/timing validation: game and editor Development builds succeeded after the Slate syntax correction. Eight targeted editor automation tests passed with zero failures, including the new interpolation test. Both rendered Knockout and BOB end-to-end replay regressions passed. The original 41-second private recording completed normal and double-speed playback with no stationary timeline frames in the measured playback windows; double speed advanced 40 replay seconds in 20 wall seconds. Persistent controls, all three popup menus, and hide/show were rendered at 1920x1080 and 1280x720. Original saved replay payload hashes remained unchanged. The Development executable and symbols were updated.
+
+## Named replay clips
+
+In the theatre, choose **More → Create clip**. The temporary panel provides independent start/end sliders, editable `m:ss.sss` timestamps (plain seconds are also accepted), **Use current** buttons, a clip name, and **Loop preview**. The selected interval is highlighted on the existing timeline. Camera/player choices remain available during preview. Dragging either boundary shows footage at that boundary, with coalesced native seeks at most every 120 ms and only one seek in flight. Release queues the final exact boundary. Timestamp edits also preview their boundary. Dragging the normal timeline stops the loop and retains its normal seek-on-release behavior. Escape closes the editor before exiting the theatre.
+
+**Review & Save** first pauses the preview and presents the name, start/end and duration without writing a library entry. **Back to Edit** returns to trimming; **Confirm & Save** writes the clip. A persistent **Clip Saved** panel confirms success and its location, with **Done** or **Another Clip** actions. The library entry is tagged **CLIP**, showing its original match title and selected duration. It opens paused at relative `00:00`; slider seeks, keyboard skips, frame steps and shot/round navigation are bounded by the selected interval. Playback stops at the endpoint, and pressing Play there restarts the clip. Recorded player/bot perspectives, follow-puck, free camera and cinematic views remain available. A clip can itself be clipped again.
+
+The native recording clock remains in source seconds so checkpoint loading, pose interpolation and recorded cameras keep their original timing. Only theatre UI time is rebased. Clips preload the source assets and seek to their start behind the existing loading overlay before opening.
+
+Clips are metadata, not rendered videos or trimmed native payloads. Each index has an optional `SourceId`, `SourceName`, absolute `ClipStart` and `ClipEnd`. `Duration` and event timestamps retain the full recording's clock. Clipping a clip flattens its source reference and adds its original offset. This avoids copying native checkpoint state and preserves all perspectives. The original entry is unchanged; the underlying recording still occupies its full disk size. Library storage totals count each shared recording once.
+
+Deleting an entry first removes its index, then deletes its native payload only if no other valid library entry references it. Deleting the original library entry therefore preserves its clips. Source IDs and finite time ranges are validated on read and write; missing clip fields retain compatibility with full-match indexes. No third-party dependencies, gameplay physics changes, or binary assets are needed.
+
+Validation on 2026-11-16: both Windows Development game and editor targets compiled successfully. Nine targeted editor automation tests passed with zero test failures or warnings. The new clip metadata regression covers invalid ranges/names, unsafe source IDs, independent titles, nested source offsets and deletion of shared recordings only after the last library reference. Rendered clip checks at 1920x1080 and 1280x720 passed loading after original-entry deletion, relative zero, looping preview, camera/player selection, nested saving, bounded seeks, restart from end and automatic stop at 2x. Both editor-panel layouts and the tagged clip library were visually inspected. Existing rendered Knockout and BOB record/save/load/seek/camera/profile regressions passed. The Development executable and symbols were updated; original player payload SHA-256 hashes remained unchanged.
+
+The same rendered clip workflow also passed on a fresh BOB recording. Timestamp fields retain exact endpoints when focused without changes, use integer milliseconds to avoid invalid `:60.000` displays, and prevent saving an invalid edited range.
+
+## Clip editing refinement and visual stability
+
+The save action now has distinct editing, review and saved states. No index is created by **Review & Save**. The success panel remains visible until **Done**, rather than silently closing as soon as the file is written. Both boundary sliders preview their actual native replay footage while dragging; requests are coalesced rather than postponed until dragging stops. The final boundary is requested on release. Normal theatre timeline scrubbing retains its existing release-to-seek behavior.
+
+The current camera/puck motion interpolation and capture settings are unchanged. Narrow Knockout guide strips are wider and use a matte finish to reduce sub-pixel edge/specular shimmer at gameplay distance. Polished, non-emissive metal puck materials receive a small 0.18 roughness floor through the shared live/replay finish, without changing their colours or physics. These are targeted shimmer reductions, not a claim that every temporal reflection artifact is eliminated.
+
+Validation: Windows game and editor Development builds succeeded. All nine targeted editor automation tests passed with zero test failures/warnings. Rendered clip tests passed on a copied current 120 Hz recording at 1920x1080 and a copied legacy recording at 1280x720. They verify footage updates during continuous dragging of both boundaries, settling on release, review without writing, actual Slate confirmation-button activation, exactly one new saved entry, persistent success feedback and Done, plus existing camera/loop/seek/library behavior. Review and saved layouts were rendered and visually inspected at both sizes. The first runtime attempt used an obsolete default fixture no longer present in the player's library; it was rerun with isolated copies. The Development executable and symbols were updated.
+
+Fresh rendered Knockout and BOB record/save/load/seek, player/free camera, lighting and profile-isolation regressions also passed after the visual finish adjustment. The current player replay's index and payload hashes remained unchanged, and the staged executable matches the compiled executable.
+
+Clip handle limits: dragging past the opposite boundary leaves the clamped time unchanged and no longer requests another preview. The preview layer also skips targets that are already queued, in flight, or displayed, including an unchanged release. Dragging back into the valid range resumes preview updates. Returning to an active/displayed target cancels an obsolete queued target from earlier in the drag.
+
+Limit-fix validation: game and editor Development builds succeeded. The rendered clip regression passed holding each boundary against the other with repeated drag events and checking no new seek/revision occurs, unchanged release, and resumed preview when moving away, alongside the existing trim/review/save/playback workflow. The updated Development executable was staged and matched the build hash. The player recording and index remained unchanged.
+
+## Replay lighting stability
+
+Replay-local light actors are now marked rewindable while watching a replay. Native checkpoint seeks previously deleted these non-networked actors, recreating the rig and invalidating lighting history repeatedly. Only FLICK-tagged, non-replicated light fixtures and the local skylight receive this treatment; gameplay actors and recorded state still rewind normally. The controller restores a missing/replaced rig and applies local preference, arena/context or scale changes. Ordinary seeks with the same rig no longer reconfigure every light or declare a camera cut. Large time/view discontinuities retain history resets.
+
+Unreal always considers replay cameras movable, even when the world is paused. A replay-only scene-view extension now allows the actual viewport to use paused temporal sampling after 32 settled frames. Camera movement, look/fly input, replay seeks/revisions, playback, lighting changes and viewport resizing allow convergence again. UI/input keep ticking, and the scene continues to render; this does not substitute a cached screenshot. Other worlds and scene-capture views are excluded.
+
+The retained changes preserve light intensities, colours, exposure, render scale, hardware/software Lumen preference and the existing quality presets. Higher reflection reconstruction, full-resolution reflection rays, higher final-gather sampling, higher TSR history resolution and harder shadows were compared in isolated processes. Their additional cost or visual change did not justify keeping them; default reflection/final-gather quality remains 1.
+
+The controlled 1920x1080 overview comparison used the same recording at source time 24 seconds, twelve paused captures and ten repeated same-time seek captures. Deck luminance temporal standard deviation fell from 0.4313 to approximately 0.0001 after settling. Immediate post-seek variation fell from 1.5769 to 0.6204 (about 61% lower). Paused mean luminance was 118.58 before and 118.52 after on a 0-255 scale. Six-second screenshot-free playback windows measured 8.81 ms versus 9.26 ms mean frame time in the final comparison; these are short scene checks, not a general performance benchmark. Local light identities, transforms and powers remained stable across seeks. Free-camera input wakes temporal rendering; released free-camera and opposite-player views settle again.
+
+One initial rig-refresh trial failed the visual comparison because deleted lights were not restored. It was corrected by explicitly restoring missing rigs and preserving the local fixtures across rewinds. An ordinary paused-world flag trial also had no effect because Unreal overrides that flag for replay worlds; the retained view extension addresses that actual renderer path.
+
+Rollback: `flick.Visual.StableArenaLighting 0` disables both retained changes (reopen the replay to reinitialize the rig). `flick.Visual.PauseStableSampling 0` disables only settled sampling. Exact pre-change source/configuration and the packaged executable are backed up under `Saved/ReplayImplementation/LightingStabilityRollback`; its `Restore.ps1` restores those files without reverting the earlier clip features. Rebuild targets after a source rollback; the old executable is restored immediately. Comparison artifacts are in `Saved/ReplayImplementation/LightingStability`.
+
+Final validation: game and editor Development targets compiled successfully. Nine targeted editor automation tests passed with zero test failures/warnings. The rendered clip workflow passed live dragging, both handle limits, no repeated seeks at limits, review/confirmation, looping, cameras, bounded playback and persistence. A fresh BOB recording passed save/load/seek, paused/free-camera lighting, profile isolation and return to the library. The final render audit checked stable local light identities, camera wake-up and settled free/opposite-player views. A separate isolated preference check lowered the cool-softbox value from 2.997 to 2.250 while paused and restored it: scene RGB mean changed from 87.94 to 85.17 and returned to 87.87, confirming the paused view updates to preference changes. The player recording/index hashes remained unchanged, and the staged executable matches the compiled executable. An analysis-only log-reading command initially assumed UTF-8; Unreal's UTF-16 log output was then decoded correctly.
+
+
+## Winner-screen transition hitch ? 2026-11-16
+
+Match-end recording previously called the global replay-streaming Flush on the
+game thread. The previous rendered BOB log records six consecutive 100 ms sleeps
+on the same frame when the recording stopped, blocking the winner-camera transition
+for approximately 600 ms. FinishCapture now requests the normal asynchronous stop
+and retains the local streamer until its queued writes reach Idle. Save and replay
+opening remain unavailable until finalization completes; recording failures do not
+expose a partial file. New-match capture also waits before deleting the old temporary
+file. Application shutdown still drains pending writes before temporary-file cleanup.
+
+Both Development targets compiled successfully and the packaged executable was
+updated. All 12 focused editor tests passed, including post-match arena presentation,
+rematch flow and replay tests. Rendered packaged Knockout and BOB recordings passed
+record/save/load, puck counts, pause/seek/free-camera and library persistence checks.
+Both updated logs contain zero blocking 100 ms flush sleeps. This verifies removal
+of the identified recording stall, not an exhaustive benchmark of every cosmetic
+or graphics configuration. Logs are under Saved/ReplayImplementation/WinnerHitch*
+and the SmokeClassic/SmokeBob folders.

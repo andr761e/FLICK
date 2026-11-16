@@ -177,6 +177,9 @@ AFlickTestArena::AFlickTestArena()
 	StadiumCrowd->SetupAttachment(GetRootComponent());
 	StadiumStructureMesh->SetupAttachment(GetRootComponent());
 	ConfigureVisualComponent(StadiumStructureMesh);
+	// The filtered floor joints replace only shallow authored seam geometry.
+	// Lumen must see the same material offsets as the rasterized floor.
+	StadiumStructureMesh->bEvaluateWorldPositionOffsetInRayTracing = true;
 	// The enclosing wall is presentation geometry, not an actual roof. Let the
 	// established arena key light reach gameplay instead of casting the entire
 	// board and every puck into one large interior shadow.

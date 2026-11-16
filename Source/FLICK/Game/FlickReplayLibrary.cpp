@@ -20,7 +20,10 @@ bool UFlickReplaySubsystem::IsValidId(const FString& Id)
 
 bool UFlickReplaySubsystem::WriteIndex(const FFlickSavedReplay& R)
 {
-	if (!IsValidId(R.Id) || R.Name.Len()>100 || R.Markers.Num()>20000 || R.Players.Num()>8) return false;
+	if (!IsValidId(R.Id) || R.Name.Len()>100 || R.Markers.Num()>20000 || R.Players.Num()>8
+		|| !FMath::IsFinite(R.Duration) || R.Duration<0 || R.Duration>14400) return false;
+	if(R.IsClip()&&(!IsValidId(R.SourceId)||R.SourceId==R.Id||R.SourceName.Len()>100
+		||!FMath::IsFinite(R.ClipStart)||!FMath::IsFinite(R.ClipEnd)||R.ClipStart<0||R.ClipEnd>R.Duration||R.ClipEnd-R.ClipStart<.1f)) return false;
 	auto O=MakeShared<FJsonObject>();
 	O->SetNumberField(TEXT("Format"),1); O->SetStringField(TEXT("Id"),R.Id); O->SetStringField(TEXT("Name"),R.Name);
 	O->SetStringField(TEXT("Date"),R.RecordedAt); O->SetStringField(TEXT("Build"),R.GameVersion);
@@ -28,6 +31,11 @@ bool UFlickReplaySubsystem::WriteIndex(const FFlickSavedReplay& R)
 	O->SetNumberField(TEXT("Variant"),static_cast<int32>(R.Variant)); O->SetNumberField(TEXT("TeamSize"),R.TeamSize);
 	O->SetNumberField(TEXT("Duration"),R.Duration); O->SetBoolField(TEXT("Favourite"),R.bFavourite);
 	O->SetNumberField(TEXT("PoseSampleRate"),R.PoseSampleRate);
+	if(R.IsClip())
+	{
+		O->SetStringField(TEXT("SourceId"),R.SourceId); O->SetStringField(TEXT("SourceName"),R.SourceName);
+		O->SetNumberField(TEXT("ClipStart"),R.ClipStart); O->SetNumberField(TEXT("ClipEnd"),R.ClipEnd);
+	}
 	TArray<TSharedPtr<FJsonValue>> Players,Markers,Assets;
 	for(const auto& Path:R.Assets) Assets.Add(MakeShared<FJsonValueString>(Path.ToString()));
 	O->SetArrayField(TEXT("Assets"),Assets);
@@ -55,6 +63,16 @@ bool UFlickReplaySubsystem::ReadIndex(const FString& Id,FFlickSavedReplay& R)
 	O->TryGetNumberField(TEXT("Variant"),Variant); O->TryGetNumberField(TEXT("TeamSize"),TeamSize);
 	if (Variant<0 || Variant>2 || TeamSize<1 || TeamSize>4) return false;
 	R.Id=Id; R.Duration=Duration; R.Variant=static_cast<EFlickMatchVariant>(static_cast<int32>(Variant)); R.TeamSize=static_cast<int32>(TeamSize);
+	R.SourceId.Reset(); R.SourceName.Reset(); R.ClipStart=R.ClipEnd=0;
+	if(O->HasField(TEXT("SourceId")))
+	{
+		double Start=0,End=0;
+		if(!O->TryGetStringField(TEXT("SourceId"),R.SourceId)||!IsValidId(R.SourceId)||R.SourceId==Id
+			||!O->TryGetStringField(TEXT("SourceName"),R.SourceName)||R.SourceName.Len()>100
+			||!O->TryGetNumberField(TEXT("ClipStart"),Start)||!O->TryGetNumberField(TEXT("ClipEnd"),End)
+			||!FMath::IsFinite(Start)||!FMath::IsFinite(End)||Start<0||End>Duration||End-Start<.1) return false;
+		R.ClipStart=Start; R.ClipEnd=End;
+	}
 	double SampleRate=8;
 	O->TryGetNumberField(TEXT("PoseSampleRate"),SampleRate);
 	if(!FMath::IsFinite(SampleRate)||SampleRate<1||SampleRate>240) return false;
@@ -81,7 +99,7 @@ bool UFlickReplaySubsystem::ReadIndex(const FString& Id,FFlickSavedReplay& R)
 			R.Markers.Add({static_cast<float>(Time),Label}); Previous=Time;
 		}
 	}
-	R.Bytes=IFileManager::Get().FileSize(*(Root()/TEXT("Matches")/(Id+TEXT(".flick.replay"))));
+	R.Bytes=IFileManager::Get().FileSize(*(Root()/TEXT("Matches")/(R.PayloadId()+TEXT(".flick.replay"))));
 	return R.Bytes>0;
 }
 
@@ -107,7 +125,30 @@ bool UFlickReplaySubsystem::SetFavourite(const FString& Id,bool bValue)
 }
 bool UFlickReplaySubsystem::Delete(const FString& Id)
 {
-	if (!IsValidId(Id)|| (IsTheatre()&&Playing.Id==Id)) return false;
-	if (!IFileManager::Get().Delete(*(Root()/TEXT("Matches")/(Id+TEXT(".flick.replay"))),false,true)) return false;
-	const bool bDeleted=IFileManager::Get().Delete(*IndexPath(Id),false,true); ++LibraryRevision; return bDeleted;
+	FFlickSavedReplay Entry;
+	if (!IsValidId(Id)|| ((IsTheatre()||IsLoadingTheatre())&&Playing.Id==Id)||!ReadIndex(Id,Entry)) return false;
+	// Remove the library entry first. A crash can leave an unused payload, never
+	// a surviving clip whose only recording has already been deleted.
+	if(!IFileManager::Get().Delete(*IndexPath(Id),false,true)) return false;
+	++LibraryRevision;
+	for(const auto& Other:List()) if(Other.PayloadId()==Entry.PayloadId()) return true;
+	return IFileManager::Get().Delete(*(Root()/TEXT("Matches")/(Entry.PayloadId()+TEXT(".flick.replay"))),false,true);
+}
+
+FString UFlickReplaySubsystem::SaveClip(const FString& Id,const FString& Name,float Start,float End)
+{
+	FFlickSavedReplay Source;
+	const FString Clean=Name.TrimStartAndEnd();
+	if(Clean.IsEmpty()||Clean.Len()>100) {Status=TEXT("Enter a clip name (1-100 characters).");return {};}
+	if(!ReadIndex(Id,Source)) {Status=TEXT("The source recording could not be read.");return {};}
+	if(!FMath::IsFinite(Start)||!FMath::IsFinite(End)||Start<0||End>Source.ViewDuration()||End-Start<.1f)
+	{Status=TEXT("Choose a valid range of at least 0.1 seconds inside this replay.");return {};}
+	FFlickSavedReplay Clip=Source;
+	Clip.SourceId=Source.PayloadId(); Clip.SourceName=Source.IsClip()?Source.SourceName:Source.Name;
+	Clip.Id=FGuid::NewGuid().ToString(EGuidFormats::Digits);Clip.Name=Clean;
+	const float Offset=Source.IsClip()?Source.ClipStart:0.f;
+	Clip.ClipStart=Offset+Start;Clip.ClipEnd=Offset+End;Clip.bFavourite=false;
+	Clip.RecordedAt=FDateTime::UtcNow().ToIso8601();
+	if(!WriteIndex(Clip)) {Status=TEXT("Could not save the clip. Check available disk space and try again.");return {};}
+	++LibraryRevision;Status=TEXT("Clip saved to Profile / Saved Replays.");return Clip.Id;
 }

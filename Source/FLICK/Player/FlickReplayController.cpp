@@ -1,4 +1,5 @@
 #include "Player/FlickReplayController.h"
+#include "Player/FlickReplayViewExtension.h"
 #include "Player/FlickCameraPawn.h"
 #include "Player/FlickPlayerState.h"
 #include "Game/FlickReplaySubsystem.h"
@@ -6,11 +7,14 @@
 #include "Pieces/FlickPiece.h"
 #include "Core/FlickModeRules.h"
 #include "Core/FlickLightingSettings.h"
+#include "Core/FlickRenderStability.h"
 #include "Arena/FlickArenaLighting.h"
 #include "UI/FlickReplayTheatre.h"
 #include "UI/FlickLockerStyle.h"
 #include "Engine/Engine.h"
 #include "Engine/RectLight.h"
+#include "Engine/Light.h"
+#include "Engine/SkyLight.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/GameViewportClient.h"
@@ -20,6 +24,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Framework/Application/SlateApplication.h"
 
 AFlickReplayController::AFlickReplayController()
 {
@@ -41,7 +46,7 @@ void AFlickReplayController::BeginPlay()
 void AFlickReplayController::EndPlay(const EEndPlayReason::Type Reason)
 {
 	if (TheatreUI.IsValid()&&GEngine&&GEngine->GameViewport) GEngine->GameViewport->RemoveViewportWidgetContent(TheatreUI.ToSharedRef());
-	TheatreUI.Reset(); Super::EndPlay(Reason);
+	TheatreUI.Reset();PauseViewExtension.Reset();Super::EndPlay(Reason);
 }
 void AFlickReplayController::SetupInputComponent()
 {
@@ -56,7 +61,7 @@ void AFlickReplayController::SetupInputComponent()
 }
 void AFlickReplayController::TogglePause() { if(auto* R=Replay()) R->SetPaused(!R->IsPaused()); }
 void AFlickReplayController::ToggleControls() { bControls=!bControls; }
-void AFlickReplayController::Exit() { if(bLooking||bFlyLatched) {bFlyLatched=false;LookReleased();return;} if(auto* R=Replay()) R->ExitTheatre(); }
+void AFlickReplayController::Exit() { if(bLooking||bFlyLatched) {bFlyLatched=false;LookReleased();return;} if(auto* R=Replay()) {if(R->IsEditingClip()) R->CloseClip();else R->ExitTheatre();} }
 void AFlickReplayController::ResetView() {OverviewZoom=1;Orbit=0;SelectCamera(EFlickReplayCamera::Overview);}
 void AFlickReplayController::ToggleFly() {if(bFlyLatched) {bFlyLatched=false;LookReleased();}else {SelectCamera(EFlickReplayCamera::Free);bFlyLatched=true;LookPressed();}}
 void AFlickReplayController::LookPressed() { bLooking=true; bShowMouseCursor=false; SetInputMode(FInputModeGameOnly()); }
@@ -70,7 +75,8 @@ void AFlickReplayController::SelectCamera(EFlickReplayCamera Value)
 	CameraMode=Value;
 	// Restore the complete local presentation when taking over from a recorded
 	// target. Never inherit a stale rig/camera history after a replay transition.
-	LightingRevision=INDEX_NONE;
+	if(!FlickRenderStability::IsEnabled()) LightingRevision=INDEX_NONE;
+	bViewLightingReady=false;
 	if(PlayerCameraManager) PlayerCameraManager->SetGameCameraCutThisFrame();
 	if (TheatreCamera) { TheatreCamera->ClearSpectatorView(); TheatreCamera->SetFreeCameraEnabled(Value==EFlickReplayCamera::Free); }
 }
@@ -184,11 +190,31 @@ void AFlickReplayController::UpdateViewLighting()
 	LastLightingEye=Eye;bViewLightingReady=true;
 }
 
+bool AFlickReplayController::WantsPausedSampling() const
+{
+	const auto* R=Replay();
+	return R&&R->IsPaused()&&!R->IsSeeking()&&FlickRenderStability::PauseStableSampling()&&SettledPausedFrames>=32;
+}
+void AFlickReplayController::UpdatePausedRendering()
+{
+	const auto* R=Replay();if(!R||!TheatreCamera) return;
+	const auto View=TheatreCamera->CaptureSpectatorView();
+	const FTransform Transform(View.Rotation,View.Location);
+	const bool bViewChanged=!Transform.Equals(LastPausedView,.001f)||!FMath::IsNearlyEqual(View.FieldOfView,LastPausedFov,.001f);
+	if(!R->IsPaused()||R->IsSeeking()||bLooking||bFlyLatched||bViewChanged||LastPausedRevision!=R->GetPlaybackRevision()) SettledPausedFrames=0;
+	else SettledPausedFrames=FMath::Min(SettledPausedFrames+1,32);
+	LastPausedView=Transform;LastPausedFov=View.FieldOfView;LastPausedRevision=R->GetPlaybackRevision();
+	// Keep temporal rendering active during movement and convergence. Once
+	// settled, use the engine's normal paused history/sample-index behaviour.
+	// UI and camera input still tick; no cached screenshot replaces the view.
+}
+
 void AFlickReplayController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
 	if (!GetWorld()->IsPlayingReplay()||!IsLocalController()) return;
 	GetWorld()->bIsCameraMoveableWhenPaused=true;
+	if(!PauseViewExtension.IsValid()) PauseViewExtension=FSceneViewExtensions::NewExtension<FFlickReplayViewExtension>(this);
 	if (!TheatreUI.IsValid()&&GEngine&&GEngine->GameViewport)
 	{
 		bShowMouseCursor=true; SetInputMode(FInputModeGameAndUI().SetHideCursorDuringCapture(false));
@@ -214,9 +240,13 @@ void AFlickReplayController::PlayerTick(float DeltaTime)
 	if (!R->IsSeeking())
 	{
 		const int32 Context=static_cast<int32>(State->ActiveMatchVariant)|(State->PlayersPerTeam<<4);
+		const bool bStable=FlickRenderStability::IsEnabled();
+		const bool bDiscontinuousTime=FMath::Abs(R->GetTime()-LastReplayTime)>1;
+		const bool bPlaybackChanged=LightingRevision!=R->GetPlaybackRevision();
 		const bool bCheckRig=FPlatformTime::Seconds()>=NextRigCheck;
+		const bool bResolveRig=bCheckRig||bPlaybackChanged||!ViewPuckKey.IsValid()||!ViewPuckFill.IsValid();
 		FlickArenaLighting::FRig Rig;
-		if(bCheckRig) {Rig=FlickArenaLighting::FindRig(GetWorld());NextRigCheck=FPlatformTime::Seconds()+.5;}
+		if(bResolveRig) {Rig=FlickArenaLighting::FindRig(GetWorld());NextRigCheck=FPlatformTime::Seconds()+.5;}
 		uint32 SettingsHash=LightingSettingsHash;
 		if(bCheckRig)
 		{
@@ -224,10 +254,19 @@ void AFlickReplayController::PlayerTick(float DeltaTime)
 			for(int32 I=0;I<int32(FlickLightingSettings::EControl::Count);++I)
 				SettingsHash=HashCombineFast(SettingsHash,GetTypeHash(FlickLightingSettings::GetValue(FlickLightingSettings::EScene::Gameplay,FlickLightingSettings::EControl(I))));
 		}
-		if ((bCheckRig&&!IsValid(Rig.PuckFinishLight))||SettingsHash!=LightingSettingsHash||FMath::Abs(LightingSurfaceZ-State->ArenaSurfaceZ)>.1f||LightingRevision!=R->GetPlaybackRevision()||LightingContext!=Context||FMath::Abs(R->GetTime()-LastReplayTime)>1)
+		const float Radius=FlickModeRules::GetArenaRadius(State->ActiveMatchVariant,State->PlayersPerTeam)
+			*(State->bPrivateMatchActive&&State->ActiveMatchVariant==EFlickMatchVariant::Classic?FMath::Clamp(State->PrivateMatchSettings.ArenaScale,.85f,1.3f):1.f);
+		bool bRigChanged=bResolveRig&&(Rig.PuckFinishLight.Get()!=ViewPuckKey.Get()||Rig.PuckFillLight.Get()!=ViewPuckFill.Get());
+		if(bResolveRig&&ViewDeckLights.Num()==3)
+			bRigChanged|=ViewDeckLights[0].Get()!=Rig.TestPuckKeyLight.Get()||ViewDeckLights[1].Get()!=Rig.TestPuckRimLight.Get()||ViewDeckLights[2].Get()!=Rig.DeckReflectionLight.Get();
+		const bool bMissingRig=!ViewPuckKey.IsValid()||!ViewPuckFill.IsValid()
+			||(bResolveRig&&(!IsValid(Rig.PuckFinishLight)||!IsValid(Rig.PuckFillLight)));
+		const bool bPresentationChanged=SettingsHash!=LightingSettingsHash||FMath::Abs(LightingSurfaceZ-State->ArenaSurfaceZ)>.1f
+			||LightingContext!=Context||FMath::Abs(LightingArenaRadius-Radius)>.1f;
+		if(bMissingRig||bRigChanged||bPresentationChanged||LightingRevision==INDEX_NONE||(!bStable&&(bPlaybackChanged||bDiscontinuousTime)))
 		{
-			if(!bCheckRig) Rig=FlickArenaLighting::FindRig(GetWorld());
-			bSnapNextCamera=true;
+			if(!bResolveRig) Rig=FlickArenaLighting::FindRig(GetWorld());
+			bSnapNextCamera=true;SettledPausedFrames=0;
 			FlickArenaLighting::FParameters Parameters;
 			Parameters.bClassicArenaLighting=State->ActiveMatchVariant==EFlickMatchVariant::Classic;
 			Parameters.bBobArenaLighting=State->ActiveMatchVariant==EFlickMatchVariant::Bob;
@@ -238,6 +277,13 @@ void AFlickReplayController::PlayerTick(float DeltaTime)
 				Parameters.ArenaRadius*=FMath::Clamp(State->PrivateMatchSettings.ArenaScale,.85f,1.3f);
 			Parameters.ArenaSurfaceZ=State->ArenaSurfaceZ;
 			FlickArenaLighting::Configure(GetWorld(),Rig,Parameters);
+			// These are viewer-local fixtures, not recorded match actors. Native
+			// checkpoint rewinds otherwise delete them and invalidate Lumen's
+			// lighting caches on every scrub. Preserve only our non-networked rig.
+			for(TActorIterator<ALight> It(GetWorld());It;++It)
+				if(!It->GetIsReplicated()) for(const FName Tag:It->Tags)
+					if(Tag.ToString().StartsWith(TEXT("FLICK."))) {It->bReplayRewindable=bStable;break;}
+			if(Rig.SkyLightActor&&!Rig.SkyLightActor->GetIsReplicated()) Rig.SkyLightActor->bReplayRewindable=bStable;
 			// Cache an authored south-side reference, rather than keeping its
 			// highlights frozen on one side when the replay viewer changes sides.
 			if(Parameters.bTestArenaMode)
@@ -262,6 +308,14 @@ void AFlickReplayController::PlayerTick(float DeltaTime)
 			if(PlayerCameraManager) PlayerCameraManager->SetGameCameraCutThisFrame();
 			LightingContext=Context; LightingRevision=R->GetPlaybackRevision();
 		}
+		if(bPlaybackChanged)
+		{
+			// A seek may replace actors, but unchanged lights/camera do not need
+			// another reset. Large time jumps still invalidate temporal history.
+			bSnapNextCamera=true;
+			if(bDiscontinuousTime&&PlayerCameraManager) PlayerCameraManager->SetGameCameraCutThisFrame();
+			LightingRevision=R->GetPlaybackRevision();
+		}
 		LastReplayTime=R->GetTime();
 		if(bCheckRig)
 			for(TActorIterator<AFlickCameraPawn> It(GetWorld());It;++It)
@@ -274,6 +328,10 @@ void AFlickReplayController::PlayerTick(float DeltaTime)
 	const auto ApplyView=[&](const FFlickSpectatorView& TargetView)
 	{
 		FFlickSpectatorView View=TargetView;
+		if(bSnapNextCamera&&PlayerCameraManager
+			&&(FVector::DistSquared(TheatreCamera->GetActorLocation(),View.Location)>FMath::Square(250.f)
+				||TheatreCamera->GetActorQuat().AngularDistance(View.Rotation.Quaternion())>FMath::DegreesToRadians(20.f)))
+			PlayerCameraManager->SetGameCameraCutThisFrame();
 		if(!bSnapNextCamera&&!R->IsPaused())
 		{
 			const float Blend=1.f-FMath::Exp(-12.f*RealDelta);
@@ -283,16 +341,22 @@ void AFlickReplayController::PlayerTick(float DeltaTime)
 		}
 		TheatreCamera->SnapSpectatorView(View);bSnapNextCamera=false;
 		UpdateViewLighting();
+		UpdatePausedRendering();
 	};
+	const auto Focused=FSlateApplication::Get().GetKeyboardFocusedWidget();
+	const bool bTyping=Focused.IsValid()&&Focused->GetTypeAsString().Contains(TEXT("EditableText"));
+	if(!bTyping)
+	{
 	if (WasInputKeyJustPressed(EKeys::Right)) R->Seek(R->GetTime()+5);
 	if (WasInputKeyJustPressed(EKeys::Left)) R->Seek(R->GetTime()-5);
 	if (WasInputKeyJustPressed(EKeys::Period)) { R->SetPaused(true); R->Seek(R->GetTime()+1.f/30); }
 	if (WasInputKeyJustPressed(EKeys::Comma)) { R->SetPaused(true); R->Seek(R->GetTime()-1.f/30); }
-	if (WasInputKeyJustPressed(EKeys::Home)) R->Seek(0);
-	if (WasInputKeyJustPressed(EKeys::End)) R->Seek(R->GetDuration());
+	if (WasInputKeyJustPressed(EKeys::Home)) R->Seek(R->GetViewStart());
+	if (WasInputKeyJustPressed(EKeys::End)) R->Seek(R->GetViewEnd());
 	if (WasInputKeyJustPressed(EKeys::C)) SelectCamera(static_cast<EFlickReplayCamera>((static_cast<int32>(CameraMode)+1)%5));
 	if (WasInputKeyJustPressed(EKeys::LeftBracket)) CycleTarget(-1);
 	if (WasInputKeyJustPressed(EKeys::RightBracket)) CycleTarget(1);
+	}
 	float MX=0,MY=0; GetInputMouseDelta(MX,MY);
 	if (CameraMode==EFlickReplayCamera::Free)
 	{
@@ -300,6 +364,7 @@ void AFlickReplayController::PlayerTick(float DeltaTime)
 			(IsInputKeyDown(EKeys::D)?1.f:0)-(IsInputKeyDown(EKeys::A)?1.f:0),(IsInputKeyDown(EKeys::E)?1.f:0)-(IsInputKeyDown(EKeys::Q)?1.f:0),
 			FVector2D(MX,MY),IsInputKeyDown(EKeys::LeftShift),RealDelta);
 		UpdateViewLighting();
+		UpdatePausedRendering();
 		return;
 	}
 	TheatreCamera->SetFreeCameraEnabled(false);

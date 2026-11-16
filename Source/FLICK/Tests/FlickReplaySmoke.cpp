@@ -1,4 +1,6 @@
 #include "Tests/FlickReplaySmoke.h"
+#include "Tests/FlickReplayClipSmoke.h"
+#include "Tests/FlickReplayLightingSmoke.h"
 #if !UE_BUILD_SHIPPING
 #include "Game/FlickReplaySubsystem.h"
 #include "Game/FlickGameInstance.h"
@@ -38,6 +40,8 @@ namespace FlickReplaySmoke
 {
 	bool Tick(UFlickReplaySubsystem& R,float DeltaTime)
 	{
+		if(FlickReplayLightingSmoke::Tick(R)) return true;
+		if(FlickReplayClipSmoke::Tick(R)) return true;
 		static FString InspectId;
 		static bool bInspect=FParse::Value(FCommandLine::Get(),TEXT("FlickReplayInspect="),InspectId);
 		if(bInspect)

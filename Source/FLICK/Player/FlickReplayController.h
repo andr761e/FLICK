@@ -34,12 +34,18 @@ public:
 	bool ShowsControls() const { return bControls; }
 	void TogglePause();
 	void Exit();
+	bool WantsPausedSampling() const;
 private:
 	void LookPressed();
 	void LookReleased();
 	void WheelUp();
 	void WheelDown();
 	void UpdateViewLighting();
+	void UpdatePausedRendering();
+	FTransform LastPausedView=FTransform::Identity;
+	float LastPausedFov=0;
+	int32 LastPausedRevision=INDEX_NONE,SettledPausedFrames=0;
+	TSharedPtr<class FFlickReplayViewExtension,ESPMode::ThreadSafe> PauseViewExtension;
 	UPROPERTY(Transient) TObjectPtr<AFlickCameraPawn> TheatreCamera;
 	TSharedPtr<SWidget> TheatreUI;
 	EFlickReplayCamera CameraMode = EFlickReplayCamera::Overview;

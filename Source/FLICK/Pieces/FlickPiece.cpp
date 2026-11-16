@@ -1469,6 +1469,19 @@ void AFlickPiece::EnableTestArenaVisuals()
 			}
 		}
 	}
+	// Stabilize only unusually sharp metal highlights. Keep colour, normal detail
+	// and emissive roles intact, and use the same finish live and in the theatre.
+	for(int32 Slot=0;Slot<WorkshopMesh->GetNumMaterials();++Slot)
+	{
+		auto* Material=WorkshopMesh->GetMaterial(Slot);
+		float Roughness=1.f,Metallic=0.f,Emission=0.f;
+		if(!Material||!Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Roughness")),Roughness)) continue;
+		Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Metallic")),Metallic);
+		Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")),Emission);
+		if(Metallic>.5f&&Emission<.1f&&Roughness<FlickPuckFinish::MinimumMetalRoughness)
+			if(auto* Finish=WorkshopMesh->CreateDynamicMaterialInstance(Slot))
+				Finish->SetScalarParameterValue(TEXT("Roughness"),FlickPuckFinish::MinimumMetalRoughness);
+	}
 	// Convert from the root cylinder's gameplay scale to the high-detail mesh's authored
 	// Classic dimensions. This is normally an identity transform, but it also scales the
 	// Standard art down correctly for BOB's smaller physics pucks.

@@ -109,6 +109,7 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 							// paint. Near-black values were absorbing the reflections.
 							Material->SetVectorParameterValue(TEXT("BaseColor"), OneVsOneDeckTint);
 							Material->SetScalarParameterValue(TEXT("DeckFinish"), 1.f);
+							Material->SetScalarParameterValue(TEXT("DeckGuides"), 1.f);
 							Material->SetScalarParameterValue(TEXT("DeckRelief"), DeckFinishRelief);
 							Material->SetScalarParameterValue(TEXT("Metallic"), OneVsOneDeckMetallic);
 							Material->SetScalarParameterValue(TEXT("Roughness"), OneVsOneDeckRoughness);
@@ -176,7 +177,11 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 						// skirt wash, not only a sharp mirror image of its LEDs.
 						Material->SetScalarParameterValue(TEXT("Metallic"), SourceName.Contains(TEXT("Porcelain")) ? .76f : .82f);
 						Material->SetScalarParameterValue(TEXT("Roughness"), 0.24f);
+						if (Component == StadiumStructureMesh && SourceName.Contains(TEXT("Porcelain")))
+							Material->SetScalarParameterValue(TEXT("ConcourseSeams"), 1.f);
 					}
+					if (Component == StadiumStructureMesh && SourceName.Contains(TEXT("Graphite_Inset")))
+						Material->SetScalarParameterValue(TEXT("ConcourseSeamGeometry"), 1.f);
 				}
 			}
 		}
@@ -268,6 +273,7 @@ void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
 					{
 						Material->SetVectorParameterValue(TEXT("BaseColor"), OneVsOneDeckTint);
 						Material->SetScalarParameterValue(TEXT("DeckFinish"), 1.f);
+						Material->SetScalarParameterValue(TEXT("DeckGuides"), 1.f);
 						Material->SetScalarParameterValue(TEXT("DeckRelief"), DeckFinishRelief);
 						Material->SetScalarParameterValue(TEXT("Metallic"), OneVsOneDeckMetallic);
 						Material->SetScalarParameterValue(TEXT("Roughness"), OneVsOneDeckRoughness);
@@ -304,8 +310,6 @@ void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
 			}
 		}
 		bConceptApplied = true;
-		ConceptGuides->SetVisibility(true);
-		ConceptGuides->SetHiddenInGame(false);
 		for (auto* Component : {ConceptSocketMetal.Get(), ConceptSocketDark.Get(), ConceptWarmRim.Get()})
 		{
 			Component->SetVisibility(true);
@@ -390,6 +394,25 @@ void AFlickTestArena::BuildConceptSockets()
 
 void AFlickTestArena::BuildConceptGuides()
 {
+	// The current architectural shader draws the guides directly on the deck.
+	// No separate depth/normal, subpixel box silhouette or Lumen occluder remains.
+	// Retain the old mesh presentation only for projects missing that shader.
+	for (int32 Slot = 0; Slot < WorkshopArenaMesh->GetNumMaterials(); ++Slot)
+	{
+		float IntegratedGuides = 0.f, GuideWidth = 0.f;
+		if (const auto* Material = WorkshopArenaMesh->GetMaterial(Slot);
+			Material && Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("DeckGuides")), IntegratedGuides)
+			&& Material->GetScalarParameterValue(FMaterialParameterInfo(TEXT("GuideWidth")), GuideWidth)
+			&& IntegratedGuides > .5f)
+		{
+			ConceptGuides->ClearInstances();
+			ConceptGuides->SetVisibility(false);
+			ConceptGuides->SetHiddenInGame(true);
+			return;
+		}
+	}
+	ConceptGuides->SetVisibility(true);
+	ConceptGuides->SetHiddenInGame(false);
 	if (!ConceptGuideMaterial)
 	{
 		auto* Source = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/TestArena/Arena/MI_08_Floor_Lines.MI_08_Floor_Lines"));
@@ -397,8 +420,10 @@ void AFlickTestArena::BuildConceptGuides()
 		if (ConceptGuideMaterial)
 		{
 			ConceptGuideMaterial->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.48f, .57f, .62f));
-			ConceptGuideMaterial->SetScalarParameterValue(TEXT("Roughness"), .48f);
-			ConceptGuideMaterial->SetScalarParameterValue(TEXT("Metallic"), .15f);
+			// These are painted guides. Narrow glossy strips produce sub-pixel
+			// specular sparkles as the camera moves, especially at arena overview.
+			ConceptGuideMaterial->SetScalarParameterValue(TEXT("Roughness"), .8f);
+			ConceptGuideMaterial->SetScalarParameterValue(TEXT("Metallic"), .05f);
 			ConceptGuideMaterial->SetScalarParameterValue(TEXT("Emission"), 0.f);
 			ConceptGuideMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), .035f);
 			ConceptGuideMaterial->SetScalarParameterValue(TEXT("RenderLayerOffset"), 0.f);
@@ -416,8 +441,8 @@ void AFlickTestArena::BuildConceptGuides()
 	// One restrained axis and concentric guides replace spokes/ticks/arrows.
 	// Separate visual layers at axis/axis and axis/ring intersections. Coplanar
 	// boxes otherwise fight for depth as the camera moves. These never collide.
-	Line(FVector2D(-ArenaRadius * .94f, 0.f), FVector2D(ArenaRadius * .94f, 0.f), .55f, .9f);
-	Line(FVector2D(0.f, -ArenaRadius * .94f), FVector2D(0.f, ArenaRadius * .94f), .55f, 1.f);
+	Line(FVector2D(-ArenaRadius * .94f, 0.f), FVector2D(ArenaRadius * .94f, 0.f), 1.05f, .9f);
+	Line(FVector2D(0.f, -ArenaRadius * .94f), FVector2D(0.f, ArenaRadius * .94f), 1.05f, 1.f);
 	for (const float Fraction : {.151f, .36f, .52f, .705f, .855f})
 	for (int32 Segment = 0; Segment < 192; ++Segment)
 	{
@@ -425,7 +450,7 @@ void AFlickTestArena::BuildConceptGuides()
 		const float A = UE_TWO_PI * Segment / 192.f;
 		const float B = UE_TWO_PI * (Segment + 1) / 192.f;
 		Line(FVector2D(FMath::Cos(A), FMath::Sin(A)) * ArenaRadius * Fraction,
-			FVector2D(FMath::Cos(B), FMath::Sin(B)) * ArenaRadius * Fraction, Fraction < .2f ? .9f : .55f);
+			FVector2D(FMath::Cos(B), FMath::Sin(B)) * ArenaRadius * Fraction, Fraction < .2f ? 1.3f : 1.05f);
 	}
 }
 

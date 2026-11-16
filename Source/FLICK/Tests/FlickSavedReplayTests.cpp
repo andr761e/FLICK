@@ -58,4 +58,47 @@ bool FFlickSavedReplayCorruptionTest::RunTest(const FString&)
 	IFileManager::Get().Delete(*Index,false,true);
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFlickSavedReplayClipTest,"FLICK.Replays.Clips",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FFlickSavedReplayClipTest::RunTest(const FString&)
+{
+	FFlickSavedReplay Source;Source.Id=FGuid::NewGuid().ToString(EGuidFormats::Digits);Source.Name=TEXT("Original match");Source.Duration=60;
+	Source.Markers={{0,TEXT("Round 1")},{12,TEXT("Shot 2")},{30,TEXT("Round 2")}};
+	const FString Payload=UFlickReplaySubsystem::Root()/TEXT("Matches")/(Source.Id+TEXT(".flick.replay"));
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Payload),true);
+	FFileHelper::SaveStringToFile(TEXT("clip test payload"),*Payload);
+	TestTrue(TEXT("Source written"),UFlickReplaySubsystem::WriteIndex(Source));
+	auto* GI=NewObject<UGameInstance>();auto* Library=NewObject<UFlickReplaySubsystem>(GI);
+	TestTrue(TEXT("Reversed range rejected"),Library->SaveClip(Source.Id,TEXT("Bad"),20,10).IsEmpty());
+	TestTrue(TEXT("Outside source rejected"),Library->SaveClip(Source.Id,TEXT("Bad"),10,61).IsEmpty());
+	TestTrue(TEXT("Negative time rejected"),Library->SaveClip(Source.Id,TEXT("Bad"),-1,10).IsEmpty());
+	TestTrue(TEXT("Zero duration rejected"),Library->SaveClip(Source.Id,TEXT("Bad"),10,10).IsEmpty());
+	TestTrue(TEXT("Blank name rejected"),Library->SaveClip(Source.Id,TEXT("  "),10,20).IsEmpty());
+	const FString ClipId=Library->SaveClip(Source.Id,TEXT("  Winning shot  "),10,20);
+	FFlickSavedReplay Clip;
+	TestTrue(TEXT("Clip can be read"),UFlickReplaySubsystem::ReadIndex(ClipId,Clip));
+	TestTrue(TEXT("Entry identifies as a clip"),Clip.IsClip());
+	TestEqual(TEXT("Name trimmed"),Clip.Name,FString(TEXT("Winning shot")));
+	TestEqual(TEXT("Shared source"),Clip.PayloadId(),Source.Id);
+	TestEqual(TEXT("Clip duration"),Clip.ViewDuration(),10.f);
+	TestEqual(TEXT("Source clock retained"),Clip.Duration,60.f);
+	TestEqual(TEXT("Markers retain source times"),Clip.Markers[1].Time,12.f);
+	const FString NestedId=Library->SaveClip(ClipId,TEXT("Contact"),2,4);
+	FFlickSavedReplay Nested;
+	TestTrue(TEXT("Nested clip readable"),UFlickReplaySubsystem::ReadIndex(NestedId,Nested));
+	TestEqual(TEXT("Nested clip flattened"),Nested.PayloadId(),Source.Id);
+	TestEqual(TEXT("Nested start is absolute"),Nested.ClipStart,12.f);
+	TestEqual(TEXT("Nested end is absolute"),Nested.ClipEnd,14.f);
+	TestEqual(TEXT("Original match title retained"),Nested.SourceName,Source.Name);
+	TestTrue(TEXT("Nested out-of-bounds rejected"),Library->SaveClip(ClipId,TEXT("Bad"),0,11).IsEmpty());
+	FFlickSavedReplay Invalid=Clip;Invalid.SourceId=TEXT("../escape");
+	TestFalse(TEXT("Unsafe payload ID rejected"),UFlickReplaySubsystem::WriteIndex(Invalid));
+	Invalid=Clip;Invalid.ClipEnd=61;TestFalse(TEXT("Invalid clip metadata rejected"),UFlickReplaySubsystem::WriteIndex(Invalid));
+	TestTrue(TEXT("Original entry deleted"),Library->Delete(Source.Id));
+	TestTrue(TEXT("Clip survives deleting original"),UFlickReplaySubsystem::ReadIndex(ClipId,Clip));
+	TestTrue(TEXT("First clip deleted"),Library->Delete(ClipId));
+	TestTrue(TEXT("Nested clip survives independently"),UFlickReplaySubsystem::ReadIndex(NestedId,Nested));
+	TestTrue(TEXT("Final clip deleted"),Library->Delete(NestedId));
+	TestEqual(TEXT("Payload removed only after last reference"),IFileManager::Get().FileSize(*Payload),int64(-1));
+	return true;
+}
 #endif

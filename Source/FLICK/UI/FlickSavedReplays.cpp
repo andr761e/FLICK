@@ -56,14 +56,15 @@ namespace
 		{
 			if (!Rows.IsValid()||!Replay.IsValid()) return;
 			Revision=Replay->GetLibraryRevision(); Rows->ClearChildren();
-			auto Entries=Replay->List(); int64 Bytes=0; for(const auto& E:Entries) Bytes+=E.Bytes;
-			Summary=FString::Printf(TEXT("%d SAVED MATCHES   //   %.1f MB ON THIS COMPUTER   //   EDIT A TITLE TO RENAME"),Entries.Num(),Bytes/(1024.0*1024.0));
+			auto Entries=Replay->List(); int64 Bytes=0;TSet<FString> Payloads;
+			for(const auto& E:Entries) if(!Payloads.Contains(E.PayloadId())) {Payloads.Add(E.PayloadId());Bytes+=E.Bytes;}
+			Summary=FString::Printf(TEXT("%d SAVED REPLAYS / CLIPS   //   %.1f MB ON THIS COMPUTER   //   EDIT A TITLE TO RENAME"),Entries.Num(),Bytes/(1024.0*1024.0));
 			if (Sort==0) Entries.Sort([](const auto& A,const auto& B) {return A.RecordedAt>B.RecordedAt;});
 			if (Sort==2) Entries.Sort([](const auto& A,const auto& B) {return A.Variant!=B.Variant?static_cast<int32>(A.Variant)<static_cast<int32>(B.Variant):A.RecordedAt>B.RecordedAt;});
 			int32 Visible=0;
 			for(const auto& E:Entries)
 			{
-				if (!Search.IsEmpty()&&!(E.Name+E.Mode+FString::Join(E.Players,TEXT(" "))).Contains(Search)) continue;
+				if (!Search.IsEmpty()&&!(E.Name+E.Mode+E.SourceName+FString::Join(E.Players,TEXT(" "))).Contains(Search)) continue;
 				++Visible;
 				const FString Id=E.Id;
 				Rows->AddSlot().AutoHeight().Padding(0,0,0,12)
@@ -72,13 +73,14 @@ namespace
 				 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0,0,16,0)
 				   [Button(E.bFavourite?TEXT("★"):TEXT("☆"),[this,Id,b=E.bFavourite]() {Replay->SetFavourite(Id,!b);Refresh();})]
 				 + SHorizontalBox::Slot().FillWidth(1)[SNew(SVerticalBox)
+				   + SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(E.IsClip()?TEXT("CLIP  //  ")+E.SourceName:TEXT("FULL MATCH"))).Font(UiFont(10,true)).ColorAndOpacity(Brand).AutoWrapText(true)]
 				   + SVerticalBox::Slot().AutoHeight()[SNew(SEditableTextBox).Style(&NameStyle).Text(FText::FromString(E.Name)).Font(UiFont(18,true))
 				     .OnTextCommitted_Lambda([this,Id](const FText& Name,ETextCommit::Type) {if(!Replay->RenameReplay(Id,Name.ToString())) Revision=-1;})]
 				   + SVerticalBox::Slot().AutoHeight().Padding(0,7)[SNew(STextBlock).Text(FText::FromString(FString::Printf(TEXT("%s  //  %s %dv%d  //  %02d:%02d  //  %s UTC"),
-				     *E.Mode,E.Variant==EFlickMatchVariant::Bob?TEXT("BOB"):TEXT("KNOCKOUT"),E.TeamSize,E.TeamSize,int32(E.Duration)/60,int32(E.Duration)%60,*E.RecordedAt.Left(16).Replace(TEXT("T"),TEXT(" "))))).Font(UiFont(11,true)).ColorAndOpacity(Ice)]
+				     *E.Mode,E.Variant==EFlickMatchVariant::Bob?TEXT("BOB"):TEXT("KNOCKOUT"),E.TeamSize,E.TeamSize,int32(E.ViewDuration())/60,int32(E.ViewDuration())%60,*E.RecordedAt.Left(16).Replace(TEXT("T"),TEXT(" "))))).Font(UiFont(11,true)).ColorAndOpacity(Ice)]
 				   + SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(E.Result+TEXT("   //   ")+FString::Join(E.Players,TEXT("  ·  ")))).Font(UiFont(11)).ColorAndOpacity(Muted).AutoWrapText(true)]]
 				 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(16,0,8,0)
-				   [Button(WatchPending==Id?TEXT("LEAVE ROOM & WATCH"):TEXT("WATCH REPLAY"),[this,Id]()
+				   [Button(WatchPending==Id?TEXT("LEAVE ROOM & WATCH"):E.IsClip()?TEXT("WATCH CLIP"):TEXT("WATCH REPLAY"),[this,Id]()
 				   { if(Replay->NeedsSessionExit()){if(WatchPending==Id) Replay->WatchAfterLeaving(Id);else {WatchPending=Id;Refresh();}}else Replay->Watch(Id); })]
 				 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				   [Button(DeletePending==Id?TEXT("CONFIRM DELETE"):TEXT("DELETE"),[this,Id]() {if(DeletePending==Id){Replay->Delete(Id);DeletePending.Reset();}else DeletePending=Id;Refresh();})]]];
