@@ -19,10 +19,8 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
-	EFlickRankedBackendMode GetMode() const { return Mode; }
 	const FString& GetSeasonId() const { return SeasonId; }
 	const FString& GetSteamTicketAudience() const { return SteamTicketAudience; }
-	int32 GetMaximumTeamRatingSpread() const { return MaximumTeamRatingSpread; }
 	bool IsRemoteAuthorityEnabled() const { return Mode == EFlickRankedBackendMode::RemoteHttp; }
 	bool CanRunRankedAuthority(FString& OutError) const;
 	FString GetStatusLabel() const;

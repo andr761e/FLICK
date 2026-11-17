@@ -141,11 +141,6 @@ void AFlickGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AFlickGameState, MaxLaunchSpeed);
 }
 
-void AFlickGameState::ResetMatchState()
-{
-	ResetSeriesState(RoundsToWin);
-}
-
 void AFlickGameState::ResetSeriesState(const int32 InRoundsToWin)
 {
 	RematchVotes.Reset();
@@ -424,13 +419,6 @@ void AFlickGameState::ShowAccolade(
 		AccoladeFeedEvents.RemoveAt(0, AccoladeFeedEvents.Num() - 16);
 	}
 	ForceNetUpdate();
-}
-
-float AFlickGameState::GetDramaticEventTimeRemaining() const
-{
-	return DramaticEvent == EFlickDramaticEvent::None
-		? 0.0f
-		: FMath::Max(0.0f, DramaticEventEndServerTime - GetServerWorldTimeSeconds());
 }
 
 void AFlickGameState::BeginShot(const EFlickTeam ShootingTeam, const int32 PieceId, const float NormalizedPower)

@@ -61,7 +61,7 @@ void AFlickAudioDirector::UpdateVoices(double Now, bool bPaused)
 				Voice.Component->Stop();
 				Voice.Component->DestroyComponent();
 			}
-			ActiveVoices.RemoveAtSwap(Index);
+			ActiveVoices.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 		}
 	}
 }

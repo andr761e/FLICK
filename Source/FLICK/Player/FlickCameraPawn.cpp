@@ -586,17 +586,6 @@ void AFlickCameraPawn::AdjustGameplayZoom(const int32 StepDirection)
 	bGameplayViewTransitioning = true;
 }
 
-void AFlickCameraPawn::AdjustGameplayElevationFine(const int32 StepDirection, const float Sensitivity)
-{
-	if (StepDirection == 0 || bMenuPresentation || bGameplayElevationLocked || bTopDownView)
-	{
-		return;
-	}
-	const float StepDegrees = FMath::Lerp(0.75f, 5.0f, FMath::Clamp(Sensitivity, 0.0f, 1.0f));
-	SetGameplayElevation(GameplayElevationAngle + FMath::Sign(StepDirection) * StepDegrees);
-	GameplayElevationPresetIndex = 1;
-}
-
 void AFlickCameraPawn::ToggleTopDownView()
 {
 	if (bMenuPresentation || bCinematicReplay || bFreeCameraEnabled) return;

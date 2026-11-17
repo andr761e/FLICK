@@ -229,6 +229,22 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 	if (GameMode.IsValid() && GameMode->GetFrontendScreen() == EFlickFrontendScreen::Settings)
 		LastFocusedScreen = EFlickFrontendScreen::Settings;
 
+	const auto BuildFpsCounter = [this](bool bGameplay) -> TSharedRef<SWidget>
+	{
+		return SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Ink).Padding(FMargin(6.0f, 2.0f))
+			.Visibility_Lambda([this, bGameplay]()
+			{
+				const bool bPlaying = GetScreenVisibility(EFlickFrontendScreen::Playing) == EVisibility::Visible;
+				return (FlickVisualSettings::IsFpsVisible() || bFpsPreview) && bPlaying == bGameplay
+					? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+			})
+			[
+				SNew(STextBlock)
+				.Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("%d FPS"), FMath::RoundToInt(1.0f / FMath::Max(SmoothedFrameSeconds, 0.0001f)))); })
+				.Font(UiFont(9, true)).ColorAndOpacity(Muted)
+			];
+	};
+
 	ChildSlot
 	[
 		SNew(SOverlay)
@@ -529,16 +545,11 @@ void SFlickGameLayer::Construct(const FArguments& InArgs)
 					? EVisibility::Visible : EVisibility::Collapsed;
 			})[BuildMenuRadio()]
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(12.0f, 0.0f, 0.0f, 8.0f)
-		[
-			SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Ink).Padding(FMargin(6.0f, 2.0f))
-			.Visibility_Lambda([this]() { return FlickVisualSettings::IsFpsVisible() || bFpsPreview ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("%d FPS"), FMath::RoundToInt(1.0f / FMath::Max(SmoothedFrameSeconds, 0.0001f)))); })
-				.Font(UiFont(9, true)).ColorAndOpacity(Muted)
-			]
-		]
+		// Menus reserve the top-centre margin; gameplay keeps its existing corner.
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0, 8, 0, 0)
+		[BuildFpsCounter(false)]
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(12, 0, 0, 8)
+		[BuildFpsCounter(true)]
 		]
 		]
 		]

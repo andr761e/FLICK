@@ -199,8 +199,6 @@ public:
 	EFlickFrontendScreen GetFrontendScreen() const { return FrontendScreen; }
 	EFlickFrontendScreen GetSettingsReturnScreen() const { return SettingsReturnScreen; }
 	EFlickMatchVariant GetSelectedMatchVariant() const { return SelectedMatchVariant; }
-	EFlickMatchVariant GetActiveMatchVariant() const { return ActiveMatchVariant; }
-	bool IsWaitingForNetworkPlayer() const { return bNetworkMatchRequested && !bNetworkMatchStarted; }
 	bool IsNetworkLobby() const { return bNetworkMatchRequested && !bNetworkMatchStarted; }
 	bool IsNetworkSession() const { return bNetworkMatchRequested; }
 	bool IsPartySession() const { return bPartyRequested; }
@@ -227,7 +225,6 @@ public:
 	FString GetTutorialHint() const;
 	bool IsTutorialComplete() const { return bTutorialCompleted; }
 	bool IsTutorialTransitioning() const { return TutorialTransitionRemaining > 0.0f; }
-	bool IsTestArenaMode() const { return bTestArenaMode; }
 	bool IsCinematicReplayActive() const { return bCinematicReplayActive; }
 	void RequestReplaySkip(APlayerController* Player, int32 ReplaySerial);
 	bool IsCinematicReplayPullbackActive() const;
@@ -244,7 +241,6 @@ public:
 	EFlickTeam GetTrainingPlacementTeam() const { return TrainingPlacementTeam; }
 	EFlickPieceArchetype GetTrainingPlacementArchetype() const { return TrainingPlacementArchetype; }
 	bool IsRankedQueueSelected() const { return bRankedQueueSelected; }
-	bool IsPrivateMatchSetup() const { return bPrivateMatchSetupActive; }
 	bool IsPrivateMatch() const { return bPrivateMatchActive; }
 	const FFlickPrivateMatchSettings& GetPrivateMatchSettings() const { return PrivateMatchSettings; }
 	int32 GetPlayersPerTeam() const { return CurrentPlayersPerTeam; }
@@ -271,11 +267,8 @@ public:
 	bool IsPreparingTrainingBotMatch() const { return bClassSelectionStartsTrainingBotMatch; }
 	bool HasPendingClassChanges() const { return bHasPendingClassChanges; }
 	bool CanOpenClassChange() const;
-	int32 GetCurrentStartingPiecesPerTeam() const { return CurrentStartingPiecesPerTeam; }
-	EFlickMatchVariant GetLoadoutEditingVariant() const { return LoadoutEditingVariant; }
 	EFlickLineupPreset GetLoadoutEditingPreset() const { return LoadoutEditingPreset; }
 	int32 GetLoadoutEditingPieceCount() const;
-	int32 GetCurrentRoundsToWin() const { return CurrentRoundsToWin; }
 	bool IsBobMode() const { return ActiveMatchVariant == EFlickMatchVariant::Bob; }
 	bool DoesSelectedModeSupportLoadouts() const;
 	bool CanChangeCameraView() const;
@@ -396,8 +389,6 @@ public:
 	float GetMaxLaunchSpeed() const { return MaxLaunchSpeed; }
 	float GetMinDragDistance() const { return MinDragDistance; }
 	float GetPowerExponent() const { return PowerExponent; }
-	float GetResolutionElapsed() const { return ResolutionElapsed; }
-	float GetMaximumResolutionDuration() const { return MaximumResolutionDuration; }
 	bool IsResolvingKickoff() const { return bResolvingKickoff; }
 	int32 CountActivePieces(EFlickTeam Team) const;
 

@@ -388,7 +388,7 @@ void AFlickReplayController::PlayerTick(float DeltaTime)
 	}
 	if (CameraMode==EFlickReplayCamera::Puck||CameraMode==EFlickReplayCamera::Cinematic)
 	{
-		TArray<AFlickPiece*> Pieces;
+		TArray<AFlickPiece*, TInlineAllocator<32>> Pieces;
 		for(TActorIterator<AFlickPiece> It(GetWorld());It;++It) if(!It->IsHidden()) Pieces.Add(*It);
 		Pieces.Sort([](const AFlickPiece& A,const AFlickPiece& B) { return A.GetPieceId()<B.GetPieceId(); });
 		if (!Pieces.IsEmpty()) Focus=Pieces[Target%Pieces.Num()]->GetActorLocation();

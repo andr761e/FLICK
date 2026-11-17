@@ -40,7 +40,6 @@ public:
 	void ClearAiming();
 	bool IsAimingShot() const { return bAimingShot; }
 	bool IsFreeCameraActive() const;
-	float GetAimPowerPercent() const { return CurrentLaunchResult.NormalizedPower * 100.0f; }
 	const AFlickPiece* GetSelectedPiece() const { return SelectedPiece; }
 	const FFlickLaunchResult& GetAimResult() const { return CurrentLaunchResult; }
 	bool HasAimCursorPoint() const { return bHasAimCursorPoint; }
@@ -54,7 +53,6 @@ public:
 	FVector GetAimCursorWorldPoint() const { return AimCursorWorldPoint; }
 	bool HasPredictedContact() const { return bHasPredictedContact; }
 	FVector GetPredictedContactWorldPoint() const { return PredictedContactWorldPoint; }
-	const AFlickPiece* GetPredictedContactPiece() const { return PredictedContactPiece; }
 	float GetAimGuideDistance() const { return AimGuideDistance; }
 	bool IsScoreboardVisible() const { return bScoreboardVisible; }
 	EFlickTeam GetLocalTeam() const;
@@ -71,7 +69,6 @@ public:
 	void RequestConfirmClass();
 	void RequestTogglePrivateMatchSlot(EFlickTeam Team, int32 PlayerSlot);
 	void RequestPrivateMatchSpectate();
-	bool IsPrivateTeamMenuOpen() const { return bPrivateTeamMenuOpen; }
 	bool ShouldShowPrivateTeamMenu() const;
 	void ClosePrivateTeamMenu() { bPrivateTeamMenuOpen = false; }
 	void OpenPrivateTeamMenu() { bPrivateTeamMenuOpen = true; }
@@ -128,7 +125,6 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerRequestReplaySkip(int32 ReplaySerial);
 	float GetCinematicReplayPresentationProgress() const { return CinematicReplayPresentationProgress; }
-	float GetCinematicReplayPresentationPullbackAlpha() const { return CinematicReplayPresentationPullbackAlpha; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FLICK|Debug")
 	bool bDrawAimDebug = false;
@@ -325,9 +321,6 @@ private:
 	EFlickFrontendScreen LocalMatchMenuScreen = EFlickFrontendScreen::Playing;
 
 	UPROPERTY()
-	TObjectPtr<AFlickPiece> PredictedContactPiece;
-
-	UPROPERTY()
 	TObjectPtr<AFlickPiece> TrainingDraggedPiece;
 
 	FFlickLaunchResult CurrentLaunchResult;
@@ -345,7 +338,6 @@ private:
 	bool bNetworkAutoShotSubmitted = false;
 	bool bCinematicReplayPresentationActive = false;
 	float CinematicReplayPresentationProgress = 0.0f;
-	float CinematicReplayPresentationPullbackAlpha = 0.0f;
 	bool bNetworkAutoReadyRequested = false;
 	bool bNetworkAutoReadySubmitted = false;
 	bool bNetworkAutoStartSubmitted = false;

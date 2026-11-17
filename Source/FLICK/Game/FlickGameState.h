@@ -53,7 +53,6 @@ public:
 	AFlickGameState();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void ResetMatchState();
 	void ResetSeriesState(int32 InRoundsToWin = 3);
 	void ResetRoundState();
 	void CompleteRound(EFlickMatchOutcome Outcome);
@@ -123,7 +122,6 @@ public:
 		float InDuration);
 	void ClearDramaticEvent();
 	void ShowAccolade(EFlickAccolade Accolade, EFlickTeam Team, int32 BonusPoints = 0);
-	float GetDramaticEventTimeRemaining() const;
 
 	bool IsGameplayActive() const { return MatchPhase != EFlickMatchPhase::WaitingToStart; }
 	bool RegisterReplaySkipVote(APlayerState* Player, int32 Serial);

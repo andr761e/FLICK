@@ -122,31 +122,19 @@ void AFlickHUD::DrawHUD()
 		MenuCursorPosition = FVector2D(CursorX, CursorY);
 	}
 
-	if (FlickGameMode && FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::MainMenu)
+	if (FlickGameMode)
 	{
-		return;
-	}
-	if (FlickGameMode && FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::ModeSelect)
-	{
-		return;
-	}
-
-	if (FlickGameMode && FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::Loadout)
-	{
-		return;
-	}
-
-	if (FlickGameMode && FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::Settings)
-	{
-		return;
-	}
-	if (FlickGameMode && FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::ItemShop)
-	{
-		return;
-	}
-	if (FlickGameMode && FlickGameMode->GetFrontendScreen() == EFlickFrontendScreen::PrivateMatch)
-	{
-		return;
+		switch (FlickGameMode->GetFrontendScreen())
+		{
+		case EFlickFrontendScreen::MainMenu:
+		case EFlickFrontendScreen::ModeSelect:
+		case EFlickFrontendScreen::Loadout:
+		case EFlickFrontendScreen::Settings:
+		case EFlickFrontendScreen::ItemShop:
+		case EFlickFrontendScreen::PrivateMatch:
+			return;
+		default: break;
+		}
 	}
 	if (!FlickGameMode && FlickGameState->bNetworkLobbyActive && FlickController)
 	{

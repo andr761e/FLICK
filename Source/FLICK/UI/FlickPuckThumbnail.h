@@ -3,6 +3,7 @@
 #include "Core/FlickPieceArchetypeRules.h"
 #include "Engine/Texture2D.h"
 #include "Styling/SlateBrush.h"
+#include "Rendering/RenderingCommon.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Widgets/SLeafWidget.h"
 
@@ -40,4 +41,7 @@ private:
 	FMargin EdgeFade;
 	TStrongObjectPtr<UTexture2D> Texture;
 	mutable FSlateBrush Brush;
+	// Slate copies submissions; keep scratch capacity across paints.
+	mutable TArray<FSlateVertex> PaintVertices;
+	mutable TArray<SlateIndex> PaintIndices;
 };

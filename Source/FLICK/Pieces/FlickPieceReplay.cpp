@@ -71,7 +71,7 @@ void AFlickPiece::QueueSavedReplayPose(float Time, const FVector& Location, cons
 		SavedReplayPoses.Last() = Pose;
 	else
 	{
-		if (SavedReplayPoses.Num() >= 16) SavedReplayPoses.RemoveAt(0);
+		if (SavedReplayPoses.Num() >= 16) SavedReplayPoses.RemoveAt(0, 1, EAllowShrinking::No);
 		SavedReplayPoses.Add(Pose);
 	}
 	// Apply once after packet delivery, in the actor tick. A seek/paused world
@@ -109,7 +109,9 @@ void AFlickPiece::UpdateSavedReplayPose()
 	const float Delay = FMath::Max(FMath::Clamp(ReplayPoseDelay.GetValueOnGameThread(), 0.f, .2f),
 		FMath::Clamp(1.25f / FMath::Max(1.f, SourceRate), .025f, .3f));
 	const float Time = Driver->GetDemoCurrentTime() - Delay;
-	while (SavedReplayPoses.Num() > 2 && SavedReplayPoses[1].Time <= Time) SavedReplayPoses.RemoveAt(0);
+	int32 Expired = 0;
+	while (SavedReplayPoses.Num() - Expired > 2 && SavedReplayPoses[Expired + 1].Time <= Time) ++Expired;
+	if (Expired) SavedReplayPoses.RemoveAt(0, Expired, EAllowShrinking::No);
 	const auto& A = SavedReplayPoses[0];
 	const auto& B = SavedReplayPoses.Num() > 1 ? SavedReplayPoses[1] : A;
 	const float Alpha = B.Time > A.Time ? FMath::Clamp((Time - A.Time) / (B.Time - A.Time), 0.f, 1.f) : 1.f;

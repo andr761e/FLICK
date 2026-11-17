@@ -51,8 +51,6 @@ public:
 	bool IsDividerRaised(int32 DividerIndex) const;
 	bool IsDividerPending(int32 DividerIndex) const;
 	bool FindDividerIndex(const UPrimitiveComponent* Component, int32& OutDividerIndex) const;
-	FVector GetSwitchLabelLocation(int32 Index) const;
-	FVector GetDividerLabelLocation(int32 Index) const;
 	FVector GetDividerWorldCenter(int32 Index) const;
 	FVector GetSwitchWorldCenter(int32 Index) const;
 	int32 FindSwitchAtWorldLocation(const FVector& WorldLocation) const;

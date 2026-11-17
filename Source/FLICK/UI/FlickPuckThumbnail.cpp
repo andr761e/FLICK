@@ -65,8 +65,9 @@ int32 SFlickPuckThumbnail::OnPaint(const FPaintArgs&, const FGeometry& Geometry,
 		const auto Points = FlickUITheme::GetPanelOutline(Area, CutSize);
 		const float Angle=FMath::DegreesToRadians(RollDegrees);
 		const float Cos=FMath::Cos(Angle), Sin=FMath::Sin(Angle);
-		TArray<FSlateVertex> Vertices;
-		TArray<SlateIndex> Indices;
+		auto& Vertices = PaintVertices;
+		auto& Indices = PaintIndices;
+		Vertices.Reset(); Indices.Reset();
 		const float FadeWidth = FMath::Clamp(FadeRight, 0.f, static_cast<float>(Area.X));
 		const float FadeStart = Area.X - FadeWidth;
 		const auto AppendPolygon = [&](const TArray<FVector2D>& Polygon) {
@@ -99,15 +100,7 @@ int32 SFlickPuckThumbnail::OnPaint(const FPaintArgs&, const FGeometry& Geometry,
 			// blends into the native card; the puck itself stays fully opaque.
 			for (const bool bLeft : {true, false})
 			{
-				TArray<FVector2D> Clipped;
-				for (int32 Index = 0; Index < Points.Num(); ++Index)
-				{
-					const FVector2D A = Points[Index], B = Points[(Index + 1) % Points.Num()];
-					const bool bAInside = bLeft ? A.X <= FadeStart : A.X >= FadeStart;
-					const bool bBInside = bLeft ? B.X <= FadeStart : B.X >= FadeStart;
-					if (bAInside) Clipped.Add(A);
-					if (bAInside != bBInside) Clipped.Add(FMath::Lerp(A, B, (FadeStart - A.X) / (B.X - A.X)));
-				}
+				const auto Clipped = FlickArtworkGeometry::ClipPolygon(Points, true, FadeStart, bLeft);
 				AppendPolygon(Clipped);
 			}
 		}

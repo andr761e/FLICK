@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/FlickTypes.h"
+#include "Pieces/FlickTrailMeshBuffers.h"
 #include "GameFramework/Actor.h"
 #include "FlickPiece.generated.h"
 
@@ -398,4 +399,5 @@ private:
 	UFUNCTION()
 	void OnRep_ReplayCosmeticTime();
 	float LastReplayCosmeticTime = -1.0f;
+	FFlickTrailMeshBuffers TrailRibbons, TrailParticles;
 };

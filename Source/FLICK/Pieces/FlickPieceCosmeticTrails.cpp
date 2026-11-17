@@ -16,46 +16,47 @@ namespace
 	constexpr float TeleportDistance = 450.0f;
 	constexpr float MinimumSpeed = 12.0f;
 
-	// Two batched sections: feathered ribbons and camera-facing particles.
-	// No particle actors, collision bodies or lights.
-	struct FTrailBatch
-	{
-		TArray<FVector> Vertices, Normals;
-		TArray<FVector2D> UVs;
-		TArray<FColor> Colors;
-		TArray<int32> Indices;
-		void Pair(const FVector& Center, const FVector& Side, float Width, FLinearColor Color, float U)
-		{
-			Vertices.Append({Center - Side * Width, Center + Side * Width});
-			Normals.Append({FVector::UpVector, FVector::UpVector});
-			UVs.Append({FVector2D(U, 0), FVector2D(U, 1)});
-			Colors.Append({Color.ToFColor(false), Color.ToFColor(false)});
-		}
-		void Quad(const FVector& Center, const FVector& Right, const FVector& Up, float Size, float Height, FLinearColor Color)
-		{
-			const int32 A = Vertices.Num();
-			Vertices.Append({Center - Right * Size - Up * Height, Center + Right * Size - Up * Height,
-				Center - Right * Size + Up * Height, Center + Right * Size + Up * Height});
-			const FVector Normal = FVector::CrossProduct(Right, Up).GetSafeNormal();
-			Normals.Append({Normal, Normal, Normal, Normal});
-			UVs.Append({{0,1}, {1,1}, {0,0}, {1,0}});
-			for (int32 I = 0; I < 4; ++I) Colors.Add(Color.ToFColor(false));
-			Indices.Append({A, A+1, A+2, A+1, A+3, A+2});
-		}
-		void Upload(UProceduralMeshComponent* Mesh, int32 Section) const
-		{
-			if (Vertices.IsEmpty()) { Mesh->ClearMeshSection(Section); return; }
-			const FProcMeshSection* Existing = Mesh->GetProcMeshSection(Section);
-			if (Existing && Existing->ProcVertexBuffer.Num() == Vertices.Num() && Existing->ProcIndexBuffer.Num() == Indices.Num())
-				Mesh->UpdateMeshSection(Section, Vertices, Normals, UVs, Colors, TArray<FProcMeshTangent>());
-			else Mesh->CreateMeshSection(Section, Vertices, Indices, Normals, UVs, Colors, TArray<FProcMeshTangent>(), false);
-		}
-	};
 	float Noise(float Seed)
 	{
 		const float Value = FMath::Sin(Seed * 127.1f + 31.7f) * 43758.5453f;
 		return Value - FMath::FloorToFloat(Value);
 	}
+}
+
+
+void FFlickTrailMeshBuffers::Reset(int32 VertexCapacity, int32 IndexCapacity)
+{
+	Vertices.Reset(VertexCapacity); Normals.Reset(VertexCapacity);
+	UVs.Reset(VertexCapacity); Colors.Reset(VertexCapacity); Indices.Reset(IndexCapacity);
+}
+
+void FFlickTrailMeshBuffers::Pair(const FVector& Center, const FVector& Side, float Width, FLinearColor Color, float U)
+{
+	Vertices.Append({Center - Side * Width, Center + Side * Width});
+	Normals.Append({FVector::UpVector, FVector::UpVector});
+	UVs.Append({FVector2D(U, 0), FVector2D(U, 1)});
+	const FColor PackedColor = Color.ToFColor(false);
+	Colors.Append({PackedColor, PackedColor});
+}
+void FFlickTrailMeshBuffers::Quad(const FVector& Center, const FVector& Right, const FVector& Up, float Size, float Height, FLinearColor Color)
+{
+	const int32 A = Vertices.Num();
+	Vertices.Append({Center - Right * Size - Up * Height, Center + Right * Size - Up * Height,
+		Center - Right * Size + Up * Height, Center + Right * Size + Up * Height});
+	const FVector Normal = FVector::CrossProduct(Right, Up).GetSafeNormal();
+	Normals.Append({Normal, Normal, Normal, Normal});
+	UVs.Append({{0,1}, {1,1}, {0,0}, {1,0}});
+	const FColor PackedColor = Color.ToFColor(false);
+	for (int32 I = 0; I < 4; ++I) Colors.Add(PackedColor);
+	Indices.Append({A, A+1, A+2, A+1, A+3, A+2});
+}
+void FFlickTrailMeshBuffers::Upload(UProceduralMeshComponent* Mesh, int32 Section) const
+{
+	if (Vertices.IsEmpty()) { Mesh->ClearMeshSection(Section); return; }
+	const FProcMeshSection* Existing = Mesh->GetProcMeshSection(Section);
+	if (Existing && Existing->ProcVertexBuffer.Num() == Vertices.Num() && Existing->ProcIndexBuffer.Num() == Indices.Num())
+		Mesh->UpdateMeshSection(Section, Vertices, Normals, UVs, Colors, TArray<FProcMeshTangent>());
+	else Mesh->CreateMeshSection(Section, Vertices, Indices, Normals, UVs, Colors, TArray<FProcMeshTangent>(), false);
 }
 
 void AFlickPiece::UpdateCollectionTrail(const float DeltaSeconds)
@@ -145,21 +146,41 @@ void AFlickPiece::UpdateCollectionTrail(const float DeltaSeconds)
 			CameraRight = Basis.GetUnitAxis(EAxis::Y); CameraUp = Basis.GetUnitAxis(EAxis::Z);
 		}
 	const int32 Count = TrailPoints.Num();
-	FTrailBatch Ribbons, Particles;
+	auto& Ribbons = TrailRibbons;
+	auto& Particles = TrailParticles;
+	Ribbons.Reset(Count * Style.Lanes * 2, (Count - 1) * Style.Lanes * 6);
+	Particles.Reset((Count - 1) * 4, (Count - 1) * 6);
+	// Every lane shares the sampled path and camera-facing basis.
+	struct FPathPoint
+	{
+		FVector Side, RibbonSide;
+		float Age, Life, Cap, Birth, RootLife, Fade;
+	};
+	const FVector CameraNormal = FVector::CrossProduct(CameraRight, CameraUp);
+	TArray<FPathPoint, TInlineAllocator<MaxSamples>> Path;
+	Path.SetNumUninitialized(Count);
+	for (int32 I = 0; I < Count; ++I)
+	{
+		auto& Point = Path[I];
+		const FVector Tangent = (TrailPoints[FMath::Max(0, I-1)] - TrailPoints[FMath::Min(Count-1, I+1)]).GetSafeNormal2D();
+		Point.Side = FVector(-Tangent.Y, Tangent.X, 0);
+		FVector FacingSide = FVector::CrossProduct(Tangent, CameraNormal).GetSafeNormal();
+		if (FVector::DotProduct(FacingSide, Point.Side) < 0) FacingSide *= -1;
+		Point.RibbonSide = (Point.Side*.55f + FacingSide*.45f).GetSafeNormal();
+		Point.Age = TrailPointAges[I];
+		Point.Life = FMath::Clamp(1 - Point.Age / Style.Lifetime, 0.0f, 1.0f);
+		Point.Cap = FMath::Clamp((Count - 1 - I) / 4.0f, 0.0f, 1.0f);
+		Point.Birth = TrailClock - Point.Age;
+		Point.RootLife = FMath::Sqrt(Point.Life);
+		Point.Fade = FMath::Pow(Point.Life, 1.1f);
+	}
 	for (int32 Lane = 0; Lane < Style.Lanes; ++Lane)
 	{
 		const int32 Start = Ribbons.Vertices.Num();
 		for (int32 I = 0; I < Count; ++I)
 		{
-			const FVector Tangent = (TrailPoints[FMath::Max(0, I-1)] - TrailPoints[FMath::Min(Count-1, I+1)]).GetSafeNormal2D();
-			const FVector Side(-Tangent.Y, Tangent.X, 0);
-			// A banked ribbon retains its width at low replay angles.
-			FVector FacingSide = FVector::CrossProduct(Tangent, FVector::CrossProduct(CameraRight, CameraUp)).GetSafeNormal();
-			if (FVector::DotProduct(FacingSide, Side) < 0) FacingSide *= -1;
-			const FVector RibbonSide = (Side*.55f + FacingSide*.45f).GetSafeNormal();
-			const float Age = TrailPointAges[I], Life = FMath::Clamp(1 - Age / Style.Lifetime, 0.0f, 1.0f);
-			const float Cap = FMath::Clamp((Count - 1 - I) / 4.0f, 0.0f, 1.0f);
-			const float Birth = TrailClock - Age;
+			const auto& Point = Path[I];
+			const float Age = Point.Age, Life = Point.Life, Cap = Point.Cap, Birth = Point.Birth;
 			const float Strand = Lane - (Style.Lanes - 1) * 0.5f;
 			float Width = Lane == 0 ? Style.Width : 1.25f;
 			float Offset = Lane == 0 ? 0 : Strand * 6;
@@ -190,10 +211,10 @@ void AFlickPiece::UpdateCollectionTrail(const float DeltaSeconds)
 			case 11: Offset = Strand * 4 + Wave * 3; Width = Lane == 0 ? Style.Width : 2; Opacity = .17f; break;
 			default: break;
 			}
-			Color.A = FMath::Min(0.95f, Opacity * 1.15f) * FMath::Pow(Life, 1.1f) * Cap;
+			Color.A = FMath::Min(0.95f, Opacity * 1.15f) * Point.Fade * Cap;
 			const float Lift = Lane == 0 ? 0 : (1-Life)*(2+3*Wave);
-			const FVector Center = TrailPoints[I] + Side * Offset * FMath::Sqrt(Life) + FVector(0,0,3.5f + Lane*.25f + Lift);
-			Ribbons.Pair(Center, RibbonSide, Width * FMath::Sqrt(Life) * Cap, Color, Age / Style.Lifetime);
+			const FVector Center = TrailPoints[I] + Point.Side * Offset * Point.RootLife + FVector(0,0,3.5f + Lane*.25f + Lift);
+			Ribbons.Pair(Center, Point.RibbonSide, Width * Point.RootLife * Cap, Color, Age / Style.Lifetime);
 			if (I < Count - 1)
 			{
 				const int32 A = Start + I * 2;

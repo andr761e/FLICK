@@ -51,8 +51,9 @@ int32 SFlickShopArtwork::OnPaint(const FPaintArgs&, const FGeometry& Geometry, c
 		for (float& X : Columns) X = FMath::Clamp(X, 0.f, static_cast<float>(Area.X));
 		Columns.Sort();
 		const float Rows[] = {0, Cut, static_cast<float>(Area.Y) - Cut, static_cast<float>(Area.Y)};
-		TArray<FSlateVertex> Vertices;
-		TArray<SlateIndex> Indices;
+		auto& Vertices = PaintVertices;
+		auto& Indices = PaintIndices;
+		Vertices.Reset(); Indices.Reset();
 		for (int32 R = 0; R < UE_ARRAY_COUNT(Rows); ++R)
 		{
 			const float Y = Rows[R];
@@ -106,8 +107,9 @@ int32 SFlickShopArtwork::OnPaint(const FPaintArgs&, const FGeometry& Geometry, c
 	}
 	// Image vertices follow the frame's cut corners, not just rectangular Slate clipping.
 	const auto Points = FlickUITheme::GetPanelOutline(DrawSize, CutSize);
-	TArray<FSlateVertex> Vertices;
-	TArray<SlateIndex> Indices;
+	auto& Vertices = PaintVertices;
+	auto& Indices = PaintIndices;
+	Vertices.Reset(); Indices.Reset();
 	for (const FVector2D& Point : Points)
 		Vertices.Add(FSlateVertex::Make(Transform, FVector2f(Point + Offset), UVMin + FVector2f(Point / DrawSize) * (UVMax - UVMin), Tint.ToFColor(true)));
 	for (int32 I = 1; I + 1 < Points.Num(); ++I) Indices.Append({0, static_cast<SlateIndex>(I), static_cast<SlateIndex>(I + 1)});

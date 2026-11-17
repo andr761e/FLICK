@@ -33,7 +33,6 @@ public:
 	const FString& GetStatusMessage() const { return StatusMessage; }
 	const FString& GetSteamTicketAudience() const { return SteamTicketAudience; }
 	float GetReconnectGraceSeconds() const { return ReconnectGraceSeconds; }
-	const FFlickCoordinatorAllocation& GetLastAllocation() const { return LastAllocation; }
 
 	bool QueueParty(const FFlickCoordinatorQueueRequest& Request, FFlickCoordinatorQueueCallback Callback);
 	bool CancelQueue();

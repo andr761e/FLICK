@@ -6,6 +6,23 @@
 // This avoids rectangular image seams without blur targets or extra textures.
 namespace FlickArtworkGeometry
 {
+	template<typename Coordinate = double>
+	inline TArray<FVector2D> ClipPolygon(TConstArrayView<FVector2D> Polygon, bool bX, float Boundary, bool bBefore)
+	{
+		TArray<FVector2D> Clipped;
+		Clipped.Reserve(Polygon.Num() + 1);
+		for (int32 I = 0; I < Polygon.Num(); ++I)
+		{
+			const FVector2D A = Polygon[I], B = Polygon[(I+1)%Polygon.Num()];
+			const Coordinate Av = bX ? A.X : A.Y, Bv = bX ? B.X : B.Y;
+			const bool bA = bBefore ? Av <= Boundary : Av >= Boundary;
+			const bool bB = bBefore ? Bv <= Boundary : Bv >= Boundary;
+			if (bA) Clipped.Add(A);
+			if (bA != bB) Clipped.Add(FMath::Lerp(A,B,(Boundary-Av)/(Bv-Av)));
+		}
+		return Clipped;
+	}
+
 	inline TArray<TArray<FVector2D>> FadePolygons(const TArray<FVector2D>& Outline, FVector2D Size, FMargin Fade)
 	{
 		TArray<TArray<FVector2D>> Polygons;
@@ -15,16 +32,7 @@ namespace FlickArtworkGeometry
 			for (const auto& Polygon : Polygons)
 				for (bool bBefore : {true,false})
 				{
-					TArray<FVector2D> Clipped;
-					for (int32 I = 0; I < Polygon.Num(); ++I)
-					{
-						const FVector2D A = Polygon[I], B = Polygon[(I+1)%Polygon.Num()];
-						const float Av = bX ? A.X : A.Y, Bv = bX ? B.X : B.Y;
-						const bool bA = bBefore ? Av <= Boundary : Av >= Boundary;
-						const bool bB = bBefore ? Bv <= Boundary : Bv >= Boundary;
-						if (bA) Clipped.Add(A);
-						if (bA != bB) Clipped.Add(FMath::Lerp(A,B,(Boundary-Av)/(Bv-Av)));
-					}
+					auto Clipped = ClipPolygon<float>(Polygon, bX, Boundary, bBefore);
 					if (Clipped.Num() >= 3) Result.Add(MoveTemp(Clipped));
 				}
 			Polygons = MoveTemp(Result);

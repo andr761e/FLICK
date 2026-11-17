@@ -129,16 +129,11 @@ public:
 	bool HasPersistentPartyIdentity() const { return !PersistentPartyId.IsEmpty() && PersistentPartySlot != INDEX_NONE; }
 	bool IsPersistentPartyLeader() const { return HasPersistentPartyIdentity() && bPersistentPartyLeader; }
 	const FString& GetPersistentPartyId() const { return PersistentPartyId; }
-	int32 GetPersistentPartySlot() const { return PersistentPartySlot; }
-	int32 GetPersistentPartySize() const { return PersistentPartySize; }
 	bool IsMatchmakingActive() const;
 	float GetMatchmakingElapsedSeconds() const;
 	double GetMatchmakingStartedSeconds() const;
 	bool HasMatchmakingAttempt() const;
 	int32 GetMatchmakingPlayersPerTeam() const { return PendingPlayersPerTeam; }
-	int32 GetMatchmakingPartySize() const { return PendingPartySize; }
-	bool IsRankedMatchmaking() const { return bPendingRanked; }
-	int32 GetPendingQueueRating() const { return PendingQueueRating; }
 	int32 GetRankedSearchRange() const { return CurrentRankedSearchRange; }
 	EFlickSessionState GetState() const;
 	const FString& GetStatusMessage() const;

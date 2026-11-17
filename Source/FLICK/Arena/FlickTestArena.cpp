@@ -757,21 +757,6 @@ bool AFlickTestArena::IsDividerPending(const int32 DividerIndex) const
 		&& (PendingToggleMask & (1 << DividerIndex)) != 0;
 }
 
-FVector AFlickTestArena::GetSwitchLabelLocation(const int32 Index) const
-{
-	const FVector2D Center = GetZoneLocalCenter(Index);
-	return GetActorTransform().TransformPosition(FVector(
-		Center - Center.GetSafeNormal() * (ControlZoneRadius + 24.0f), SurfaceZ + 5.0f));
-}
-
-FVector AFlickTestArena::GetDividerLabelLocation(const int32 Index) const
-{
-	if (!DividerCenters.IsValidIndex(Index)) return GetActorLocation();
-	const FVector2D Center = DividerCenters[Index];
-	return GetActorTransform().TransformPosition(FVector(
-		Center - Center.GetSafeNormal() * (DividerThickness + 30.0f), SurfaceZ + 5.0f));
-}
-
 FVector AFlickTestArena::GetDividerWorldCenter(const int32 Index) const
 {
 	if (!DividerCenters.IsValidIndex(Index))

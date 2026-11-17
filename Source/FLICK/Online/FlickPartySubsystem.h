@@ -40,7 +40,6 @@ public:
 	bool IsActive() const { return !PartyId.IsEmpty() && !Members.IsEmpty(); }
 	bool IsLocalLeader() const { return IsActive() && LocalUserId == LeaderUserId; }
 	const FString& GetPartyId() const { return PartyId; }
-	const FString& GetLeaderUserId() const { return LeaderUserId; }
 	const FString& GetLocalUserId() const { return LocalUserId; }
 	int32 GetMemberCount() const { return Members.Num(); }
 	const TArray<FFlickPartyMember>& GetMembers() const { return Members; }

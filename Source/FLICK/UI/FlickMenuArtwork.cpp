@@ -95,8 +95,9 @@ int32 SFlickMenuArtwork::OnPaint(const FPaintArgs&, const FGeometry& Geometry, c
 	const auto& Transform = Geometry.GetAccumulatedRenderTransform();
 	const FLinearColor Tint = Style.GetColorAndOpacityTint();
 	const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
-	TArray<FSlateVertex> Vertices;
-	TArray<SlateIndex> Indices;
+	auto& Vertices = PaintVertices;
+	auto& Indices = PaintIndices;
+	Vertices.Reset(); Indices.Reset();
 	for (const auto& Polygon : FlickArtworkGeometry::FadePolygons(Points,Size,EdgeFade))
 	{
 		const SlateIndex Start = static_cast<SlateIndex>(Vertices.Num());

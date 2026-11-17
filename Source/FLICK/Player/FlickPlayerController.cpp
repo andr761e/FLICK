@@ -555,7 +555,6 @@ void AFlickPlayerController::ClearAiming()
 	CurrentLaunchResult = FFlickLaunchResult();
 	AimCursorWorldPoint = FVector::ZeroVector;
 	PredictedContactWorldPoint = FVector::ZeroVector;
-	PredictedContactPiece = nullptr;
 	AimGuideDistance = 0.0f;
 	bAimingShot = false;
 	bHasAimCursorPoint = false;
@@ -1066,7 +1065,6 @@ void AFlickPlayerController::UpdateAimFromCursor()
 void AFlickPlayerController::UpdatePredictedContact()
 {
 	bHasPredictedContact = false;
-	PredictedContactPiece = nullptr;
 	PredictedContactWorldPoint = FVector::ZeroVector;
 	AimGuideDistance = 0.0f;
 	if (!SelectedPiece || !CurrentLaunchResult.bValidShot || !GetWorld())
@@ -1099,7 +1097,6 @@ void AFlickPlayerController::UpdatePredictedContact()
 	}
 
 	bHasPredictedContact = true;
-	PredictedContactPiece = HitPiece;
 	PredictedContactWorldPoint = Hit.ImpactPoint.IsNearlyZero() ? Hit.Location : Hit.ImpactPoint;
 	AimGuideDistance = FVector::Distance(Start, Hit.Location);
 }
@@ -2250,7 +2247,6 @@ void AFlickPlayerController::ClientBeginCinematicReplay_Implementation(
 {
 	bCinematicReplayPresentationActive = true;
 	CinematicReplayPresentationProgress = 0.0f;
-	CinematicReplayPresentationPullbackAlpha = 0.0f;
 	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		Camera->BeginCinematicReplay(InitialFocus, ShootingTeam);
@@ -2264,7 +2260,6 @@ void AFlickPlayerController::ClientUpdateCinematicReplay_Implementation(
 {
 	bCinematicReplayPresentationActive = true;
 	CinematicReplayPresentationProgress = FMath::Clamp(NormalizedProgress, 0.0f, 1.0f);
-	CinematicReplayPresentationPullbackAlpha = FMath::Clamp(PullbackAlpha, 0.0f, 1.0f);
 	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		Camera->UpdateCinematicReplay(Focus, NormalizedProgress, PullbackAlpha);
@@ -2275,7 +2270,6 @@ void AFlickPlayerController::ClientEndCinematicReplay_Implementation()
 {
 	bCinematicReplayPresentationActive = false;
 	CinematicReplayPresentationProgress = 0.0f;
-	CinematicReplayPresentationPullbackAlpha = 0.0f;
 	if (AFlickCameraPawn* Camera = Cast<AFlickCameraPawn>(GetPawn()))
 	{
 		Camera->EndCinematicReplay();
