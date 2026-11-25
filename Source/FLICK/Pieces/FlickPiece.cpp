@@ -363,9 +363,16 @@ void AFlickPiece::Tick(const float DeltaSeconds)
 	const EFlickTeam ViewerTeam = IndicatorViewer ? IndicatorViewer->GetLocalTeam() : EFlickTeam::None;
 	const bool bViewerChanged = ViewerTeam != LastIndicatorViewerTeam;
 	LastIndicatorViewerTeam = ViewerTeam;
-	if (bSelected || bHovered || bWasFlashing || bOwnershipChanged || bAccessibilityChanged || bIndicatorChanged || bViewerChanged)
+	// Saved playback also restores the recorded visibility/light state above.
+	// Retain its full highlight refresh if a replay puck is selected or hovered.
+	const bool bReplayHighlight = ReplayCosmeticTime >= 0.f && (bSelected || bHovered);
+	if (bReplayHighlight || bWasFlashing || bOwnershipChanged || bAccessibilityChanged || bIndicatorChanged || bViewerChanged)
 	{
 		ApplyVisuals();
+	}
+	else if (bSelected)
+	{
+		UpdateSelectionPulse();
 	}
 	if (bWasFlashing && HitFlashRemaining <= 0.0f)
 	{
@@ -818,21 +825,17 @@ void AFlickPiece::ApplyEliminatedState()
 
 void AFlickPiece::SetSelected(const bool bInSelected)
 {
-	if (bEliminated)
-	{
-		bSelected = false;
-	}
-	else
-	{
-		bSelected = bInSelected;
-	}
-
+	const bool bNewSelected = !bEliminated && bInSelected;
+	if (bSelected == bNewSelected) return;
+	bSelected = bNewSelected;
 	ApplyVisuals();
 }
 
 void AFlickPiece::SetHovered(const bool bInHovered)
 {
-	bHovered = !bEliminated && bInHovered;
+	const bool bNewHovered = !bEliminated && bInHovered;
+	if (bHovered == bNewHovered) return;
+	bHovered = bNewHovered;
 	ApplyVisuals();
 }
 
@@ -1709,7 +1712,7 @@ void AFlickPiece::ApplyVisuals()
 		SetAccentPaint(Material, FMath::Lerp(VisualAccent, FLinearColor::White, 0.06f), bSelected ? 0.36f : 0.18f);
 	}
 	AccentLight->SetLightColor(TeamColor);
-	AccentLight->SetIntensity(0.0f);
+	if (!HasTestArenaVisuals()) AccentLight->SetIntensity(0.0f);
 
 	const int32 IndicatorStyle = FlickVisualSettings::GetPuckIndicatorStyle();
 	const bool bShowIndicator = !bEliminated && !bPregamePreview && !bCosmeticPreview && !bLocalOwnershipRing;
@@ -1742,17 +1745,22 @@ void AFlickPiece::ApplyVisuals()
 	TeamIndicatorLabel->SetText(FText::FromString(bHasLocalTeam ? (bTeammate ? TEXT("ALLY") : TEXT("FOE"))
 		: Team == EFlickTeam::Player1 ? TEXT("BLUE") : TEXT("ORANGE")));
 	TeamIndicatorLabel->SetVisibility(bShowIndicator && IndicatorStyle == 2);
-	const float Width = bBobOpponent ? 1.30f : FlickVisualSettings::IsColorBlindAssistEnabled()
+	SelectionHaloWidth = bBobOpponent ? 1.30f : FlickVisualSettings::IsColorBlindAssistEnabled()
 		? (bTeammate ? 1.12f : 1.25f) : 1.15f;
-	const float Pulse = bSelected
-		? 1.0f + 0.055f * FMath::Sin(VisualTime * 7.0f)
-		: 1.0f;
-	SelectionHalo->SetRelativeScale3D(FVector(
-		BaseHaloRelativeScale.X * Pulse * Width / 1.15f,
-		BaseHaloRelativeScale.Y * Pulse * Width / 1.15f,
-		BaseHaloRelativeScale.Z));
+	UpdateSelectionPulse();
 
 	// Type marks are part of the face treatment, never floating TextRender labels.
 	Label->SetVisibility(false);
 	UpdateTestArenaVisuals();
+}
+
+void AFlickPiece::UpdateSelectionPulse()
+{
+	const float Pulse = bSelected
+		? 1.0f + 0.055f * FMath::Sin(VisualTime * 7.0f)
+		: 1.0f;
+	SelectionHalo->SetRelativeScale3D(FVector(
+		BaseHaloRelativeScale.X * Pulse * SelectionHaloWidth / 1.15f,
+		BaseHaloRelativeScale.Y * Pulse * SelectionHaloWidth / 1.15f,
+		BaseHaloRelativeScale.Z));
 }

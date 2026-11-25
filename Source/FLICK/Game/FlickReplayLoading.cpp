@@ -1,7 +1,6 @@
 #include "Game/FlickReplaySubsystem.h"
 #include "Game/FlickGameState.h"
 #include "Player/FlickReplayController.h"
-#include "Misc/App.h"
 #include "GameFramework/WorldSettings.h"
 #include "Pieces/FlickPiece.h"
 #include "UI/FlickReplayTheatre.h"
@@ -91,7 +90,8 @@ void UFlickReplaySubsystem::TickLoading()
 		if(WarmFrames<=150&&WarmFrames%30==1) {Camera->SelectCamera(EFlickReplayCamera((WarmFrames-1)/30));StableSince=FPlatformTime::Seconds();}
 		if(WarmFrames==151) {Camera->ResetView();StableSince=FPlatformTime::Seconds();}
 	}
-	if(FApp::GetDeltaTime()>.05) StableSince=FPlatformTime::Seconds();
+	// Readiness depends on the arena, camera passes and buffered data. A slow
+	// renderer (or a frame cap) can stay below 20 FPS even after all are ready.
 	Status=TEXT("Preparing camera views and rendering resources...");
 	if(WarmFrames>=180&&FPlatformTime::Seconds()-StableSince>=1)
 	{

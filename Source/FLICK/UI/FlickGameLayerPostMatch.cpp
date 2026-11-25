@@ -263,10 +263,6 @@ TSharedRef<SWidget> SFlickGameLayer::BuildPostMatchOverlay()
   .ColorAndOpacity_Lambda([Presentation]()
   { const auto* View = Presentation(); return FLinearColor(1, 1, 1, View ? View->GetWinnerStatsOpacity() : 0.0f); })
   [Winners]]
- + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0, 0, 0, 30)
- [SNew(SBox).Visibility_Lambda([ShowDetails]() { return ShowDetails() ? EVisibility::Collapsed : EVisibility::Visible; })
-  [Action(TEXT("CONTINUE TO SUMMARY"), FOnClicked::CreateLambda([Presentation]()
-   { if (auto* View = Presentation()) View->ContinueToSummary(); return FReply::Handled(); }), false)]]
  + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
  .Padding(TAttribute<FMargin>::CreateLambda([this]()
  { const auto* State = GetScoreboardGameState(); return FMargin(32, State && State->bRankedMatch ? 100.f : 150.f, 32, 32); }))

@@ -43,14 +43,17 @@ void UFlickReplaySubsystem::StartCapture(AFlickGameState& State)
 	if(const auto* Rate=IConsoleManager::Get().FindConsoleVariable(TEXT("demo.RecordHz"))) Current.PoseSampleRate=Rate->GetFloat();
 	UE_LOG(LogTemp,Display,TEXT("FLICK replay capture: %.1f Hz"),Current.PoseSampleRate);
 	// Store asset references, never transient per-puck material instances.
-	const auto RememberAsset=[this](UObject* Asset)
+	TSet<UObject*> SeenAssets;
+	const auto RememberAsset=[this, &SeenAssets](UObject* Asset)
 	{
-		if(Asset&&Asset->IsAsset()) Current.Assets.AddUnique(FSoftObjectPath(Asset));
+		if (!Asset || !Asset->IsAsset()) return;
+		bool bAlreadySeen = false;
+		SeenAssets.Add(Asset, &bAlreadySeen);
+		if (!bAlreadySeen) Current.Assets.Emplace(Asset);
 	};
 	for(TActorIterator<AActor> It(GetWorld());It;++It)
 	{
-		TArray<UStaticMeshComponent*> Meshes; It->GetComponents(Meshes);
-		for(const auto* Mesh:Meshes)
+		for(const auto* Mesh:TInlineComponentArray<UStaticMeshComponent*>(*It))
 		{
 			RememberAsset(Mesh->GetStaticMesh());
 			for(int32 I=0;I<Mesh->GetNumMaterials();++I)

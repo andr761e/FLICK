@@ -168,6 +168,10 @@ AFlickTestArena::AFlickTestArena()
 	// The setter is a no-op before a scene proxy exists, so initialize the
 	// component property here before registration builds that proxy.
 	WorkshopArenaMesh->bEvaluateWorldPositionOffsetInRayTracing = true;
+	// These offsets are fixed inlays, not animation. Keep their displaced depth
+	// and ray-traced surface, but cache shadows and omit deformation velocities.
+	WorkshopArenaMesh->ShadowCacheInvalidationBehavior = EShadowCacheInvalidationBehavior::Rigid;
+	WorkshopArenaMesh->bWorldPositionOffsetWritesVelocity = false;
 	if (bUsingWorkshopAssets)
 	{
 		WorkshopArenaMesh->SetStaticMesh(WorkshopArenaAsset.Object);
@@ -180,6 +184,8 @@ AFlickTestArena::AFlickTestArena()
 	// The filtered floor joints replace only shallow authored seam geometry.
 	// Lumen must see the same material offsets as the rasterized floor.
 	StadiumStructureMesh->bEvaluateWorldPositionOffsetInRayTracing = true;
+	StadiumStructureMesh->ShadowCacheInvalidationBehavior = EShadowCacheInvalidationBehavior::Rigid;
+	StadiumStructureMesh->bWorldPositionOffsetWritesVelocity = false;
 	// The enclosing wall is presentation geometry, not an actual roof. Let the
 	// established arena key light reach gameplay instead of casting the entire
 	// board and every puck into one large interior shadow.

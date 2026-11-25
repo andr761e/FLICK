@@ -140,6 +140,17 @@ bool FFlickArenaConceptTest::RunTest(const FString& Parameters)
 					Arena->DividerBaseMeshes[Index]->GetRelativeScale3D().X * Arena->DividerLength + 4.f, .01f));
 		}
 		TestEqual(TEXT("Guides cannot collide with pucks"), Arena->ConceptGuides->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		for (const auto* Group : {&Arena->ZoneOuterMeshes, &Arena->DividerBaseMeshes})
+		{
+			const auto* First = (*Group)[0].Get();
+			for (int32 Slot = 0; Slot < First->GetNumMaterials(); ++Slot)
+			{
+				if (Slot == First->GetMaterialIndex(TEXT("09_Switch_Accent"))) continue;
+				for (int32 Index = 1; Index < Group->Num(); ++Index)
+					TestTrue(TEXT("Repeated housings retain batchable cosmetic finishes across format/menu changes"),
+						(*Group)[Index]->GetMaterial(Slot) == First->GetMaterial(Slot));
+			}
+		}
 		for (const auto& Housing : Arena->ZoneOuterMeshes)
 		{
 			if (!Housing->IsVisible()) continue;

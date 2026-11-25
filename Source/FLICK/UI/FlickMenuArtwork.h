@@ -45,6 +45,8 @@ private:
 	FMargin EdgeFade;
 	TStrongObjectPtr<UTexture2D> Texture;
 	mutable FSlateBrush Brush;
+	mutable FVector2D CachedPolygonSize = FVector2D::ZeroVector;
+	mutable TArray<TArray<FVector2D>> CachedPolygons;
 	// Slate copies submissions; keep scratch capacity across paints.
 	mutable TArray<FSlateVertex> PaintVertices;
 	mutable TArray<SlateIndex> PaintIndices;

@@ -167,6 +167,8 @@ private:
 	void EnsureVisualMaterials();
 	void UpdateVisualTransforms();
 	void ApplyVisuals();
+	void UpdateSelectionPulse();
+	float SelectionHaloWidth = 1.15f;
 	bool UsesLocalOwnershipRing() const;
 	// Per-view presentation only; deliberately not replicated.
 	bool bLocalOwnershipRing = false;

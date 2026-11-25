@@ -31,7 +31,8 @@ FVector2f FlickMenuArtwork::AuthoredSize(const EFlickMenuArtwork Artwork)
 		|| Artwork == EFlickMenuArtwork::ProfileCustomize || Artwork == EFlickMenuArtwork::ProfilePlacement
 		|| Artwork == EFlickMenuArtwork::PracticePrecision || Artwork == EFlickMenuArtwork::PracticeKnockouts
 		|| Artwork == EFlickMenuArtwork::PracticeSwitch || Artwork == EFlickMenuArtwork::PracticeBob) return FVector2f(1672, 941);
-	return Artwork == EFlickMenuArtwork::Bob || Artwork == EFlickMenuArtwork::BobVsBot || Artwork == EFlickMenuArtwork::Triples
+	if (Artwork == EFlickMenuArtwork::Bob) return FVector2f(1859, 845);
+	return Artwork == EFlickMenuArtwork::BobVsBot || Artwork == EFlickMenuArtwork::Triples
 		? FVector2f(1862, 845) : FVector2f(1860, 845);
 }
 
@@ -91,14 +92,18 @@ int32 SFlickMenuArtwork::OnPaint(const FPaintArgs&, const FGeometry& Geometry, c
 	// Rectangular Slate clipping cannot follow cut corners. Draw the texture on
 	// the actual eight-sided polygon, so no image can escape its card frame.
 	const float Cut = FMath::Clamp(CutSize, 0.0f, FMath::Min(Size.X, Size.Y) * .24f);
-	const auto Points = FlickUITheme::GetPanelOutline(Size, Cut);
+	if (CachedPolygonSize != Size)
+	{
+		CachedPolygons = FlickArtworkGeometry::FadePolygons(FlickUITheme::GetPanelOutline(Size, Cut), Size, EdgeFade);
+		CachedPolygonSize = Size;
+	}
 	const auto& Transform = Geometry.GetAccumulatedRenderTransform();
 	const FLinearColor Tint = Style.GetColorAndOpacityTint();
 	const ESlateDrawEffect Effect = bParentEnabled && IsEnabled() ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect;
 	auto& Vertices = PaintVertices;
 	auto& Indices = PaintIndices;
 	Vertices.Reset(); Indices.Reset();
-	for (const auto& Polygon : FlickArtworkGeometry::FadePolygons(Points,Size,EdgeFade))
+	for (const auto& Polygon : CachedPolygons)
 	{
 		const SlateIndex Start = static_cast<SlateIndex>(Vertices.Num());
 		for (const FVector2D& Point : Polygon)

@@ -73,6 +73,9 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 		MenuPresentationMaterials.Reset();
 		if (bEnabled && OneVsOneMaterials.IsEmpty())
 		{
+			// Repeated housings use identical cosmetic overrides. Share those
+			// MIDs so Unreal can batch them; live accents remain state-owned.
+			TMap<UMaterialInterface*, UMaterialInstanceDynamic*> SwitchFinishes, SocketFinishes;
 			for (UStaticMeshComponent* Component : Components)
 			{
 				const int32 AccentSlot = Component->GetMaterialIndex(TEXT("09_Switch_Accent"));
@@ -89,9 +92,15 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 					float Emission = 0.0f;
 					if (Original) Original->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Emission")), Emission);
 					const bool bArchitecture = Component == WorkshopArenaMesh || Component == StadiumStructureMesh;
-					UMaterialInstanceDynamic* Material = Original
-						? (bArchitecture && Emission < .1f ? ArchitecturalFinish(Original, this)
-							: UMaterialInstanceDynamic::Create(Original, this, FName(*Name))) : nullptr;
+					auto* Shared = ZoneOuterMeshes.Contains(Component) ? &SwitchFinishes
+						: DividerBaseMeshes.Contains(Component) ? &SocketFinishes : nullptr;
+					UMaterialInstanceDynamic* Material = Shared ? Shared->FindRef(Original) : nullptr;
+					if (!Material && Original)
+					{
+						Material = bArchitecture && Emission < .1f ? ArchitecturalFinish(Original, this)
+							: UMaterialInstanceDynamic::Create(Original, this, FName(*Name));
+						if (Shared) Shared->Add(Original, Material);
+					}
 					OneVsOneMaterials.Add(Material);
 					if (!Material) continue;
 					// No material light-lift on the architectural metal: real lighting
@@ -236,6 +245,10 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 	RefreshPattern(OneVsOneMaterials);
 	RefreshPattern(ConceptMaterials);
 	RefreshPattern(MenuPresentationMaterials);
+	// A format/height change can change the fixed material offsets. Refresh the
+	// cached rigid surfaces here; moving pucks/dividers retain normal invalidation.
+	WorkshopArenaMesh->MarkRenderStateDirty();
+	StadiumStructureMesh->MarkRenderStateDirty();
 }
 
 void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
@@ -249,6 +262,7 @@ void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
 		MenuPresentationMaterials.Reset();
 		if (ConceptMaterials.IsEmpty())
 		{
+			TMap<UMaterialInterface*, UMaterialInstanceDynamic*> SharedFinishes;
 			TArray<UStaticMeshComponent*> Components{WorkshopArenaMesh};
 			for (UStaticMeshComponent* Component : ZoneOuterMeshes) Components.Add(Component);
 			for (UStaticMeshComponent* Component : DividerBaseMeshes) Components.Add(Component);
@@ -259,7 +273,12 @@ void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
 				// Switch/socket accent MIDs remain owned by mechanism state.
 				if (Slot == Component->GetMaterialIndex(TEXT("09_Switch_Accent"))) continue;
 				auto* Original = Component->GetMaterial(Slot);
-				auto* Material = ClonePresentationMaterial(Original, this);
+				auto* Material = Component == WorkshopArenaMesh ? nullptr : SharedFinishes.FindRef(Original);
+				if (!Material)
+				{
+					Material = ClonePresentationMaterial(Original, this);
+					if (Component != WorkshopArenaMesh) SharedFinishes.Add(Original, Material);
+				}
 				if (!Material) continue;
 				ConceptMaterials.Add(Material);
 				Component->SetMaterial(Slot, Material);
