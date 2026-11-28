@@ -148,41 +148,12 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMainMenu()
 		+ SOverlay::Slot()
 		.HAlign(HAlign_Left)
 		.VAlign(VAlign_Top)
-		.Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(FlickMainMenuStyle::LeftPadding, 50.f + GetMainMenuVerticalInset(), 0, 0); }))
+		.Padding(TAttribute<FMargin>::CreateLambda([]() { return FMargin(FlickMainMenuStyle::LeftPadding, 72.f + GetMainMenuVerticalInset(), 0, 0); }))
 		[
 			SNew(SDPIScaler).DPIScale_Lambda([]() { return GetMainMenuColumnScale(); })
 			.Visibility_Lambda([this]() { return bLightingPreview ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 			[
 			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight()
-			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				.Padding(0.0f, 0.0f, 18.0f, 0.0f)
-				[
-					SNew(SBox)
-					.WidthOverride(36.0f)
-					.HeightOverride(3.0f)
-					[
-						SNew(SBorder)
-						.BorderImage(WhiteBrush())
-						.BorderBackgroundColor(Brand)
-					]
-				]
-
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("PHYSICS. PRECISION. RIVALRY.")))
-					.Font(WordmarkTaglineFont(9))
-					.ColorAndOpacity(FlickMainMenuStyle::Lime)
-				]
-			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(-5.0f, 7.0f, 0.0f, 0.0f)
 			[
 				SNew(SBox)

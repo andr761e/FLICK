@@ -119,6 +119,10 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 							Material->SetVectorParameterValue(TEXT("BaseColor"), OneVsOneDeckTint);
 							Material->SetScalarParameterValue(TEXT("DeckFinish"), 1.f);
 							Material->SetScalarParameterValue(TEXT("DeckGuides"), 1.f);
+							// Wider, lower-contrast paint retains its shape at overview distance.
+							Material->SetScalarParameterValue(TEXT("GuideWidth"), 1.45f);
+							Material->SetVectorParameterValue(TEXT("GuideColor"), FLinearColor(.28f, .36f, .40f));
+							Material->SetVectorParameterValue(TEXT("GuideLift"), FLinearColor(.009f, .012f, .014f));
 							Material->SetScalarParameterValue(TEXT("DeckRelief"), DeckFinishRelief);
 							Material->SetScalarParameterValue(TEXT("Metallic"), OneVsOneDeckMetallic);
 							Material->SetScalarParameterValue(TEXT("Roughness"), OneVsOneDeckRoughness);
@@ -185,7 +189,8 @@ void AFlickTestArena::UpdateOneVsOnePresentation()
 						// The concourse needs some diffuse response for the amber
 						// skirt wash, not only a sharp mirror image of its LEDs.
 						Material->SetScalarParameterValue(TEXT("Metallic"), SourceName.Contains(TEXT("Porcelain")) ? .76f : .82f);
-						Material->SetScalarParameterValue(TEXT("Roughness"), 0.24f);
+						// Satin concourse catches broad fixture highlights outside the polished playing deck.
+						Material->SetScalarParameterValue(TEXT("Roughness"), .46f);
 						if (Component == StadiumStructureMesh && SourceName.Contains(TEXT("Porcelain")))
 							Material->SetScalarParameterValue(TEXT("ConcourseSeams"), 1.f);
 					}
@@ -313,6 +318,16 @@ void AFlickTestArena::UpdateOneVsOneConcept(const bool bRebuildGuides)
 					// below the deck; retain the housing transform and activation area.
 					Material->SetScalarParameterValue(TEXT("RenderLayerOffset"), -3.f);
 				}
+				else if (ZoneOuterMeshes.Contains(Component)
+					&& Slot == Component->GetMaterialIndex(TEXT("10_Inner_Field")))
+				{
+					// A smoked face leaves the actual switch target and perimeter lamp
+					// distinct even when a bright softbox is reflected across the pad.
+					Material->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.036f, .062f, .078f));
+					Material->SetScalarParameterValue(TEXT("Metallic"), .33f);
+					Material->SetScalarParameterValue(TEXT("Roughness"), .44f);
+					Material->SetScalarParameterValue(TEXT("SurfaceLift"), .025f);
+				}
 				else if (DividerBaseMeshes.Contains(Component)
 					&& (Name.Contains(TEXT("Accent_Metal")) || Name.Contains(TEXT("Deep_Recess"))))
 				{
@@ -353,13 +368,10 @@ void AFlickTestArena::BuildConceptSockets()
 			TEXT("/Game/TestArena/Arena/MI_07_Team_Orange.MI_07_Team_Orange")), this);
 		if (ConceptSocketMetalMaterial)
 		{
-			ConceptSocketMetalMaterial->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.53f, .58f, .63f));
-			ConceptSocketMetalMaterial->SetScalarParameterValue(TEXT("Metallic"), .92f);
-			ConceptSocketMetalMaterial->SetScalarParameterValue(TEXT("Roughness"), .19f);
-			// The existing arena's dark reflection environment otherwise makes
-			// horizontal metal read black. Keep the same restrained ambient fill
-			// convention as the authored metal, without changing global lighting.
-			ConceptSocketMetalMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), .16f);
+			ConceptSocketMetalMaterial->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(.21f, .27f, .31f));
+			ConceptSocketMetalMaterial->SetScalarParameterValue(TEXT("Metallic"), .82f);
+			ConceptSocketMetalMaterial->SetScalarParameterValue(TEXT("Roughness"), .32f);
+			ConceptSocketMetalMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), .045f);
 			ConceptSocketMetalMaterial->SetScalarParameterValue(TEXT("RenderLayerOffset"), 0.f);
 		}
 		if (ConceptSocketDarkMaterial)

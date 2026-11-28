@@ -1342,7 +1342,12 @@ void AFlickTestArena::CreateRuntimeMaterials()
 	}
 	// Matte, non-emissive surfaces preserve puck readability and avoid adding bloom.
 	SetMaterialColor(ZoneInsetMaterial, FLinearColor(0.012f, 0.019f, 0.017f, 1.0f), 0.88f);
-	SetMaterialColor(DormantSocketMaterial, FLinearColor(0.11f, 0.14f, 0.18f, 1.0f), 0.72f);
+	SetMaterialColor(DormantSocketMaterial, FLinearColor(.035f, .052f, .066f), .48f);
+	if (bUsingWorkshopAssets && DormantSocketMaterial)
+	{
+		DormantSocketMaterial->SetScalarParameterValue(TEXT("Emission"), 0.f);
+		DormantSocketMaterial->SetScalarParameterValue(TEXT("SurfaceLift"), .025f);
+	}
 	for (int32 Index = 0; Index < MaxMechanismCount; ++Index)
 	{
 		const FLinearColor Accent = GetMechanismColor(Index);
@@ -1401,12 +1406,12 @@ void AFlickTestArena::ApplyMechanismState(const bool bSnap)
 			FLinearColor(BaseColor.R, BaseColor.G, BaseColor.B, 1.0f) * (bPending ? 0.65f : bRaised ? 0.4f : 0.18f), 0.9f);
 		if (bUsingWorkshopAssets)
 		{
-			// State colours stay authoritative; all formats share the same richer
-			// rendered signal output without changing activation or divider state.
+			// The lens and matching socket share a material. A queued gate draws
+			// the eye at both ends of the trace.
 			if (AccentMaterials.IsValidIndex(Index) && AccentMaterials[Index])
-				AccentMaterials[Index]->SetScalarParameterValue(TEXT("Emission"), 1.2f);
+				AccentMaterials[Index]->SetScalarParameterValue(TEXT("Emission"), bPending ? 2.0f : bRaised ? 1.25f : .70f);
 			if (DotMaterials.IsValidIndex(Index) && DotMaterials[Index])
-				DotMaterials[Index]->SetScalarParameterValue(TEXT("Emission"), 1.8f);
+				DotMaterials[Index]->SetScalarParameterValue(TEXT("Emission"), bPending ? 1.8f : 1.1f);
 		}
 	}
 	UpdateDividerTransforms();

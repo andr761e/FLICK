@@ -7,6 +7,7 @@
 namespace FlickHomeSurface
 {
 	inline const FLinearColor Midnight = FLinearColor::FromSRGBColor(FColor(3, 17, 29, 248));
+	inline const FLinearColor NavigationFace = FLinearColor::FromSRGBColor(FColor(18, 48, 64, 248));
 	inline const FLinearColor Gold = FLinearColor::FromSRGBColor(FColor(224, 247, 73));
 	inline const FLinearColor Blue = FLinearColor::FromSRGBColor(FColor(3, 133, 193));
 	inline FLinearColor Shade(const FVector2D UV, const FLinearColor Fill, bool bPrimary = false)

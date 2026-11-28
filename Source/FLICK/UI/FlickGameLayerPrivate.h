@@ -148,24 +148,33 @@ namespace
 		TArray<FSlateVertex> Vertices;
 		TArray<SlateIndex> Indices;
 		constexpr int32 Steps = 5;
-		Vertices.Reserve(Outline.Num() * Steps * Steps * 3);
+		constexpr int32 VerticesPerEdge = (Steps + 1) * (Steps + 2) / 2;
+		Vertices.Reserve(Outline.Num() * VerticesPerEdge);
 		Indices.Reserve(Outline.Num() * Steps * Steps * 3);
-		const auto AddTriangle = [&](FVector2D A, FVector2D B, FVector2D C) {
-			for (const FVector2D P : {A, B, C})
-			{
-				Indices.Add(static_cast<SlateIndex>(Vertices.Num()));
-				const FLinearColor Color = FlickHomeSurface::Shade(P / Size, Fill, bPrimary) * Tint;
-				Vertices.Add(FSlateVertex::Make(Geometry.GetAccumulatedRenderTransform(), FVector2f(P), FVector2f::ZeroVector, Color.ToFColor(true)));
-			}
-		};
+		const auto& Transform = Geometry.GetAccumulatedRenderTransform();
+		const FVector2D Center = Size * .5;
 		for (int32 Edge = 0; Edge < Outline.Num(); ++Edge)
 		{
-			const FVector2D A = Size * .5, B = Outline[Edge], C = Outline[(Edge + 1) % Outline.Num()];
-			const auto P = [&](int32 I, int32 J) { return A + (B - A) * (I / float(Steps)) + (C - A) * (J / float(Steps)); };
-			for (int32 I = 0; I < Steps; ++I) for (int32 J = 0; J < Steps - I; ++J)
+			const FVector2D ToStart = Outline[Edge] - Center;
+			const FVector2D ToEnd = Outline[(Edge + 1) % Outline.Num()] - Center;
+			// Each successive row is one vertex shorter. Adjacent triangles share
+			// the transformed, shaded vertices without changing their interpolation.
+			for (int32 I = 0; I <= Steps; ++I)
 			{
-				AddTriangle(P(I,J), P(I+1,J), P(I,J+1));
-				if (I + J < Steps - 1) AddTriangle(P(I+1,J), P(I+1,J+1), P(I,J+1));
+				const int32 RowSize = Steps + 1 - I;
+				const int32 RowStart = Vertices.Num();
+				for (int32 J = 0; J < RowSize; ++J)
+				{
+					const FVector2D P = Center + ToStart * (I / float(Steps)) + ToEnd * (J / float(Steps));
+					const FLinearColor Color = FlickHomeSurface::Shade(P / Size, Fill, bPrimary) * Tint;
+					Vertices.Add(FSlateVertex::Make(Transform, FVector2f(P), FVector2f::ZeroVector, Color.ToFColor(true)));
+					if (J + 1 >= RowSize) continue;
+					const SlateIndex Current = static_cast<SlateIndex>(RowStart + J);
+					const SlateIndex Next = static_cast<SlateIndex>(Current + RowSize);
+					Indices.Append({Current, Next, static_cast<SlateIndex>(Current + 1)});
+					if (J + 2 < RowSize)
+						Indices.Append({Next, static_cast<SlateIndex>(Next + 1), static_cast<SlateIndex>(Current + 1)});
+				}
 			}
 		}
 		FSlateDrawElement::MakeCustomVerts(Elements, Layer, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
@@ -471,7 +480,7 @@ namespace
 			for (FVector2D& Point : Shadow) Point.Y += 4.0f;
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Shadow,
 				ESlateDrawEffect::None, FLinearColor(0.0f, 0.0f, 0.0f, 0.32f) * Tint, true, bHomePresentation ? 6.0f : 12.0f);
-			if (bPrimary || HighlightAlpha > 0.01f)
+			if ((!bHomePresentation && bPrimary) || HighlightAlpha > 0.01f)
 				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline,
 					FlickMainMenuStyle::Lime * Tint, bPrimary ? (bHomePresentation ? .8f : 1.6f) : HighlightAlpha * .8f);
 			const FSlateRenderTransform& Transform = AllottedGeometry.GetAccumulatedRenderTransform();
@@ -484,7 +493,8 @@ namespace
 			{
 				FLinearColor Color = FMath::Lerp(Left, Right, static_cast<float>(Position.X / Size.X));
 				const FLinearColor Sheen = (bPrimary ? BrandHover : PanelSheen) * Tint;
-				return FMath::Lerp(Color, Sheen, (1.0f - static_cast<float>(Position.Y / Size.Y)) * (bPrimary ? 0.15f : 0.32f)).ToFColor(true);
+				const float SheenStrength = bHomePresentation ? .075f : (bPrimary ? .15f : .32f);
+				return FMath::Lerp(Color, Sheen, (1.0f - static_cast<float>(Position.Y / Size.Y)) * SheenStrength).ToFColor(true);
 			};
 			Vertices.Add(FSlateVertex::Make(
 				Transform,
@@ -503,16 +513,15 @@ namespace
 			TArray<SlateIndex> Indices;
 			for (int32 Index = 0; Index < Points.Num(); ++Index)
 				Indices.Append({0, static_cast<SlateIndex>(Index + 1), static_cast<SlateIndex>((Index + 1) % Points.Num() + 1)});
-			if (bHomePresentation)
-				DrawHomeSurface(OutDrawElements, AllottedGeometry, LayerId + 1, Points, Left, Tint, bPrimary);
-			else FSlateDrawElement::MakeCustomVerts(
+			FSlateDrawElement::MakeCustomVerts(
 				OutDrawElements, LayerId + 1, WhiteBrush()->GetRenderingResource(), Vertices, Indices, nullptr, 0, 0);
 			if (bHomePresentation)
 			{
-				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline, bPrimary ? Brand : Cyan, bPrimary ? 2.8f : .7f);
+				if (bPrimary)
+					DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId, Outline, Brand * Tint, .65f);
 				FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2, AllottedGeometry.ToPaintGeometry(),
-					{Points[0] + FVector2D(6, 1), Points[1] - FVector2D(10, -1)}, ESlateDrawEffect::None,
-					(bPrimary ? Paper : Ice).CopyWithNewOpacity(.6f) * Tint, true, 1.f);
+					{Points[0] + FVector2D(6, 1), Points[0] + FVector2D(Size.X * .36, 1)}, ESlateDrawEffect::None,
+					(bPrimary ? Paper : Ice).CopyWithNewOpacity(bPrimary ? .55f : .20f) * Tint, true, 1.f);
 			}
 			if (bPrimary && !bHomePresentation)
 			{
@@ -554,8 +563,8 @@ namespace
 			if (!bHomePresentation && !bPrimary)
 				DrawMenuGlow(OutDrawElements, AllottedGeometry, LayerId + 2, SweptRail, FlickMainMenuStyle::Lime * Tint, 0.65f);
 			if (!bHomePresentation) DrawRail(SweptRail, bPrimary ? RailColor : FlickMainMenuStyle::Lime * Tint, bPrimary ? 1.0f : 1.6f);
-			else if (!bPrimary) DrawRail({Points[4] - FVector2D(18, 0), Points[4], Points[3]}, FlickMainMenuStyle::Lime * Tint, 1.f);
-			else DrawRail({FVector2D(-5, 10), FVector2D(-5, Size.Y - 2)}, FlickMainMenuStyle::Lime * Tint, 3.f);
+			else if (!bPrimary && HighlightAlpha > .01f)
+				DrawRail({Points[4] - FVector2D(18, 0), Points[4], Points[3]}, OutlineColor, 1.5f);
 
 			if (bPrimary || HighlightAlpha > 0.01f)
 			{

@@ -33,98 +33,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 				]
 			]
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(18.0f, 14.0f, 0.0f, 0.0f)
-		[
-			SNew(SBox)
-			.Visibility_Lambda([this]() { return GameMode.IsValid() && (GameMode->IsFreePlayTraining() || GameMode->IsTutorialMode()) ? EVisibility::Collapsed : EVisibility::Visible; })
-			[BuildTeamPlate(EFlickTeam::Player1)]
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 14.0f, 18.0f, 0.0f)
-		[
-			SNew(SBox)
-			.Visibility_Lambda([this]() { return GameMode.IsValid() && (GameMode->IsFreePlayTraining() || GameMode->IsTutorialMode()) ? EVisibility::Collapsed : EVisibility::Visible; })
-			[BuildTeamPlate(EFlickTeam::Player2)]
-		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 16.0f, 0.0f, 0.0f)[BuildTrainingToolsPanel()]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.0f, 132.0f, 0.0f, 0.0f)[BuildTutorialOverlay()]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24, 132, 0, 0)[BuildPracticeOverlay()]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.0f, 14.0f, 0.0f, 0.0f)
 		[
-			SNew(SBox)
-			.WidthOverride(356.0f)
-			.HeightOverride(62.0f)
-			[
-				SNew(SFlickAngularBorder).RefinedSurface(true)
-				.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.015f, 0.84f))
-				.AccentColor(Brand.CopyWithNewOpacity(0.6f))
-				.CutSize(7.0f)
-				.BorderWidth(1.0f)
-				.Padding(FMargin(10.0f, 3.0f))
-				[
-					SNew(SOverlay)
-					+ SOverlay::Slot()
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 2.0f)
-						[
-							SNew(SScaleBox)
-							.Stretch(EStretch::ScaleToFit)
-							.StretchDirection(EStretchDirection::DownOnly)
-							.HAlign(HAlign_Center)
-							[
-								SNew(STextBlock)
-								.Text_Lambda([this]() { return GetMatchStatusText(); })
-								.Font(DisplayFont(16))
-								.ColorAndOpacity_Lambda([this]() { return GetMatchStatusColor(); })
-							]
-						]
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
-						[
-							SNew(STextBlock)
-							.Visibility_Lambda([this]() { return GetNextTurnVisibility(); })
-							.Text_Lambda([this]() { return GetNextTurnText(); })
-							.Font(UiFont(8, true))
-							.ColorAndOpacity_Lambda([this]() { return GetNextTurnColor(); })
-						]
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
-						[
-							SNew(STextBlock)
-							.Text_Lambda([this]()
-							{
-								const AFlickGameState* State = GetScoreboardGameState();
-								if (!State) return FText::GetEmpty();
-								if (GameMode.IsValid() && GameMode->IsTrainingMode())
-								{
-									if (GameMode->IsPracticeMode()) return FText::FromString(GameMode->GetPractice()->IsComplete()
-										? TEXT("PRACTICE COMPLETE") : FString::Printf(TEXT("CHALLENGE %d / 5"), GameMode->GetPractice()->GetChallengeNumber()));
-									if (GameMode->IsTutorialMode())
-									{
-										return FText::FromString(GameMode->IsTutorialComplete()
-											? TEXT("TUTORIAL COMPLETE")
-											: FString::Printf(TEXT("LESSON %d / %d"), GameMode->GetTutorialStageNumber(), GameMode->GetTutorialStageCount()));
-									}
-									if (GameMode->IsTrainingEditMode())
-									{
-										return FText::FromString(TEXT("BOARD EDITOR  /  T SAVE"));
-									}
-									if (!GameMode->IsTrainingBotMatch())
-									{
-										return FText::FromString(FString::Printf(TEXT("FREE PLAY  /  SHOT %d"), State->TurnNumber));
-									}
-								}
-								const FString Context = State->ActiveMatchVariant == EFlickMatchVariant::Bob
-									? FString::Printf(TEXT("BOB  /  SHOT %d"), State->TurnNumber)
-									: FString::Printf(TEXT("ROUND %d  /  SHOT %d"), State->RoundNumber, State->TurnNumber);
-								return FText::FromString(State->bShotClockActive
-									? FString::Printf(TEXT("%s  /  %02d SEC"), *Context, FMath::CeilToInt(State->GetShotClockTimeRemaining()))
-									: Context);
-							})
-							.Font(UiFont(8, true))
-							.ColorAndOpacity(Muted)
-						]
-					]
-				]
-			]
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth()[BuildTeamPlate(EFlickTeam::Player1)]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(3.0f, 0.0f)[BuildMatchStatusPlate()]
+			+ SHorizontalBox::Slot().AutoWidth()[BuildTeamPlate(EFlickTeam::Player2)]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(24.0f, 0.0f, 0.0f, 36.0f)
 		[
@@ -144,6 +61,81 @@ TSharedRef<SWidget> SFlickGameLayer::BuildMatchHud()
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 86.0f, 18.0f, 0.0f)[BuildEventFeed()];
 }
 
+TSharedRef<SWidget> SFlickGameLayer::BuildMatchStatusPlate()
+{
+	return SNew(SBox)
+		.WidthOverride(286.0f)
+		.HeightOverride(58.0f)
+		[
+			SNew(SFlickAngularBorder).RefinedSurface(true)
+			.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.015f, 0.94f))
+			.AccentColor(Hairline)
+			.CutSize(7.0f)
+			.BorderWidth(1.0f)
+			.Padding(FMargin(10.0f, 3.0f))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, 2.0f)
+				[
+					SNew(SScaleBox)
+					.Stretch(EStretch::ScaleToFit)
+					.StretchDirection(EStretchDirection::DownOnly)
+					.HAlign(HAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text_Lambda([this]() { return GetMatchStatusText(); })
+						.Font(DisplayFont(16))
+						.ColorAndOpacity_Lambda([this]() { return GetMatchStatusColor(); })
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				[
+					SNew(STextBlock)
+					.Visibility_Lambda([this]() { return GetNextTurnVisibility(); })
+					.Text_Lambda([this]() { return GetNextTurnText(); })
+					.Font(UiFont(8, true))
+					.ColorAndOpacity_Lambda([this]() { return GetNextTurnColor(); })
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this]()
+					{
+						const AFlickGameState* State = GetScoreboardGameState();
+						if (!State) return FText::GetEmpty();
+						if (GameMode.IsValid() && GameMode->IsTrainingMode())
+						{
+							if (GameMode->IsPracticeMode()) return FText::FromString(GameMode->GetPractice()->IsComplete()
+								? TEXT("PRACTICE COMPLETE") : FString::Printf(TEXT("CHALLENGE %d / 5"), GameMode->GetPractice()->GetChallengeNumber()));
+							if (GameMode->IsTutorialMode())
+							{
+								return FText::FromString(GameMode->IsTutorialComplete()
+									? TEXT("TUTORIAL COMPLETE")
+									: FString::Printf(TEXT("LESSON %d / %d"), GameMode->GetTutorialStageNumber(), GameMode->GetTutorialStageCount()));
+							}
+							if (GameMode->IsTrainingEditMode())
+							{
+								return FText::FromString(TEXT("BOARD EDITOR  /  T SAVE"));
+							}
+							if (!GameMode->IsTrainingBotMatch())
+							{
+								return FText::FromString(FString::Printf(TEXT("FREE PLAY  /  SHOT %d"), State->TurnNumber));
+							}
+						}
+						const FString Context = State->ActiveMatchVariant == EFlickMatchVariant::Bob
+							? FString::Printf(TEXT("BOB  /  SHOT %d"), State->TurnNumber)
+							: FString::Printf(TEXT("ROUND %d  /  SHOT %d"), State->RoundNumber, State->TurnNumber);
+						return FText::FromString(State->bShotClockActive
+							? FString::Printf(TEXT("%s  /  %02d SEC"), *Context, FMath::CeilToInt(State->GetShotClockTimeRemaining()))
+							: Context);
+					})
+					.Font(UiFont(8, true))
+					.ColorAndOpacity(Muted)
+				]
+			]
+		];
+}
+
 TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 {
 	const auto ReplayTeam = [this]() { const AFlickGameState* State = GetScoreboardGameState(); return State && State->ReplayShootingTeam != EFlickTeam::None ? State->ReplayShootingTeam : EFlickTeam::Player1; };
@@ -151,108 +143,80 @@ TSharedRef<SWidget> SFlickGameLayer::BuildCinematicReplayOverlay()
 	const auto ReplayLabel = [this]() { const AFlickGameState* State = GetScoreboardGameState(); return FText::FromString(State && State->bReplaySelfKnockout ? TEXT("SELF-KNOCKOUT") : TEXT("ROUND-WINNING SHOT")); };
 	return SNew(SOverlay)
 		.Visibility(EVisibility::HitTestInvisible)
-		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Top)
+		+ SOverlay::Slot().VAlign(VAlign_Bottom)
 		[
-			SNew(SBox).HeightOverride(78.0f)
-			[
-				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.0f, 0.002f, 0.006f, 0.97f))
-			]
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom)
-		[
-			SNew(SBox).HeightOverride(78.0f)
-			[
-				SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(FLinearColor(0.0f, 0.002f, 0.006f, 0.97f))
-			]
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(30.0f, 23.0f, 0.0f, 0.0f)
-		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
-			[
-				SNew(SBox).WidthOverride(42.0f).HeightOverride(3.0f)
-				[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Orange)]
-			]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("CINEMATIC REPLAY"))).Font(UiFont(12, true)).ColorAndOpacity(Paper)
-			]
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.0f, 24.0f, 30.0f, 0.0f)
-		[
-			SNew(STextBlock).Text_Lambda(ReplayLabel).Font(UiFont(10, true)).ColorAndOpacity(Muted)
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(30.0f, 0.0f, 30.0f, 31.0f)
-		[
-			SNew(SBox).HeightOverride(3.0f)
-			[
-				SNew(SProgressBar)
-				.Style(&ShotClockBarStyle)
-				.Percent_Lambda([this]()
-				{
-					if (PlayerController.IsValid())
-					{
-						return TOptional<float>(PlayerController->GetCinematicReplayPresentationProgress());
-					}
-					return TOptional<float>(GameMode.IsValid() ? GameMode->GetCinematicReplayProgress() : 0.0f);
-				})
-				.FillColorAndOpacity(Orange)
-			]
-		]
-		+ SOverlay::Slot()
-		[
-			SNew(SConstraintCanvas)
-			+ SConstraintCanvas::Slot().Anchors(FAnchors(0.5f, 0.79f)).Alignment(FVector2D(0.5f, 0.5f)).AutoSize(true)
-			[
-				SNew(SBox).WidthOverride(370.0f).HeightOverride(78.0f)
-				[
-					SNew(SFlickMainMenuPanel)
-					.BackgroundColor(Ink.CopyWithNewOpacity(0.95f))
-					.AccentColor_Lambda([this, ReplayTeam]() { return GetTeamAccent(ReplayTeam()); })
-					.CutSize(10.0f).BorderWidth(1.4f).Padding(FMargin(12.0f, 9.0f))
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 16.0f, 0.0f)
-						[
-							SNew(SBox).WidthOverride(58.0f).HeightOverride(58.0f)
-							[
-								SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(Ink).AccentColor(Hairline).CutSize(8.0f).Padding(2.0f)
-								[
-									SNew(SOverlay)
-									+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerAvatarBrush(ReplayTeam(), ReplaySlot()); })]
-									+ SOverlay::Slot().Padding(14.0f)
-									[SNew(SFlickStatusGlobe).Color(Cyan).Visibility_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerAvatarBrush(ReplayTeam(), ReplaySlot()) ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })]
-								]
-							]
-						]
-						+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda(ReplayLabel).Font(UiFont(9, true)).ColorAndOpacity_Lambda([this, ReplayTeam]() { return GetTeamAccent(ReplayTeam()); })]
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)[SNew(STextBlock).Text_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerName(ReplayTeam(), ReplaySlot()); }).Font(UiFont(17, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
-						]
-					]
-				]
-			]
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 30.0f, 92.0f)
-		[
-			SNew(SBox).WidthOverride(300.0f)
+			SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Ink.CopyWithNewOpacity(.96f)).Padding(0)
 			[
 				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda([]() { return FText::FromString(FlickControlBindings::GetKey(TEXT("ReplaySkip")).GetDisplayName().ToString() + TEXT("  //  VOTE TO SKIP")); }).Font(UiFont(11, true)).ColorAndOpacity(Brand).Justification(ETextJustify::Right)]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+				+ SVerticalBox::Slot().AutoHeight()
 				[
-					SNew(STextBlock).Text_Lambda([this]()
-					{
-						TArray<FString> Pending;
-						if (const AFlickGameState* State = GetScoreboardGameState())
+					SNew(SBox).HeightOverride(2.f)
+					[
+						SNew(SProgressBar)
+						.Style(&ShotClockBarStyle)
+						.Percent_Lambda([this]()
 						{
-							for (const APlayerState* Player : State->GetPendingReplayPlayers())
-								Pending.Add(Player->GetPlayerName().IsEmpty() ? TEXT("PLAYER") : Player->GetPlayerName());
+							if (PlayerController.IsValid())
+							{
+								return TOptional<float>(PlayerController->GetCinematicReplayPresentationProgress());
 							}
-						return FText::FromString(Pending.IsEmpty() ? TEXT("ALL PLAYERS READY TO SKIP") : TEXT("WAITING FOR: ") + FString::Join(Pending, TEXT(", ")));
-					}).Font(UiFont(9)).ColorAndOpacity(Paper).Justification(ETextJustify::Right).AutoWrapText(true)
+							return TOptional<float>(GameMode.IsValid() ? GameMode->GetCinematicReplayProgress() : 0.0f);
+						})
+						.FillColorAndOpacity_Lambda([this, ReplayTeam]() { return FSlateColor(GetTeamAccent(ReplayTeam())); })
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(TAttribute<FMargin>::CreateLambda([this]()
+				{
+					return FMargin(FlickVisualSettings::IsFpsVisible() || bFpsPreview ? 90.f : 24.f, 9.f, 24.f, 9.f);
+				}))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()
+						[SNew(STextBlock).Text(FText::FromString(TEXT("CINEMATIC REPLAY"))).Font(UiFont(9, true)).ColorAndOpacity(Muted)]
+						+ SVerticalBox::Slot().AutoHeight()
+						[SNew(STextBlock).Text_Lambda(ReplayLabel).Font(DisplayFont(16)).ColorAndOpacity(Paper)]
+					]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(18.f, 2.f)
+					[SNew(SBox).WidthOverride(2.f)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor_Lambda([this, ReplayTeam]() { return GetTeamAccent(ReplayTeam()); })]]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SBox).WidthOverride(36.f).HeightOverride(36.f)
+						[
+							SNew(SOverlay)
+							+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerAvatarBrush(ReplayTeam(), ReplaySlot()); })]
+							+ SOverlay::Slot().Padding(8.0f)
+							[SNew(SFlickStatusGlobe).Color(Cyan).Visibility_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerAvatarBrush(ReplayTeam(), ReplaySlot()) ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })]
+						]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(10.f, 0.f)
+					[
+						SNew(STextBlock).Text_Lambda([this, ReplayTeam, ReplaySlot]() { return GetScoreboardPlayerName(ReplayTeam(), ReplaySlot()); })
+						.Font(UiFont(14, true)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SBox).WidthOverride(300.f)
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text_Lambda([]() { return FText::FromString(FlickControlBindings::GetKey(TEXT("ReplaySkip")).GetDisplayName().ToString() + TEXT("  //  VOTE TO SKIP")); }).Font(UiFont(11, true)).ColorAndOpacity(Brand).Justification(ETextJustify::Right)]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
+							[
+								SNew(STextBlock).Text_Lambda([this]()
+								{
+									TArray<FString> Pending;
+									if (const AFlickGameState* State = GetScoreboardGameState())
+									{
+										for (const APlayerState* Player : State->GetPendingReplayPlayers())
+											Pending.Add(Player->GetPlayerName().IsEmpty() ? TEXT("PLAYER") : Player->GetPlayerName());
+										}
+									return FText::FromString(Pending.IsEmpty() ? TEXT("ALL PLAYERS READY TO SKIP") : TEXT("WAITING FOR: ") + FString::Join(Pending, TEXT(", ")));
+								}).Font(UiFont(9)).ColorAndOpacity(Paper).Justification(ETextJustify::Right).AutoWrapText(true)
+							]
+						]
+					]
 				]
 			]
 		];
@@ -610,126 +574,79 @@ TSharedRef<SWidget> SFlickGameLayer::BuildTeamPlate(const EFlickTeam Team)
 			&& (State->MatchPhase == EFlickMatchPhase::Aiming
 				|| State->MatchPhase == EFlickMatchPhase::KickoffPlanning);
 	};
-	TSharedRef<SHorizontalBox> SeriesPips = SNew(SHorizontalBox);
-	for (int32 PipIndex = 0; PipIndex < 3; ++PipIndex)
-	{
-		SeriesPips->AddSlot().AutoWidth().Padding(0.0f, 0.0f, PipIndex == 2 ? 0.0f : 6.0f, 0.0f)
-				[
-					SNew(SFlickRoundPip)
-					.Color_Lambda([this, Team]() { return GetTeamAccent(Team); })
-					.Filled_Lambda([this, Team, PipIndex]()
-					{
-						const AFlickGameState* State = GetScoreboardGameState();
-						const int32 Rounds = State ? (Team == EFlickTeam::Player1 ? State->Player1RoundsWon : State->Player2RoundsWon) : 0;
-						return PipIndex < Rounds;
-					})
-				];
-	}
-
+	const FLinearColor TeamColor = GetTeamAccent(Team);
 	return SNew(SBox)
-		.WidthOverride(218.0f)
-		.HeightOverride(70.0f)
+		.Visibility_Lambda([this]()
+		{
+			return GameMode.IsValid() && (GameMode->IsFreePlayTraining() || GameMode->IsTutorialMode())
+				? EVisibility::Collapsed : EVisibility::HitTestInvisible;
+		})
+		.WidthOverride(163.0f)
+		.HeightOverride(58.0f)
 		[
 			SNew(SOverlay)
 			+ SOverlay::Slot()
 			[
 				SNew(SFlickAngularBorder).RefinedSurface(true)
-			.BackgroundColor(FLinearColor(0.002f, 0.009f, 0.015f, 0.84f))
-			.AccentColor_Lambda([this, Team, IsTeamToPlay]() { return GetTeamAccent(Team).CopyWithNewOpacity(IsTeamToPlay() ? 0.85f : 0.38f); })
-			.CutSize(7.0f)
-			.BorderWidth(1.0f)
-			// Reserve a clear baseline above the shot-clock strip for the rounds/pocketed label.
-			.Padding(FMargin(10.0f, 3.0f, 9.0f, 14.0f))
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().FillWidth(1.0f)
+				.BackgroundColor(FMath::Lerp(Ink, TeamColor, 0.045f).CopyWithNewOpacity(0.96f))
+				.AccentColor(TeamColor.CopyWithNewOpacity(0.55f))
+				.CutSize(5.0f)
+				.BorderWidth(1.0f)
+				.Padding(FMargin(11.0f, 3.0f, 11.0f, 5.0f))
 				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 					[
-						SNew(STextBlock)
-						.Text_Lambda([this, Team]()
-						{
-							const AFlickGameState* State = GetScoreboardGameState();
-							if (GameMode.IsValid() && GameMode->IsTrainingBotMatch())
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							SNew(STextBlock)
+							.Text_Lambda([this, Team]()
 							{
-								return FText::FromString(Team == EFlickTeam::Player1 ? TEXT("YOU") : TEXT("BOT"));
-							}
-							if (GameMode.IsValid() && GameMode->IsFreePlayTraining())
+								if (GameMode.IsValid() && GameMode->IsTrainingBotMatch())
+								{
+									return FText::FromString(Team == EFlickTeam::Player1 ? TEXT("YOU") : TEXT("BOT"));
+								}
+								const AFlickGameState* State = GetScoreboardGameState();
+								return FText::FromString(State && State->PlayersPerTeam > 1
+									? FString::Printf(TEXT("TEAM %d"), GetTeamNumber(Team))
+									: FString::Printf(TEXT("PLAYER %d"), GetTeamNumber(Team)));
+							})
+							.Font(UiFont(11, true)).ColorAndOpacity(TeamColor)
+						]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							SNew(STextBlock).Text_Lambda([this, Team]() { return GetRoundsText(Team); })
+							.Font(UiFont(8, true)).ColorAndOpacity(Paper)
+						]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							SNew(STextBlock).Text(FText::FromString(TEXT("TO PLAY")))
+							.Visibility_Lambda([IsTeamToPlay]() { return IsTeamToPlay() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+							.Font(UiFont(7, true)).ColorAndOpacity(TeamColor)
+						]
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+						[
+							SNew(STextBlock).Text_Lambda([this, Team]() { return GetPieceCountText(Team); })
+							.Font(DisplayFont(21)).ColorAndOpacity(Paper)
+						]
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, -2.0f, 0.0f, 0.0f)
+						[
+							SNew(STextBlock).Text_Lambda([this]()
 							{
-								return FText::FromString(Team == EFlickTeam::Player1 ? TEXT("YOUR PUCKS") : TEXT("TARGETS"));
-							}
-							return FText::FromString(State && State->PlayersPerTeam > 1
-								? FString::Printf(TEXT("TEAM %d"), GetTeamNumber(Team))
-								: FString::Printf(TEXT("PLAYER %d"), GetTeamNumber(Team)));
-						})
-						.Font(UiFont(9, true))
-						.ColorAndOpacity(GetTeamAccent(Team))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 1.0f, 0.0f, 0.0f)
-					[
-						SNew(STextBlock)
-						.Text_Lambda([IsTeamToPlay]() { return FText::FromString(IsTeamToPlay() ? TEXT("TO PLAY") : TEXT("")); })
-						.Font(UiFont(7, true))
-						.ColorAndOpacity(Paper)
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
-					[
-						SNew(SBox)
-						.Visibility_Lambda([this]()
-						{
-							const AFlickGameState* State = GetScoreboardGameState();
-							return (GameMode.IsValid() && GameMode->IsFreePlayTraining())
-								|| (State && State->ActiveMatchVariant == EFlickMatchVariant::Bob)
-								? EVisibility::Collapsed : EVisibility::Visible;
-						})
-						[SeriesPips]
-					]
-					+ SVerticalBox::Slot().FillHeight(1.0f)[SNew(SSpacer)]
-					+ SVerticalBox::Slot().AutoHeight()
-					[
-						SNew(STextBlock)
-						.Text_Lambda([this, Team]() { return GetRoundsText(Team); })
-						.Font(UiFont(8, true))
-						.ColorAndOpacity(Muted)
-					]
-				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(5.0f, -3.0f, 0.0f, 0.0f)
-				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
-					[
-						SNew(STextBlock)
-						.Text_Lambda([this, Team]() { return GetPieceCountText(Team); })
-						.Font(DisplayFont(25))
-						.ColorAndOpacity(Paper)
-					]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, -3.0f, 0.0f, 0.0f)
-					[
-						SNew(STextBlock)
-						.Text_Lambda([this]()
-						{
-							const AFlickGameState* State = GetScoreboardGameState();
-							return FText::FromString(State && State->ActiveMatchVariant == EFlickMatchVariant::Bob ? TEXT("LEFT TO POCKET") : TEXT("PUCKS IN PLAY"));
-						})
-						.Font(UiFont(7, true))
-						.ColorAndOpacity(Muted)
+								const AFlickGameState* State = GetScoreboardGameState();
+								return FText::FromString(State && State->ActiveMatchVariant == EFlickMatchVariant::Bob
+									? TEXT("TO POCKET") : TEXT("IN PLAY"));
+							}).Font(UiFont(7, true)).ColorAndOpacity(Muted)
+						]
 					]
 				]
 			]
-			]
-			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Fill)
-			[
-				SNew(SBox).WidthOverride(2.0f)
-				[
-					SNew(SBorder).BorderImage(WhiteBrush())
-					.BorderBackgroundColor_Lambda([this, Team, IsTeamToPlay]()
-					{
-						return GetTeamAccent(Team).CopyWithNewOpacity(IsTeamToPlay() ? 1.0f : 0.35f);
-					})
-				]
-			]
-			+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(2.0f, 0.0f, 0.0f, 0.0f)
+			+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Bottom).Padding(6.0f, 0.0f, 6.0f, 1.0f)
 			[
 				SNew(SBox)
 				.HeightOverride(2.0f)

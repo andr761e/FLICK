@@ -21,6 +21,14 @@ namespace FlickArenaLighting
 		const FName PuckWideStudioTag(TEXT("FLICK.PuckWideStudio"));
 		const FName PuckGameplayStudioTag(TEXT("FLICK.PuckGameplayStudio"));
 		const FName BobPuckStudioTag(TEXT("FLICK.BobPuckStudio"));
+
+		void SetPuckSoftboxShape(URectLightComponent* Light, bool bFill, float Scale)
+		{
+			// The long key traces the silver crown. A tall soft fill catches the
+			// side bevel as the puck tilts, revealing the thickness of the housing.
+			Light->SetSourceWidth((bFill ? 720.f : 1180.f) * Scale);
+			Light->SetSourceHeight((bFill ? 820.f : 365.f) * Scale);
+		}
 		FName RimSpillTag(int32 Index)
 		{
 			static const auto Tags = []
@@ -92,8 +100,7 @@ namespace FlickArenaLighting
 			const FVector Local(Offset.X, Offset.Y, Offset.Z - 250.f);
 			const FVector Position = FVector(0, 0, ArenaSurfaceZ)
 				+ (ProductFrame ? ProductFrame->RotateVector(Local) : Frame.RotateVector(Local)) * ArenaScale * Coverage;
-			Actor->SetActorLocation(Position);
-			Actor->SetActorRotation((FVector(0.f, 0.f, ArenaSurfaceZ) - Position).Rotation());
+			Actor->SetActorLocationAndRotation(Position, (FVector(0.f, 0.f, ArenaSurfaceZ) - Position).Rotation());
 			if (auto* Light = Actor->RectLightComponent.Get())
 			{
 				// Scale power by area: same centre illumination, much less falloff
@@ -103,8 +110,7 @@ namespace FlickArenaLighting
 				const float KeySpecular = Actor->ActorHasTag(BobPuckStudioTag)
 					? Defaults.BobPuckKeySpecularScale : Defaults.PuckGameplayKeySpecularScale;
 				Light->SetSpecularScale(bFill ? .15f : bGameplayReflection ? KeySpecular : .55f);
-				Light->SetSourceWidth((bFill ? 900.f : 1100.f) * ArenaScale * Coverage);
-				Light->SetSourceHeight((bFill ? 600.f : 650.f) * ArenaScale * Coverage);
+				SetPuckSoftboxShape(Light, bFill, ArenaScale * Coverage);
 				Light->SetAttenuationRadius(2200.f * ArenaScale * Coverage);
 			}
 		};
@@ -552,15 +558,14 @@ namespace FlickArenaLighting
 			}
 			const float Coverage = Actor->ActorHasTag(PuckWideStudioTag) ? Parameters.PuckGameplayCoverageScale : 1.f;
 			Light->SetLightingChannels(false, true, false);
-			Light->SetLightColor(bFill ? FLinearColor(.82f, .9f, 1.f) : FLinearColor(1.f, .97f, .94f));
+			Light->SetLightColor(bFill ? FLinearColor(.76f, .86f, 1.f) : FLinearColor(1.f, .95f, .87f));
 			Light->SetIntensityUnits(ELightUnits::Lumens);
 			Light->SetIntensity((bFill ? Parameters.PuckFillLightLumens : Parameters.PuckFinishLightLumens) * LocalPowerScale * FMath::Square(Coverage));
 			Light->SetDiffuseScale(1.f);
 			// Broad silver bands without a white mirror plate over the crown.
 			const float KeySpecular = bBobArenaLighting ? Parameters.BobPuckKeySpecularScale : Parameters.PuckGameplayKeySpecularScale;
 			Light->SetSpecularScale(bFill ? .15f : Actor->ActorHasTag(PuckGameplayStudioTag) ? KeySpecular : .55f);
-			Light->SetSourceWidth((bFill ? 900.f : 1100.f) * ArenaScale * Coverage);
-			Light->SetSourceHeight((bFill ? 600.f : 650.f) * ArenaScale * Coverage);
+			SetPuckSoftboxShape(Light, bFill, ArenaScale * Coverage);
 			Light->SetAttenuationRadius(2200.f * ArenaScale * Coverage);
 			Light->SetCastShadows(false);
 			Light->SetIndirectLightingIntensity(0.f);

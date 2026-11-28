@@ -629,11 +629,11 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMainMenuButton(
 	else if (Label.Contains(TEXT("SETTINGS"))) Icon = EFlickMainMenuIcon::Settings;
 	else if (Label.Contains(TEXT("QUIT"))) Icon = EFlickMainMenuIcon::Quit;
 
-	const FString Detail = Label == TEXT("PLAY") ? TEXT("Find your next rivalry")
-		: Label == TEXT("LINEUPS") ? TEXT("Build your advantage")
-		: Label == TEXT("PROFILE") ? TEXT("Your record. Your progress.")
-		: Label == TEXT("ITEM SHOP") ? TEXT("Explore the collection")
-		: Label == TEXT("SETTINGS") ? TEXT("Make yourself comfortable") : FString();
+	const FString Detail = Label == TEXT("PLAY") ? TEXT("Matchmaking, private games & training")
+		: Label == TEXT("LINEUPS") ? TEXT("Choose and customize your pucks")
+		: Label == TEXT("PROFILE") ? TEXT("Stats, match history & saved replays")
+		: Label == TEXT("ITEM SHOP") ? TEXT("Coming soon")
+		: Label == TEXT("SETTINGS") ? TEXT("Display, audio & controls") : FString();
 	TSharedRef<SButton> Button = SNew(SButton)
 		.ButtonStyle(&TransparentButtonStyle).ContentPadding(FMargin(28.0f, 0.0f, 25.0f, 0.0f))
 		.HAlign(HAlign_Fill).VAlign(VAlign_Center).OnClicked(OnClicked);
@@ -641,28 +641,26 @@ TSharedRef<SWidget> SFlickGameLayer::MakeMainMenuButton(
 	Button->SetContent(
 		SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 24.0f, 0.0f)
-		[SNew(SFlickMainMenuIcon).Icon(Icon).Color(bPrimary ? Paper : Label == TEXT("ITEM SHOP") ? FlickHomeSurface::Gold : Label == TEXT("SETTINGS") ? Brand : Cyan).Glow(!bPrimary)]
+		[SNew(SFlickMainMenuIcon).Icon(Icon).Color(bPrimary ? Ink : Ice)]
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
-			[SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(bPrimary ? 30 : 21)).ColorAndOpacity(Paper)
-				.ShadowOffset(bPrimary ? FVector2D(0,1) : FVector2D::ZeroVector).ShadowColorAndOpacity(Ink.CopyWithNewOpacity(.55f))]
+			[SNew(STextBlock).Text(FText::FromString(Label)).Font(DisplayFont(bPrimary ? 30 : 21)).ColorAndOpacity(bPrimary ? Ink : Paper)]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 2.0f, 0.0f, 0.0f)
-			[SNew(STextBlock).Text(FText::FromString(Detail)).Font(UiFont(10)).ColorAndOpacity(Paper)
-				.ShadowOffset(bPrimary ? FVector2D(0,1) : FVector2D::ZeroVector).ShadowColorAndOpacity(Ink.CopyWithNewOpacity(.6f))
+			[SNew(STextBlock).Text(FText::FromString(Detail)).Font(UiFont(10)).ColorAndOpacity(bPrimary ? Ink : Muted)
 				.Visibility(Detail.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible)]
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-		[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(21)).ColorAndOpacity(Paper)]);
+		[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(21)).ColorAndOpacity(bPrimary ? Ink : Muted)]);
 	return SNew(SBox).HeightOverride(Height)
 	[
 		SNew(SFlickMainMenuFrame)
-		.StartColor(bPrimary ? Brand : PanelRaised)
-		.EndColor(bPrimary ? Brand : Panel)
+		.StartColor(bPrimary ? BrandHover : FlickHomeSurface::NavigationFace)
+		.EndColor(bPrimary ? Brand : FlickHomeSurface::Midnight)
 		.HoverStartColor(bPrimary ? BrandHover : PanelSheen)
 		.HoverEndColor(bPrimary ? BrandHover : PanelRaised)
-		.BorderColor(bPrimary ? FlickMainMenuStyle::Lime : FLinearColor::FromSRGBColor(FColor(99, 139, 151, 204)))
+		.BorderColor(bPrimary ? BrandHover : Hairline.CopyWithNewOpacity(.32f))
 		.HoverBorderColor(bDanger ? Orange : FlickMainMenuStyle::Ice)
 		.Primary(bPrimary)
 		.HomePresentation(true)

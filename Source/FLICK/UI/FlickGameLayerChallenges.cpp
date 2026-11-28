@@ -37,28 +37,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengeRow(const int32 ChallengeInde
 		.SetBackgroundImage(FSlateRoundedBoxBrush(FLinearColor::FromSRGBColor(FColor(62, 83, 94)), 2.5f))
 		.SetFillImage(FSlateRoundedBoxBrush(FLinearColor::White, 2.5f))
 		.SetMarqueeImage(FSlateNoResource());
-	return SNew(SBox).HeightOverride(bCompact ? 90.0f : 104.0f)
-	[
-		SNew(SFlickMainMenuPanel)
-		.Premium(false)
-		.HomeSurface(bCompact)
-		.BackgroundColor(FlickUITheme::Panel)
-		.AccentColor_Lambda([this, ChallengeIndex, bCompact]()
-		{
-			const auto& Entry = FlickChallengeCatalog::Challenges[ChallengeIndex];
-			return FlickChallengeCatalog::GetProgress(Entry, GetChallengeStats()) >= Entry.Goal ? Brand : Cyan.CopyWithNewOpacity(bCompact ? .55f : 1.f);
-		})
-		.CutSize(9.0f).BorderWidth(bCompact ? .75f : 1.f).Padding(FMargin(bCompact ? 12.0f : 17.0f, 10.0f))
+	const auto Row = SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, bCompact ? 12.0f : 0.0f, 0.0f)
 		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, bCompact ? 12.0f : 0.0f, 0.0f)
-			[
-				SNew(SFlickMainMenuIcon).Icon(Challenge.Metric == EMetric::Shots ? EFlickMainMenuIcon::Target : Challenge.Metric == EMetric::Points ? EFlickMainMenuIcon::Stats : EFlickMainMenuIcon::Whistle)
-				.Color(Challenge.Metric == EMetric::Points ? FlickMainMenuStyle::Ice : Paper).Glow(bCompact && Challenge.Metric == EMetric::Points)
-				.Visibility(bCompact ? EVisibility::HitTestInvisible : EVisibility::Collapsed)
-			]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-			[
+			SNew(SFlickMainMenuIcon).Icon(Challenge.Metric == EMetric::Shots ? EFlickMainMenuIcon::Target : Challenge.Metric == EMetric::Points ? EFlickMainMenuIcon::Stats : EFlickMainMenuIcon::Whistle)
+			.Color(FlickMainMenuStyle::Ice)
+			.Visibility(bCompact ? EVisibility::HitTestInvisible : EVisibility::Collapsed)
+		]
+		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
@@ -71,13 +58,13 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengeRow(const int32 ChallengeInde
 					const auto& Entry = FlickChallengeCatalog::Challenges[ChallengeIndex];
 					const int32 Progress = FMath::Min(FlickChallengeCatalog::GetProgress(Entry, GetChallengeStats()), Entry.Goal);
 					return FText::FromString(FString::Printf(TEXT("%d / %d"), Progress, Entry.Goal));
-				}).Font(UiFont(bCompact ? 10 : 12, true)).ColorAndOpacity(bCompact ? FlickHomeSurface::Gold : Brand)]
+				}).Font(UiFont(bCompact ? 10 : 12, true)).ColorAndOpacity(bCompact ? Paper : Brand)]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, bCompact ? 0.0f : 5.0f, 0.0f, 0.0f)
 			[SNew(STextBlock).Text(FText::FromString(Challenge.Detail)).Font(UiFont(bCompact ? 9 : 11)).ColorAndOpacity(FLinearColor(0.57f, 0.68f, 0.72f)).AutoWrapText(true)]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, bCompact ? 5.0f : 10.0f, 0.0f, 0.0f)
 			[
-				SNew(SBox).WidthOverride(BarWidth).HeightOverride(bCompact ? 7.0f : 6.0f)
+				SNew(SBox).WidthOverride(BarWidth).HeightOverride(bCompact ? 4.0f : 6.0f)
 				[
 					SNew(SProgressBar).Style(&MenuProgressStyle)
 					.BarFillStyle(EProgressBarFillStyle::Scale)
@@ -89,8 +76,26 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengeRow(const int32 ChallengeInde
 					})
 				]
 			]
-			]
-		]
+		];
+	if (bCompact)
+	{
+		return SNew(SBox).HeightOverride(64.f)
+		[
+			SNew(SOverlay)
+			+ SOverlay::Slot().Padding(0, 2, 0, 7)[Row]
+			+ SOverlay::Slot().VAlign(VAlign_Bottom)
+			[SNew(SBox).HeightOverride(1)[SNew(SBorder).Padding(0).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline.CopyWithNewOpacity(.32f))]]
+		];
+	}
+	return SNew(SBox).HeightOverride(104.f)
+	[
+		SNew(SFlickMainMenuPanel).Premium(false).BackgroundColor(FlickUITheme::Panel)
+		.AccentColor_Lambda([this, ChallengeIndex]()
+		{
+			const auto& Entry = FlickChallengeCatalog::Challenges[ChallengeIndex];
+			return FlickChallengeCatalog::GetProgress(Entry, GetChallengeStats()) >= Entry.Goal ? Brand : Cyan;
+		})
+		.CutSize(9).BorderWidth(1).Padding(FMargin(17, 10))[Row]
 	];
 }
 
@@ -114,16 +119,14 @@ TSharedRef<SWidget> SFlickGameLayer::BuildChallengePreview()
 			[SNew(STextBlock).Text(FText::FromString(TEXT("\u2192"))).Font(UiFont(17)).ColorAndOpacity(Paper)]
 		];
 	const TWeakPtr<SButton> WeakViewAll = ViewAllButton;
-	return SNew(SFlickAngularBorder).HomeSurface(true).UseAccentForOutline(true)
-		.BackgroundColor(FlickUITheme::Panel)
-		.AccentColor(Cyan.CopyWithNewOpacity(.65f))
+	return SNew(SFlickAngularBorder).RefinedSurface(true).UseAccentForOutline(true)
+		.BackgroundColor(FlickHomeSurface::NavigationFace)
+		.AccentColor(Cyan.CopyWithNewOpacity(.48f))
 		.CutSize(14.0f).BorderWidth(.8f).Padding(FMargin(18.0f, 19.0f))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
-			[SNew(STextBlock).Text(FText::FromString(TEXT("CHALLENGES  //  NEAR COMPLETION"))).Font(WordmarkTaglineFont(9)).ColorAndOpacity(Brand)]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 18.0f)
-			[SNew(STextBlock).Text(FText::FromString(TEXT("YOUR NEXT MILESTONES"))).Font(DisplayFont(22)).ColorAndOpacity(Paper)]
+			[SNew(STextBlock).Text(FText::FromString(TEXT("CAREER CHALLENGES"))).Font(DisplayFont(20)).ColorAndOpacity(Paper)]
 			+ SVerticalBox::Slot().AutoHeight()
 			[SAssignNew(ChallengePreviewRows, SVerticalBox)]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)

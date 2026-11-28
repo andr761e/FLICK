@@ -154,6 +154,7 @@ private:
 #endif
 	TSharedRef<SWidget> BuildLightingSettings();
 	TSharedRef<SWidget> BuildMatchHud();
+	TSharedRef<SWidget> BuildMatchStatusPlate();
 	TSharedRef<SWidget> BuildCinematicReplayOverlay();
 	TSharedRef<SWidget> BuildScoreboardOverlay(bool bEmbedded = false);
 	TSharedRef<SWidget> BuildScoreboardTeamSection(EFlickTeam Team);

@@ -62,8 +62,8 @@ TSharedRef<SWidget> SFlickGameLayer::BuildHomeStatusPanel()
 		SNew(SOverlay)
 		+ SOverlay::Slot()
 		[
-			SNew(SFlickAngularBorder).HomeSurface(true).BackgroundColor(Panel.CopyWithNewOpacity(.97f))
-			.AccentColor(Cyan.CopyWithNewOpacity(.65f)).UseAccentForOutline(true).CutSize(14).BorderWidth(.8f).Padding(FMargin(18, 10))
+			SNew(SFlickAngularBorder).RefinedSurface(true).BackgroundColor(FlickHomeSurface::NavigationFace)
+			.AccentColor(Cyan.CopyWithNewOpacity(.48f)).UseAccentForOutline(true).CutSize(14).BorderWidth(.8f).Padding(FMargin(18, 10))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 17, 0)
@@ -82,17 +82,15 @@ TSharedRef<SWidget> SFlickGameLayer::BuildHomeStatusPanel()
 						const auto Queue = RankQueue();
 						return FText::FromString(Queue.Key == EFlickMatchVariant::Bob ? TEXT("BOB 1V1 CURRENT RANK")
 							: FString::Printf(TEXT("%dV%d CURRENT RANK"), Queue.Value, Queue.Value));
-					}).Font(DisplayFont(12)).ColorAndOpacity_Lambda([ChangePulse]() { return FMath::Lerp(Paper, Cyan, ChangePulse()); })]
+					}).Font(DisplayFont(12)).ColorAndOpacity_Lambda([ChangePulse]() { return FMath::Lerp(Muted, Cyan, ChangePulse()); })]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0, 3, 0, 0)
 					[SNew(STextBlock).Text_Lambda([this, RankQueue]() {
 						const auto* Ranking = GetRankingSubsystem();
 						const auto Queue = RankQueue();
 						return FText::FromString(Ranking ? Ranking->GetDisplayProgressLabel(Queue.Key, Queue.Value) : TEXT("UNAVAILABLE"));
-					}).Font(DisplayFont(16)).ColorAndOpacity(FlickHomeSurface::Gold).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
+					}).Font(DisplayFont(16)).ColorAndOpacity(Paper).OverflowPolicy(ETextOverflowPolicy::Ellipsis)]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0)[RankSteps]
 				]
-				+ SHorizontalBox::Slot().AutoWidth().Padding(0, 0, 14, 0)
-				[SNew(SBox).WidthOverride(1)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Hairline)]]
 				+ SHorizontalBox::Slot().AutoWidth()
 				[SNew(SBox).WidthOverride(1)[SNew(SBorder).BorderImage(WhiteBrush()).BorderBackgroundColor(Cyan.CopyWithNewOpacity(.3f))]]
 				+ SHorizontalBox::Slot().AutoWidth()[Social]

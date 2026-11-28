@@ -38,13 +38,13 @@ namespace FlickArenaLighting
 		float TestPuckRimLightIntensity = 150.0f;
 		// Fixed product-lighting rig on channel 1, independent of arena sliders.
 		float PuckFinishLightLumens = 1500.0f;
-		float PuckFillLightLumens = 750.0f;
+		float PuckFillLightLumens = 840.0f;
 		// Larger virtual studio keeps near/far board positions in similar light.
 		float PuckGameplayCoverageScale = 4.f;
 		// Reflection-aligned key needs less energy than the off-axis locker key.
-		float PuckGameplayKeySpecularScale = .055f;
+		float PuckGameplayKeySpecularScale = .048f;
 		// Smaller BOB coins need a clearer silver highlight at rack-view size.
-		float BobPuckKeySpecularScale = .10f;
+		float BobPuckKeySpecularScale = .085f;
 		FVector PuckKeyOffset = FVector(-450.f, 900.f, 1050.f);
 		FVector PuckFillOffset = FVector(600.f, -350.f, 1150.f);
 		FVector DeckKeyOffset = FVector(-520.f, 1100.f, 1150.f);
